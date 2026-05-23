@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
   );
 
   const allowance = await prisma.weeklyAllowance.upsert({
-    where: existing ? { id: existing.id } : { memberId_weekStart: { memberId, weekStart } } as never,
+    where: { memberId_weekStart: { memberId, weekStart } },
     create: { memberId, weekStart, pointsEarned, amountEarned },
     update: { amountEarned },
   });

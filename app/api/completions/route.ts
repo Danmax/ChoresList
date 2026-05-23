@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     });
 
     await prisma.weeklyAllowance.upsert({
-      where: { memberId_weekStart: { memberId, weekStart } } as never,
+      where: { memberId_weekStart: { memberId, weekStart } },
       create: { memberId, weekStart, pointsEarned: pts, amountEarned: 0 },
       update: { pointsEarned: { increment: pts } },
     });

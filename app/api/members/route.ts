@@ -30,11 +30,19 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   const body = await req.json();
-  const { id, ...data } = body;
-  const level = data.totalPoints !== undefined ? getLevelFromPoints(data.totalPoints) : undefined;
+  const { id } = body;
+  const level = body.totalPoints !== undefined ? getLevelFromPoints(body.totalPoints) : undefined;
   const member = await prisma.familyMember.update({
     where: { id },
-    data: { ...data, ...(level !== undefined && { level }) },
+    data: {
+      ...(body.name !== undefined && { name: body.name }),
+      ...(body.age !== undefined && { age: body.age }),
+      ...(body.role !== undefined && { role: body.role }),
+      ...(body.avatar !== undefined && { avatar: body.avatar }),
+      ...(body.color !== undefined && { color: body.color }),
+      ...(body.totalPoints !== undefined && { totalPoints: body.totalPoints }),
+      ...(level !== undefined && { level }),
+    },
   });
   return NextResponse.json(member);
 }

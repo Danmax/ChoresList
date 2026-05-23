@@ -9,6 +9,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+const ROLE_OPTIONS = [
+  { value: "child", label: "👦 Child" },
+  { value: "mom", label: "👩 Mom" },
+  { value: "dad", label: "👨 Dad" },
+  { value: "parent", label: "🧑 Parent" },
+];
+
+const PARENT_AVATARS = ["👩", "👨", "👩‍🦱", "👨‍🦱", "👩‍🦳", "👨‍🦳", "👩‍🦰", "👨‍🦰"];
+
 interface Member {
   id: number;
   name: string;
@@ -99,7 +108,10 @@ export default function MembersPage() {
             <div className="text-5xl">{m.avatar}</div>
             <div className="flex-1">
               <p className="font-black text-slate-800 text-lg">{m.name}</p>
-              <p className="text-slate-400 font-semibold text-sm">Age {m.age} • {m.role}</p>
+              <p className="text-slate-400 font-semibold text-sm capitalize">
+                {ROLE_OPTIONS.find((r) => r.value === m.role)?.label ?? m.role}
+                {m.role === "child" || m.role === "parent" ? ` • Age ${m.age}` : ""}
+              </p>
               <p className="text-slate-500 text-sm font-semibold">⭐ {m.totalPoints} pts • Lv.{m.level}</p>
             </div>
             <button
@@ -127,40 +139,72 @@ export default function MembersPage() {
           </DialogHeader>
           {editing && (
             <div className="space-y-4">
+              {/* Role selector */}
+              <div>
+                <Label className="font-bold mb-2 block">Who is this?</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {ROLE_OPTIONS.map((r) => (
+                    <button
+                      key={r.value}
+                      onClick={() => setEditing((p) => ({ ...p!, role: r.value }))}
+                      className={`py-2 px-3 rounded-xl font-bold text-sm transition-all border-2 ${
+                        editing.role === r.value
+                          ? "bg-violet-100 border-violet-400 text-violet-700"
+                          : "bg-slate-50 border-transparent text-slate-600 hover:bg-slate-100"
+                      }`}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div>
                 <Label className="font-bold">Name</Label>
                 <Input
                   value={editing.name ?? ""}
                   onChange={(e) => setEditing((p) => ({ ...p!, name: e.target.value }))}
-                  placeholder="Child's name"
+                  placeholder={editing.role === "mom" ? "Mom's name" : editing.role === "dad" ? "Dad's name" : "Child's name"}
                   className="rounded-xl mt-1"
                 />
               </div>
-              <div>
-                <Label className="font-bold">Age</Label>
-                <Input
-                  type="number"
-                  value={editing.age ?? 8}
-                  min={2}
-                  max={18}
-                  onChange={(e) => setEditing((p) => ({ ...p!, age: parseInt(e.target.value) }))}
-                  className="rounded-xl mt-1"
-                />
-              </div>
+
+              {(editing.role === "child" || editing.role === "parent") && (
+                <div>
+                  <Label className="font-bold">Age</Label>
+                  <Input
+                    type="number"
+                    value={editing.age ?? 8}
+                    min={2}
+                    max={99}
+                    onChange={(e) => setEditing((p) => ({ ...p!, age: parseInt(e.target.value) }))}
+                    className="rounded-xl mt-1"
+                  />
+                </div>
+              )}
+
               <div>
                 <Label className="font-bold mb-2 block">Avatar</Label>
                 <div className="flex flex-wrap gap-2">
-                  {AVATAR_OPTIONS.map((a) => (
+                  {(editing.role === "mom" || editing.role === "dad" || editing.role === "parent"
+                    ? PARENT_AVATARS
+                    : AVATAR_OPTIONS
+                  ).map((a) => (
                     <button
                       key={a}
                       onClick={() => setEditing((p) => ({ ...p!, avatar: a }))}
-                      className={`text-2xl p-2 rounded-xl transition-all ${editing.avatar === a ? "bg-violet-100 ring-2 ring-violet-400 scale-110" : "hover:bg-slate-100"}`}
+                      className={`text-2xl p-2 rounded-xl transition-all ${
+                        editing.avatar === a
+                          ? "bg-violet-100 ring-2 ring-violet-400 scale-110"
+                          : "hover:bg-slate-100"
+                      }`}
                     >
                       {a}
                     </button>
                   ))}
                 </div>
               </div>
+
               <div>
                 <Label className="font-bold mb-2 block">Color</Label>
                 <div className="flex gap-2 flex-wrap">
@@ -168,12 +212,15 @@ export default function MembersPage() {
                     <button
                       key={c}
                       onClick={() => setEditing((p) => ({ ...p!, color: c }))}
-                      className={`w-8 h-8 rounded-full transition-all ${editing.color === c ? "scale-125 ring-2 ring-offset-2 ring-slate-400" : ""}`}
+                      className={`w-8 h-8 rounded-full transition-all ${
+                        editing.color === c ? "scale-125 ring-2 ring-offset-2 ring-slate-400" : ""
+                      }`}
                       style={{ backgroundColor: c }}
                     />
                   ))}
                 </div>
               </div>
+
               <button
                 onClick={save}
                 className="w-full bg-violet-500 text-white rounded-xl py-3 font-black flex items-center justify-center gap-2 hover:bg-violet-600 transition-colors"

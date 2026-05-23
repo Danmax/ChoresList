@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { ArrowLeft, Plus, Wand2, BookOpen, ChevronRight, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Wand2, BookOpen, ChevronRight, Trash2, Pencil } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { CHORE_CATEGORIES } from "@/types";
@@ -38,6 +38,7 @@ export default function ChoresPage() {
   const [generating, setGenerating] = useState(false);
   const [showNewChore, setShowNewChore] = useState(false);
   const [newChore, setNewChore] = useState({ name: "", icon: "✅", color: "#e0e7ff", ageMin: 6, ageMax: 18, pointsValue: 10, category: "other", requiresPhoto: false });
+  const [editingChore, setEditingChore] = useState<Chore | null>(null);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/chores");
@@ -101,6 +102,18 @@ export default function ChoresPage() {
     });
     toast.success("Instructions saved!");
     setEditingInstructions(null);
+    load();
+  }
+
+  async function saveEditChore() {
+    if (!editingChore || !editingChore.name) { toast.error("Name required"); return; }
+    await fetch("/api/chores", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(editingChore),
+    });
+    toast.success("Chore updated!");
+    setEditingChore(null);
     load();
   }
 
@@ -182,6 +195,12 @@ export default function ChoresPage() {
               </div>
             </div>
             <div className="flex gap-2">
+              <button
+                onClick={() => setEditingChore({ ...chore })}
+                className="flex items-center gap-1 bg-slate-50 text-slate-600 rounded-xl px-3 py-1.5 text-sm font-bold hover:bg-slate-100 transition-colors"
+              >
+                <Pencil size={14} /> Edit
+              </button>
               <button
                 onClick={() => openInstructions(chore)}
                 className="flex items-center gap-1 bg-indigo-50 text-indigo-600 rounded-xl px-3 py-1.5 text-sm font-bold hover:bg-indigo-100 transition-colors"
@@ -410,6 +429,102 @@ export default function ChoresPage() {
               Add Chore
             </button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Chore Dialog */}
+      <Dialog open={!!editingChore} onOpenChange={(o) => !o && setEditingChore(null)}>
+        <DialogContent className="max-w-md rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="font-black">Edit Chore</DialogTitle>
+          </DialogHeader>
+          {editingChore && (
+            <div className="space-y-4">
+              <div className="flex gap-3">
+                <div className="w-20">
+                  <Label className="font-bold">Icon</Label>
+                  <Input
+                    value={editingChore.icon}
+                    onChange={(e) => setEditingChore((p) => p && ({ ...p, icon: e.target.value }))}
+                    className="rounded-xl mt-1 text-center text-2xl"
+                    maxLength={2}
+                  />
+                </div>
+                <div className="flex-1">
+                  <Label className="font-bold">Name</Label>
+                  <Input
+                    value={editingChore.name}
+                    onChange={(e) => setEditingChore((p) => p && ({ ...p, name: e.target.value }))}
+                    className="rounded-xl mt-1"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label className="font-bold">Card Color</Label>
+                <div className="flex items-center gap-3 mt-1">
+                  <input
+                    type="color"
+                    value={editingChore.color}
+                    onChange={(e) => setEditingChore((p) => p && ({ ...p, color: e.target.value }))}
+                    className="w-10 h-10 rounded-xl border border-slate-200 cursor-pointer"
+                  />
+                  <span className="text-sm font-semibold text-slate-500">{editingChore.color}</span>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <Label className="font-bold">Age Min</Label>
+                  <Input type="number" value={editingChore.ageMin} min={2} max={18}
+                    onChange={(e) => setEditingChore((p) => p && ({ ...p, ageMin: parseInt(e.target.value) }))}
+                    className="rounded-xl mt-1" />
+                </div>
+                <div>
+                  <Label className="font-bold">Age Max</Label>
+                  <Input type="number" value={editingChore.ageMax} min={2} max={18}
+                    onChange={(e) => setEditingChore((p) => p && ({ ...p, ageMax: parseInt(e.target.value) }))}
+                    className="rounded-xl mt-1" />
+                </div>
+                <div>
+                  <Label className="font-bold">Points</Label>
+                  <Input type="number" value={editingChore.pointsValue} min={1} max={100}
+                    onChange={(e) => setEditingChore((p) => p && ({ ...p, pointsValue: parseInt(e.target.value) }))}
+                    className="rounded-xl mt-1" />
+                </div>
+              </div>
+              <div>
+                <Label className="font-bold">Category</Label>
+                <Select
+                  value={editingChore.category}
+                  onValueChange={(v) => setEditingChore((p) => p && ({ ...p, category: v ?? "other" }))}
+                >
+                  <SelectTrigger className="rounded-xl mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {CHORE_CATEGORIES.map((c) => (
+                      <SelectItem key={c.value} value={c.value}>{c.icon} {c.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="edit-requires-photo"
+                  checked={editingChore.requiresPhoto}
+                  onChange={(e) => setEditingChore((p) => p && ({ ...p, requiresPhoto: e.target.checked }))}
+                  className="w-5 h-5 rounded"
+                />
+                <Label htmlFor="edit-requires-photo" className="font-bold cursor-pointer">
+                  📸 Requires before/after photo proof
+                </Label>
+              </div>
+              <button
+                onClick={saveEditChore}
+                className="w-full bg-slate-800 text-white rounded-xl py-3 font-black hover:bg-slate-700 transition-colors"
+              >
+                Save Changes
+              </button>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

@@ -112,6 +112,8 @@ model WeeklyAllowance {
   paidOut      Boolean  @default(false)
 
   member FamilyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, weekStart])
 }
 
 model AllowanceSettings {
