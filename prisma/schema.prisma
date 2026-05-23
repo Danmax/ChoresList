@@ -1,0 +1,150 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model FamilyMember {
+  id          Int      @id @default(autoincrement())
+  name        String
+  age         Int
+  role        String   @default("child")
+  avatar      String   @default("🧒")
+  color       String   @default("#a78bfa")
+  totalPoints Int      @default(0)
+  level       Int      @default(1)
+  createdAt   DateTime @default(now())
+
+  assignments      ChoreAssignment[]
+  completions      TaskCompletion[]
+  allowances       WeeklyAllowance[]
+  skills           MemberSkill[]
+  allowanceSetting AllowanceSettings?
+}
+
+model Chore {
+  id            Int     @id @default(autoincrement())
+  name          String
+  description   String?
+  icon          String  @default("✅")
+  color         String  @default("#e0e7ff")
+  ageMin        Int     @default(3)
+  ageMax        Int     @default(18)
+  pointsValue   Int     @default(10)
+  category      String  @default("other")
+  requiresPhoto Boolean @default(false)
+
+  assignments  ChoreAssignment[]
+  skillLinks   ChoreSkill[]
+  instructions ChoreInstructions?
+}
+
+model ChoreAssignment {
+  id        Int       @id @default(autoincrement())
+  memberId  Int
+  choreId   Int
+  frequency String    @default("daily")
+  dueDate   DateTime?
+  dayOfWeek Int?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+
+  member      FamilyMember     @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  chore       Chore            @relation(fields: [choreId], references: [id], onDelete: Cascade)
+  completions TaskCompletion[]
+}
+
+model TaskCompletion {
+  id               Int      @id @default(autoincrement())
+  assignmentId     Int
+  memberId         Int
+  completedAt      DateTime @default(now())
+  photoBeforePath  String?
+  photoAfterPath   String?
+  pointsEarned     Int      @default(0)
+  verifiedByParent Boolean  @default(false)
+  weekStartDate    DateTime @default(now())
+
+  assignment ChoreAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  member     FamilyMember    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+}
+
+model SkillCategory {
+  id   Int    @id @default(autoincrement())
+  name String
+  icon String @default("⭐")
+
+  chores  ChoreSkill[]
+  members MemberSkill[]
+}
+
+model ChoreSkill {
+  choreId Int
+  skillId Int
+
+  chore Chore         @relation(fields: [choreId], references: [id], onDelete: Cascade)
+  skill SkillCategory @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([choreId, skillId])
+}
+
+model MemberSkill {
+  memberId Int
+  skillId  Int
+  xp       Int @default(0)
+  level    Int @default(1)
+
+  member FamilyMember  @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  skill  SkillCategory @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([memberId, skillId])
+}
+
+model WeeklyAllowance {
+  id           Int      @id @default(autoincrement())
+  memberId     Int
+  weekStart    DateTime
+  pointsEarned Int      @default(0)
+  amountEarned Float    @default(0)
+  paidOut      Boolean  @default(false)
+
+  member FamilyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+}
+
+model AllowanceSettings {
+  id             Int   @id @default(autoincrement())
+  memberId       Int   @unique
+  weeklyBaseRate Float @default(0)
+  pointsToDollar Float @default(0.10)
+
+  member FamilyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+}
+
+model ChoreInstructions {
+  id          Int      @id @default(autoincrement())
+  choreId     Int      @unique
+  steps       String   @default("[]")
+  tips        String   @default("[]")
+  safetyNotes String   @default("[]")
+  aiGenerated Boolean  @default(true)
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  chore Chore @relation(fields: [choreId], references: [id], onDelete: Cascade)
+}
+
+model FamilyEvent {
+  id        Int       @id @default(autoincrement())
+  title     String
+  eventType String    @default("other")
+  date      DateTime
+  endDate   DateTime?
+  allDay    Boolean   @default(true)
+  recurring String    @default("none")
+  notes     String?
+  color     String    @default("#fbbf24")
+  icon      String    @default("📅")
+  createdAt DateTime  @default(now())
+}
