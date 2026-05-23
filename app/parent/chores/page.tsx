@@ -137,6 +137,17 @@ export default function ChoresPage() {
     load();
   }
 
+  async function adjustPoints(chore: Chore, delta: number) {
+    const next = Math.min(200, Math.max(5, chore.pointsValue + delta));
+    if (next === chore.pointsValue) return;
+    await fetch("/api/chores", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...chore, pointsValue: next }),
+    });
+    load();
+  }
+
   const filtered = filterCat === "all" ? chores : chores.filter((c) => c.category === filterCat);
 
   return (
@@ -188,9 +199,19 @@ export default function ChoresPage() {
                   <Badge className="bg-emerald-100 text-emerald-700 text-xs font-bold">Has Guide ✓</Badge>
                 )}
               </div>
-              <div className="flex gap-3 mt-1 text-xs font-semibold text-slate-500">
+              <div className="flex gap-3 mt-1 text-xs font-semibold text-slate-500 items-center">
                 <span>Ages {chore.ageMin}–{chore.ageMax}</span>
-                <span>⭐ {chore.pointsValue} pts</span>
+                <span className="flex items-center gap-1">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); adjustPoints(chore, -5); }}
+                    className="w-5 h-5 rounded-full bg-slate-100 hover:bg-red-100 text-slate-500 hover:text-red-500 flex items-center justify-center font-black transition-colors"
+                  >−</button>
+                  <span className="font-black text-violet-600">⭐ {chore.pointsValue} pts</span>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); adjustPoints(chore, 5); }}
+                    className="w-5 h-5 rounded-full bg-slate-100 hover:bg-emerald-100 text-slate-500 hover:text-emerald-600 flex items-center justify-center font-black transition-colors"
+                  >+</button>
+                </span>
                 <span>{CHORE_CATEGORIES.find((c) => c.value === chore.category)?.icon} {chore.category}</span>
               </div>
             </div>
