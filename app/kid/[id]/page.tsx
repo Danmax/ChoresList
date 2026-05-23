@@ -150,6 +150,12 @@ export default function KidPage() {
         <button onClick={() => router.push("/")} className="bg-white rounded-2xl p-2 shadow-sm hover:shadow-md transition-shadow">
           <ArrowLeft size={20} className="text-slate-600" />
         </button>
+        <Link
+          href={`/kid/${id}/wishlist`}
+          className="ml-auto mr-0 flex items-center gap-1.5 bg-white text-violet-600 rounded-2xl px-3 py-2 text-sm font-black shadow-sm hover:shadow-md transition-shadow"
+        >
+          🌟 Wish List
+        </Link>
         <div className="flex-1">
           <div className="flex items-center gap-3">
             <span className="text-4xl">{member.avatar}</span>

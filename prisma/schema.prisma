@@ -23,6 +23,7 @@ model FamilyMember {
   allowances       WeeklyAllowance[]
   skills           MemberSkill[]
   allowanceSetting AllowanceSettings?
+  wishList         WishListItem[]
 }
 
 model Chore {
@@ -135,6 +136,19 @@ model ChoreInstructions {
   updatedAt   DateTime @default(now()) @updatedAt
 
   chore Chore @relation(fields: [choreId], references: [id], onDelete: Cascade)
+}
+
+model WishListItem {
+  id        Int      @id @default(autoincrement())
+  memberId  Int
+  title     String
+  category  String   @default("other")
+  emoji     String   @default("🎁")
+  note      String?
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+
+  member FamilyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
 }
 
 model FamilyEvent {

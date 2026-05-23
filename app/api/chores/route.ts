@@ -21,8 +21,20 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   const body = await req.json();
-  const { id, ...data } = body;
-  const chore = await prisma.chore.update({ where: { id }, data });
+  const chore = await prisma.chore.update({
+    where: { id: body.id },
+    data: {
+      ...(body.name !== undefined && { name: body.name }),
+      ...(body.description !== undefined && { description: body.description }),
+      ...(body.icon !== undefined && { icon: body.icon }),
+      ...(body.color !== undefined && { color: body.color }),
+      ...(body.ageMin !== undefined && { ageMin: body.ageMin }),
+      ...(body.ageMax !== undefined && { ageMax: body.ageMax }),
+      ...(body.pointsValue !== undefined && { pointsValue: body.pointsValue }),
+      ...(body.category !== undefined && { category: body.category }),
+      ...(body.requiresPhoto !== undefined && { requiresPhoto: body.requiresPhoto }),
+    },
+  });
   return NextResponse.json(chore);
 }
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Users, ListChecks, CalendarDays, DollarSign, BookOpen, Home, BarChart2 } from "lucide-react";
+import { Users, ListChecks, CalendarDays, DollarSign, BookOpen, Home, BarChart2, Gift } from "lucide-react";
 
 const PARENT_PIN = "1234";
 
@@ -101,7 +101,8 @@ export default function ParentPanel() {
     { href: "/parent/assign", icon: CalendarDays, label: "Assign Chores", desc: "Set daily, weekly & special tasks", color: "#34d399", bg: "#d1fae5" },
     { href: "/parent/allowance", icon: DollarSign, label: "Allowance", desc: "Review points, pay out credits", color: "#fbbf24", bg: "#fef3c7" },
     { href: "/parent/reports", icon: BarChart2, label: "Reports", desc: "Charts, completions & points trends", color: "#10b981", bg: "#d1fae5" },
-    { href: "/calendar", icon: BookOpen, label: "Family Calendar", desc: "Schedule events & activities", color: "#f472b6", bg: "#fce7f3" },
+    { href: "/parent/wishlist", icon: Gift, label: "Wish Lists", desc: "Grant kids' wishes & requests", color: "#f472b6", bg: "#fce7f3" },
+    { href: "/calendar", icon: BookOpen, label: "Family Calendar", desc: "Schedule events & activities", color: "#f97316", bg: "#ffedd5" },
   ];
 
   return (

@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { ArrowLeft, Plus, Wand2, BookOpen, ChevronRight, Trash2, Pencil } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { CHORE_CATEGORIES } from "@/types";
+import { CHORE_CATEGORIES, CHORE_EMOJIS } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -39,6 +39,7 @@ export default function ChoresPage() {
   const [showNewChore, setShowNewChore] = useState(false);
   const [newChore, setNewChore] = useState({ name: "", icon: "✅", color: "#e0e7ff", ageMin: 6, ageMax: 18, pointsValue: 10, category: "other", requiresPhoto: false });
   const [editingChore, setEditingChore] = useState<Chore | null>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState<"new" | "edit" | null>(null);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/chores");
@@ -393,12 +394,12 @@ export default function ChoresPage() {
             <div className="flex gap-3">
               <div className="w-20">
                 <Label className="font-bold">Icon</Label>
-                <Input
-                  value={newChore.icon}
-                  onChange={(e) => setNewChore((p) => ({ ...p, icon: e.target.value }))}
-                  className="rounded-xl mt-1 text-center text-2xl"
-                  maxLength={2}
-                />
+                <button
+                  onClick={() => setShowEmojiPicker(showEmojiPicker === "new" ? null : "new")}
+                  className="mt-1 w-full h-10 rounded-xl border border-slate-200 bg-slate-50 text-2xl flex items-center justify-center hover:bg-slate-100 transition-colors"
+                >
+                  {newChore.icon}
+                </button>
               </div>
               <div className="flex-1">
                 <Label className="font-bold">Name</Label>
@@ -410,6 +411,17 @@ export default function ChoresPage() {
                 />
               </div>
             </div>
+            {showEmojiPicker === "new" && (
+              <div className="flex flex-wrap gap-1.5 p-3 bg-slate-50 rounded-2xl max-h-40 overflow-y-auto border border-slate-200">
+                {CHORE_EMOJIS.map((e) => (
+                  <button
+                    key={e}
+                    onClick={() => { setNewChore((p) => ({ ...p, icon: e })); setShowEmojiPicker(null); }}
+                    className={`text-2xl p-1.5 rounded-xl hover:bg-white transition-colors ${newChore.icon === e ? "bg-violet-100 ring-2 ring-violet-400" : ""}`}
+                  >{e}</button>
+                ))}
+              </div>
+            )}
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <Label className="font-bold">Age Min</Label>
@@ -464,12 +476,12 @@ export default function ChoresPage() {
               <div className="flex gap-3">
                 <div className="w-20">
                   <Label className="font-bold">Icon</Label>
-                  <Input
-                    value={editingChore.icon}
-                    onChange={(e) => setEditingChore((p) => p && ({ ...p, icon: e.target.value }))}
-                    className="rounded-xl mt-1 text-center text-2xl"
-                    maxLength={2}
-                  />
+                  <button
+                    onClick={() => setShowEmojiPicker(showEmojiPicker === "edit" ? null : "edit")}
+                    className="mt-1 w-full h-10 rounded-xl border border-slate-200 bg-slate-50 text-2xl flex items-center justify-center hover:bg-slate-100 transition-colors"
+                  >
+                    {editingChore.icon}
+                  </button>
                 </div>
                 <div className="flex-1">
                   <Label className="font-bold">Name</Label>
@@ -480,6 +492,17 @@ export default function ChoresPage() {
                   />
                 </div>
               </div>
+              {showEmojiPicker === "edit" && (
+                <div className="flex flex-wrap gap-1.5 p-3 bg-slate-50 rounded-2xl max-h-40 overflow-y-auto border border-slate-200">
+                  {CHORE_EMOJIS.map((e) => (
+                    <button
+                      key={e}
+                      onClick={() => { setEditingChore((p) => p && ({ ...p, icon: e })); setShowEmojiPicker(null); }}
+                      className={`text-2xl p-1.5 rounded-xl hover:bg-white transition-colors ${editingChore.icon === e ? "bg-violet-100 ring-2 ring-violet-400" : ""}`}
+                    >{e}</button>
+                  ))}
+                </div>
+              )}
               <div>
                 <Label className="font-bold">Card Color</Label>
                 <div className="flex items-center gap-3 mt-1">

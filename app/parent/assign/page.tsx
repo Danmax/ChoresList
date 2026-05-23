@@ -40,8 +40,7 @@ export default function AssignPage() {
       fetch("/api/chores"),
       fetch("/api/assignments"),
     ]);
-    const mData: Member[] = await mRes.json();
-    setMembers(mData.filter((m) => m.role !== "parent") as Member[]);
+    setMembers(await mRes.json());
     setChores(await cRes.json());
     setAssignments(await aRes.json());
   }, []);
@@ -70,15 +69,15 @@ export default function AssignPage() {
     load();
   }
 
-  const kidMembers = members.filter((m) => m.role !== "parent");
   const filteredAssignments = selectedMember
     ? assignments.filter((a) => a.memberId === parseInt(selectedMember))
     : assignments;
 
-  const availableChores = form.memberId
+  const selectedMemberObj = members.find((m) => m.id === form.memberId);
+  const availableChores = selectedMemberObj
     ? chores.filter((c) => {
-        const member = members.find((m) => m.id === form.memberId);
-        return member ? c.ageMin <= member.age && c.ageMax >= member.age : true;
+        const isParent = selectedMemberObj.role === "parent" || selectedMemberObj.role === "mom" || selectedMemberObj.role === "dad";
+        return isParent ? true : c.ageMin <= selectedMemberObj.age && c.ageMax >= selectedMemberObj.age;
       })
     : chores;
 
@@ -103,7 +102,7 @@ export default function AssignPage() {
           onClick={() => setSelectedMember("")}
           className={`px-4 py-2 rounded-full font-bold text-sm transition-colors ${!selectedMember ? "bg-slate-800 text-white" : "bg-white text-slate-600"}`}
         >
-          All Kids
+          Everyone
         </button>
         {members.map((m) => (
           <button
@@ -153,14 +152,17 @@ export default function AssignPage() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label className="font-bold">Child</Label>
+              <Label className="font-bold">Family Member</Label>
               <Select onValueChange={(v) => { const id = Number(v); setForm((p) => ({ ...p, memberId: isNaN(id) ? 0 : id, choreId: 0 })); }}>
                 <SelectTrigger className="rounded-xl mt-1">
-                  <SelectValue placeholder="Select a child" />
+                  <SelectValue placeholder="Select a family member" />
                 </SelectTrigger>
                 <SelectContent>
-                  {kidMembers.map((m) => (
-                    <SelectItem key={m.id} value={String(m.id)}>{m.avatar} {m.name} (age {m.age})</SelectItem>
+                  {members.map((m) => (
+                    <SelectItem key={m.id} value={String(m.id)}>
+                      {m.avatar} {m.name}
+                      {m.role === "child" ? ` (age ${m.age})` : ` — ${m.role}`}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>

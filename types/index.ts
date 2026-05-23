@@ -41,12 +41,85 @@ export const CHORE_CATEGORIES = [
   { value: "other", label: "Other", icon: "✅" },
 ];
 
+// Kid avatars with skin tone variants
 export const AVATAR_OPTIONS = [
-  "🧒", "👦", "👧", "🧑", "👶", "🦸", "🧙", "🐶",
-  "🐱", "🦊", "🐸", "🐼", "🦁", "🐯", "🐻", "🐨",
+  // Default (no skin tone)
+  "🧒", "👦", "👧",
+  // Light skin 🏻
+  "🧒🏻", "👦🏻", "👧🏻",
+  // Medium-light 🏼
+  "🧒🏼", "👦🏼", "👧🏼",
+  // Medium 🏽
+  "🧒🏽", "👦🏽", "👧🏽",
+  // Medium-dark 🏾
+  "🧒🏾", "👦🏾", "👧🏾",
+  // Dark 🏿
+  "🧒🏿", "👦🏿", "👧🏿",
+  // Baby/toddler
+  "👶", "👶🏻", "👶🏼", "👶🏽", "👶🏾", "👶🏿",
+  // Fun characters (no skin tone)
+  "🦸", "🧙", "🐶", "🐱", "🦊", "🐸", "🐼", "🦁", "🐯", "🐻", "🐨",
+];
+
+// Parent/adult avatars with skin tone variants
+export const PARENT_AVATARS = [
+  // Woman — all skin tones
+  "👩", "👩🏻", "👩🏼", "👩🏽", "👩🏾", "👩🏿",
+  // Man — all skin tones
+  "👨", "👨🏻", "👨🏼", "👨🏽", "👨🏾", "👨🏿",
+  // Person — all skin tones
+  "🧑", "🧑🏻", "🧑🏼", "🧑🏽", "🧑🏾", "🧑🏿",
+  // Curly hair
+  "👩‍🦱", "👩🏻‍🦱", "👩🏼‍🦱", "👩🏽‍🦱", "👩🏾‍🦱", "👩🏿‍🦱",
+  "👨‍🦱", "👨🏻‍🦱", "👨🏼‍🦱", "👨🏽‍🦱", "👨🏾‍🦱", "👨🏿‍🦱",
+  // White/grey hair
+  "👩‍🦳", "👩🏻‍🦳", "👩🏼‍🦳", "👩🏽‍🦳", "👩🏾‍🦳", "👩🏿‍🦳",
+  "👨‍🦳", "👨🏻‍🦳", "👨🏼‍🦳", "👨🏽‍🦳", "👨🏾‍🦳", "👨🏿‍🦳",
+  // Red hair
+  "👩‍🦰", "👩🏻‍🦰", "👩🏼‍🦰", "👩🏽‍🦰", "👩🏾‍🦰", "👩🏿‍🦰",
+  "👨‍🦰", "👨🏻‍🦰", "👨🏼‍🦰", "👨🏽‍🦰", "👨🏾‍🦰", "👨🏿‍🦰",
+  // Blonde
+  "👱‍♀️", "👱🏻‍♀️", "👱🏼‍♀️", "👱🏽‍♀️", "👱🏾‍♀️", "👱🏿‍♀️",
+  "👱‍♂️", "👱🏻‍♂️", "👱🏼‍♂️", "👱🏽‍♂️", "👱🏾‍♂️", "👱🏿‍♂️",
+  // Bald
+  "👩‍🦲", "👩🏻‍🦲", "👩🏼‍🦲", "👩🏽‍🦲", "👩🏾‍🦲", "👩🏿‍🦲",
+  "👨‍🦲", "👨🏻‍🦲", "👨🏼‍🦲", "👨🏽‍🦲", "👨🏾‍🦲", "👨🏿‍🦲",
+];
+
+// Chore emoji picker options
+export const CHORE_EMOJIS = [
+  // Cleaning
+  "🧹", "🧽", "🫧", "🪣", "🧺", "🧻", "🪥", "🧴", "🛁", "🚿", "🪠",
+  // Kitchen
+  "🍳", "🥘", "🍽️", "🧑‍🍳", "🥄", "🫕", "🥗", "🍵", "☕", "🧂",
+  // Outdoor / yard
+  "🌿", "🌱", "🌻", "🍂", "🌳", "🏡", "🚰", "⛏️", "🔨", "🪴",
+  // Pets
+  "🐕", "🦮", "🐈", "🐾", "🐠", "🐹", "🐇", "🦜",
+  // Laundry
+  "👕", "👖", "🧣", "🧥",
+  // General task
+  "⭐", "✅", "🌟", "💪", "📚", "🎒", "🔧", "🚗", "🏠", "📦", "🪜",
+  "🛒", "♻️", "🗑️", "📬", "🖥️", "🎵", "🎨",
 ];
 
 export const KID_COLORS = [
   "#a78bfa", "#60a5fa", "#34d399", "#f87171",
   "#fbbf24", "#f472b6", "#38bdf8", "#4ade80",
 ];
+
+export const WISH_CATEGORIES = [
+  { value: "toy", label: "Toy / Game", emoji: "🎮", color: "#a78bfa", bg: "#ede9fe" },
+  { value: "clothes", label: "Clothes / Shoes", emoji: "👟", color: "#60a5fa", bg: "#dbeafe" },
+  { value: "outing", label: "Outing / Activity", emoji: "🎉", color: "#34d399", bg: "#d1fae5" },
+  { value: "food", label: "Food / Treat", emoji: "🍕", color: "#fbbf24", bg: "#fef3c7" },
+  { value: "other", label: "Other", emoji: "⭐", color: "#f472b6", bg: "#fce7f3" },
+];
+
+export const WISH_EMOJIS: Record<string, string[]> = {
+  toy:     ["🎮", "🧸", "🎲", "🪀", "🎯", "🎁", "🚀", "🦕", "🤖", "🧩", "🎪", "🎠", "🪁", "🏀", "⚽", "🎸"],
+  clothes: ["👟", "👕", "👗", "🧢", "👒", "🧣", "🧤", "🎒", "👗", "🩴", "🧦", "🕶️"],
+  outing:  ["🎬", "⛸️", "🏞️", "🎡", "🏖️", "🎳", "🎭", "🏊", "🎨", "🎤", "🎢", "🏟️", "🌋", "🏕️"],
+  food:    ["🍕", "🍦", "🍰", "🍩", "🍿", "🌮", "🍣", "🥤", "🧋", "🍜", "🥞", "🍔"],
+  other:   ["⭐", "🌟", "💝", "🎀", "💎", "🌈", "🦋", "🌺", "🎵", "📱", "💻", "📷"],
+};

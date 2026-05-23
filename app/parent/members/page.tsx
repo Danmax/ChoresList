@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { ArrowLeft, Plus, Trash2, Save } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { AVATAR_OPTIONS, KID_COLORS } from "@/types";
+import { AVATAR_OPTIONS, KID_COLORS, PARENT_AVATARS } from "@/types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,8 +15,6 @@ const ROLE_OPTIONS = [
   { value: "dad", label: "👨 Dad" },
   { value: "parent", label: "🧑 Parent" },
 ];
-
-const PARENT_AVATARS = ["👩", "👨", "👩‍🦱", "👨‍🦱", "👩‍🦳", "👨‍🦳", "👩‍🦰", "👨‍🦰"];
 
 interface Member {
   id: number;
@@ -185,7 +183,7 @@ export default function MembersPage() {
 
               <div>
                 <Label className="font-bold mb-2 block">Avatar</Label>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-1 rounded-xl border border-slate-100 bg-slate-50">
                   {(editing.role === "mom" || editing.role === "dad" || editing.role === "parent"
                     ? PARENT_AVATARS
                     : AVATAR_OPTIONS
@@ -193,10 +191,10 @@ export default function MembersPage() {
                     <button
                       key={a}
                       onClick={() => setEditing((p) => ({ ...p!, avatar: a }))}
-                      className={`text-2xl p-2 rounded-xl transition-all ${
+                      className={`text-2xl p-1.5 rounded-xl transition-all ${
                         editing.avatar === a
                           ? "bg-violet-100 ring-2 ring-violet-400 scale-110"
-                          : "hover:bg-slate-100"
+                          : "hover:bg-white"
                       }`}
                     >
                       {a}
