@@ -31,8 +31,8 @@ export default function ParentWishlistPage() {
       fetch("/api/wishlist"),
       fetch("/api/members"),
     ]);
-    setItems(await wRes.json());
-    setMembers(await mRes.json());
+    if (wRes.ok) setItems(await wRes.json());
+    if (mRes.ok) setMembers(await mRes.json());
   }, []);
 
   useEffect(() => { load(); }, [load]);
