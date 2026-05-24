@@ -4,18 +4,27 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
+  provider  = "mysql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
+model ParentAccount {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique @db.VarChar(255)
+  passwordHash String   @db.VarChar(255)
+  passwordSalt String   @db.VarChar(255)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+}
+
 model FamilyMember {
   id          Int      @id @default(autoincrement())
-  name        String
+  name        String   @db.VarChar(255)
   age         Int
-  role        String   @default("child")
-  avatar      String   @default("🧒")
-  color       String   @default("#a78bfa")
+  role        String   @default("child") @db.VarChar(64)
+  avatar      String   @default("🧒") @db.VarChar(32)
+  color       String   @default("#a78bfa") @db.VarChar(32)
   totalPoints Int      @default(0)
   level       Int      @default(1)
   createdAt   DateTime @default(now())
@@ -26,20 +35,20 @@ model FamilyMember {
   skills           MemberSkill[]
   allowanceSetting AllowanceSettings?
   wishList         WishListItem[]
-  houseProjects    HouseProject[]   @relation("ProjectAssignee")
+  houseProjects    HouseProject[]     @relation("ProjectAssignee")
   rewardTickets    RewardTicket[]
 }
 
 model Chore {
   id            Int     @id @default(autoincrement())
-  name          String
-  description   String?
-  icon          String  @default("✅")
-  color         String  @default("#e0e7ff")
+  name          String  @db.VarChar(255)
+  description   String? @db.Text
+  icon          String  @default("✅") @db.VarChar(32)
+  color         String  @default("#e0e7ff") @db.VarChar(32)
   ageMin        Int     @default(3)
   ageMax        Int     @default(18)
   pointsValue   Int     @default(10)
-  category      String  @default("other")
+  category      String  @default("other") @db.VarChar(64)
   requiresPhoto Boolean @default(false)
 
   assignments  ChoreAssignment[]
@@ -51,7 +60,7 @@ model ChoreAssignment {
   id        Int       @id @default(autoincrement())
   memberId  Int
   choreId   Int
-  frequency String    @default("daily")
+  frequency String    @default("daily") @db.VarChar(64)
   dueDate   DateTime?
   dayOfWeek Int?
   isActive  Boolean   @default(true)
@@ -79,8 +88,8 @@ model TaskCompletion {
 
 model SkillCategory {
   id   Int    @id @default(autoincrement())
-  name String
-  icon String @default("⭐")
+  name String @db.VarChar(255)
+  icon String @default("⭐") @db.VarChar(32)
 
   chores  ChoreSkill[]
   members MemberSkill[]
@@ -133,9 +142,9 @@ model AllowanceSettings {
 model ChoreInstructions {
   id          Int      @id @default(autoincrement())
   choreId     Int      @unique
-  steps       String   @default("[]")
-  tips        String   @default("[]")
-  safetyNotes String   @default("[]")
+  steps       String   @db.Text
+  tips        String   @db.Text
+  safetyNotes String   @db.Text
   aiGenerated Boolean  @default(true)
   updatedAt   DateTime @default(now()) @updatedAt
 
@@ -145,11 +154,11 @@ model ChoreInstructions {
 model WishListItem {
   id        Int      @id @default(autoincrement())
   memberId  Int
-  title     String
-  category  String   @default("other")
-  emoji     String   @default("🎁")
-  note      String?
-  status    String   @default("pending")
+  title     String   @db.VarChar(255)
+  category  String   @default("other") @db.VarChar(64)
+  emoji     String   @default("🎁") @db.VarChar(32)
+  note      String?  @db.Text
+  status    String   @default("pending") @db.VarChar(64)
   createdAt DateTime @default(now())
 
   member FamilyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
@@ -157,15 +166,15 @@ model WishListItem {
 
 model HouseProject {
   id          Int       @id @default(autoincrement())
-  title       String
-  description String?
-  category    String    @default("other")
-  emoji       String    @default("🔧")
-  rewardTitle String
-  rewardEmoji String    @default("🎫")
+  title       String    @db.VarChar(255)
+  description String?   @db.Text
+  category    String    @default("other") @db.VarChar(64)
+  emoji       String    @default("🔧") @db.VarChar(32)
+  rewardTitle String    @db.VarChar(255)
+  rewardEmoji String    @default("🎫") @db.VarChar(32)
   pointsBonus Int       @default(50)
   assignedTo  Int?
-  status      String    @default("open")
+  status      String    @default("open") @db.VarChar(64)
   dueDate     DateTime?
   createdAt   DateTime  @default(now())
 
@@ -177,9 +186,9 @@ model RewardTicket {
   id          Int       @id @default(autoincrement())
   projectId   Int
   memberId    Int
-  rewardTitle String
-  rewardEmoji String    @default("🎫")
-  status      String    @default("pending")
+  rewardTitle String    @db.VarChar(255)
+  rewardEmoji String    @default("🎫") @db.VarChar(32)
+  status      String    @default("pending") @db.VarChar(64)
   earnedAt    DateTime  @default(now())
   redeemedAt  DateTime?
 
@@ -189,14 +198,14 @@ model RewardTicket {
 
 model FamilyEvent {
   id        Int       @id @default(autoincrement())
-  title     String
-  eventType String    @default("other")
+  title     String    @db.VarChar(255)
+  eventType String    @default("other") @db.VarChar(64)
   date      DateTime
   endDate   DateTime?
   allDay    Boolean   @default(true)
-  recurring String    @default("none")
-  notes     String?
-  color     String    @default("#fbbf24")
-  icon      String    @default("📅")
+  recurring String    @default("none") @db.VarChar(64)
+  notes     String?   @db.Text
+  color     String    @default("#fbbf24") @db.VarChar(32)
+  icon      String    @default("📅") @db.VarChar(32)
   createdAt DateTime  @default(now())
 }

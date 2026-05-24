@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { hashPassword, normalizeEmail } from "../lib/auth";
 
 const prisma = new PrismaClient();
 
@@ -46,6 +47,20 @@ const chores = [
 async function main() {
   console.log("🌱 Seeding database...");
 
+  const parentEmail = normalizeEmail(process.env.PARENT_EMAIL ?? "parent@example.com");
+  const parentPassword = process.env.PARENT_PASSWORD ?? "ChangeMe123!";
+  const { passwordHash, passwordSalt } = hashPassword(parentPassword);
+
+  await prisma.parentAccount.upsert({
+    where: { email: parentEmail },
+    update: {},
+    create: {
+      email: parentEmail,
+      passwordHash,
+      passwordSalt,
+    },
+  });
+
   await prisma.choreSkill.deleteMany();
   await prisma.chore.deleteMany();
   await prisma.skillCategory.deleteMany();
@@ -66,7 +81,7 @@ async function main() {
     }
   }
 
-  console.log(`✅ Seeded ${chores.length} chores and ${skills.length} skill categories`);
+  console.log(`✅ Seeded parent login, ${chores.length} chores, and ${skills.length} skill categories`);
 }
 
 main()

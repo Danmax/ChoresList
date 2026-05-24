@@ -1,49 +1,52 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { type FormEvent, useState, useEffect } from "react";
 import Link from "next/link";
-import { Users, ListChecks, CalendarDays, DollarSign, BookOpen, Home, BarChart2, Gift, Wrench, Ticket } from "lucide-react";
+import { Users, ListChecks, CalendarDays, DollarSign, BookOpen, Home, BarChart2, Gift, Wrench, Ticket, Mail, LockKeyhole } from "lucide-react";
 
 export default function ParentPanel() {
   const [unlocked, setUnlocked] = useState(false);
-  const [pin, setPin] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [checking, setChecking] = useState(false);
 
   useEffect(() => {
-    const stored = sessionStorage.getItem("parent-unlocked");
-    if (stored === "true") setUnlocked(true);
+    fetch("/api/parent/auth")
+      .then((res) => res.json())
+      .then(({ ok }) => setUnlocked(Boolean(ok)))
+      .catch(() => setUnlocked(false));
   }, []);
 
-  async function submitPin() {
+  async function submitLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     setChecking(true);
     try {
       const res = await fetch("/api/parent/auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin }),
+        body: JSON.stringify({ email, password }),
       });
       const { ok } = await res.json();
       if (ok) {
-        sessionStorage.setItem("parent-unlocked", "true");
         setUnlocked(true);
         setError("");
       } else {
-        setError("Wrong PIN, try again!");
-        setPin("");
+        setError("Email or password is incorrect.");
+        setPassword("");
       }
     } catch {
-      setError("Couldn't verify PIN. Try again.");
-      setPin("");
+      setError("Couldn't verify your login. Try again.");
+      setPassword("");
     } finally {
       setChecking(false);
     }
   }
 
   function lock() {
-    sessionStorage.removeItem("parent-unlocked");
+    fetch("/api/parent/auth", { method: "DELETE" }).catch(() => {});
     setUnlocked(false);
-    setPin("");
+    setPassword("");
   }
 
   if (!unlocked) {
@@ -52,53 +55,51 @@ export default function ParentPanel() {
         <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-sm text-center">
           <div className="text-6xl mb-4">🔒</div>
           <h1 className="text-2xl font-black text-slate-800 mb-2">Parent Panel</h1>
-          <p className="text-slate-500 font-semibold mb-6">Enter your 4-digit PIN</p>
+          <p className="text-slate-500 font-semibold mb-6">Sign in with your parent account</p>
 
-          <div className="flex justify-center gap-3 mb-6">
-            {[0, 1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="w-12 h-12 rounded-2xl border-2 border-slate-200 flex items-center justify-center text-2xl font-black text-slate-800"
-              >
-                {pin[i] ? "●" : ""}
+          <form onSubmit={submitLogin} className="space-y-4 text-left">
+            <label className="block">
+              <span className="text-sm font-bold text-slate-600">Email</span>
+              <div className="mt-1 flex items-center gap-2 rounded-2xl border-2 border-slate-200 bg-slate-50 px-3 py-2 focus-within:border-violet-400">
+                <Mail size={18} className="text-slate-400" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  autoComplete="email"
+                  className="min-w-0 flex-1 bg-transparent font-semibold text-slate-800 outline-none"
+                  required
+                />
               </div>
-            ))}
-          </div>
+            </label>
 
-          <div className="grid grid-cols-3 gap-3 mb-4">
-            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
-              <button
-                key={n}
-                onClick={() => pin.length < 4 && setPin((p) => p + n)}
-                className="bg-slate-100 hover:bg-slate-200 rounded-2xl py-3 text-xl font-bold text-slate-700 transition-colors"
-              >
-                {n}
-              </button>
-            ))}
+            <label className="block">
+              <span className="text-sm font-bold text-slate-600">Password</span>
+              <div className="mt-1 flex items-center gap-2 rounded-2xl border-2 border-slate-200 bg-slate-50 px-3 py-2 focus-within:border-violet-400">
+                <LockKeyhole size={18} className="text-slate-400" />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  autoComplete="current-password"
+                  className="min-w-0 flex-1 bg-transparent font-semibold text-slate-800 outline-none"
+                  required
+                />
+              </div>
+            </label>
+
             <button
-              onClick={() => setPin((p) => p.slice(0, -1))}
-              className="bg-slate-100 hover:bg-slate-200 rounded-2xl py-3 text-xl font-bold text-slate-700 transition-colors"
+              type="submit"
+              disabled={checking}
+              className="w-full bg-violet-500 hover:bg-violet-600 text-white rounded-2xl py-3 text-lg font-bold transition-colors disabled:opacity-40"
             >
-              ⌫
+              {checking ? "Checking..." : "Sign In"}
             </button>
-            <button
-              onClick={() => pin.length < 4 && setPin((p) => p + "0")}
-              className="bg-slate-100 hover:bg-slate-200 rounded-2xl py-3 text-xl font-bold text-slate-700 transition-colors"
-            >
-              0
-            </button>
-            <button
-              onClick={submitPin}
-              disabled={pin.length !== 4 || checking}
-              className="bg-violet-500 hover:bg-violet-600 text-white rounded-2xl py-3 text-xl font-bold transition-colors disabled:opacity-40"
-            >
-              {checking ? "…" : "✓"}
-            </button>
-          </div>
+          </form>
 
           {error && <p className="text-red-500 font-bold text-sm">{error}</p>}
 
-          <p className="text-slate-400 text-xs mt-4">Default PIN: 1234 — change in settings</p>
+          <p className="text-slate-400 text-xs mt-4">Default login: parent@example.com / ChangeMe123!</p>
 
           <Link href="/dashboard" className="block mt-4 text-slate-400 text-sm font-semibold hover:text-slate-600">
             ← Back to Dashboard

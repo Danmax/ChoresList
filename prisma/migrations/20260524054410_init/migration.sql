@@ -1,238 +1,245 @@
 -- CreateTable
-CREATE TABLE "FamilyMember" (
-    "id" SERIAL NOT NULL,
-    "name" TEXT NOT NULL,
-    "age" INTEGER NOT NULL,
-    "role" TEXT NOT NULL DEFAULT 'child',
-    "avatar" TEXT NOT NULL DEFAULT '🧒',
-    "color" TEXT NOT NULL DEFAULT '#a78bfa',
-    "totalPoints" INTEGER NOT NULL DEFAULT 0,
-    "level" INTEGER NOT NULL DEFAULT 1,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+CREATE TABLE `ParentAccount` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `email` VARCHAR(255) NOT NULL,
+    `passwordHash` VARCHAR(255) NOT NULL,
+    `passwordSalt` VARCHAR(255) NOT NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
-    CONSTRAINT "FamilyMember_pkey" PRIMARY KEY ("id")
-);
+    UNIQUE INDEX `ParentAccount_email_key`(`email`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE "Chore" (
-    "id" SERIAL NOT NULL,
-    "name" TEXT NOT NULL,
-    "description" TEXT,
-    "icon" TEXT NOT NULL DEFAULT '✅',
-    "color" TEXT NOT NULL DEFAULT '#e0e7ff',
-    "ageMin" INTEGER NOT NULL DEFAULT 3,
-    "ageMax" INTEGER NOT NULL DEFAULT 18,
-    "pointsValue" INTEGER NOT NULL DEFAULT 10,
-    "category" TEXT NOT NULL DEFAULT 'other',
-    "requiresPhoto" BOOLEAN NOT NULL DEFAULT false,
+CREATE TABLE `FamilyMember` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `name` VARCHAR(255) NOT NULL,
+    `age` INTEGER NOT NULL,
+    `role` VARCHAR(64) NOT NULL DEFAULT 'child',
+    `avatar` VARCHAR(32) NOT NULL DEFAULT '🧒',
+    `color` VARCHAR(32) NOT NULL DEFAULT '#a78bfa',
+    `totalPoints` INTEGER NOT NULL DEFAULT 0,
+    `level` INTEGER NOT NULL DEFAULT 1,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
-    CONSTRAINT "Chore_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "ChoreAssignment" (
-    "id" SERIAL NOT NULL,
-    "memberId" INTEGER NOT NULL,
-    "choreId" INTEGER NOT NULL,
-    "frequency" TEXT NOT NULL DEFAULT 'daily',
-    "dueDate" TIMESTAMP(3),
-    "dayOfWeek" INTEGER,
-    "isActive" BOOLEAN NOT NULL DEFAULT true,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "ChoreAssignment_pkey" PRIMARY KEY ("id")
-);
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE "TaskCompletion" (
-    "id" SERIAL NOT NULL,
-    "assignmentId" INTEGER NOT NULL,
-    "memberId" INTEGER NOT NULL,
-    "completedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "photoBeforePath" TEXT,
-    "photoAfterPath" TEXT,
-    "pointsEarned" INTEGER NOT NULL DEFAULT 0,
-    "verifiedByParent" BOOLEAN NOT NULL DEFAULT false,
-    "weekStartDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+CREATE TABLE `Chore` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `name` VARCHAR(255) NOT NULL,
+    `description` TEXT NULL,
+    `icon` VARCHAR(32) NOT NULL DEFAULT '✅',
+    `color` VARCHAR(32) NOT NULL DEFAULT '#e0e7ff',
+    `ageMin` INTEGER NOT NULL DEFAULT 3,
+    `ageMax` INTEGER NOT NULL DEFAULT 18,
+    `pointsValue` INTEGER NOT NULL DEFAULT 10,
+    `category` VARCHAR(64) NOT NULL DEFAULT 'other',
+    `requiresPhoto` BOOLEAN NOT NULL DEFAULT false,
 
-    CONSTRAINT "TaskCompletion_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "SkillCategory" (
-    "id" SERIAL NOT NULL,
-    "name" TEXT NOT NULL,
-    "icon" TEXT NOT NULL DEFAULT '⭐',
-
-    CONSTRAINT "SkillCategory_pkey" PRIMARY KEY ("id")
-);
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE "ChoreSkill" (
-    "choreId" INTEGER NOT NULL,
-    "skillId" INTEGER NOT NULL,
+CREATE TABLE `ChoreAssignment` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `memberId` INTEGER NOT NULL,
+    `choreId` INTEGER NOT NULL,
+    `frequency` VARCHAR(64) NOT NULL DEFAULT 'daily',
+    `dueDate` DATETIME(3) NULL,
+    `dayOfWeek` INTEGER NULL,
+    `isActive` BOOLEAN NOT NULL DEFAULT true,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
-    CONSTRAINT "ChoreSkill_pkey" PRIMARY KEY ("choreId","skillId")
-);
-
--- CreateTable
-CREATE TABLE "MemberSkill" (
-    "memberId" INTEGER NOT NULL,
-    "skillId" INTEGER NOT NULL,
-    "xp" INTEGER NOT NULL DEFAULT 0,
-    "level" INTEGER NOT NULL DEFAULT 1,
-
-    CONSTRAINT "MemberSkill_pkey" PRIMARY KEY ("memberId","skillId")
-);
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE "WeeklyAllowance" (
-    "id" SERIAL NOT NULL,
-    "memberId" INTEGER NOT NULL,
-    "weekStart" TIMESTAMP(3) NOT NULL,
-    "pointsEarned" INTEGER NOT NULL DEFAULT 0,
-    "amountEarned" DOUBLE PRECISION NOT NULL DEFAULT 0,
-    "paidOut" BOOLEAN NOT NULL DEFAULT false,
+CREATE TABLE `TaskCompletion` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `assignmentId` INTEGER NOT NULL,
+    `memberId` INTEGER NOT NULL,
+    `completedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `photoBeforePath` VARCHAR(191) NULL,
+    `photoAfterPath` VARCHAR(191) NULL,
+    `pointsEarned` INTEGER NOT NULL DEFAULT 0,
+    `verifiedByParent` BOOLEAN NOT NULL DEFAULT false,
+    `weekStartDate` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
-    CONSTRAINT "WeeklyAllowance_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "AllowanceSettings" (
-    "id" SERIAL NOT NULL,
-    "memberId" INTEGER NOT NULL,
-    "weeklyBaseRate" DOUBLE PRECISION NOT NULL DEFAULT 0,
-    "pointsToDollar" DOUBLE PRECISION NOT NULL DEFAULT 0.10,
-
-    CONSTRAINT "AllowanceSettings_pkey" PRIMARY KEY ("id")
-);
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE "ChoreInstructions" (
-    "id" SERIAL NOT NULL,
-    "choreId" INTEGER NOT NULL,
-    "steps" TEXT NOT NULL DEFAULT '[]',
-    "tips" TEXT NOT NULL DEFAULT '[]',
-    "safetyNotes" TEXT NOT NULL DEFAULT '[]',
-    "aiGenerated" BOOLEAN NOT NULL DEFAULT true,
-    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+CREATE TABLE `SkillCategory` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `name` VARCHAR(255) NOT NULL,
+    `icon` VARCHAR(32) NOT NULL DEFAULT '⭐',
 
-    CONSTRAINT "ChoreInstructions_pkey" PRIMARY KEY ("id")
-);
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE "WishListItem" (
-    "id" SERIAL NOT NULL,
-    "memberId" INTEGER NOT NULL,
-    "title" TEXT NOT NULL,
-    "category" TEXT NOT NULL DEFAULT 'other',
-    "emoji" TEXT NOT NULL DEFAULT '🎁',
-    "note" TEXT,
-    "status" TEXT NOT NULL DEFAULT 'pending',
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+CREATE TABLE `ChoreSkill` (
+    `choreId` INTEGER NOT NULL,
+    `skillId` INTEGER NOT NULL,
 
-    CONSTRAINT "WishListItem_pkey" PRIMARY KEY ("id")
-);
+    PRIMARY KEY (`choreId`, `skillId`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE "HouseProject" (
-    "id" SERIAL NOT NULL,
-    "title" TEXT NOT NULL,
-    "description" TEXT,
-    "category" TEXT NOT NULL DEFAULT 'other',
-    "emoji" TEXT NOT NULL DEFAULT '🔧',
-    "rewardTitle" TEXT NOT NULL,
-    "rewardEmoji" TEXT NOT NULL DEFAULT '🎫',
-    "pointsBonus" INTEGER NOT NULL DEFAULT 50,
-    "assignedTo" INTEGER,
-    "status" TEXT NOT NULL DEFAULT 'open',
-    "dueDate" TIMESTAMP(3),
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+CREATE TABLE `MemberSkill` (
+    `memberId` INTEGER NOT NULL,
+    `skillId` INTEGER NOT NULL,
+    `xp` INTEGER NOT NULL DEFAULT 0,
+    `level` INTEGER NOT NULL DEFAULT 1,
 
-    CONSTRAINT "HouseProject_pkey" PRIMARY KEY ("id")
-);
+    PRIMARY KEY (`memberId`, `skillId`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE "RewardTicket" (
-    "id" SERIAL NOT NULL,
-    "projectId" INTEGER NOT NULL,
-    "memberId" INTEGER NOT NULL,
-    "rewardTitle" TEXT NOT NULL,
-    "rewardEmoji" TEXT NOT NULL DEFAULT '🎫',
-    "status" TEXT NOT NULL DEFAULT 'pending',
-    "earnedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "redeemedAt" TIMESTAMP(3),
+CREATE TABLE `WeeklyAllowance` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `memberId` INTEGER NOT NULL,
+    `weekStart` DATETIME(3) NOT NULL,
+    `pointsEarned` INTEGER NOT NULL DEFAULT 0,
+    `amountEarned` DOUBLE NOT NULL DEFAULT 0,
+    `paidOut` BOOLEAN NOT NULL DEFAULT false,
 
-    CONSTRAINT "RewardTicket_pkey" PRIMARY KEY ("id")
-);
+    UNIQUE INDEX `WeeklyAllowance_memberId_weekStart_key`(`memberId`, `weekStart`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE "FamilyEvent" (
-    "id" SERIAL NOT NULL,
-    "title" TEXT NOT NULL,
-    "eventType" TEXT NOT NULL DEFAULT 'other',
-    "date" TIMESTAMP(3) NOT NULL,
-    "endDate" TIMESTAMP(3),
-    "allDay" BOOLEAN NOT NULL DEFAULT true,
-    "recurring" TEXT NOT NULL DEFAULT 'none',
-    "notes" TEXT,
-    "color" TEXT NOT NULL DEFAULT '#fbbf24',
-    "icon" TEXT NOT NULL DEFAULT '📅',
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+CREATE TABLE `AllowanceSettings` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `memberId` INTEGER NOT NULL,
+    `weeklyBaseRate` DOUBLE NOT NULL DEFAULT 0,
+    `pointsToDollar` DOUBLE NOT NULL DEFAULT 0.10,
 
-    CONSTRAINT "FamilyEvent_pkey" PRIMARY KEY ("id")
-);
+    UNIQUE INDEX `AllowanceSettings_memberId_key`(`memberId`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
--- CreateIndex
-CREATE UNIQUE INDEX "WeeklyAllowance_memberId_weekStart_key" ON "WeeklyAllowance"("memberId", "weekStart");
+-- CreateTable
+CREATE TABLE `ChoreInstructions` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `choreId` INTEGER NOT NULL,
+    `steps` TEXT NOT NULL,
+    `tips` TEXT NOT NULL,
+    `safetyNotes` TEXT NOT NULL,
+    `aiGenerated` BOOLEAN NOT NULL DEFAULT true,
+    `updatedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
--- CreateIndex
-CREATE UNIQUE INDEX "AllowanceSettings_memberId_key" ON "AllowanceSettings"("memberId");
+    UNIQUE INDEX `ChoreInstructions_choreId_key`(`choreId`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
--- CreateIndex
-CREATE UNIQUE INDEX "ChoreInstructions_choreId_key" ON "ChoreInstructions"("choreId");
+-- CreateTable
+CREATE TABLE `WishListItem` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `memberId` INTEGER NOT NULL,
+    `title` VARCHAR(255) NOT NULL,
+    `category` VARCHAR(64) NOT NULL DEFAULT 'other',
+    `emoji` VARCHAR(32) NOT NULL DEFAULT '🎁',
+    `note` TEXT NULL,
+    `status` VARCHAR(64) NOT NULL DEFAULT 'pending',
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `HouseProject` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `title` VARCHAR(255) NOT NULL,
+    `description` TEXT NULL,
+    `category` VARCHAR(64) NOT NULL DEFAULT 'other',
+    `emoji` VARCHAR(32) NOT NULL DEFAULT '🔧',
+    `rewardTitle` VARCHAR(255) NOT NULL,
+    `rewardEmoji` VARCHAR(32) NOT NULL DEFAULT '🎫',
+    `pointsBonus` INTEGER NOT NULL DEFAULT 50,
+    `assignedTo` INTEGER NULL,
+    `status` VARCHAR(64) NOT NULL DEFAULT 'open',
+    `dueDate` DATETIME(3) NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `RewardTicket` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `projectId` INTEGER NOT NULL,
+    `memberId` INTEGER NOT NULL,
+    `rewardTitle` VARCHAR(255) NOT NULL,
+    `rewardEmoji` VARCHAR(32) NOT NULL DEFAULT '🎫',
+    `status` VARCHAR(64) NOT NULL DEFAULT 'pending',
+    `earnedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `redeemedAt` DATETIME(3) NULL,
+
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `FamilyEvent` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `title` VARCHAR(255) NOT NULL,
+    `eventType` VARCHAR(64) NOT NULL DEFAULT 'other',
+    `date` DATETIME(3) NOT NULL,
+    `endDate` DATETIME(3) NULL,
+    `allDay` BOOLEAN NOT NULL DEFAULT true,
+    `recurring` VARCHAR(64) NOT NULL DEFAULT 'none',
+    `notes` TEXT NULL,
+    `color` VARCHAR(32) NOT NULL DEFAULT '#fbbf24',
+    `icon` VARCHAR(32) NOT NULL DEFAULT '📅',
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- AddForeignKey
-ALTER TABLE "ChoreAssignment" ADD CONSTRAINT "ChoreAssignment_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "FamilyMember"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `ChoreAssignment` ADD CONSTRAINT `ChoreAssignment_memberId_fkey` FOREIGN KEY (`memberId`) REFERENCES `FamilyMember`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "ChoreAssignment" ADD CONSTRAINT "ChoreAssignment_choreId_fkey" FOREIGN KEY ("choreId") REFERENCES "Chore"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `ChoreAssignment` ADD CONSTRAINT `ChoreAssignment_choreId_fkey` FOREIGN KEY (`choreId`) REFERENCES `Chore`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "TaskCompletion" ADD CONSTRAINT "TaskCompletion_assignmentId_fkey" FOREIGN KEY ("assignmentId") REFERENCES "ChoreAssignment"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `TaskCompletion` ADD CONSTRAINT `TaskCompletion_assignmentId_fkey` FOREIGN KEY (`assignmentId`) REFERENCES `ChoreAssignment`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "TaskCompletion" ADD CONSTRAINT "TaskCompletion_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "FamilyMember"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `TaskCompletion` ADD CONSTRAINT `TaskCompletion_memberId_fkey` FOREIGN KEY (`memberId`) REFERENCES `FamilyMember`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "ChoreSkill" ADD CONSTRAINT "ChoreSkill_choreId_fkey" FOREIGN KEY ("choreId") REFERENCES "Chore"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `ChoreSkill` ADD CONSTRAINT `ChoreSkill_choreId_fkey` FOREIGN KEY (`choreId`) REFERENCES `Chore`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "ChoreSkill" ADD CONSTRAINT "ChoreSkill_skillId_fkey" FOREIGN KEY ("skillId") REFERENCES "SkillCategory"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `ChoreSkill` ADD CONSTRAINT `ChoreSkill_skillId_fkey` FOREIGN KEY (`skillId`) REFERENCES `SkillCategory`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "MemberSkill" ADD CONSTRAINT "MemberSkill_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "FamilyMember"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `MemberSkill` ADD CONSTRAINT `MemberSkill_memberId_fkey` FOREIGN KEY (`memberId`) REFERENCES `FamilyMember`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "MemberSkill" ADD CONSTRAINT "MemberSkill_skillId_fkey" FOREIGN KEY ("skillId") REFERENCES "SkillCategory"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `MemberSkill` ADD CONSTRAINT `MemberSkill_skillId_fkey` FOREIGN KEY (`skillId`) REFERENCES `SkillCategory`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "WeeklyAllowance" ADD CONSTRAINT "WeeklyAllowance_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "FamilyMember"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `WeeklyAllowance` ADD CONSTRAINT `WeeklyAllowance_memberId_fkey` FOREIGN KEY (`memberId`) REFERENCES `FamilyMember`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "AllowanceSettings" ADD CONSTRAINT "AllowanceSettings_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "FamilyMember"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `AllowanceSettings` ADD CONSTRAINT `AllowanceSettings_memberId_fkey` FOREIGN KEY (`memberId`) REFERENCES `FamilyMember`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "ChoreInstructions" ADD CONSTRAINT "ChoreInstructions_choreId_fkey" FOREIGN KEY ("choreId") REFERENCES "Chore"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `ChoreInstructions` ADD CONSTRAINT `ChoreInstructions_choreId_fkey` FOREIGN KEY (`choreId`) REFERENCES `Chore`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "WishListItem" ADD CONSTRAINT "WishListItem_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "FamilyMember"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `WishListItem` ADD CONSTRAINT `WishListItem_memberId_fkey` FOREIGN KEY (`memberId`) REFERENCES `FamilyMember`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "HouseProject" ADD CONSTRAINT "HouseProject_assignedTo_fkey" FOREIGN KEY ("assignedTo") REFERENCES "FamilyMember"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE `HouseProject` ADD CONSTRAINT `HouseProject_assignedTo_fkey` FOREIGN KEY (`assignedTo`) REFERENCES `FamilyMember`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "RewardTicket" ADD CONSTRAINT "RewardTicket_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "HouseProject"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `RewardTicket` ADD CONSTRAINT `RewardTicket_projectId_fkey` FOREIGN KEY (`projectId`) REFERENCES `HouseProject`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "RewardTicket" ADD CONSTRAINT "RewardTicket_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "FamilyMember"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `RewardTicket` ADD CONSTRAINT `RewardTicket_memberId_fkey` FOREIGN KEY (`memberId`) REFERENCES `FamilyMember`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
