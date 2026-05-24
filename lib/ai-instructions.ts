@@ -1,6 +1,6 @@
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 
-const client = new Anthropic();
+const client = new OpenAI({ apiKey: process.env.CHATGPT_API_KEY });
 
 export interface ChoreInstructionData {
   steps: string[];
@@ -12,13 +12,8 @@ const SYSTEM_PROMPT = `You are a friendly parenting assistant that creates clear
 Always use simple, positive language with action verbs. Make instructions fun and achievable.
 Return ONLY valid JSON — no markdown, no extra text.`;
 
-export async function generateChoreInstructions(
-  choreName: string,
-  category: string,
-  ageMin: number,
-  ageMax: number
-): Promise<ChoreInstructionData> {
-  const userPrompt = `Create step-by-step instructions for "${choreName}" (category: ${category}) suitable for kids aged ${ageMin}–${ageMax}.
+const buildUserPrompt = (choreName: string, category: string, ageMin: number, ageMax: number) =>
+  `Create step-by-step instructions for "${choreName}" (category: ${category}) suitable for kids aged ${ageMin}–${ageMax}.
 
 Return a JSON object with exactly these keys:
 - "steps": array of 4-8 clear action steps (short sentences starting with a verb)
@@ -27,21 +22,7 @@ Return a JSON object with exactly these keys:
 
 Keep language simple, positive, and motivating for kids.`;
 
-  const response = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 1024,
-    system: [
-      {
-        type: "text",
-        text: SYSTEM_PROMPT,
-        cache_control: { type: "ephemeral" },
-      },
-    ],
-    messages: [{ role: "user", content: userPrompt }],
-  });
-
-  const text = response.content[0].type === "text" ? response.content[0].text : "";
-
+function parseResponse(text: string): ChoreInstructionData {
   try {
     const parsed = JSON.parse(text);
     return {
@@ -54,40 +35,43 @@ Keep language simple, positive, and motivating for kids.`;
   }
 }
 
+export async function generateChoreInstructions(
+  choreName: string,
+  category: string,
+  ageMin: number,
+  ageMax: number
+): Promise<ChoreInstructionData> {
+  const response = await client.chat.completions.create({
+    model: "gpt-4o-mini",
+    max_tokens: 1024,
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: buildUserPrompt(choreName, category, ageMin, ageMax) },
+    ],
+  });
+
+  const text = response.choices[0]?.message?.content ?? "";
+  return parseResponse(text);
+}
+
 export async function* streamChoreInstructions(
   choreName: string,
   category: string,
   ageMin: number,
   ageMax: number
 ): AsyncGenerator<string> {
-  const userPrompt = `Create step-by-step instructions for "${choreName}" (category: ${category}) suitable for kids aged ${ageMin}–${ageMax}.
-
-Return a JSON object with exactly these keys:
-- "steps": array of 4-8 clear action steps (short sentences starting with a verb)
-- "tips": array of 2-3 encouraging tips to do the job well
-- "safetyNotes": array of 0-3 age-appropriate safety reminders (empty array if no safety concerns)
-
-Keep language simple, positive, and motivating for kids.`;
-
-  const stream = client.messages.stream({
-    model: "claude-sonnet-4-6",
+  const stream = await client.chat.completions.create({
+    model: "gpt-4o-mini",
     max_tokens: 1024,
-    system: [
-      {
-        type: "text",
-        text: SYSTEM_PROMPT,
-        cache_control: { type: "ephemeral" },
-      },
+    stream: true,
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: buildUserPrompt(choreName, category, ageMin, ageMax) },
     ],
-    messages: [{ role: "user", content: userPrompt }],
   });
 
-  for await (const event of stream) {
-    if (
-      event.type === "content_block_delta" &&
-      event.delta.type === "text_delta"
-    ) {
-      yield event.delta.text;
-    }
+  for await (const chunk of stream) {
+    const delta = chunk.choices[0]?.delta?.content;
+    if (delta) yield delta;
   }
 }
