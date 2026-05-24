@@ -51,29 +51,29 @@ export default function FamilyDashboard() {
   const sorted = [...kids].sort((a, b) => b.totalPoints - a.totalPoints);
 
   return (
-    <div className={`min-h-screen ${tvMode ? "p-12" : "p-6"}`}>
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className={`font-black text-slate-800 ${tvMode ? "text-6xl" : "text-4xl"}`}>
+    <div className={`min-h-screen ${tvMode ? "p-12" : "p-4 sm:p-6"}`}>
+      <div className="flex flex-wrap items-center gap-3 mb-6 sm:mb-8">
+        <div className="flex-1 min-w-0">
+          <h1 className={`font-black text-slate-800 ${tvMode ? "text-6xl" : "text-3xl sm:text-4xl"}`}>
             🏠 ChoresList
           </h1>
-          <p className="text-slate-500 font-semibold mt-1">
+          <p className="text-slate-500 font-semibold mt-1 text-sm sm:text-base">
             {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
           </p>
         </div>
         {!tvMode && (
-          <div className="flex gap-3">
+          <div className="flex gap-2 sm:gap-3">
             <Link
               href="/calendar"
-              className="flex items-center gap-2 bg-white rounded-2xl px-4 py-2.5 shadow-sm font-bold text-slate-600 hover:shadow-md transition-shadow"
+              className="flex items-center gap-1.5 bg-white rounded-2xl px-3 sm:px-4 py-2.5 shadow-sm font-bold text-slate-600 hover:shadow-md transition-shadow text-sm sm:text-base"
             >
-              <Calendar size={18} /> Calendar
+              <Calendar size={16} /> <span className="hidden sm:inline">Calendar</span>
             </Link>
             <Link
               href="/parent"
-              className="flex items-center gap-2 bg-white rounded-2xl px-4 py-2.5 shadow-sm font-bold text-slate-600 hover:shadow-md transition-shadow"
+              className="flex items-center gap-1.5 bg-white rounded-2xl px-3 sm:px-4 py-2.5 shadow-sm font-bold text-slate-600 hover:shadow-md transition-shadow text-sm sm:text-base"
             >
-              <Settings size={18} /> Parent Panel
+              <Settings size={16} /> <span className="hidden sm:inline">Parent Panel</span>
             </Link>
           </div>
         )}

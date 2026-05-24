@@ -57,17 +57,35 @@ export default function KidPage() {
   const [photoType, setPhotoType] = useState<"before" | "after">("before");
   const [activeCompletion, setActiveCompletion] = useState<number | null>(null);
   const [celebratePoints, setCelebratePoints] = useState<number | null>(null);
+  const [projects, setProjects] = useState<{id:number;title:string;emoji:string;rewardTitle:string;rewardEmoji:string;pointsBonus:number;status:string}[]>([]);
+  const [earnedTicket, setEarnedTicket] = useState<{rewardTitle:string;rewardEmoji:string;projectTitle:string} | null>(null);
+  const [ticketCelebration, setTicketCelebration] = useState(false);
 
   const loadData = useCallback(async () => {
-    const [membersRes, assignRes] = await Promise.all([
+    const [membersRes, assignRes, projRes] = await Promise.all([
       fetch("/api/members"),
       fetch(`/api/assignments?memberId=${id}`),
+      fetch(`/api/projects?memberId=${id}&status=open`),
     ]);
     const members: Member[] = await membersRes.json();
     const found = members.find((m) => m.id === parseInt(id));
     setMember(found ?? null);
     setAssignments(await assignRes.json());
+    if (projRes.ok) setProjects(await projRes.json());
   }, [id]);
+
+  async function completeProject(project: typeof projects[0]) {
+    const res = await fetch("/api/projects", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: project.id, status: "completed", completedById: parseInt(id) }),
+    });
+    if (!res.ok) { toast.error("Could not complete project"); return; }
+    const data = await res.json();
+    setEarnedTicket({ rewardTitle: data.ticket.rewardTitle, rewardEmoji: data.ticket.rewardEmoji, projectTitle: project.title });
+    setTicketCelebration(true);
+    loadData();
+  }
 
   useEffect(() => {
     loadData();
@@ -146,21 +164,18 @@ export default function KidPage() {
       </AnimatePresence>
 
       {/* Header */}
-      <div className="flex items-center gap-4 mb-6">
-        <button onClick={() => router.push("/")} className="bg-white rounded-2xl p-2 shadow-sm hover:shadow-md transition-shadow">
+      <div className="flex items-start gap-3 mb-6">
+        <button onClick={() => router.push("/")} className="bg-white rounded-2xl p-2 shadow-sm hover:shadow-md transition-shadow mt-1 shrink-0">
           <ArrowLeft size={20} className="text-slate-600" />
         </button>
-        <Link
-          href={`/kid/${id}/wishlist`}
-          className="ml-auto mr-0 flex items-center gap-1.5 bg-white text-violet-600 rounded-2xl px-3 py-2 text-sm font-black shadow-sm hover:shadow-md transition-shadow"
-        >
-          🌟 Wish List
-        </Link>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3">
             <span className="text-4xl">{member.avatar}</span>
-            <div>
-              <h1 className="text-2xl font-black text-slate-800">{member.name}&apos;s Chores</h1>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <h1 className="text-xl sm:text-2xl font-black text-slate-800 truncate">{member.name}&apos;s Chores</h1>
+                <Link href={`/kid/${id}/wishlist`} className="shrink-0 text-xl" title="Wish List">🌟</Link>
+              </div>
               <div className="flex items-center gap-2">
                 <Badge style={{ backgroundColor: member.color }} className="text-white font-bold text-xs">
                   Lv.{getLevelFromPoints(member.totalPoints)} {getLevelTitle(getLevelFromPoints(member.totalPoints))}
@@ -387,6 +402,98 @@ export default function KidPage() {
           </button>
         </DialogContent>
       </Dialog>
+
+      {/* Projects section */}
+      {projects.length > 0 && (
+        <div className="mt-8">
+          <h2 className="text-xl font-black text-slate-700 mb-3">🔧 House Projects</h2>
+          <div className="space-y-3">
+            {projects.map((p) => (
+              <div key={p.id} className="bg-white rounded-3xl p-4 shadow-sm border-2 border-orange-100">
+                <div className="flex items-center gap-3">
+                  <span className="text-4xl">{p.emoji}</span>
+                  <div className="flex-1">
+                    <p className="font-black text-slate-800">{p.title}</p>
+                    <div className="flex items-center gap-2 mt-1 bg-amber-50 border border-amber-200 rounded-xl px-2 py-1 w-fit">
+                      <span className="text-base">{p.rewardEmoji}</span>
+                      <span className="text-xs font-black text-amber-700">Earn: {p.rewardTitle}</span>
+                    </div>
+                    <p className="text-xs text-slate-400 font-semibold mt-1">⭐ +{p.pointsBonus} bonus pts</p>
+                  </div>
+                  <button
+                    onClick={() => completeProject(p)}
+                    className="bg-orange-500 text-white rounded-2xl px-4 py-2.5 font-black text-sm hover:bg-orange-600 transition-colors"
+                  >
+                    Done! ✅
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Ticket celebration overlay */}
+      <AnimatePresence>
+        {ticketCelebration && earnedTicket && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            onClick={() => setTicketCelebration(false)}
+          >
+            {/* Flying confetti */}
+            {[...Array(24)].map((_, i) => (
+              <motion.div key={i}
+                initial={{ x: 0, y: 0, opacity: 1, scale: 0 }}
+                animate={{ x: (Math.random()-0.5)*500, y: (Math.random()-0.5)*500, opacity: 0, scale: 2 }}
+                transition={{ duration: 2, delay: i * 0.04 }}
+                className="fixed text-3xl pointer-events-none"
+                style={{ left: "50%", top: "50%" }}
+              >
+                {["⭐","🌟","✨","🎉","🎊","💫","🎈"][i % 7]}
+              </motion.div>
+            ))}
+
+            <motion.div
+              initial={{ scale: 0.5, y: 100 }} animate={{ scale: 1, y: 0 }}
+              transition={{ type: "spring", stiffness: 260, damping: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl"
+            >
+              {/* Ticket header */}
+              <div className="bg-gradient-to-r from-amber-400 to-orange-500 px-5 py-4 text-center">
+                <p className="text-white font-black text-lg tracking-widest">🎫 YOU EARNED A TICKET!</p>
+              </div>
+              {/* Ticket body */}
+              <div className="bg-white px-6 py-6 text-center">
+                <motion.div
+                  animate={{ scale: [1, 1.2, 1] }}
+                  transition={{ repeat: 3, duration: 0.6 }}
+                  className="text-7xl mb-3"
+                >{earnedTicket.rewardEmoji}</motion.div>
+                <h2 className="text-2xl font-black text-slate-800 mb-1">{earnedTicket.rewardTitle}</h2>
+                <p className="text-slate-400 font-semibold text-sm mb-1">for completing</p>
+                <p className="text-slate-600 font-bold">🔧 {earnedTicket.projectTitle}</p>
+              </div>
+              {/* Perforated divider */}
+              <div className="bg-white px-4">
+                <div className="border-t-2 border-dashed border-slate-200" />
+              </div>
+              <div className="bg-white px-6 pb-6 pt-4 text-center">
+                <p className="text-slate-500 font-bold text-sm mb-4">
+                  Show this to Mom or Dad to cash in your reward! 🎉
+                </p>
+                <button
+                  onClick={() => setTicketCelebration(false)}
+                  className="w-full bg-gradient-to-r from-amber-400 to-orange-500 text-white rounded-2xl py-3 font-black text-lg hover:opacity-90 transition-opacity"
+                >
+                  Awesome! 🚀
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="mt-8 text-center">
         <Link href="/" className="text-slate-400 font-semibold text-sm hover:text-slate-600">

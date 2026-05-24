@@ -24,6 +24,8 @@ model FamilyMember {
   skills           MemberSkill[]
   allowanceSetting AllowanceSettings?
   wishList         WishListItem[]
+  houseProjects    HouseProject[]   @relation("ProjectAssignee")
+  rewardTickets    RewardTicket[]
 }
 
 model Chore {
@@ -149,6 +151,38 @@ model WishListItem {
   createdAt DateTime @default(now())
 
   member FamilyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+}
+
+model HouseProject {
+  id          Int       @id @default(autoincrement())
+  title       String
+  description String?
+  category    String    @default("other")
+  emoji       String    @default("🔧")
+  rewardTitle String
+  rewardEmoji String    @default("🎫")
+  pointsBonus Int       @default(50)
+  assignedTo  Int?
+  status      String    @default("open")
+  dueDate     DateTime?
+  createdAt   DateTime  @default(now())
+
+  assignee FamilyMember?  @relation("ProjectAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
+  tickets  RewardTicket[]
+}
+
+model RewardTicket {
+  id          Int       @id @default(autoincrement())
+  projectId   Int
+  memberId    Int
+  rewardTitle String
+  rewardEmoji String    @default("🎫")
+  status      String    @default("pending")
+  earnedAt    DateTime  @default(now())
+  redeemedAt  DateTime?
+
+  project HouseProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  member  FamilyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
 }
 
 model FamilyEvent {

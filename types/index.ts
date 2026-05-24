@@ -116,6 +116,38 @@ export const WISH_CATEGORIES = [
   { value: "other", label: "Other", emoji: "⭐", color: "#f472b6", bg: "#fce7f3" },
 ];
 
+export const PROJECT_CATEGORIES = [
+  { value: "repair", label: "Repair", emoji: "🔧" },
+  { value: "yard", label: "Yard Work", emoji: "🌿" },
+  { value: "painting", label: "Painting", emoji: "🎨" },
+  { value: "cleaning", label: "Deep Clean", emoji: "🧹" },
+  { value: "assembly", label: "Assembly", emoji: "📦" },
+  { value: "garden", label: "Garden", emoji: "🌱" },
+  { value: "other", label: "Other", emoji: "✨" },
+];
+
+export const PROJECT_EMOJIS = [
+  "🔧","🪛","🔨","🪚","🪜","🪣","🧰","⚙️","🔩","🪝",
+  "🌿","🍂","🌳","🌱","🌻","🪴","🏡","🚰","⛏️","🌾",
+  "🎨","🖌️","🖼️","✨","💡","🪟","🚪","🛋️","🪞","🛁",
+  "🧹","🧽","🫧","📦","🛒","♻️","🗑️","📬","🏠","🪤",
+];
+
+export const REWARD_PRESETS = [
+  { emoji: "🍦", title: "Ice Cream Treat" },
+  { emoji: "🍩", title: "Dessert of Choice" },
+  { emoji: "🍕", title: "Pick Tonight's Dinner" },
+  { emoji: "🦶", title: "Foot Massage" },
+  { emoji: "💆", title: "Back / Shoulder Rub" },
+  { emoji: "🎬", title: "Movie Night Pick" },
+  { emoji: "🎮", title: "Extra Screen Time" },
+  { emoji: "🛍️", title: "Small Shopping Trip" },
+  { emoji: "💤", title: "Stay Up 30 Min Later" },
+  { emoji: "🎪", title: "Fun Day Out" },
+  { emoji: "🧁", title: "Bake Something Together" },
+  { emoji: "🎉", title: "Pick a Family Activity" },
+];
+
 export const WISH_EMOJIS: Record<string, string[]> = {
   toy:     ["🎮", "🧸", "🎲", "🪀", "🎯", "🎁", "🚀", "🦕", "🤖", "🧩", "🎪", "🎠", "🪁", "🏀", "⚽", "🎸"],
   clothes: ["👟", "👕", "👗", "🧢", "👒", "🧣", "🧤", "🎒", "👗", "🩴", "🧦", "🕶️"],
