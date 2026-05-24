@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { withErrors } from "@/lib/api";
 
-export async function GET(req: NextRequest) {
+export const GET = withErrors(async (req: NextRequest) => {
   const { searchParams } = new URL(req.url);
   const memberId = searchParams.get("memberId");
-
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const dayOfWeek = today.getDay();
-
   const assignments = await prisma.choreAssignment.findMany({
     where: {
       isActive: true,
@@ -31,9 +30,9 @@ export async function GET(req: NextRequest) {
     orderBy: { createdAt: "asc" },
   });
   return NextResponse.json(assignments);
-}
+});
 
-export async function POST(req: NextRequest) {
+export const POST = withErrors(async (req: NextRequest) => {
   const body = await req.json();
   const assignment = await prisma.choreAssignment.create({
     data: {
@@ -46,11 +45,11 @@ export async function POST(req: NextRequest) {
     include: { chore: true, member: true },
   });
   return NextResponse.json(assignment, { status: 201 });
-}
+});
 
-export async function DELETE(req: NextRequest) {
+export const DELETE = withErrors(async (req: NextRequest) => {
   const { searchParams } = new URL(req.url);
   const id = parseInt(searchParams.get("id") ?? "0");
   await prisma.choreAssignment.update({ where: { id }, data: { isActive: false } });
   return NextResponse.json({ ok: true });
-}
+});

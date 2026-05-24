@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { calcPointsEarned, getLevelFromPoints } from "@/lib/points";
 import { getWeekStart } from "@/lib/allowance";
+import { withErrors } from "@/lib/api";
 
-export async function POST(req: NextRequest) {
+export const POST = withErrors(async (req: NextRequest) => {
   const body = await req.json();
   const { assignmentId, memberId, withPhoto } = body;
 
@@ -28,12 +29,7 @@ export async function POST(req: NextRequest) {
   const weekStart = getWeekStart();
 
   const completion = await prisma.taskCompletion.create({
-    data: {
-      assignmentId,
-      memberId,
-      pointsEarned: pts,
-      weekStartDate: weekStart,
-    },
+    data: { assignmentId, memberId, pointsEarned: pts, weekStartDate: weekStart },
   });
 
   const member = await prisma.familyMember.findUnique({ where: { id: memberId } });
@@ -43,7 +39,6 @@ export async function POST(req: NextRequest) {
       where: { id: memberId },
       data: { totalPoints: newPoints, level: getLevelFromPoints(newPoints) },
     });
-
     await prisma.weeklyAllowance.upsert({
       where: { memberId_weekStart: { memberId, weekStart } },
       create: { memberId, weekStart, pointsEarned: pts, amountEarned: 0 },
@@ -52,13 +47,12 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ completion, pointsEarned: pts }, { status: 201 });
-}
+});
 
-export async function GET(req: NextRequest) {
+export const GET = withErrors(async (req: NextRequest) => {
   const { searchParams } = new URL(req.url);
   const memberId = searchParams.get("memberId");
   const week = searchParams.get("week");
-
   const weekStart = week ? new Date(week) : getWeekStart();
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekEnd.getDate() + 7);
@@ -72,12 +66,11 @@ export async function GET(req: NextRequest) {
     orderBy: { completedAt: "desc" },
   });
   return NextResponse.json(completions);
-}
+});
 
-export async function PUT(req: NextRequest) {
+export const PUT = withErrors(async (req: NextRequest) => {
   const body = await req.json();
   const { id, verifiedByParent } = body;
-
   const completion = await prisma.taskCompletion.update({
     where: { id },
     data: {
@@ -86,4 +79,4 @@ export async function PUT(req: NextRequest) {
     },
   });
   return NextResponse.json(completion);
-}
+});

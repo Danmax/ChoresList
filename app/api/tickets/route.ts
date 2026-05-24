@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { withErrors } from "@/lib/api";
 
-export async function GET(req: NextRequest) {
+export const GET = withErrors(async (req: NextRequest) => {
   const { searchParams } = new URL(req.url);
   const memberId = searchParams.get("memberId");
   const status = searchParams.get("status");
@@ -18,9 +19,9 @@ export async function GET(req: NextRequest) {
     orderBy: { earnedAt: "desc" },
   });
   return NextResponse.json(tickets);
-}
+});
 
-export async function PUT(req: NextRequest) {
+export const PUT = withErrors(async (req: NextRequest) => {
   const body = await req.json();
   const { id, status } = body;
   const ticket = await prisma.rewardTicket.update({
@@ -31,4 +32,4 @@ export async function PUT(req: NextRequest) {
     },
   });
   return NextResponse.json(ticket);
-}
+});

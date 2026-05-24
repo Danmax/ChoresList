@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { withErrors } from "@/lib/api";
 
 function weekStart(date: Date): Date {
   const d = new Date(date);
@@ -13,7 +14,7 @@ function weekLabel(date: Date): string {
   return `${date.getMonth() + 1}/${date.getDate()}`;
 }
 
-export async function GET(req: NextRequest) {
+export const GET = withErrors(async (req: NextRequest) => {
   const { searchParams } = new URL(req.url);
   const range = searchParams.get("range") ?? "month";
 
@@ -22,13 +23,9 @@ export async function GET(req: NextRequest) {
   if (range === "week") {
     startDate = weekStart(now);
   } else if (range === "month") {
-    startDate = new Date(now);
-    startDate.setDate(now.getDate() - 28);
-    startDate = weekStart(startDate);
+    startDate = weekStart(new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000));
   } else {
-    startDate = new Date(now);
-    startDate.setDate(now.getDate() - 84);
-    startDate = weekStart(startDate);
+    startDate = weekStart(new Date(now.getTime() - 84 * 24 * 60 * 60 * 1000));
   }
 
   const [members, completions, assignments] = await Promise.all([
@@ -47,29 +44,22 @@ export async function GET(req: NextRequest) {
     }),
   ]);
 
-  // Weekly points chart data: [{ week, [memberName]: points }]
   const weekMap = new Map<string, Record<string, number | string>>();
   for (const c of completions) {
-    const ws = weekStart(c.completedAt);
-    const label = weekLabel(ws);
+    const label = weekLabel(weekStart(c.completedAt));
     if (!weekMap.has(label)) weekMap.set(label, { week: label });
     const entry = weekMap.get(label)!;
     entry[c.member.name] = ((entry[c.member.name] as number) ?? 0) + c.pointsEarned;
   }
-  const weekly = Array.from(weekMap.values());
 
-  // Completions chart data: [{ week, [memberName]: count }]
   const completionWeekMap = new Map<string, Record<string, number | string>>();
   for (const c of completions) {
-    const ws = weekStart(c.completedAt);
-    const label = weekLabel(ws);
+    const label = weekLabel(weekStart(c.completedAt));
     if (!completionWeekMap.has(label)) completionWeekMap.set(label, { week: label });
     const entry = completionWeekMap.get(label)!;
     entry[c.member.name] = ((entry[c.member.name] as number) ?? 0) + 1;
   }
-  const weeklyCompletions = Array.from(completionWeekMap.values());
 
-  // Top chores
   const choreMap = new Map<string, { name: string; icon: string; count: number; points: number }>();
   for (const c of completions) {
     const name = c.assignment.chore.name;
@@ -78,9 +68,7 @@ export async function GET(req: NextRequest) {
     existing.points += c.pointsEarned;
     choreMap.set(name, existing);
   }
-  const topChores = Array.from(choreMap.values()).sort((a, b) => b.count - a.count).slice(0, 8);
 
-  // By category
   const catMap = new Map<string, { category: string; count: number; points: number }>();
   for (const c of completions) {
     const cat = c.assignment.chore.category;
@@ -89,9 +77,7 @@ export async function GET(req: NextRequest) {
     existing.points += c.pointsEarned;
     catMap.set(cat, existing);
   }
-  const byCategory = Array.from(catMap.values()).sort((a, b) => b.count - a.count);
 
-  // Assignments per member
   const assignCountByMember = new Map<number, number>();
   for (const a of assignments) {
     assignCountByMember.set(a.memberId, (assignCountByMember.get(a.memberId) ?? 0) + 1);
@@ -115,11 +101,11 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     members: memberStats,
-    weekly,
-    weeklyCompletions,
-    topChores,
-    byCategory,
+    weekly: Array.from(weekMap.values()),
+    weeklyCompletions: Array.from(completionWeekMap.values()),
+    topChores: Array.from(choreMap.values()).sort((a, b) => b.count - a.count).slice(0, 8),
+    byCategory: Array.from(catMap.values()).sort((a, b) => b.count - a.count),
     totalCompletions: completions.length,
     totalPoints: completions.reduce((sum, c) => sum + c.pointsEarned, 0),
   });
-}
+});
