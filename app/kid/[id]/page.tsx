@@ -496,7 +496,7 @@ export default function KidPage() {
       </AnimatePresence>
 
       <div className="mt-8 text-center">
-        <Link href="/" className="text-slate-400 font-semibold text-sm hover:text-slate-600">
+        <Link href="/dashboard" className="text-slate-400 font-semibold text-sm hover:text-slate-600">
           ← Back to Family Dashboard
         </Link>
       </div>

@@ -109,7 +109,7 @@ export default function CalendarPage() {
   return (
     <div className="min-h-screen p-4 sm:p-6">
       <div className="flex items-center gap-4 mb-6">
-        <Link href="/" className="bg-white rounded-2xl p-2 shadow-sm hover:shadow-md transition-shadow">
+        <Link href="/dashboard" className="bg-white rounded-2xl p-2 shadow-sm hover:shadow-md transition-shadow">
           <ArrowLeft size={20} className="text-slate-600" />
         </Link>
         <h1 className="text-3xl font-black text-slate-800 flex-1">📅 Family Calendar</h1>

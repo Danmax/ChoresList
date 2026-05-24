@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Users, ListChecks, CalendarDays, DollarSign, BookOpen, Home, BarChart2, Gift, Wrench, Ticket } from "lucide-react";
 
-const PARENT_PIN = "1234";
+const PARENT_PIN = process.env.NEXT_PUBLIC_PARENT_PIN ?? "1234";
 
 export default function ParentPanel() {
   const [unlocked, setUnlocked] = useState(false);
@@ -87,7 +87,7 @@ export default function ParentPanel() {
 
           <p className="text-slate-400 text-xs mt-4">Default PIN: 1234 — change in settings</p>
 
-          <Link href="/" className="block mt-4 text-slate-400 text-sm font-semibold hover:text-slate-600">
+          <Link href="/dashboard" className="block mt-4 text-slate-400 text-sm font-semibold hover:text-slate-600">
             ← Back to Dashboard
           </Link>
         </div>
@@ -116,7 +116,7 @@ export default function ParentPanel() {
         </div>
         <div className="flex gap-3">
           <Link
-            href="/"
+            href="/dashboard"
             className="flex items-center gap-2 bg-white rounded-2xl px-4 py-2.5 shadow-sm font-bold text-slate-600 hover:shadow-md transition-shadow"
           >
             <Home size={18} /> Dashboard
