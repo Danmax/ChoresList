@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { ArrowLeft, Plus, Trash2, Save } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Save, ClipboardList } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { AVATAR_OPTIONS, KID_COLORS, PARENT_AVATARS } from "@/types";
@@ -112,12 +112,21 @@ export default function MembersPage() {
               </p>
               <p className="text-slate-500 text-sm font-semibold">⭐ {m.totalPoints} pts • Lv.{m.level}</p>
             </div>
-            <button
-              onClick={(e) => { e.stopPropagation(); remove(m.id); }}
-              className="text-red-400 hover:text-red-600 transition-colors p-1"
-            >
-              <Trash2 size={18} />
-            </button>
+            <div className="flex flex-col gap-1.5 items-end shrink-0">
+              <Link
+                href={`/kid/${m.id}`}
+                onClick={(e) => e.stopPropagation()}
+                className="flex items-center gap-1 text-xs font-bold text-violet-600 bg-violet-50 hover:bg-violet-100 px-2.5 py-1.5 rounded-xl transition-colors"
+              >
+                <ClipboardList size={13} /> Tasks
+              </Link>
+              <button
+                onClick={(e) => { e.stopPropagation(); remove(m.id); }}
+                className="text-red-400 hover:text-red-600 transition-colors p-1"
+              >
+                <Trash2 size={18} />
+              </button>
+            </div>
           </div>
         ))}
       </div>

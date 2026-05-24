@@ -28,6 +28,8 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [open, setOpen] = useState(false);
+  const [completingProject, setCompletingProject] = useState<Project | null>(null);
+  const [completedById, setCompletedById] = useState<string>("");
   const [form, setForm] = useState(BLANK);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showRewardPicker, setShowRewardPicker] = useState(false);
@@ -59,6 +61,22 @@ export default function ProjectsPage() {
     toast.success("Project created!");
     setOpen(false);
     setForm(BLANK);
+    load();
+  }
+
+  async function completeProject() {
+    if (!completingProject || !completedById) { toast.error("Select who completed it"); return; }
+    const res = await fetch("/api/projects", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: completingProject.id, status: "completed", completedById: parseInt(completedById) }),
+    });
+    if (!res.ok) { toast.error("Could not mark complete"); return; }
+    const data = await res.json();
+    const member = members.find((m) => m.id === parseInt(completedById));
+    toast.success(`🎫 Reward ticket earned by ${member?.name ?? ""}! Check Reward Tickets to redeem.`);
+    setCompletingProject(null);
+    setCompletedById("");
     load();
   }
 
@@ -142,9 +160,19 @@ export default function ProjectsPage() {
                   </div>
                 )}
               </div>
-              <button onClick={() => remove(p.id)} className="text-red-300 hover:text-red-500 transition-colors shrink-0">
-                <Trash2 size={16} />
-              </button>
+              <div className="flex flex-col gap-2 shrink-0">
+                {p.status === "open" && (
+                  <button
+                    onClick={() => { setCompletingProject(p); setCompletedById(p.assignedTo ? String(p.assignedTo) : ""); }}
+                    className="flex items-center gap-1 bg-emerald-500 text-white rounded-xl px-3 py-1.5 text-xs font-black hover:bg-emerald-600 transition-colors"
+                  >
+                    <CheckCircle2 size={13} /> Done
+                  </button>
+                )}
+                <button onClick={() => remove(p.id)} className="text-red-300 hover:text-red-500 transition-colors self-end">
+                  <Trash2 size={16} />
+                </button>
+              </div>
             </div>
           </div>
         ))}
@@ -155,6 +183,46 @@ export default function ProjectsPage() {
           </div>
         )}
       </div>
+
+      {/* Mark Complete Dialog */}
+      <Dialog open={!!completingProject} onOpenChange={(o) => !o && setCompletingProject(null)}>
+        <DialogContent className="max-w-sm rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="font-black">
+              {completingProject?.emoji} Who completed this?
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-slate-500 font-semibold text-sm">{completingProject?.title}</p>
+          <div className="space-y-4 pt-2">
+            <div>
+              <Label className="font-bold">Completed by</Label>
+              <Select value={completedById} onValueChange={(v) => setCompletedById(v ?? "")}>
+                <SelectTrigger className="rounded-xl mt-1">
+                  <SelectValue placeholder="Select a family member" />
+                </SelectTrigger>
+                <SelectContent>
+                  {members.map((m) => (
+                    <SelectItem key={m.id} value={String(m.id)}>{m.avatar} {m.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {completedById && completingProject && (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-sm font-semibold text-amber-700">
+                🎫 This will generate a <strong>{completingProject.rewardEmoji} {completingProject.rewardTitle}</strong> reward ticket
+                {completingProject.pointsBonus > 0 && ` and award +${completingProject.pointsBonus} bonus points`}.
+              </div>
+            )}
+            <button
+              onClick={completeProject}
+              disabled={!completedById}
+              className="w-full bg-emerald-500 text-white rounded-xl py-3 font-black hover:bg-emerald-600 transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+            >
+              <CheckCircle2 size={18} /> Mark Complete & Issue Ticket
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Create Project Dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
