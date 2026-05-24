@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 
-const client = new OpenAI({ apiKey: process.env.CHATGPT_API_KEY });
+const client = new OpenAI({ apiKey: process.env.CHATGPT_API_KEY ?? "" });
 
 export interface ChoreInstructionData {
   steps: string[];
