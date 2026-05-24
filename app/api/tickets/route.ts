@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { withErrors } from "@/lib/api";
+import { requireSession, withErrors } from "@/lib/api";
 
 export const GET = withErrors(async (req: NextRequest) => {
+  const { householdId } = requireSession(req);
   const { searchParams } = new URL(req.url);
   const memberId = searchParams.get("memberId");
   const status = searchParams.get("status");
 
   const tickets = await prisma.rewardTicket.findMany({
     where: {
+      householdId,
       ...(memberId && { memberId: parseInt(memberId) }),
       ...(status && { status }),
     },
@@ -22,10 +24,11 @@ export const GET = withErrors(async (req: NextRequest) => {
 });
 
 export const PUT = withErrors(async (req: NextRequest) => {
+  const { householdId } = requireSession(req);
   const body = await req.json();
   const { id, status } = body;
   const ticket = await prisma.rewardTicket.update({
-    where: { id },
+    where: { id, householdId },
     data: {
       status,
       ...(status === "redeemed" && { redeemedAt: new Date() }),

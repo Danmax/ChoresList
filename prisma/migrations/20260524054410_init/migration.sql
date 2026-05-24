@@ -1,9 +1,11 @@
 -- CreateTable
 CREATE TABLE `ParentAccount` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `householdId` INTEGER NOT NULL,
     `email` VARCHAR(255) NOT NULL,
     `passwordHash` VARCHAR(255) NOT NULL,
     `passwordSalt` VARCHAR(255) NOT NULL,
+    `emailVerified` BOOLEAN NOT NULL DEFAULT false,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
@@ -12,8 +14,32 @@ CREATE TABLE `ParentAccount` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
+CREATE TABLE `Household` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `name` VARCHAR(255) NOT NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `EmailConfirmationToken` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `parentId` INTEGER NOT NULL,
+    `tokenHash` VARCHAR(255) NOT NULL,
+    `expiresAt` DATETIME(3) NOT NULL,
+    `usedAt` DATETIME(3) NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+    UNIQUE INDEX `EmailConfirmationToken_tokenHash_key`(`tokenHash`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
 CREATE TABLE `FamilyMember` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `householdId` INTEGER NOT NULL,
     `name` VARCHAR(255) NOT NULL,
     `age` INTEGER NOT NULL,
     `role` VARCHAR(64) NOT NULL DEFAULT 'child',
@@ -29,6 +55,7 @@ CREATE TABLE `FamilyMember` (
 -- CreateTable
 CREATE TABLE `Chore` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `householdId` INTEGER NOT NULL,
     `name` VARCHAR(255) NOT NULL,
     `description` TEXT NULL,
     `icon` VARCHAR(32) NOT NULL DEFAULT '✅',
@@ -45,6 +72,7 @@ CREATE TABLE `Chore` (
 -- CreateTable
 CREATE TABLE `ChoreAssignment` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `householdId` INTEGER NOT NULL,
     `memberId` INTEGER NOT NULL,
     `choreId` INTEGER NOT NULL,
     `frequency` VARCHAR(64) NOT NULL DEFAULT 'daily',
@@ -59,6 +87,7 @@ CREATE TABLE `ChoreAssignment` (
 -- CreateTable
 CREATE TABLE `TaskCompletion` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `householdId` INTEGER NOT NULL,
     `assignmentId` INTEGER NOT NULL,
     `memberId` INTEGER NOT NULL,
     `completedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -74,6 +103,7 @@ CREATE TABLE `TaskCompletion` (
 -- CreateTable
 CREATE TABLE `SkillCategory` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `householdId` INTEGER NOT NULL,
     `name` VARCHAR(255) NOT NULL,
     `icon` VARCHAR(32) NOT NULL DEFAULT '⭐',
 
@@ -101,6 +131,7 @@ CREATE TABLE `MemberSkill` (
 -- CreateTable
 CREATE TABLE `WeeklyAllowance` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `householdId` INTEGER NOT NULL,
     `memberId` INTEGER NOT NULL,
     `weekStart` DATETIME(3) NOT NULL,
     `pointsEarned` INTEGER NOT NULL DEFAULT 0,
@@ -114,6 +145,7 @@ CREATE TABLE `WeeklyAllowance` (
 -- CreateTable
 CREATE TABLE `AllowanceSettings` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `householdId` INTEGER NOT NULL,
     `memberId` INTEGER NOT NULL,
     `weeklyBaseRate` DOUBLE NOT NULL DEFAULT 0,
     `pointsToDollar` DOUBLE NOT NULL DEFAULT 0.10,
@@ -139,6 +171,7 @@ CREATE TABLE `ChoreInstructions` (
 -- CreateTable
 CREATE TABLE `WishListItem` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `householdId` INTEGER NOT NULL,
     `memberId` INTEGER NOT NULL,
     `title` VARCHAR(255) NOT NULL,
     `category` VARCHAR(64) NOT NULL DEFAULT 'other',
@@ -153,6 +186,7 @@ CREATE TABLE `WishListItem` (
 -- CreateTable
 CREATE TABLE `HouseProject` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `householdId` INTEGER NOT NULL,
     `title` VARCHAR(255) NOT NULL,
     `description` TEXT NULL,
     `category` VARCHAR(64) NOT NULL DEFAULT 'other',
@@ -171,6 +205,7 @@ CREATE TABLE `HouseProject` (
 -- CreateTable
 CREATE TABLE `RewardTicket` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `householdId` INTEGER NOT NULL,
     `projectId` INTEGER NOT NULL,
     `memberId` INTEGER NOT NULL,
     `rewardTitle` VARCHAR(255) NOT NULL,
@@ -185,6 +220,7 @@ CREATE TABLE `RewardTicket` (
 -- CreateTable
 CREATE TABLE `FamilyEvent` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `householdId` INTEGER NOT NULL,
     `title` VARCHAR(255) NOT NULL,
     `eventType` VARCHAR(64) NOT NULL DEFAULT 'other',
     `date` DATETIME(3) NOT NULL,
@@ -200,16 +236,37 @@ CREATE TABLE `FamilyEvent` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- AddForeignKey
+ALTER TABLE `ParentAccount` ADD CONSTRAINT `ParentAccount_householdId_fkey` FOREIGN KEY (`householdId`) REFERENCES `Household`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `EmailConfirmationToken` ADD CONSTRAINT `EmailConfirmationToken_parentId_fkey` FOREIGN KEY (`parentId`) REFERENCES `ParentAccount`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `FamilyMember` ADD CONSTRAINT `FamilyMember_householdId_fkey` FOREIGN KEY (`householdId`) REFERENCES `Household`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `Chore` ADD CONSTRAINT `Chore_householdId_fkey` FOREIGN KEY (`householdId`) REFERENCES `Household`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE `ChoreAssignment` ADD CONSTRAINT `ChoreAssignment_memberId_fkey` FOREIGN KEY (`memberId`) REFERENCES `FamilyMember`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `ChoreAssignment` ADD CONSTRAINT `ChoreAssignment_choreId_fkey` FOREIGN KEY (`choreId`) REFERENCES `Chore`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE `ChoreAssignment` ADD CONSTRAINT `ChoreAssignment_householdId_fkey` FOREIGN KEY (`householdId`) REFERENCES `Household`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE `TaskCompletion` ADD CONSTRAINT `TaskCompletion_assignmentId_fkey` FOREIGN KEY (`assignmentId`) REFERENCES `ChoreAssignment`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `TaskCompletion` ADD CONSTRAINT `TaskCompletion_memberId_fkey` FOREIGN KEY (`memberId`) REFERENCES `FamilyMember`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `TaskCompletion` ADD CONSTRAINT `TaskCompletion_householdId_fkey` FOREIGN KEY (`householdId`) REFERENCES `Household`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `SkillCategory` ADD CONSTRAINT `SkillCategory_householdId_fkey` FOREIGN KEY (`householdId`) REFERENCES `Household`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `ChoreSkill` ADD CONSTRAINT `ChoreSkill_choreId_fkey` FOREIGN KEY (`choreId`) REFERENCES `Chore`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
@@ -227,7 +284,13 @@ ALTER TABLE `MemberSkill` ADD CONSTRAINT `MemberSkill_skillId_fkey` FOREIGN KEY 
 ALTER TABLE `WeeklyAllowance` ADD CONSTRAINT `WeeklyAllowance_memberId_fkey` FOREIGN KEY (`memberId`) REFERENCES `FamilyMember`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE `WeeklyAllowance` ADD CONSTRAINT `WeeklyAllowance_householdId_fkey` FOREIGN KEY (`householdId`) REFERENCES `Household`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE `AllowanceSettings` ADD CONSTRAINT `AllowanceSettings_memberId_fkey` FOREIGN KEY (`memberId`) REFERENCES `FamilyMember`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `AllowanceSettings` ADD CONSTRAINT `AllowanceSettings_householdId_fkey` FOREIGN KEY (`householdId`) REFERENCES `Household`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `ChoreInstructions` ADD CONSTRAINT `ChoreInstructions_choreId_fkey` FOREIGN KEY (`choreId`) REFERENCES `Chore`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
@@ -236,10 +299,23 @@ ALTER TABLE `ChoreInstructions` ADD CONSTRAINT `ChoreInstructions_choreId_fkey` 
 ALTER TABLE `WishListItem` ADD CONSTRAINT `WishListItem_memberId_fkey` FOREIGN KEY (`memberId`) REFERENCES `FamilyMember`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE `WishListItem` ADD CONSTRAINT `WishListItem_householdId_fkey` FOREIGN KEY (`householdId`) REFERENCES `Household`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE `HouseProject` ADD CONSTRAINT `HouseProject_assignedTo_fkey` FOREIGN KEY (`assignedTo`) REFERENCES `FamilyMember`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `HouseProject` ADD CONSTRAINT `HouseProject_householdId_fkey` FOREIGN KEY (`householdId`) REFERENCES `Household`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `RewardTicket` ADD CONSTRAINT `RewardTicket_projectId_fkey` FOREIGN KEY (`projectId`) REFERENCES `HouseProject`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `RewardTicket` ADD CONSTRAINT `RewardTicket_memberId_fkey` FOREIGN KEY (`memberId`) REFERENCES `FamilyMember`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `RewardTicket` ADD CONSTRAINT `RewardTicket_householdId_fkey` FOREIGN KEY (`householdId`) REFERENCES `Household`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `FamilyEvent` ADD CONSTRAINT `FamilyEvent_householdId_fkey` FOREIGN KEY (`householdId`) REFERENCES `Household`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+

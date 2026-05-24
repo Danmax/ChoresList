@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { streamChoreInstructions } from "@/lib/ai-instructions";
+import { authErrorResponse, requireSession } from "@/lib/api";
 
 type Params = { params: Promise<{ id: string }> };
 
 function err(e: unknown, status = 500) {
+  const authResponse = authErrorResponse(e);
+  if (authResponse) return authResponse;
+
   const message = e instanceof Error ? e.message : String(e);
   console.error("[API instructions]", message);
   return NextResponse.json({ error: message }, { status });
@@ -12,9 +16,10 @@ function err(e: unknown, status = 500) {
 
 export async function GET(_req: NextRequest, { params }: Params) {
   try {
+    const { householdId } = requireSession(_req);
     const { id } = await params;
-    const instructions = await prisma.choreInstructions.findUnique({
-      where: { choreId: parseInt(id) },
+    const instructions = await prisma.choreInstructions.findFirst({
+      where: { choreId: parseInt(id), chore: { householdId } },
     });
     return NextResponse.json(instructions ?? null);
   } catch (e) { return err(e); }
@@ -22,9 +27,10 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
 export async function POST(_req: NextRequest, { params }: Params) {
   try {
+    const { householdId } = requireSession(_req);
     const { id } = await params;
     const choreId = parseInt(id);
-    const chore = await prisma.chore.findUnique({ where: { id: choreId } });
+    const chore = await prisma.chore.findUnique({ where: { id: choreId, householdId } });
     if (!chore) return NextResponse.json({ error: "Chore not found" }, { status: 404 });
 
     const encoder = new TextEncoder();
@@ -74,8 +80,11 @@ export async function POST(_req: NextRequest, { params }: Params) {
 
 export async function PUT(req: NextRequest, { params }: Params) {
   try {
+    const { householdId } = requireSession(req);
     const { id } = await params;
     const choreId = parseInt(id);
+    const chore = await prisma.chore.findUnique({ where: { id: choreId, householdId } });
+    if (!chore) return NextResponse.json({ error: "Chore not found" }, { status: 404 });
     const body = await req.json();
     const instructions = await prisma.choreInstructions.upsert({
       where: { choreId },
@@ -99,8 +108,12 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
   try {
+    const { householdId } = requireSession(_req);
     const { id } = await params;
-    await prisma.choreInstructions.delete({ where: { choreId: parseInt(id) } });
+    const instructions = await prisma.choreInstructions.findFirst({
+      where: { choreId: parseInt(id), chore: { householdId } },
+    });
+    if (instructions) await prisma.choreInstructions.delete({ where: { id: instructions.id } });
     return NextResponse.json({ ok: true });
   } catch (e) { return err(e); }
 }

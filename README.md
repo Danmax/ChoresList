@@ -10,6 +10,12 @@ DIRECT_URL="mysql://u130206374_parent:PASSWORD@srv2104.hstgr.io:3306/u130206374_
 PARENT_EMAIL="parent@example.com"
 PARENT_PASSWORD="ChangeMe123!"
 AUTH_SECRET="replace-with-a-long-random-string"
+SMTP_HOST=""
+SMTP_PORT="587"
+SMTP_SECURE="false"
+SMTP_USER=""
+SMTP_PASSWORD=""
+SMTP_FROM=""
 ```
 
 Then create the schema and seed the default chores plus the parent login:
@@ -18,6 +24,8 @@ Then create the schema and seed the default chores plus the parent login:
 npm run db:migrate
 npm run db:seed
 ```
+
+Parent accounts are household-scoped. New households can sign up from `/parent`; if SMTP is configured the app sends a confirmation email, otherwise it returns a development confirmation link.
 
 First, run the development server:
 

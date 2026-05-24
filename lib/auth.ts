@@ -18,3 +18,13 @@ export function verifyPassword(password: string, passwordHash: string, passwordS
   if (candidate.length !== expected.length) return false;
   return timingSafeEqual(candidate, expected);
 }
+
+export function createConfirmationToken() {
+  const token = randomBytes(32).toString("base64url");
+  const tokenHash = hashPassword(token, "email-confirmation").passwordHash;
+  return { token, tokenHash };
+}
+
+export function hashConfirmationToken(token: string) {
+  return hashPassword(token, "email-confirmation").passwordHash;
+}

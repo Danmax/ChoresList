@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { withErrors } from "@/lib/api";
+import { requireSession, withErrors } from "@/lib/api";
 
 export const GET = withErrors(async (req: NextRequest) => {
+  const { householdId } = requireSession(req);
   const { searchParams } = new URL(req.url);
   const memberId = searchParams.get("memberId");
   const today = new Date();
@@ -11,6 +12,7 @@ export const GET = withErrors(async (req: NextRequest) => {
   const assignments = await prisma.choreAssignment.findMany({
     where: {
       isActive: true,
+      householdId,
       ...(memberId && { memberId: parseInt(memberId) }),
       OR: [
         { frequency: "daily" },
@@ -33,9 +35,17 @@ export const GET = withErrors(async (req: NextRequest) => {
 });
 
 export const POST = withErrors(async (req: NextRequest) => {
+  const { householdId } = requireSession(req);
   const body = await req.json();
+  const [member, chore] = await Promise.all([
+    prisma.familyMember.findFirst({ where: { id: body.memberId, householdId } }),
+    prisma.chore.findFirst({ where: { id: body.choreId, householdId } }),
+  ]);
+  if (!member || !chore) return NextResponse.json({ error: "Member or chore not found" }, { status: 404 });
+
   const assignment = await prisma.choreAssignment.create({
     data: {
+      householdId,
       memberId: body.memberId,
       choreId: body.choreId,
       frequency: body.frequency ?? "daily",
@@ -48,8 +58,9 @@ export const POST = withErrors(async (req: NextRequest) => {
 });
 
 export const DELETE = withErrors(async (req: NextRequest) => {
+  const { householdId } = requireSession(req);
   const { searchParams } = new URL(req.url);
   const id = parseInt(searchParams.get("id") ?? "0");
-  await prisma.choreAssignment.update({ where: { id }, data: { isActive: false } });
+  await prisma.choreAssignment.update({ where: { id, householdId }, data: { isActive: false } });
   return NextResponse.json({ ok: true });
 });

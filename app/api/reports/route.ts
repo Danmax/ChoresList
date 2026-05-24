@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { withErrors } from "@/lib/api";
+import { requireSession, withErrors } from "@/lib/api";
 
 function weekStart(date: Date): Date {
   const d = new Date(date);
@@ -15,6 +15,7 @@ function weekLabel(date: Date): string {
 }
 
 export const GET = withErrors(async (req: NextRequest) => {
+  const { householdId } = requireSession(req);
   const { searchParams } = new URL(req.url);
   const range = searchParams.get("range") ?? "month";
 
@@ -29,9 +30,9 @@ export const GET = withErrors(async (req: NextRequest) => {
   }
 
   const [members, completions, assignments] = await Promise.all([
-    prisma.familyMember.findMany({ orderBy: { totalPoints: "desc" } }),
+    prisma.familyMember.findMany({ where: { householdId }, orderBy: { totalPoints: "desc" } }),
     prisma.taskCompletion.findMany({
-      where: { completedAt: { gte: startDate } },
+      where: { householdId, completedAt: { gte: startDate } },
       include: {
         member: { select: { id: true, name: true, color: true, avatar: true } },
         assignment: { include: { chore: { select: { name: true, icon: true, category: true } } } },
@@ -39,7 +40,7 @@ export const GET = withErrors(async (req: NextRequest) => {
       orderBy: { completedAt: "asc" },
     }),
     prisma.choreAssignment.findMany({
-      where: { isActive: true },
+      where: { householdId, isActive: true },
       include: { chore: { select: { name: true, icon: true, category: true } } },
     }),
   ]);

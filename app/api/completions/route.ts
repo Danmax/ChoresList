@@ -2,14 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { calcPointsEarned, getLevelFromPoints } from "@/lib/points";
 import { getWeekStart } from "@/lib/allowance";
-import { withErrors } from "@/lib/api";
+import { requireSession, withErrors } from "@/lib/api";
 
 export const POST = withErrors(async (req: NextRequest) => {
+  const { householdId } = requireSession(req);
   const body = await req.json();
   const { assignmentId, memberId, withPhoto } = body;
 
   const assignment = await prisma.choreAssignment.findUnique({
-    where: { id: assignmentId },
+    where: { id: assignmentId, householdId },
     include: { chore: true },
   });
   if (!assignment) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -18,7 +19,7 @@ export const POST = withErrors(async (req: NextRequest) => {
   todayStart.setHours(0, 0, 0, 0);
 
   const dailyAssignments = await prisma.choreAssignment.findMany({
-    where: { memberId, isActive: true, frequency: "daily" },
+    where: { householdId, memberId, isActive: true, frequency: "daily" },
     include: { completions: { where: { completedAt: { gte: todayStart } }, take: 1 } },
   });
   const allDone =
@@ -29,19 +30,19 @@ export const POST = withErrors(async (req: NextRequest) => {
   const weekStart = getWeekStart();
 
   const completion = await prisma.taskCompletion.create({
-    data: { assignmentId, memberId, pointsEarned: pts, weekStartDate: weekStart },
+    data: { householdId, assignmentId, memberId, pointsEarned: pts, weekStartDate: weekStart },
   });
 
-  const member = await prisma.familyMember.findUnique({ where: { id: memberId } });
+  const member = await prisma.familyMember.findUnique({ where: { id: memberId, householdId } });
   if (member) {
     const newPoints = member.totalPoints + pts;
     await prisma.familyMember.update({
-      where: { id: memberId },
+      where: { id: memberId, householdId },
       data: { totalPoints: newPoints, level: getLevelFromPoints(newPoints) },
     });
     await prisma.weeklyAllowance.upsert({
       where: { memberId_weekStart: { memberId, weekStart } },
-      create: { memberId, weekStart, pointsEarned: pts, amountEarned: 0 },
+      create: { householdId, memberId, weekStart, pointsEarned: pts, amountEarned: 0 },
       update: { pointsEarned: { increment: pts } },
     });
   }
@@ -50,6 +51,7 @@ export const POST = withErrors(async (req: NextRequest) => {
 });
 
 export const GET = withErrors(async (req: NextRequest) => {
+  const { householdId } = requireSession(req);
   const { searchParams } = new URL(req.url);
   const memberId = searchParams.get("memberId");
   const week = searchParams.get("week");
@@ -60,6 +62,7 @@ export const GET = withErrors(async (req: NextRequest) => {
   const completions = await prisma.taskCompletion.findMany({
     where: {
       ...(memberId && { memberId: parseInt(memberId) }),
+      householdId,
       completedAt: { gte: weekStart, lt: weekEnd },
     },
     include: { assignment: { include: { chore: true } }, member: true },
@@ -69,10 +72,11 @@ export const GET = withErrors(async (req: NextRequest) => {
 });
 
 export const PUT = withErrors(async (req: NextRequest) => {
+  const { householdId } = requireSession(req);
   const body = await req.json();
   const { id, verifiedByParent } = body;
   const completion = await prisma.taskCompletion.update({
-    where: { id },
+    where: { id, householdId },
     data: {
       verifiedByParent,
       ...(verifiedByParent && { pointsEarned: { multiply: 1.25 } as never }),

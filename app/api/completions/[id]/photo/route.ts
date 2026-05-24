@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
+import { authErrorResponse, requireSession } from "@/lib/api";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function POST(req: NextRequest, { params }: Params) {
   try {
+    const { householdId } = requireSession(req);
     const { id } = await params;
     const completionId = parseInt(id);
 
@@ -32,12 +34,15 @@ export async function POST(req: NextRequest, { params }: Params) {
     const updateField = type === "before" ? "photoBeforePath" : "photoAfterPath";
 
     const completion = await prisma.taskCompletion.update({
-      where: { id: completionId },
+      where: { id: completionId, householdId },
       data: { [updateField]: relativePath },
     });
 
     return NextResponse.json({ path: relativePath, completion });
   } catch (e) {
+    const authResponse = authErrorResponse(e);
+    if (authResponse) return authResponse;
+
     const message = e instanceof Error ? e.message : String(e);
     console.error("[API photo]", message);
     return NextResponse.json({ error: message }, { status: 500 });

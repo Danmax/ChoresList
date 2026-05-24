@@ -6,12 +6,21 @@ import { Users, ListChecks, CalendarDays, DollarSign, BookOpen, Home, BarChart2,
 
 export default function ParentPanel() {
   const [unlocked, setUnlocked] = useState(false);
+  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [householdName, setHouseholdName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [confirmUrl, setConfirmUrl] = useState("");
+  const [canResendConfirmation, setCanResendConfirmation] = useState(false);
   const [checking, setChecking] = useState(false);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("confirmed")) setNotice("Email confirmed. You can sign in now.");
+    if (params.has("confirmError")) setError("Confirmation link is invalid or expired.");
+
     fetch("/api/parent/auth")
       .then((res) => res.json())
       .then(({ ok }) => setUnlocked(Boolean(ok)))
@@ -25,19 +34,52 @@ export default function ParentPanel() {
       const res = await fetch("/api/parent/auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, mode, householdName }),
       });
-      const { ok } = await res.json();
-      if (ok) {
+      const data = await res.json();
+      if (data.ok && data.needsConfirmation) {
+        setNotice("Account created. Confirm your email, then sign in.");
+        setConfirmUrl(data.confirmUrl ?? "");
+        setCanResendConfirmation(false);
+        setMode("login");
+        setPassword("");
+        setError("");
+      } else if (data.ok) {
         setUnlocked(true);
         setError("");
+        setNotice("");
       } else {
-        setError("Email or password is incorrect.");
-        setPassword("");
+        setError(data.error ?? "Email or password is incorrect.");
+        setCanResendConfirmation(Boolean(data.needsConfirmation));
+        if (!data.needsConfirmation) setPassword("");
       }
     } catch {
       setError("Couldn't verify your login. Try again.");
       setPassword("");
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  async function resendConfirmation() {
+    setChecking(true);
+    try {
+      const res = await fetch("/api/parent/resend-confirmation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setNotice(data.message ?? "Confirmation sent.");
+        setConfirmUrl(data.confirmUrl ?? "");
+        setError("");
+        setCanResendConfirmation(false);
+      } else {
+        setError(data.error ?? "Could not resend confirmation.");
+      }
+    } catch {
+      setError("Could not resend confirmation.");
     } finally {
       setChecking(false);
     }
@@ -54,10 +96,26 @@ export default function ParentPanel() {
       <div className="min-h-screen flex items-center justify-center p-6">
         <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-sm text-center">
           <div className="text-6xl mb-4">🔒</div>
-          <h1 className="text-2xl font-black text-slate-800 mb-2">Parent Panel</h1>
-          <p className="text-slate-500 font-semibold mb-6">Sign in with your parent account</p>
+          <h1 className="text-2xl font-black text-slate-800 mb-2">{mode === "signup" ? "Create Household" : "Parent Panel"}</h1>
+          <p className="text-slate-500 font-semibold mb-6">
+            {mode === "signup" ? "Start a private family workspace" : "Sign in with your parent account"}
+          </p>
 
           <form onSubmit={submitLogin} className="space-y-4 text-left">
+            {mode === "signup" && (
+              <label className="block">
+                <span className="text-sm font-bold text-slate-600">Household name</span>
+                <input
+                  type="text"
+                  value={householdName}
+                  onChange={(event) => setHouseholdName(event.target.value)}
+                  autoComplete="organization"
+                  className="mt-1 w-full rounded-2xl border-2 border-slate-200 bg-slate-50 px-3 py-2 font-semibold text-slate-800 outline-none focus:border-violet-400"
+                  placeholder="The Maldonado Family"
+                />
+              </label>
+            )}
+
             <label className="block">
               <span className="text-sm font-bold text-slate-600">Email</span>
               <div className="mt-1 flex items-center gap-2 rounded-2xl border-2 border-slate-200 bg-slate-50 px-3 py-2 focus-within:border-violet-400">
@@ -97,9 +155,36 @@ export default function ParentPanel() {
             </button>
           </form>
 
+          {notice && <p className="mt-4 text-emerald-600 font-bold text-sm">{notice}</p>}
+          {confirmUrl && (
+            <a href={confirmUrl} className="mt-2 block break-all text-xs font-bold text-violet-500 hover:text-violet-700">
+              Development confirmation link
+            </a>
+          )}
           {error && <p className="text-red-500 font-bold text-sm">{error}</p>}
+          {canResendConfirmation && (
+            <button
+              type="button"
+              onClick={resendConfirmation}
+              disabled={!email || !password || checking}
+              className="mt-3 w-full rounded-2xl bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200 disabled:opacity-40"
+            >
+              Resend confirmation email
+            </button>
+          )}
 
-          <p className="text-slate-400 text-xs mt-4">Default login: parent@example.com / ChangeMe123!</p>
+          <button
+            type="button"
+            onClick={() => {
+              setMode((current) => (current === "login" ? "signup" : "login"));
+              setError("");
+              setNotice("");
+              setConfirmUrl("");
+            }}
+            className="mt-4 text-sm font-bold text-violet-500 hover:text-violet-700"
+          >
+            {mode === "signup" ? "Already have an account? Sign in" : "Create a household account"}
+          </button>
 
           <Link href="/dashboard" className="block mt-4 text-slate-400 text-sm font-semibold hover:text-slate-600">
             ← Back to Dashboard

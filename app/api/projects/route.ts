@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getLevelFromPoints } from "@/lib/points";
-import { withErrors } from "@/lib/api";
+import { requireSession, withErrors } from "@/lib/api";
 
 export const GET = withErrors(async (req: NextRequest) => {
+  const { householdId } = requireSession(req);
   const { searchParams } = new URL(req.url);
   const memberId = searchParams.get("memberId");
   const status = searchParams.get("status");
 
   const projects = await prisma.houseProject.findMany({
     where: {
+      householdId,
       ...(status && { status }),
       ...(memberId && { OR: [{ assignedTo: parseInt(memberId) }, { assignedTo: null }] }),
     },
@@ -23,9 +25,15 @@ export const GET = withErrors(async (req: NextRequest) => {
 });
 
 export const POST = withErrors(async (req: NextRequest) => {
+  const { householdId } = requireSession(req);
   const body = await req.json();
+  if (body.assignedTo) {
+    const assignee = await prisma.familyMember.findFirst({ where: { id: body.assignedTo, householdId } });
+    if (!assignee) return NextResponse.json({ error: "Assignee not found" }, { status: 404 });
+  }
   const project = await prisma.houseProject.create({
     data: {
+      householdId,
       title: body.title,
       description: body.description ?? null,
       category: body.category ?? "other",
@@ -42,15 +50,20 @@ export const POST = withErrors(async (req: NextRequest) => {
 });
 
 export const PUT = withErrors(async (req: NextRequest) => {
+  const { householdId } = requireSession(req);
   const body = await req.json();
 
   if (body.status === "completed" && body.completedById) {
+    const member = await prisma.familyMember.findUnique({ where: { id: body.completedById, householdId } });
+    if (!member) return NextResponse.json({ error: "Member not found" }, { status: 404 });
+
     const project = await prisma.houseProject.update({
-      where: { id: body.id },
+      where: { id: body.id, householdId },
       data: { status: "completed" },
     });
     const ticket = await prisma.rewardTicket.create({
       data: {
+        householdId,
         projectId: project.id,
         memberId: body.completedById,
         rewardTitle: project.rewardTitle,
@@ -58,20 +71,22 @@ export const PUT = withErrors(async (req: NextRequest) => {
       },
     });
     if (project.pointsBonus > 0) {
-      const member = await prisma.familyMember.findUnique({ where: { id: body.completedById } });
-      if (member) {
-        const newPoints = member.totalPoints + project.pointsBonus;
-        await prisma.familyMember.update({
-          where: { id: body.completedById },
-          data: { totalPoints: newPoints, level: getLevelFromPoints(newPoints) },
-        });
-      }
+      const newPoints = member.totalPoints + project.pointsBonus;
+      await prisma.familyMember.update({
+        where: { id: body.completedById, householdId },
+        data: { totalPoints: newPoints, level: getLevelFromPoints(newPoints) },
+      });
     }
     return NextResponse.json({ project, ticket });
   }
 
+  if (body.assignedTo) {
+    const assignee = await prisma.familyMember.findFirst({ where: { id: body.assignedTo, householdId } });
+    if (!assignee) return NextResponse.json({ error: "Assignee not found" }, { status: 404 });
+  }
+
   const project = await prisma.houseProject.update({
-    where: { id: body.id },
+    where: { id: body.id, householdId },
     data: {
       ...(body.title !== undefined && { title: body.title }),
       ...(body.description !== undefined && { description: body.description }),
@@ -89,8 +104,9 @@ export const PUT = withErrors(async (req: NextRequest) => {
 });
 
 export const DELETE = withErrors(async (req: NextRequest) => {
+  const { householdId } = requireSession(req);
   const { searchParams } = new URL(req.url);
   const id = parseInt(searchParams.get("id") ?? "0");
-  await prisma.houseProject.delete({ where: { id } });
+  await prisma.houseProject.delete({ where: { id, householdId } });
   return NextResponse.json({ ok: true });
 });
