@@ -4,26 +4,39 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Users, ListChecks, CalendarDays, DollarSign, BookOpen, Home, BarChart2, Gift, Wrench, Ticket } from "lucide-react";
 
-const PARENT_PIN = process.env.NEXT_PUBLIC_PARENT_PIN ?? "1234";
-
 export default function ParentPanel() {
   const [unlocked, setUnlocked] = useState(false);
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
+  const [checking, setChecking] = useState(false);
 
   useEffect(() => {
     const stored = sessionStorage.getItem("parent-unlocked");
     if (stored === "true") setUnlocked(true);
   }, []);
 
-  function submitPin() {
-    if (pin === PARENT_PIN) {
-      sessionStorage.setItem("parent-unlocked", "true");
-      setUnlocked(true);
-      setError("");
-    } else {
-      setError("Wrong PIN, try again!");
+  async function submitPin() {
+    setChecking(true);
+    try {
+      const res = await fetch("/api/parent/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin }),
+      });
+      const { ok } = await res.json();
+      if (ok) {
+        sessionStorage.setItem("parent-unlocked", "true");
+        setUnlocked(true);
+        setError("");
+      } else {
+        setError("Wrong PIN, try again!");
+        setPin("");
+      }
+    } catch {
+      setError("Couldn't verify PIN. Try again.");
       setPin("");
+    } finally {
+      setChecking(false);
     }
   }
 
@@ -76,10 +89,10 @@ export default function ParentPanel() {
             </button>
             <button
               onClick={submitPin}
-              disabled={pin.length !== 4}
+              disabled={pin.length !== 4 || checking}
               className="bg-violet-500 hover:bg-violet-600 text-white rounded-2xl py-3 text-xl font-bold transition-colors disabled:opacity-40"
             >
-              ✓
+              {checking ? "…" : "✓"}
             </button>
           </div>
 
