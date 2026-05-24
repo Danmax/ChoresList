@@ -28,11 +28,26 @@ interface Member {
 export default function FamilyDashboard() {
   const [members, setMembers] = useState<Member[]>([]);
   const [tvMode, setTvMode] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   const loadMembers = useCallback(async () => {
-    const res = await fetch("/api/members");
-    const data = await res.json();
-    setMembers(data);
+    try {
+      const res = await fetch("/api/members");
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !Array.isArray(data)) {
+        const msg = (data && typeof data === "object" && "error" in data && typeof data.error === "string")
+          ? data.error
+          : `HTTP ${res.status}`;
+        setApiError(msg);
+        setMembers([]);
+        return;
+      }
+      setApiError(null);
+      setMembers(data);
+    } catch (e) {
+      setApiError(e instanceof Error ? e.message : String(e));
+      setMembers([]);
+    }
   }, []);
 
   useEffect(() => {
@@ -79,7 +94,17 @@ export default function FamilyDashboard() {
         )}
       </div>
 
-      {kids.length === 0 && (
+      {apiError && (
+        <div className="mb-6 rounded-2xl border-2 border-red-200 bg-red-50 p-4 text-sm">
+          <p className="font-bold text-red-700 mb-1">⚠️ Couldn&apos;t load family members</p>
+          <pre className="whitespace-pre-wrap break-words text-red-900 font-mono text-xs">{apiError}</pre>
+          <p className="text-red-600 text-xs mt-2">
+            Check that <code>DATABASE_URL</code> is set in your Hostinger env panel and that migrations have run.
+          </p>
+        </div>
+      )}
+
+      {kids.length === 0 && !apiError && (
         <div className="text-center py-24">
           <div className="text-8xl mb-6">👨‍👩‍👧‍👦</div>
           <h2 className="text-2xl font-bold text-slate-700 mb-2">No family members yet</h2>
