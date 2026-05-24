@@ -31,7 +31,7 @@ export default function AssignPage() {
   const [selectedMember, setSelectedMember] = useState<string>("");
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
-    memberId: 0, choreId: 0, frequency: "daily", dueDate: "", dayOfWeek: "1",
+    memberId: "", choreId: "", frequency: "daily", dueDate: "", dayOfWeek: "1",
   });
 
   const load = useCallback(async () => {
@@ -53,7 +53,9 @@ export default function AssignPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        ...form,
+        memberId: parseInt(form.memberId),
+        choreId: parseInt(form.choreId),
+        frequency: form.frequency,
         dueDate: form.dueDate || null,
         dayOfWeek: form.frequency === "weekly" ? parseInt(form.dayOfWeek) : null,
       }),
@@ -73,7 +75,7 @@ export default function AssignPage() {
     ? assignments.filter((a) => a.memberId === parseInt(selectedMember))
     : assignments;
 
-  const selectedMemberObj = members.find((m) => m.id === form.memberId);
+  const selectedMemberObj = members.find((m) => m.id === parseInt(form.memberId));
   const availableChores = selectedMemberObj
     ? chores.filter((c) => {
         const isParent = selectedMemberObj.role === "parent" || selectedMemberObj.role === "mom" || selectedMemberObj.role === "dad";
@@ -89,7 +91,7 @@ export default function AssignPage() {
         </Link>
         <h1 className="text-3xl font-black text-slate-800 flex-1">📅 Assign Chores</h1>
         <button
-          onClick={() => { setForm({ memberId: 0, choreId: 0, frequency: "daily", dueDate: "", dayOfWeek: "1" }); setOpen(true); }}
+          onClick={() => { setForm({ memberId: "", choreId: "", frequency: "daily", dueDate: "", dayOfWeek: "1" }); setOpen(true); }}
           className="flex items-center gap-2 bg-emerald-500 text-white rounded-2xl px-4 py-2.5 font-bold hover:bg-emerald-600 transition-colors"
         >
           <Plus size={18} /> Assign Chore
@@ -153,7 +155,7 @@ export default function AssignPage() {
           <div className="space-y-4">
             <div>
               <Label className="font-bold">Family Member</Label>
-              <Select onValueChange={(v) => { const id = Number(v); setForm((p) => ({ ...p, memberId: isNaN(id) ? 0 : id, choreId: 0 })); }}>
+              <Select value={form.memberId} onValueChange={(v) => setForm((p) => ({ ...p, memberId: v ?? "", choreId: "" }))}>
                 <SelectTrigger className="rounded-xl mt-1">
                   <SelectValue placeholder="Select a family member" />
                 </SelectTrigger>
@@ -169,7 +171,7 @@ export default function AssignPage() {
             </div>
             <div>
               <Label className="font-bold">Chore</Label>
-              <Select onValueChange={(v) => { const id = Number(v); setForm((p) => ({ ...p, choreId: isNaN(id) ? 0 : id })); }}>
+              <Select value={form.choreId} onValueChange={(v) => setForm((p) => ({ ...p, choreId: v ?? "" }))}>
                 <SelectTrigger className="rounded-xl mt-1">
                   <SelectValue placeholder="Select a chore" />
                 </SelectTrigger>

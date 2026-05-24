@@ -195,17 +195,23 @@ export default function ProjectsPage() {
           <p className="text-slate-500 font-semibold text-sm">{completingProject?.title}</p>
           <div className="space-y-4 pt-2">
             <div>
-              <Label className="font-bold">Completed by</Label>
-              <Select value={completedById} onValueChange={(v) => setCompletedById(v ?? "")}>
-                <SelectTrigger className="rounded-xl mt-1">
-                  <SelectValue placeholder="Select a family member" />
-                </SelectTrigger>
-                <SelectContent>
-                  {members.map((m) => (
-                    <SelectItem key={m.id} value={String(m.id)}>{m.avatar} {m.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label className="font-bold mb-2 block">Completed by</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {members.map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => setCompletedById(String(m.id))}
+                    className={`flex items-center gap-2 p-3 rounded-xl font-bold transition-all border-2 ${
+                      completedById === String(m.id)
+                        ? "bg-emerald-50 border-emerald-400 text-emerald-800"
+                        : "bg-slate-50 border-transparent text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    <span className="text-2xl">{m.avatar}</span>
+                    <span className="text-sm">{m.name}</span>
+                  </button>
+                ))}
+              </div>
             </div>
             {completedById && completingProject && (
               <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-sm font-semibold text-amber-700">
