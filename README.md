@@ -5,8 +5,8 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 Configure MySQL before running the app:
 
 ```bash
-DATABASE_URL="mysql://USER:PASSWORD@HOST:3306/chores_list"
-DIRECT_URL="mysql://USER:PASSWORD@HOST:3306/chores_list"
+DATABASE_URL="mysql://u130206374_parent:PASSWORD@HOST:3306/u130206374_chores"
+DIRECT_URL="mysql://u130206374_parent:PASSWORD@HOST:3306/u130206374_chores"
 PARENT_EMAIL="parent@example.com"
 PARENT_PASSWORD="ChangeMe123!"
 AUTH_SECRET="replace-with-a-long-random-string"
