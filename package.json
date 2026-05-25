@@ -4,9 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && prisma migrate deploy && next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:resolve:init": "prisma migrate resolve --applied 20260524054410_init",
     "db:seed": "npx tsx prisma/seed.ts",
     "db:studio": "prisma studio"
   },
