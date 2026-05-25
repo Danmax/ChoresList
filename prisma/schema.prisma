@@ -41,6 +41,8 @@ model Household {
   houseProjects     HouseProject[]
   rewardTickets     RewardTicket[]
   events            FamilyEvent[]
+  devices           HouseholdDevice[]
+  pairingCodes      DevicePairingCode[]
 }
 
 model EmailConfirmationToken {
@@ -74,6 +76,8 @@ model FamilyMember {
   wishList         WishListItem[]
   houseProjects    HouseProject[]     @relation("ProjectAssignee")
   rewardTickets    RewardTicket[]
+  devices          HouseholdDevice[]
+  pairingCodes     DevicePairingCode[]
   household        Household          @relation(fields: [householdId], references: [id], onDelete: Cascade)
 }
 
@@ -267,4 +271,34 @@ model FamilyEvent {
   createdAt   DateTime  @default(now())
 
   household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+}
+
+model HouseholdDevice {
+  id          Int       @id @default(autoincrement())
+  householdId Int
+  memberId    Int?
+  name        String    @db.VarChar(255)
+  mode        String    @default("household") @db.VarChar(32)
+  tokenHash   String    @unique @db.VarChar(255)
+  lastSeenAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  household Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  member    FamilyMember? @relation(fields: [memberId], references: [id], onDelete: SetNull)
+}
+
+model DevicePairingCode {
+  id          Int       @id @default(autoincrement())
+  householdId Int
+  memberId    Int?
+  codeHash    String    @unique @db.VarChar(255)
+  deviceName  String    @db.VarChar(255)
+  mode        String    @default("household") @db.VarChar(32)
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  household Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  member    FamilyMember? @relation(fields: [memberId], references: [id], onDelete: SetNull)
 }

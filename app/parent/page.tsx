@@ -2,7 +2,7 @@
 
 import { type FormEvent, useState, useEffect } from "react";
 import Link from "next/link";
-import { Users, ListChecks, CalendarDays, DollarSign, BookOpen, Home, BarChart2, Gift, Wrench, Ticket, Mail, LockKeyhole } from "lucide-react";
+import { Users, ListChecks, CalendarDays, DollarSign, BookOpen, Home, BarChart2, Gift, Wrench, Ticket, Mail, LockKeyhole, MonitorSmartphone } from "lucide-react";
 
 export default function ParentPanel() {
   const [unlocked, setUnlocked] = useState(false);
@@ -202,6 +202,7 @@ export default function ParentPanel() {
     { href: "/parent/projects", icon: Wrench, label: "House Projects", desc: "Fix-it tasks with reward tickets", color: "#f97316", bg: "#ffedd5" },
     { href: "/parent/tickets", icon: Ticket, label: "Reward Tickets", desc: "Cash in earned rewards", color: "#eab308", bg: "#fefce8" },
     { href: "/parent/reports", icon: BarChart2, label: "Reports", desc: "Charts, completions & points trends", color: "#10b981", bg: "#d1fae5" },
+    { href: "/parent/devices", icon: MonitorSmartphone, label: "Device Screens", desc: "Pair QR task boards for kids", color: "#6366f1", bg: "#e0e7ff" },
     { href: "/parent/wishlist", icon: Gift, label: "Wish Lists", desc: "Grant kids' wishes & requests", color: "#f472b6", bg: "#fce7f3" },
     { href: "/calendar", icon: BookOpen, label: "Family Calendar", desc: "Schedule events & activities", color: "#f97316", bg: "#ffedd5" },
   ];
