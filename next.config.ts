@@ -9,6 +9,10 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  assetPrefix: process.env.NODE_ENV === "production" ? "/next-assets" : undefined,
+  images: {
+    unoptimized: true,
+  },
   turbopack: {
     root: process.cwd(),
   },
