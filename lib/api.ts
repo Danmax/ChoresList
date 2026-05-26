@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { AuthError } from "@/lib/auth-error";
 import { parentSession, verifySessionToken, type SessionPayload } from "@/lib/session";
+import { ElevationRequiredError, requireElevation } from "@/lib/elevation";
+
+export { AuthError };
 
 type RouteHandler = (req: NextRequest, ctx?: unknown) => Promise<NextResponse | Response>;
 
@@ -25,14 +29,6 @@ export function withErrors(handler: RouteHandler): RouteHandler {
   };
 }
 
-export class AuthError extends Error {
-  status = 401;
-
-  constructor(message = "Authentication required") {
-    super(message);
-  }
-}
-
 export function requireSession(req: NextRequest): SessionPayload {
   const session = verifySessionToken(req.cookies.get(parentSession.name)?.value);
   if (!session) throw new AuthError();
@@ -40,8 +36,20 @@ export function requireSession(req: NextRequest): SessionPayload {
 }
 
 export function authErrorResponse(error: unknown) {
+  if (error instanceof ElevationRequiredError) {
+    return NextResponse.json(
+      { error: error.message, needsPin: true, hasPin: error.hasPin },
+      { status: error.status }
+    );
+  }
   if (error instanceof AuthError) {
     return NextResponse.json({ error: error.message }, { status: error.status });
   }
   return null;
+}
+
+export async function requireParentSession(req: NextRequest): Promise<SessionPayload> {
+  const session = requireSession(req);
+  await requireElevation(req, session.parentId, session.householdId);
+  return session;
 }

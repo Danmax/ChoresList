@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { calcPointsEarned, getLevelFromPoints } from "@/lib/points";
 import { getWeekStart } from "@/lib/allowance";
-import { requireSession, withErrors } from "@/lib/api";
+import { requireParentSession, requireSession, withErrors } from "@/lib/api";
 
 export const POST = withErrors(async (req: NextRequest) => {
   const { householdId } = requireSession(req);
@@ -73,7 +73,7 @@ export const GET = withErrors(async (req: NextRequest) => {
 });
 
 export const PUT = withErrors(async (req: NextRequest) => {
-  const { householdId } = requireSession(req);
+  const { householdId } = await requireParentSession(req);
   const body = await req.json();
   const { id, verifiedByParent } = body;
 

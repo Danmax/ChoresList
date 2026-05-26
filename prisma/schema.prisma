@@ -15,6 +15,8 @@ model ParentAccount {
   email         String   @unique @db.VarChar(255)
   passwordHash  String   @db.VarChar(255)
   passwordSalt  String   @db.VarChar(255)
+  pinHash       String?  @db.VarChar(255)
+  pinSalt       String?  @db.VarChar(255)
   emailVerified Boolean  @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @default(now()) @updatedAt

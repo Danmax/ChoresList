@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireSession, withErrors } from "@/lib/api";
+import { requireParentSession, requireSession, withErrors } from "@/lib/api";
 
 export const GET = withErrors(async (req: NextRequest) => {
   const { householdId } = requireSession(req);
@@ -35,7 +35,7 @@ export const GET = withErrors(async (req: NextRequest) => {
 });
 
 export const POST = withErrors(async (req: NextRequest) => {
-  const { householdId } = requireSession(req);
+  const { householdId } = await requireParentSession(req);
   const body = await req.json();
   const [member, chore] = await Promise.all([
     prisma.familyMember.findFirst({ where: { id: body.memberId, householdId } }),
@@ -58,7 +58,7 @@ export const POST = withErrors(async (req: NextRequest) => {
 });
 
 export const DELETE = withErrors(async (req: NextRequest) => {
-  const { householdId } = requireSession(req);
+  const { householdId } = await requireParentSession(req);
   const { searchParams } = new URL(req.url);
   const id = parseInt(searchParams.get("id") ?? "0");
   await prisma.choreAssignment.update({ where: { id, householdId }, data: { isActive: false } });

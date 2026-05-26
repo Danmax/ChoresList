@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { streamChoreInstructions } from "@/lib/ai-instructions";
-import { authErrorResponse, requireSession } from "@/lib/api";
+import { authErrorResponse, requireParentSession, requireSession } from "@/lib/api";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -27,7 +27,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
 export async function POST(_req: NextRequest, { params }: Params) {
   try {
-    const { householdId } = requireSession(_req);
+    const { householdId } = await requireParentSession(_req);
     const { id } = await params;
     const choreId = parseInt(id);
     const chore = await prisma.chore.findUnique({ where: { id: choreId, householdId } });
@@ -80,7 +80,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
 
 export async function PUT(req: NextRequest, { params }: Params) {
   try {
-    const { householdId } = requireSession(req);
+    const { householdId } = await requireParentSession(req);
     const { id } = await params;
     const choreId = parseInt(id);
     const chore = await prisma.chore.findUnique({ where: { id: choreId, householdId } });
@@ -108,7 +108,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
   try {
-    const { householdId } = requireSession(_req);
+    const { householdId } = await requireParentSession(_req);
     const { id } = await params;
     const instructions = await prisma.choreInstructions.findFirst({
       where: { choreId: parseInt(id), chore: { householdId } },

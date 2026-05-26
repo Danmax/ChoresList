@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getLevelFromPoints } from "@/lib/points";
-import { requireSession, withErrors } from "@/lib/api";
+import { requireParentSession, requireSession, withErrors } from "@/lib/api";
 
 export const GET = withErrors(async (req: NextRequest) => {
   const { householdId } = requireSession(req);
@@ -25,7 +25,7 @@ export const GET = withErrors(async (req: NextRequest) => {
 });
 
 export const POST = withErrors(async (req: NextRequest) => {
-  const { householdId } = requireSession(req);
+  const { householdId } = await requireParentSession(req);
   const body = await req.json();
   if (body.assignedTo) {
     const assignee = await prisma.familyMember.findFirst({ where: { id: body.assignedTo, householdId } });
@@ -49,13 +49,29 @@ export const POST = withErrors(async (req: NextRequest) => {
   return NextResponse.json(project, { status: 201 });
 });
 
+const KID_COMPLETE_FIELDS = new Set(["id", "status", "completedById"]);
+
 export const PUT = withErrors(async (req: NextRequest) => {
-  const { householdId } = requireSession(req);
   const body = await req.json();
 
-  if (body.status === "completed" && body.completedById) {
+  const isKidCompletion =
+    body?.status === "completed" &&
+    typeof body?.completedById === "number" &&
+    Object.keys(body).every((k) => KID_COMPLETE_FIELDS.has(k));
+
+  const { householdId } = isKidCompletion
+    ? requireSession(req)
+    : await requireParentSession(req);
+
+  if (isKidCompletion) {
     const member = await prisma.familyMember.findUnique({ where: { id: body.completedById, householdId } });
     if (!member) return NextResponse.json({ error: "Member not found" }, { status: 404 });
+
+    const existing = await prisma.houseProject.findFirst({ where: { id: body.id, householdId } });
+    if (!existing) return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    if (existing.status === "completed") {
+      return NextResponse.json({ error: "Project already completed" }, { status: 409 });
+    }
 
     const project = await prisma.houseProject.update({
       where: { id: body.id, householdId },
@@ -104,7 +120,7 @@ export const PUT = withErrors(async (req: NextRequest) => {
 });
 
 export const DELETE = withErrors(async (req: NextRequest) => {
-  const { householdId } = requireSession(req);
+  const { householdId } = await requireParentSession(req);
   const { searchParams } = new URL(req.url);
   const id = parseInt(searchParams.get("id") ?? "0");
   await prisma.houseProject.delete({ where: { id, householdId } });

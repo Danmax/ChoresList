@@ -1,0 +1,3 @@
+ALTER TABLE `ParentAccount`
+  ADD COLUMN `pinHash` VARCHAR(255) NULL,
+  ADD COLUMN `pinSalt` VARCHAR(255) NULL;

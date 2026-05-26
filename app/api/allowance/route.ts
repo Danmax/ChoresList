@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { calcWeeklyAllowance, getWeekStart } from "@/lib/allowance";
-import { requireSession, withErrors } from "@/lib/api";
+import { requireParentSession, requireSession, withErrors } from "@/lib/api";
 
 export const GET = withErrors(async (req: NextRequest) => {
   const { householdId } = requireSession(req);
@@ -16,7 +16,7 @@ export const GET = withErrors(async (req: NextRequest) => {
 });
 
 export const POST = withErrors(async (req: NextRequest) => {
-  const { householdId } = requireSession(req);
+  const { householdId } = await requireParentSession(req);
   const body = await req.json();
   const { memberId } = body;
   const member = await prisma.familyMember.findFirst({ where: { id: memberId, householdId } });
@@ -36,7 +36,7 @@ export const POST = withErrors(async (req: NextRequest) => {
 });
 
 export const PUT = withErrors(async (req: NextRequest) => {
-  const { householdId } = requireSession(req);
+  const { householdId } = await requireParentSession(req);
   const body = await req.json();
   const { id, paidOut } = body;
   const allowance = await prisma.weeklyAllowance.update({ where: { id, householdId }, data: { paidOut } });
@@ -44,7 +44,7 @@ export const PUT = withErrors(async (req: NextRequest) => {
 });
 
 export const PATCH = withErrors(async (req: NextRequest) => {
-  const { householdId } = requireSession(req);
+  const { householdId } = await requireParentSession(req);
   const body = await req.json();
   const { memberId, weeklyBaseRate, pointsToDollar } = body;
   const member = await prisma.familyMember.findFirst({ where: { id: memberId, householdId } });

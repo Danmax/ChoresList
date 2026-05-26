@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireSession, withErrors } from "@/lib/api";
+import { requireParentSession, requireSession, withErrors } from "@/lib/api";
 import { getBaseUrl } from "@/lib/base-url";
 import { generatePairingCode, hashPairingCode } from "@/lib/device-session";
 
@@ -19,7 +19,7 @@ export const GET = withErrors(async (req: NextRequest) => {
 });
 
 export const POST = withErrors(async (req: NextRequest) => {
-  const { householdId } = requireSession(req);
+  const { householdId } = await requireParentSession(req);
   const body = await req.json();
   const mode = body.mode === "member" ? "member" : "household";
   const memberId = mode === "member" ? Number(body.memberId) : null;
@@ -69,7 +69,7 @@ export const POST = withErrors(async (req: NextRequest) => {
 });
 
 export const DELETE = withErrors(async (req: NextRequest) => {
-  const { householdId } = requireSession(req);
+  const { householdId } = await requireParentSession(req);
   const { searchParams } = new URL(req.url);
   const id = Number(searchParams.get("id") ?? 0);
 

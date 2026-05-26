@@ -1,6 +1,6 @@
 import { createHash, createHmac, randomBytes, randomInt, timingSafeEqual } from "crypto";
 import { NextRequest } from "next/server";
-import { AuthError } from "@/lib/api";
+import { AuthError } from "@/lib/auth-error";
 
 const DEVICE_SESSION_TTL_SECONDS = 60 * 60 * 24 * 90;
 const DEVICE_SESSION_COOKIE = "kid-device-session";
