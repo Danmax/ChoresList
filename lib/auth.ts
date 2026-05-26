@@ -28,3 +28,13 @@ export function createConfirmationToken() {
 export function hashConfirmationToken(token: string) {
   return hashPassword(token, "email-confirmation").passwordHash;
 }
+
+export function createPasswordResetToken() {
+  const token = randomBytes(32).toString("base64url");
+  const tokenHash = hashPassword(token, "password-reset").passwordHash;
+  return { token, tokenHash };
+}
+
+export function hashPasswordResetToken(token: string) {
+  return hashPassword(token, "password-reset").passwordHash;
+}

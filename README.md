@@ -10,12 +10,12 @@ DIRECT_URL="mysql://u130206374_parent:PASSWORD@srv2104.hstgr.io:3306/u130206374_
 PARENT_EMAIL="parent@example.com"
 PARENT_PASSWORD="ChangeMe123!"
 AUTH_SECRET="replace-with-a-long-random-string"
-SMTP_HOST=""
+SMTP_HOST="smtp.gmail.com"
 SMTP_PORT="587"
 SMTP_SECURE="false"
-SMTP_USER=""
-SMTP_PASSWORD=""
-SMTP_FROM=""
+SMTP_USER="chores@frowear.com"
+SMTP_PASSWORD="your-gmail-app-password"
+SMTP_FROM="ChoresList <chores@frowear.com>"
 ```
 
 Then create the schema and seed the default chores plus the parent login:
@@ -26,6 +26,8 @@ npm run db:seed
 ```
 
 Parent accounts are household-scoped. New households can sign up from `/parent`; if SMTP is configured the app sends a confirmation email, otherwise it returns a development confirmation link.
+
+For Gmail SMTP, `SMTP_PASSWORD` must be a Google app password for `chores@frowear.com`, not the normal Gmail password. In the Google account, enable 2-Step Verification, then create an app password for Mail and paste that 16-character password into `.env` and the production host environment variables.
 
 First, run the development server:
 

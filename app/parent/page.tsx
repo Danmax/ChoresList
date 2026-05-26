@@ -6,10 +6,11 @@ import { Users, ListChecks, CalendarDays, DollarSign, BookOpen, Home, BarChart2,
 
 export default function ParentPanel() {
   const [unlocked, setUnlocked] = useState(false);
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [mode, setMode] = useState<"login" | "signup" | "forgot" | "reset">("login");
   const [householdName, setHouseholdName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [resetToken, setResetToken] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [confirmUrl, setConfirmUrl] = useState("");
@@ -20,6 +21,12 @@ export default function ParentPanel() {
     const params = new URLSearchParams(window.location.search);
     if (params.has("confirmed")) setNotice("Email confirmed. You can sign in now.");
     if (params.has("confirmError")) setError("Confirmation link is invalid or expired.");
+    const token = params.get("reset");
+    if (token) {
+      setResetToken(token);
+      setMode("reset");
+      setNotice("Choose a new parent password.");
+    }
 
     fetch("/api/parent/auth")
       .then((res) => res.json())
@@ -29,6 +36,15 @@ export default function ParentPanel() {
 
   async function submitLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (mode === "forgot") {
+      await requestPasswordReset();
+      return;
+    }
+    if (mode === "reset") {
+      await resetPassword();
+      return;
+    }
+
     setChecking(true);
     try {
       const res = await fetch("/api/parent/auth", {
@@ -56,6 +72,56 @@ export default function ParentPanel() {
     } catch {
       setError("Couldn't verify your login. Try again.");
       setPassword("");
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  async function requestPasswordReset() {
+    setChecking(true);
+    try {
+      const res = await fetch("/api/parent/password-reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setNotice("If that email has a parent account, a reset link has been sent.");
+        setConfirmUrl(data.resetUrl ?? "");
+        setError("");
+      } else {
+        setError(data.error ?? "Could not send reset link.");
+      }
+    } catch {
+      setError("Could not send reset link.");
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  async function resetPassword() {
+    setChecking(true);
+    try {
+      const res = await fetch("/api/parent/password-reset", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: resetToken, password }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setNotice("Password updated. Sign in with your new password.");
+        setMode("login");
+        setPassword("");
+        setResetToken("");
+        setConfirmUrl("");
+        setError("");
+        window.history.replaceState({}, "", "/parent");
+      } else {
+        setError(data.error ?? "Could not reset password.");
+      }
+    } catch {
+      setError("Could not reset password.");
     } finally {
       setChecking(false);
     }
@@ -96,9 +162,17 @@ export default function ParentPanel() {
       <div className="min-h-screen flex items-center justify-center p-6">
         <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-sm text-center">
           <div className="text-6xl mb-4">🔒</div>
-          <h1 className="text-2xl font-black text-slate-800 mb-2">{mode === "signup" ? "Create Household" : "Parent Panel"}</h1>
+          <h1 className="text-2xl font-black text-slate-800 mb-2">
+            {mode === "signup" ? "Create Household" : mode === "forgot" ? "Reset Password" : mode === "reset" ? "New Password" : "Parent Panel"}
+          </h1>
           <p className="text-slate-500 font-semibold mb-6">
-            {mode === "signup" ? "Start a private family workspace" : "Sign in with your parent account"}
+            {mode === "signup"
+              ? "Start a private family workspace"
+              : mode === "forgot"
+                ? "Send a password reset link"
+                : mode === "reset"
+                  ? "Enter a new parent password"
+                  : "Sign in with your parent account"}
           </p>
 
           <form onSubmit={submitLogin} className="space-y-4 text-left">
@@ -116,6 +190,7 @@ export default function ParentPanel() {
               </label>
             )}
 
+            {mode !== "reset" && (
             <label className="block">
               <span className="text-sm font-bold text-slate-600">Email</span>
               <div className="mt-1 flex items-center gap-2 rounded-2xl border-2 border-slate-200 bg-slate-50 px-3 py-2 focus-within:border-violet-400">
@@ -130,28 +205,31 @@ export default function ParentPanel() {
                 />
               </div>
             </label>
+            )}
 
-            <label className="block">
-              <span className="text-sm font-bold text-slate-600">Password</span>
-              <div className="mt-1 flex items-center gap-2 rounded-2xl border-2 border-slate-200 bg-slate-50 px-3 py-2 focus-within:border-violet-400">
-                <LockKeyhole size={18} className="text-slate-400" />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  autoComplete="current-password"
-                  className="min-w-0 flex-1 bg-transparent font-semibold text-slate-800 outline-none"
-                  required
-                />
-              </div>
-            </label>
+            {mode !== "forgot" && (
+              <label className="block">
+                <span className="text-sm font-bold text-slate-600">Password</span>
+                <div className="mt-1 flex items-center gap-2 rounded-2xl border-2 border-slate-200 bg-slate-50 px-3 py-2 focus-within:border-violet-400">
+                  <LockKeyhole size={18} className="text-slate-400" />
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    autoComplete={mode === "reset" || mode === "signup" ? "new-password" : "current-password"}
+                    className="min-w-0 flex-1 bg-transparent font-semibold text-slate-800 outline-none"
+                    required
+                  />
+                </div>
+              </label>
+            )}
 
             <button
               type="submit"
-              disabled={checking}
+              disabled={checking || (mode === "forgot" && !email) || (mode === "reset" && !password)}
               className="w-full bg-violet-500 hover:bg-violet-600 text-white rounded-2xl py-3 text-lg font-bold transition-colors disabled:opacity-40"
             >
-              {checking ? "Checking..." : "Sign In"}
+              {checking ? "Checking..." : mode === "forgot" ? "Send Reset Link" : mode === "reset" ? "Update Password" : mode === "signup" ? "Create Account" : "Sign In"}
             </button>
           </form>
 
@@ -173,18 +251,35 @@ export default function ParentPanel() {
             </button>
           )}
 
-          <button
-            type="button"
-            onClick={() => {
-              setMode((current) => (current === "login" ? "signup" : "login"));
-              setError("");
-              setNotice("");
-              setConfirmUrl("");
-            }}
-            className="mt-4 text-sm font-bold text-violet-500 hover:text-violet-700"
-          >
-            {mode === "signup" ? "Already have an account? Sign in" : "Create a household account"}
-          </button>
+          {mode !== "reset" && (
+            <button
+              type="button"
+              onClick={() => {
+                setMode((current) => (current === "login" ? "signup" : "login"));
+                setError("");
+                setNotice("");
+                setConfirmUrl("");
+              }}
+              className="mt-4 text-sm font-bold text-violet-500 hover:text-violet-700"
+            >
+              {mode === "signup" ? "Already have an account? Sign in" : "Create a household account"}
+            </button>
+          )}
+
+          {mode !== "signup" && (
+            <button
+              type="button"
+              onClick={() => {
+                setMode((current) => (current === "forgot" || current === "reset" ? "login" : "forgot"));
+                setError("");
+                setNotice("");
+                setConfirmUrl("");
+              }}
+              className="mt-3 block w-full text-sm font-bold text-slate-400 hover:text-slate-600"
+            >
+              {mode === "forgot" || mode === "reset" ? "Back to sign in" : "Forgot password?"}
+            </button>
+          )}
 
           <Link href="/dashboard" className="block mt-4 text-slate-400 text-sm font-semibold hover:text-slate-600">
             ← Back to Dashboard

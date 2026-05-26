@@ -21,6 +21,7 @@ model ParentAccount {
 
   household          Household                @relation(fields: [householdId], references: [id], onDelete: Cascade)
   confirmationTokens EmailConfirmationToken[]
+  passwordResetTokens PasswordResetToken[]
 }
 
 model Household {
@@ -46,6 +47,17 @@ model Household {
 }
 
 model EmailConfirmationToken {
+  id        Int       @id @default(autoincrement())
+  parentId  Int
+  tokenHash String    @unique @db.VarChar(255)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  parent ParentAccount @relation(fields: [parentId], references: [id], onDelete: Cascade)
+}
+
+model PasswordResetToken {
   id        Int       @id @default(autoincrement())
   parentId  Int
   tokenHash String    @unique @db.VarChar(255)

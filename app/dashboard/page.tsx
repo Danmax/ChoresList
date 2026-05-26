@@ -29,12 +29,14 @@ export default function FamilyDashboard() {
   const [members, setMembers] = useState<Member[]>([]);
   const [tvMode, setTvMode] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [authRequired, setAuthRequired] = useState(false);
 
   const loadMembers = useCallback(async () => {
     try {
       const res = await fetch("/api/members");
       const data = await res.json().catch(() => null);
       if (!res.ok || !Array.isArray(data)) {
+        setAuthRequired(res.status === 401);
         const msg = (data && typeof data === "object" && "error" in data && typeof data.error === "string")
           ? data.error
           : `HTTP ${res.status}`;
@@ -42,9 +44,11 @@ export default function FamilyDashboard() {
         setMembers([]);
         return;
       }
+      setAuthRequired(false);
       setApiError(null);
       setMembers(data);
     } catch (e) {
+      setAuthRequired(false);
       setApiError(e instanceof Error ? e.message : String(e));
       setMembers([]);
     }
@@ -94,7 +98,19 @@ export default function FamilyDashboard() {
         )}
       </div>
 
-      {apiError && (
+      {authRequired ? (
+        <div className="mx-auto max-w-md rounded-3xl bg-white p-6 text-center shadow-sm">
+          <div className="mb-3 text-5xl">🔒</div>
+          <h2 className="mb-2 text-2xl font-black text-slate-800">Parent sign-in required</h2>
+          <p className="mb-5 text-sm font-semibold text-slate-500">Sign in to view your family dashboard.</p>
+          <Link
+            href="/parent"
+            className="inline-flex rounded-2xl bg-violet-500 px-6 py-3 font-black text-white transition-colors hover:bg-violet-600"
+          >
+            Sign In
+          </Link>
+        </div>
+      ) : apiError && (
         <div className="mb-6 rounded-2xl border-2 border-red-200 bg-red-50 p-4 text-sm">
           <p className="font-bold text-red-700 mb-1">⚠️ Couldn&apos;t load family members</p>
           <pre className="whitespace-pre-wrap break-words text-red-900 font-mono text-xs">{apiError}</pre>
@@ -104,7 +120,7 @@ export default function FamilyDashboard() {
         </div>
       )}
 
-      {kids.length === 0 && !apiError && (
+      {kids.length === 0 && !apiError && !authRequired && (
         <div className="text-center py-24">
           <div className="text-8xl mb-6">👨‍👩‍👧‍👦</div>
           <h2 className="text-2xl font-bold text-slate-700 mb-2">No family members yet</h2>
@@ -126,7 +142,7 @@ export default function FamilyDashboard() {
         </div>
       )}
 
-      {sorted.length > 1 && (
+      {!authRequired && sorted.length > 1 && (
         <div className="mb-8 bg-white/70 backdrop-blur rounded-3xl p-4 shadow-sm">
           <div className="flex items-center gap-2 mb-3">
             <Trophy size={18} className="text-yellow-500" />
@@ -147,25 +163,26 @@ export default function FamilyDashboard() {
         </div>
       )}
 
-      <div
-        className={`grid gap-6 ${
-          tvMode
-            ? "grid-cols-2 gap-10"
-            : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-        }`}
-      >
-        {kids.map((member, i) => {
-          const progress = getPointsForNextLevel(member.totalPoints);
-          const todayDone = member.assignments.filter((a) => a.completions.length > 0).length;
-          const todayTotal = member.assignments.length;
-          const allDone = todayTotal > 0 && todayDone === todayTotal;
+      {!authRequired && (
+        <div
+          className={`grid gap-6 ${
+            tvMode
+              ? "grid-cols-2 gap-10"
+              : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+          }`}
+        >
+          {kids.map((member, i) => {
+            const progress = getPointsForNextLevel(member.totalPoints);
+            const todayDone = member.assignments.filter((a) => a.completions.length > 0).length;
+            const todayTotal = member.assignments.length;
+            const allDone = todayTotal > 0 && todayDone === todayTotal;
 
-          return (
-            <motion.div
-              key={member.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1 }}
+            return (
+              <motion.div
+                key={member.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.1 }}
             >
               <Link href={`/kid/${member.id}`}>
                 <div
@@ -211,12 +228,13 @@ export default function FamilyDashboard() {
                   </div>
                 </div>
               </Link>
-            </motion.div>
-          );
-        })}
-      </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      )}
 
-      {tvMode && (
+      {tvMode && !authRequired && (
         <p className="text-center text-slate-400 mt-12 font-semibold">
           Tap a card to see your chores • Auto-refreshes every minute
         </p>

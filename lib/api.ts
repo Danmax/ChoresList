@@ -12,6 +12,12 @@ export function withErrors(handler: RouteHandler): RouteHandler {
       if (authResponse) return authResponse;
 
       const message = error instanceof Error ? error.message : String(error);
+      if (message.includes("does not exist in the current database") || message.includes("doesn't exist")) {
+        return NextResponse.json(
+          { error: "Database migrations are missing. Run `npm run db:deploy` on the production database, then restart the app." },
+          { status: 500 }
+        );
+      }
       console.error(`[API] ${req.method} ${req.nextUrl?.pathname ?? req.url} →`, message);
       return NextResponse.json({ error: message }, { status: 500 });
     }
