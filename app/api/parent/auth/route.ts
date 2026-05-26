@@ -25,7 +25,7 @@ export const GET = withErrors(async (req: NextRequest) => {
   const confirmationToken = req.nextUrl.searchParams.get("confirm");
   if (confirmationToken) {
     const result = await confirmEmail(confirmationToken);
-    const redirectUrl = new URL("/parent", req.url);
+    const redirectUrl = new URL("/parent", getBaseUrl(req));
     redirectUrl.searchParams.set(result.ok ? "confirmed" : "confirmError", "1");
     return NextResponse.redirect(redirectUrl);
   }
