@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createConfirmationToken, normalizeEmail, verifyPassword } from "@/lib/auth";
 import { withErrors } from "@/lib/api";
+import { getBaseUrl } from "@/lib/base-url";
 import { sendConfirmationEmail } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
+import { rateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
 export const POST = withErrors(async (req: NextRequest) => {
+  const limited = rateLimit(req, { key: "resend-confirm", limit: 5, windowMs: 60 * 60_000 });
+  if (limited) return limited;
+
   const { email, password } = await req.json();
 
   if (typeof email !== "string" || typeof password !== "string") {
@@ -39,7 +44,7 @@ export const POST = withErrors(async (req: NextRequest) => {
     },
   });
 
-  const confirmUrl = new URL("/api/parent/auth", req.url);
+  const confirmUrl = new URL("/api/parent/auth", getBaseUrl(req));
   confirmUrl.searchParams.set("confirm", token);
   const emailResult = await sendConfirmationEmail({ to: parent.email, confirmUrl: confirmUrl.toString() });
 

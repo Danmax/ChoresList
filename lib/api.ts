@@ -19,7 +19,8 @@ export function withErrors(handler: RouteHandler): RouteHandler {
         );
       }
       console.error(`[API] ${req.method} ${req.nextUrl?.pathname ?? req.url} →`, message);
-      return NextResponse.json({ error: message }, { status: 500 });
+      const clientError = process.env.NODE_ENV === "production" ? "Something went wrong" : message;
+      return NextResponse.json({ error: clientError }, { status: 500 });
     }
   };
 }

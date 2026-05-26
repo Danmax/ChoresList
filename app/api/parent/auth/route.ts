@@ -1,12 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withErrors } from "@/lib/api";
 import { createConfirmationToken, hashConfirmationToken, hashPassword, normalizeEmail, verifyPassword } from "@/lib/auth";
+import { getBaseUrl } from "@/lib/base-url";
 import { sendConfirmationEmail } from "@/lib/email";
 import { seedHouseholdDefaults } from "@/lib/household-defaults";
 import { prisma } from "@/lib/prisma";
+import { rateLimit } from "@/lib/rate-limit";
 import { createSessionToken, parentSession, verifySessionToken } from "@/lib/session";
 
 export const runtime = "nodejs";
+
+const sessionCookieOptions = (maxAge: number) => ({
+  httpOnly: true,
+  sameSite: "lax" as const,
+  secure: process.env.NODE_ENV !== "development",
+  path: "/",
+  maxAge,
+});
+
+const GENERIC_SIGNUP_MESSAGE =
+  "If that email is available, we sent a confirmation link. Check your inbox to finish signup.";
 
 export const GET = withErrors(async (req: NextRequest) => {
   const confirmationToken = req.nextUrl.searchParams.get("confirm");
@@ -23,21 +36,37 @@ export const GET = withErrors(async (req: NextRequest) => {
 });
 
 export const POST = withErrors(async (req: NextRequest) => {
+  const limited = rateLimit(req, { key: "parent-auth", limit: 10, windowMs: 60_000 });
+  if (limited) return limited;
+
   const { email, password, mode, householdName } = await req.json();
 
   if (typeof email !== "string" || typeof password !== "string") {
     return NextResponse.json({ ok: false }, { status: 400 });
   }
 
+  const normalizedEmail = normalizeEmail(email);
+
   if (mode === "signup") {
+    const emailLimited = rateLimit(req, {
+      key: "parent-signup-email",
+      bucket: normalizedEmail,
+      limit: 3,
+      windowMs: 60 * 60_000,
+    });
+    if (emailLimited) return emailLimited;
+
     if (password.length < 8) {
       return NextResponse.json({ ok: false, error: "Password must be at least 8 characters." }, { status: 400 });
     }
 
-    const normalizedEmail = normalizeEmail(email);
     const existing = await prisma.parentAccount.findUnique({ where: { email: normalizedEmail } });
     if (existing) {
-      return NextResponse.json({ ok: false, error: "An account already exists for this email." }, { status: 409 });
+      return NextResponse.json({
+        ok: true,
+        needsConfirmation: true,
+        message: GENERIC_SIGNUP_MESSAGE,
+      });
     }
 
     const { passwordHash, passwordSalt } = hashPassword(password);
@@ -62,7 +91,7 @@ export const POST = withErrors(async (req: NextRequest) => {
       await seedHouseholdDefaults(tx, parent.householdId);
     });
 
-    const confirmUrl = new URL("/api/parent/auth", req.url);
+    const confirmUrl = new URL("/api/parent/auth", getBaseUrl(req));
     confirmUrl.searchParams.set("confirm", confirmationToken);
     const emailResult = await sendConfirmationEmail({ to: normalizedEmail, confirmUrl: confirmUrl.toString() });
 
@@ -70,18 +99,24 @@ export const POST = withErrors(async (req: NextRequest) => {
       ok: true,
       needsConfirmation: true,
       message: emailResult.sent
-        ? "Account created. Check your email to confirm before signing in."
+        ? GENERIC_SIGNUP_MESSAGE
         : "Account created. SMTP is not configured, so use the development confirmation link.",
       confirmUrl: emailResult.sent ? undefined : confirmUrl.toString(),
     });
   }
 
-  const parent = await prisma.parentAccount.findUnique({
-    where: { email: normalizeEmail(email) },
+  const emailLimited = rateLimit(req, {
+    key: "parent-login-email",
+    bucket: normalizedEmail,
+    limit: 8,
+    windowMs: 10 * 60_000,
   });
+  if (emailLimited) return emailLimited;
+
+  const parent = await prisma.parentAccount.findUnique({ where: { email: normalizedEmail } });
 
   if (!parent || !verifyPassword(password, parent.passwordHash, parent.passwordSalt)) {
-    return NextResponse.json({ ok: false });
+    return NextResponse.json({ ok: false, error: "Email or password is incorrect." }, { status: 401 });
   }
 
   if (!parent.emailVerified) {
@@ -92,11 +127,7 @@ export const POST = withErrors(async (req: NextRequest) => {
   response.cookies.set({
     name: parentSession.name,
     value: createSessionToken(parent),
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: parentSession.maxAge,
+    ...sessionCookieOptions(parentSession.maxAge),
   });
   return response;
 });
@@ -133,11 +164,7 @@ export const DELETE = withErrors(async () => {
   response.cookies.set({
     name: parentSession.name,
     value: "",
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 0,
+    ...sessionCookieOptions(0),
   });
   return response;
 });

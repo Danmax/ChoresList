@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSession, withErrors } from "@/lib/api";
+import { getBaseUrl } from "@/lib/base-url";
 import { generatePairingCode, hashPairingCode } from "@/lib/device-session";
 
 const PAIRING_TTL_MINUTES = 10;
@@ -63,7 +64,7 @@ export const POST = withErrors(async (req: NextRequest) => {
     id: pairingCode?.id,
     code,
     expiresAt,
-    pairUrl: `${req.nextUrl.origin}/pair?code=${code}`,
+    pairUrl: `${getBaseUrl(req)}/pair?code=${code}`,
   });
 });
 

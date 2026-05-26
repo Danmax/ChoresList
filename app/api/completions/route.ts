@@ -7,14 +7,15 @@ import { requireSession, withErrors } from "@/lib/api";
 export const POST = withErrors(async (req: NextRequest) => {
   const { householdId } = requireSession(req);
   const body = await req.json();
-  const { assignmentId, memberId, withPhoto } = body;
+  const { assignmentId, withPhoto } = body;
 
-  const assignment = await prisma.choreAssignment.findUnique({
-    where: { id: assignmentId, householdId },
+  const assignment = await prisma.choreAssignment.findFirst({
+    where: { id: assignmentId, householdId, isActive: true },
     include: { chore: true },
   });
   if (!assignment) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  const memberId = assignment.memberId;
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
@@ -75,12 +76,54 @@ export const PUT = withErrors(async (req: NextRequest) => {
   const { householdId } = requireSession(req);
   const body = await req.json();
   const { id, verifiedByParent } = body;
-  const completion = await prisma.taskCompletion.update({
+
+  const existing = await prisma.taskCompletion.findFirst({
     where: { id, householdId },
-    data: {
-      verifiedByParent,
-      ...(verifiedByParent && { pointsEarned: { multiply: 1.25 } as never }),
-    },
+    select: { id: true, verifiedByParent: true, pointsEarned: true, memberId: true, weekStartDate: true },
   });
+  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const wasVerified = existing.verifiedByParent;
+  const willVerify = Boolean(verifiedByParent);
+
+  if (wasVerified === willVerify) {
+    return NextResponse.json(existing);
+  }
+
+  const baseline = wasVerified
+    ? Math.round(existing.pointsEarned / 1.25)
+    : existing.pointsEarned;
+  const nextPoints = willVerify ? Math.round(baseline * 1.25) : baseline;
+  const delta = nextPoints - existing.pointsEarned;
+
+  const completion = await prisma.taskCompletion.update({
+    where: { id: existing.id, householdId },
+    data: { verifiedByParent: willVerify, pointsEarned: nextPoints },
+  });
+
+  if (delta !== 0) {
+    const member = await prisma.familyMember.findUnique({
+      where: { id: existing.memberId, householdId },
+    });
+    if (member) {
+      const total = Math.max(0, member.totalPoints + delta);
+      await prisma.familyMember.update({
+        where: { id: member.id, householdId },
+        data: { totalPoints: total, level: getLevelFromPoints(total) },
+      });
+      await prisma.weeklyAllowance.upsert({
+        where: { memberId_weekStart: { memberId: member.id, weekStart: existing.weekStartDate } },
+        create: {
+          householdId,
+          memberId: member.id,
+          weekStart: existing.weekStartDate,
+          pointsEarned: Math.max(0, delta),
+          amountEarned: 0,
+        },
+        update: { pointsEarned: { increment: delta } },
+      });
+    }
+  }
+
   return NextResponse.json(completion);
 });

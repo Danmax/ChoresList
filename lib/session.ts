@@ -10,8 +10,21 @@ export type SessionPayload = {
   expiresAt: number;
 };
 
+const PLACEHOLDER_SECRETS = new Set([
+  "",
+  "dev-secret-change-me",
+  "replace-with-a-long-random-string",
+]);
+
 function secret() {
-  return process.env.AUTH_SECRET ?? "dev-secret-change-me";
+  const value = process.env.AUTH_SECRET?.trim() ?? "";
+  if (PLACEHOLDER_SECRETS.has(value) || value.length < 32) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("AUTH_SECRET must be set to a random value of at least 32 characters");
+    }
+    return "dev-only-secret-change-me-now";
+  }
+  return value;
 }
 
 function sign(value: string) {

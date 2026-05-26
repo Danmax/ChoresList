@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import {
+  PAIRING_CODE_LENGTH,
   createDeviceSessionToken,
   deviceSession,
   generateDeviceSecret,
@@ -9,13 +10,17 @@ import {
   normalizePairingCode,
 } from "@/lib/device-session";
 import { withErrors } from "@/lib/api";
+import { rateLimit } from "@/lib/rate-limit";
 
 export const POST = withErrors(async (req: NextRequest) => {
+  const limited = rateLimit(req, { key: "device-pair", limit: 8, windowMs: 10 * 60_000 });
+  if (limited) return limited;
+
   const body = await req.json();
   const code = normalizePairingCode(body.code);
 
-  if (code.length !== 6) {
-    return NextResponse.json({ error: "Enter the 6 digit code" }, { status: 400 });
+  if (code.length !== PAIRING_CODE_LENGTH) {
+    return NextResponse.json({ error: `Enter the ${PAIRING_CODE_LENGTH} digit code` }, { status: 400 });
   }
 
   const pairingCode = await prisma.devicePairingCode.findFirst({
@@ -52,7 +57,7 @@ export const POST = withErrors(async (req: NextRequest) => {
   response.cookies.set(deviceSession.name, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: process.env.NODE_ENV !== "development",
     path: "/",
     maxAge: deviceSession.maxAge,
   });

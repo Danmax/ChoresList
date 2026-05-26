@@ -1,22 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createPasswordResetToken, hashPassword, hashPasswordResetToken, normalizeEmail } from "@/lib/auth";
 import { withErrors } from "@/lib/api";
+import { getBaseUrl } from "@/lib/base-url";
 import { sendPasswordResetEmail } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
+import { rateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
 const RESET_TTL_MS = 1000 * 60 * 60;
 
 export const POST = withErrors(async (req: NextRequest) => {
+  const ipLimited = rateLimit(req, { key: "pw-reset-ip", limit: 10, windowMs: 60 * 60_000 });
+  if (ipLimited) return ipLimited;
+
   const { email } = await req.json();
   if (typeof email !== "string") {
     return NextResponse.json({ ok: false }, { status: 400 });
   }
 
-  const parent = await prisma.parentAccount.findUnique({
-    where: { email: normalizeEmail(email) },
+  const normalizedEmail = normalizeEmail(email);
+  const emailLimited = rateLimit(req, {
+    key: "pw-reset-email",
+    bucket: normalizedEmail,
+    limit: 3,
+    windowMs: 60 * 60_000,
   });
+  if (emailLimited) return emailLimited;
+
+  const parent = await prisma.parentAccount.findUnique({ where: { email: normalizedEmail } });
 
   if (!parent) {
     return NextResponse.json({ ok: true });
@@ -36,7 +48,7 @@ export const POST = withErrors(async (req: NextRequest) => {
     },
   });
 
-  const resetUrl = new URL("/parent", req.url);
+  const resetUrl = new URL("/parent", getBaseUrl(req));
   resetUrl.searchParams.set("reset", token);
   const emailResult = await sendPasswordResetEmail({ to: parent.email, resetUrl: resetUrl.toString() });
 
@@ -47,6 +59,8 @@ export const POST = withErrors(async (req: NextRequest) => {
 });
 
 export const PUT = withErrors(async (req: NextRequest) => {
+  const limited = rateLimit(req, { key: "pw-reset-confirm", limit: 10, windowMs: 10 * 60_000 });
+  if (limited) return limited;
   const { token, password } = await req.json();
   if (typeof token !== "string" || typeof password !== "string") {
     return NextResponse.json({ ok: false, error: "Missing reset token or password." }, { status: 400 });

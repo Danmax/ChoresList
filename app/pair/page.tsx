@@ -10,10 +10,12 @@ export default function PairDevicePage() {
   const [error, setError] = useState("");
   const [pairing, setPairing] = useState(false);
 
+  const PAIRING_CODE_LENGTH = 8;
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const codeParam = params.get("code") ?? "";
-    if (codeParam) setCode(codeParam.replace(/\D/g, "").slice(0, 6));
+    if (codeParam) setCode(codeParam.replace(/\D/g, "").slice(0, PAIRING_CODE_LENGTH));
   }, []);
 
   async function pair(event: FormEvent<HTMLFormElement>) {
@@ -54,15 +56,15 @@ export default function PairDevicePage() {
             inputMode="numeric"
             autoComplete="one-time-code"
             value={code}
-            onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+            onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, PAIRING_CODE_LENGTH))}
             className="w-full rounded-3xl border-2 border-slate-100 bg-slate-50 px-4 py-4 text-center font-mono text-4xl font-black tracking-widest text-slate-800 outline-none focus:border-violet-300"
-            placeholder="000000"
-            maxLength={6}
+            placeholder={"0".repeat(PAIRING_CODE_LENGTH)}
+            maxLength={PAIRING_CODE_LENGTH}
           />
 
           <button
             type="submit"
-            disabled={pairing || code.length !== 6}
+            disabled={pairing || code.length !== PAIRING_CODE_LENGTH}
             className="flex w-full items-center justify-center gap-2 rounded-2xl bg-violet-500 px-4 py-3 text-lg font-black text-white transition-colors hover:bg-violet-600 disabled:opacity-40"
           >
             {pairing ? <Loader2 size={20} className="animate-spin" /> : <CheckCircle2 size={20} />}

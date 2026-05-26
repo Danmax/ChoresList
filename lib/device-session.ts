@@ -1,9 +1,12 @@
-import { createHash, createHmac, randomBytes, timingSafeEqual } from "crypto";
+import { createHash, createHmac, randomBytes, randomInt, timingSafeEqual } from "crypto";
 import { NextRequest } from "next/server";
 import { AuthError } from "@/lib/api";
 
 const DEVICE_SESSION_TTL_SECONDS = 60 * 60 * 24 * 90;
 const DEVICE_SESSION_COOKIE = "kid-device-session";
+const PAIRING_CODE_DIGITS = 8;
+const PAIRING_CODE_MIN = 10 ** (PAIRING_CODE_DIGITS - 1);
+const PAIRING_CODE_MAX = 10 ** PAIRING_CODE_DIGITS;
 
 export type DeviceMode = "household" | "member";
 
@@ -16,8 +19,26 @@ export type DeviceSessionPayload = {
   expiresAt: number;
 };
 
+const PLACEHOLDER_SECRETS = new Set([
+  "",
+  "dev-secret-change-me",
+  "replace-with-a-long-random-string",
+]);
+
 function secret() {
-  return process.env.AUTH_SECRET ?? "dev-secret-change-me";
+  const value = process.env.AUTH_SECRET?.trim() ?? "";
+  if (PLACEHOLDER_SECRETS.has(value) || value.length < 32) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("AUTH_SECRET must be set to a random value of at least 32 characters");
+    }
+    return "dev-only-secret-change-me-now";
+  }
+  return value;
+}
+
+function pairingSecret() {
+  const value = process.env.PAIRING_SECRET?.trim();
+  return value && value.length >= 32 ? value : secret();
 }
 
 function sign(value: string) {
@@ -25,7 +46,7 @@ function sign(value: string) {
 }
 
 export function hashPairingCode(code: string) {
-  return createHmac("sha256", secret()).update(`pair:${code}`).digest("hex");
+  return createHmac("sha256", pairingSecret()).update(`pair:${code}`).digest("hex");
 }
 
 export function hashDeviceSecret(deviceSecret: string) {
@@ -37,12 +58,14 @@ export function generateDeviceSecret() {
 }
 
 export function generatePairingCode() {
-  return String(Math.floor(100000 + Math.random() * 900000));
+  return String(randomInt(PAIRING_CODE_MIN, PAIRING_CODE_MAX));
 }
 
 export function normalizePairingCode(code: unknown) {
-  return String(code ?? "").replace(/\D/g, "").slice(0, 6);
+  return String(code ?? "").replace(/\D/g, "").slice(0, PAIRING_CODE_DIGITS);
 }
+
+export const PAIRING_CODE_LENGTH = PAIRING_CODE_DIGITS;
 
 export function createDeviceSessionToken(device: {
   id: number;
