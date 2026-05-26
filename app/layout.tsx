@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Nunito } from "next/font/google";
+import { ChunkReloader } from "@/components/chunk-reloader";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -42,6 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${nunito.variable} h-full`}>
       <body className="min-h-full bg-gradient-to-br from-violet-50 via-blue-50 to-emerald-50 font-[family-name:var(--font-nunito)]">
+        <ChunkReloader />
         {children}
         <Toaster richColors position="top-right" />
       </body>
