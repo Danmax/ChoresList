@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { Star, Trophy, Calendar, DollarSign, Sparkles, ClipboardList, Gift, Wrench, BarChart2, Users } from "lucide-react";
 
@@ -50,7 +51,14 @@ export default function LandingPage() {
       {/* Hero */}
       <div className="relative overflow-hidden">
         <div className="max-w-4xl mx-auto px-6 pt-20 pb-16 text-center">
-          <div className="text-7xl mb-6">🏠</div>
+          <Image
+            src="/logo.png"
+            alt="ChoresList"
+            width={160}
+            height={160}
+            priority
+            className="mx-auto mb-6 h-32 w-32 sm:h-40 sm:w-40 rounded-3xl object-contain"
+          />
           <h1 className="text-5xl sm:text-6xl font-black text-slate-800 mb-4 leading-tight">
             ChoresList
           </h1>

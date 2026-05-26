@@ -12,6 +12,23 @@ const nunito = Nunito({
 export const metadata: Metadata = {
   title: "ChoresList — Family Chore Tracker",
   description: "Fun family chore management with rewards, points, and skill tracking",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      {
+        url: "/Favicon.png",
+        type: "image/png",
+        sizes: "290x290",
+      },
+    ],
+    apple: [
+      {
+        url: "/Icon.png",
+        type: "image/png",
+        sizes: "420x420",
+      },
+    ],
+  },
 };
 
 export const viewport: Viewport = {

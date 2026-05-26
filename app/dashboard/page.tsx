@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Settings, Trophy, Calendar, Star } from "lucide-react";
@@ -73,8 +74,15 @@ export default function FamilyDashboard() {
     <div className={`min-h-screen ${tvMode ? "p-12" : "p-4 sm:p-6"}`}>
       <div className="flex flex-wrap items-center gap-3 mb-6 sm:mb-8">
         <div className="flex-1 min-w-0">
-          <h1 className={`font-black text-slate-800 ${tvMode ? "text-6xl" : "text-3xl sm:text-4xl"}`}>
-            🏠 ChoresList
+          <h1 className={`flex items-center gap-3 font-black text-slate-800 ${tvMode ? "text-6xl" : "text-3xl sm:text-4xl"}`}>
+            <Image
+              src="/logo.png"
+              alt=""
+              width={64}
+              height={64}
+              className={`shrink-0 rounded-2xl object-contain ${tvMode ? "h-16 w-16" : "h-10 w-10 sm:h-12 sm:w-12"}`}
+            />
+            <span>ChoresList</span>
           </h1>
           <p className="text-slate-500 font-semibold mt-1 text-sm sm:text-base">
             {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
