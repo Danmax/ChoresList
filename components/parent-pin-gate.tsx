@@ -1,7 +1,7 @@
 "use client";
 
 import { type FormEvent, useCallback, useEffect, useState } from "react";
-import { LockKeyhole, ShieldCheck, X } from "lucide-react";
+import { LockKeyhole, LogOut, ShieldCheck } from "lucide-react";
 
 type Status = "loading" | "elevated" | "needs-pin" | "needs-setup" | "signed-out";
 
@@ -127,6 +127,18 @@ export function ParentPinGate({ children }: { children: React.ReactNode }) {
     }
   }
 
+  async function signOut() {
+    setBusy(true);
+    try {
+      await Promise.allSettled([
+        fetch("/api/parent/elevate", { method: "DELETE" }),
+        fetch("/api/parent/auth", { method: "DELETE" }),
+      ]);
+    } finally {
+      window.location.href = "/parent";
+    }
+  }
+
   if (status === "loading") {
     return (
       <div className="flex min-h-screen items-center justify-center text-slate-500">
@@ -235,14 +247,26 @@ export function ParentPinGate({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="relative">
-      <button
-        type="button"
-        onClick={lock}
-        title="Lock parent panel"
-        className="fixed bottom-4 right-4 z-40 flex items-center gap-1 rounded-full bg-white/90 px-3 py-2 text-xs font-bold text-slate-600 shadow-lg backdrop-blur hover:text-slate-800"
-      >
-        <X size={14} /> Lock
-      </button>
+      <div className="fixed bottom-4 right-4 z-40 flex gap-2">
+        <button
+          type="button"
+          onClick={lock}
+          title="Re-prompt for parent PIN (does not sign out)"
+          disabled={busy}
+          className="flex items-center gap-1 rounded-full bg-white/90 px-3 py-2 text-xs font-bold text-slate-600 shadow-lg backdrop-blur hover:text-slate-800 disabled:opacity-60"
+        >
+          <LockKeyhole size={14} /> Lock PIN
+        </button>
+        <button
+          type="button"
+          onClick={signOut}
+          title="Sign out of the parent account on this device"
+          disabled={busy}
+          className="flex items-center gap-1 rounded-full bg-white/90 px-3 py-2 text-xs font-bold text-red-500 shadow-lg backdrop-blur hover:text-red-600 disabled:opacity-60"
+        >
+          <LogOut size={14} /> Sign out
+        </button>
+      </div>
       {children}
     </div>
   );

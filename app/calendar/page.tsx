@@ -26,6 +26,42 @@ interface FamilyEvent {
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
+const DURATION_PRESETS: { label: string; minutes: number }[] = [
+  { label: "15 min", minutes: 15 },
+  { label: "30 min", minutes: 30 },
+  { label: "45 min", minutes: 45 },
+  { label: "1 hour", minutes: 60 },
+  { label: "1.5 hours", minutes: 90 },
+  { label: "2 hours", minutes: 120 },
+  { label: "3 hours", minutes: 180 },
+  { label: "4 hours", minutes: 240 },
+  { label: "6 hours", minutes: 360 },
+];
+
+function formatTime(iso: string) {
+  return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
+
+function localDateKey(iso: string) {
+  const d = new Date(iso);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function eventTimeLabel(e: { allDay: boolean; date: string; endDate?: string | null }) {
+  if (e.allDay) return null;
+  const start = formatTime(e.date);
+  if (!e.endDate) return start;
+  return `${start} – ${formatTime(e.endDate)}`;
+}
+
+function eventStartMillis(e: { allDay: boolean; date: string }) {
+  if (e.allDay) return -1;
+  return new Date(e.date).getTime();
+}
+
 export default function CalendarPage() {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
@@ -38,6 +74,8 @@ export default function CalendarPage() {
     eventType: "other" as EventType,
     date: "",
     allDay: true,
+    startTime: "18:00",
+    durationMinutes: 60,
     recurring: "none",
     notes: "",
   });
@@ -61,18 +99,49 @@ export default function CalendarPage() {
 
   function openNewEvent(dateStr?: string) {
     const d = dateStr ?? `${year}-${String(month).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-    setForm({ title: "", eventType: "other", date: d, allDay: true, recurring: "none", notes: "" });
+    setForm({
+      title: "",
+      eventType: "other",
+      date: d,
+      allDay: true,
+      startTime: "18:00",
+      durationMinutes: 60,
+      recurring: "none",
+      notes: "",
+    });
     setOpen(true);
   }
 
   async function saveEvent() {
     if (!form.title || !form.date) { toast.error("Title and date required"); return; }
+    if (!form.allDay && form.durationMinutes <= 0) {
+      toast.error("Duration must be at least 1 minute");
+      return;
+    }
     const meta = EVENT_TYPE_META[form.eventType];
+
+    let startIso: string;
+    let endIso: string | null;
+    if (form.allDay) {
+      startIso = new Date(`${form.date}T00:00:00`).toISOString();
+      endIso = null;
+    } else {
+      const start = new Date(`${form.date}T${form.startTime}:00`);
+      startIso = start.toISOString();
+      endIso = new Date(start.getTime() + form.durationMinutes * 60_000).toISOString();
+    }
+
     await fetch("/api/events", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        ...form,
+        title: form.title,
+        eventType: form.eventType,
+        date: startIso,
+        endDate: endIso,
+        allDay: form.allDay,
+        recurring: form.recurring,
+        notes: form.notes,
         color: meta.color,
         icon: meta.icon,
       }),
@@ -99,11 +168,15 @@ export default function CalendarPage() {
 
   function eventsOnDay(day: number): FamilyEvent[] {
     const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    return events.filter((e) => e.date.startsWith(dateStr));
+    return events
+      .filter((e) => localDateKey(e.date) === dateStr)
+      .sort((a, b) => eventStartMillis(a) - eventStartMillis(b));
   }
 
   const selectedEvents = selectedDate
-    ? events.filter((e) => e.date.startsWith(selectedDate))
+    ? events
+        .filter((e) => localDateKey(e.date) === selectedDate)
+        .sort((a, b) => eventStartMillis(a) - eventStartMillis(b))
     : [];
 
   return (
@@ -156,15 +229,18 @@ export default function CalendarPage() {
                   {day}
                 </div>
                 <div className="space-y-0.5">
-                  {dayEvents.slice(0, 3).map((e) => (
-                    <div
-                      key={e.id}
-                      className="text-xs font-bold truncate rounded-md px-1 py-0.5 text-white"
-                      style={{ backgroundColor: e.color }}
-                    >
-                      {e.icon} {e.title}
-                    </div>
-                  ))}
+                  {dayEvents.slice(0, 3).map((e) => {
+                    const time = eventTimeLabel(e);
+                    return (
+                      <div
+                        key={e.id}
+                        className="text-xs font-bold truncate rounded-md px-1 py-0.5 text-white"
+                        style={{ backgroundColor: e.color }}
+                      >
+                        {e.icon} {time ? `${time.split(" – ")[0]} ` : ""}{e.title}
+                      </div>
+                    );
+                  })}
                   {dayEvents.length > 3 && (
                     <div className="text-xs font-bold text-slate-400">+{dayEvents.length - 3} more</div>
                   )}
@@ -190,26 +266,31 @@ export default function CalendarPage() {
             </div>
           ) : (
             <div className="space-y-2">
-              {selectedEvents.map((e) => (
-                <div key={e.id} className="bg-white rounded-2xl p-4 shadow-sm flex items-start gap-3">
-                  <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
-                    style={{ backgroundColor: e.color + "22" }}
-                  >
-                    {e.icon}
+              {selectedEvents.map((e) => {
+                const time = eventTimeLabel(e);
+                return (
+                  <div key={e.id} className="bg-white rounded-2xl p-4 shadow-sm flex items-start gap-3">
+                    <div
+                      className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
+                      style={{ backgroundColor: e.color + "22" }}
+                    >
+                      {e.icon}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-black text-slate-800">{e.title}</p>
+                      <p className="text-xs font-bold text-slate-500 mt-0.5">
+                        {time ? `${time} • ` : ""}
+                        {EVENT_TYPE_META[e.eventType]?.label}
+                        {e.recurring !== "none" && ` • Repeats ${e.recurring}`}
+                      </p>
+                      {e.notes && <p className="text-sm text-slate-500 mt-1">{e.notes}</p>}
+                    </div>
+                    <button onClick={() => deleteEvent(e.id)} className="text-red-400 hover:text-red-600 p-1 transition-colors">
+                      <Trash2 size={14} />
+                    </button>
                   </div>
-                  <div className="flex-1">
-                    <p className="font-black text-slate-800">{e.title}</p>
-                    <p className="text-xs font-bold text-slate-500 mt-0.5">
-                      {EVENT_TYPE_META[e.eventType]?.label} {e.recurring !== "none" && `• Repeats ${e.recurring}`}
-                    </p>
-                    {e.notes && <p className="text-sm text-slate-500 mt-1">{e.notes}</p>}
-                  </div>
-                  <button onClick={() => deleteEvent(e.id)} className="text-red-400 hover:text-red-600 p-1 transition-colors">
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -269,6 +350,45 @@ export default function CalendarPage() {
                 className="rounded-xl mt-1"
               />
             </div>
+
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={form.allDay}
+                onChange={(e) => setForm((p) => ({ ...p, allDay: e.target.checked }))}
+                className="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-400"
+              />
+              <span className="text-sm font-bold text-slate-700">All day</span>
+            </label>
+
+            {!form.allDay && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="font-bold">Start time</Label>
+                  <Input
+                    type="time"
+                    value={form.startTime}
+                    onChange={(e) => setForm((p) => ({ ...p, startTime: e.target.value }))}
+                    className="rounded-xl mt-1"
+                  />
+                </div>
+                <div>
+                  <Label className="font-bold">Duration</Label>
+                  <Select
+                    value={String(form.durationMinutes)}
+                    onValueChange={(v) => setForm((p) => ({ ...p, durationMinutes: parseInt(v ?? "60", 10) || 60 }))}
+                  >
+                    <SelectTrigger className="rounded-xl mt-1"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {DURATION_PRESETS.map((d) => (
+                        <SelectItem key={d.minutes} value={String(d.minutes)}>{d.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
             <div>
               <Label className="font-bold">Repeats</Label>
               <Select value={form.recurring} onValueChange={(v) => setForm((p) => ({ ...p, recurring: v ?? "none" }))}>
