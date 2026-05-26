@@ -8,24 +8,45 @@ export const GET = withErrors(async (req: NextRequest) => {
   const month = searchParams.get("month");
   const year = searchParams.get("year");
 
-  const where =
-    month && year
-      ? {
-          householdId,
-          date: {
-            gte: new Date(parseInt(year), parseInt(month) - 1, 1),
-            lte: new Date(parseInt(year), parseInt(month), 0, 23, 59, 59),
-          },
-        }
-      : { householdId };
+  if (month && year) {
+    const monthStart = new Date(parseInt(year), parseInt(month) - 1, 1);
+    const monthEnd = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59);
 
-  const events = await prisma.familyEvent.findMany({ where, orderBy: { date: "asc" } });
+    const events = await prisma.familyEvent.findMany({
+      where: {
+        householdId,
+        OR: [
+          { date: { gte: monthStart, lte: monthEnd } },
+          {
+            recurring: { not: "none" },
+            date: { lte: monthEnd },
+            OR: [{ recurringEndDate: null }, { recurringEndDate: { gte: monthStart } }],
+          },
+        ],
+      },
+      orderBy: { date: "asc" },
+    });
+    return NextResponse.json(events);
+  }
+
+  const events = await prisma.familyEvent.findMany({
+    where: { householdId },
+    orderBy: { date: "asc" },
+  });
   return NextResponse.json(events);
 });
 
 export const POST = withErrors(async (req: NextRequest) => {
   const { householdId } = await requireParentSession(req);
   const body = await req.json();
+  const recurring = typeof body.recurring === "string" ? body.recurring : "none";
+  const recurringCount =
+    recurring !== "none" && Number.isFinite(Number(body.recurringCount))
+      ? Math.max(1, Math.min(520, Math.round(Number(body.recurringCount))))
+      : null;
+  const recurringEndDate =
+    recurring !== "none" && body.recurringEndDate ? new Date(body.recurringEndDate) : null;
+
   const event = await prisma.familyEvent.create({
     data: {
       householdId,
@@ -34,7 +55,9 @@ export const POST = withErrors(async (req: NextRequest) => {
       date: new Date(body.date),
       endDate: body.endDate ? new Date(body.endDate) : null,
       allDay: body.allDay ?? true,
-      recurring: body.recurring ?? "none",
+      recurring,
+      recurringEndDate,
+      recurringCount,
       notes: body.notes ?? null,
       color: body.color ?? "#fbbf24",
       icon: body.icon ?? "📅",
@@ -53,6 +76,12 @@ export const PUT = withErrors(async (req: NextRequest) => {
       ...data,
       date: data.date ? new Date(data.date) : undefined,
       endDate: data.endDate ? new Date(data.endDate) : undefined,
+      recurringEndDate:
+        data.recurringEndDate === null
+          ? null
+          : data.recurringEndDate
+            ? new Date(data.recurringEndDate)
+            : undefined,
     },
   });
   return NextResponse.json(event);

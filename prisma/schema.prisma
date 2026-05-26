@@ -271,18 +271,20 @@ model RewardTicket {
 }
 
 model FamilyEvent {
-  id          Int       @id @default(autoincrement())
-  householdId Int
-  title       String    @db.VarChar(255)
-  eventType   String    @default("other") @db.VarChar(64)
-  date        DateTime
-  endDate     DateTime?
-  allDay      Boolean   @default(true)
-  recurring   String    @default("none") @db.VarChar(64)
-  notes       String?   @db.Text
-  color       String    @default("#fbbf24") @db.VarChar(32)
-  icon        String    @default("📅") @db.VarChar(32)
-  createdAt   DateTime  @default(now())
+  id                Int       @id @default(autoincrement())
+  householdId       Int
+  title             String    @db.VarChar(255)
+  eventType         String    @default("other") @db.VarChar(64)
+  date              DateTime
+  endDate           DateTime?
+  allDay            Boolean   @default(true)
+  recurring         String    @default("none") @db.VarChar(64)
+  recurringEndDate  DateTime?
+  recurringCount    Int?
+  notes             String?   @db.Text
+  color             String    @default("#fbbf24") @db.VarChar(32)
+  icon              String    @default("📅") @db.VarChar(32)
+  createdAt         DateTime  @default(now())
 
   household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { ArrowLeft, Plus, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -11,6 +11,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
+type RecurringMode = "none" | "weekly" | "monthly";
+type RecurringEndMode = "never" | "date" | "count";
+type ViewMode = "month" | "week" | "day";
+
 interface FamilyEvent {
   id: number;
   title: string;
@@ -19,12 +23,17 @@ interface FamilyEvent {
   endDate?: string | null;
   allDay: boolean;
   recurring: string;
+  recurringEndDate?: string | null;
+  recurringCount?: number | null;
   notes?: string | null;
   color: string;
   icon: string;
 }
 
+type DisplayEvent = FamilyEvent & { _seriesId: number; _isOccurrence: boolean };
+
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const DAY_LABELS_FULL = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
 const DURATION_PRESETS: { label: string; minutes: number }[] = [
   { label: "15 min", minutes: 15 },
@@ -38,16 +47,32 @@ const DURATION_PRESETS: { label: string; minutes: number }[] = [
   { label: "6 hours", minutes: 360 },
 ];
 
-function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+const MAX_EXPAND = 520;
+
+function pad(n: number) {
+  return String(n).padStart(2, "0");
+}
+
+function dateInputValue(d: Date) {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function utcDateKey(iso: string) {
+  const d = new Date(iso);
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
 }
 
 function localDateKey(iso: string) {
   const d = new Date(iso);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function eventDateKey(e: { allDay: boolean; date: string }) {
+  return e.allDay ? utcDateKey(e.date) : localDateKey(e.date);
+}
+
+function formatTime(iso: string) {
+  return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
 function eventTimeLabel(e: { allDay: boolean; date: string; endDate?: string | null }) {
@@ -62,13 +87,81 @@ function eventStartMillis(e: { allDay: boolean; date: string }) {
   return new Date(e.date).getTime();
 }
 
+function startOfWeek(d: Date) {
+  const result = new Date(d);
+  const dow = result.getDay();
+  result.setDate(result.getDate() - dow);
+  result.setHours(0, 0, 0, 0);
+  return result;
+}
+
+function addDays(d: Date, n: number) {
+  const result = new Date(d);
+  result.setDate(result.getDate() + n);
+  return result;
+}
+
+function addMonths(d: Date, n: number) {
+  const result = new Date(d);
+  const day = result.getDate();
+  result.setDate(1);
+  result.setMonth(result.getMonth() + n);
+  const lastDay = new Date(result.getFullYear(), result.getMonth() + 1, 0).getDate();
+  result.setDate(Math.min(day, lastDay));
+  return result;
+}
+
+function expandOccurrences(events: FamilyEvent[], windowStart: Date, windowEnd: Date): DisplayEvent[] {
+  const out: DisplayEvent[] = [];
+
+  for (const e of events) {
+    const recurring = (e.recurring ?? "none") as RecurringMode;
+
+    if (recurring === "none") {
+      out.push({ ...e, _seriesId: e.id, _isOccurrence: false });
+      continue;
+    }
+
+    const start = new Date(e.date);
+    const seriesEnd = e.recurringEndDate ? new Date(e.recurringEndDate) : null;
+    const maxCount = e.recurringCount && e.recurringCount > 0 ? e.recurringCount : MAX_EXPAND;
+    const duration = e.endDate ? new Date(e.endDate).getTime() - start.getTime() : 0;
+
+    for (let i = 0; i < maxCount && i < MAX_EXPAND; i++) {
+      const occStart = recurring === "weekly" ? addDays(start, 7 * i) : addMonths(start, i);
+      if (seriesEnd && occStart.getTime() > seriesEnd.getTime()) break;
+      if (occStart.getTime() > windowEnd.getTime()) break;
+
+      const occEnd = e.endDate ? new Date(occStart.getTime() + duration) : null;
+      const occDateKey = e.allDay ? utcDateKey(occStart.toISOString()) : localDateKey(occStart.toISOString());
+      const windowStartKey = `${windowStart.getFullYear()}-${pad(windowStart.getMonth() + 1)}-${pad(windowStart.getDate())}`;
+      if (occDateKey < windowStartKey) continue;
+
+      out.push({
+        ...e,
+        date: occStart.toISOString(),
+        endDate: occEnd ? occEnd.toISOString() : null,
+        _seriesId: e.id,
+        _isOccurrence: i > 0,
+      });
+    }
+  }
+
+  return out;
+}
+
+function meta(eventType: string) {
+  return EVENT_TYPE_META[eventType as EventType];
+}
+
 export default function CalendarPage() {
-  const today = new Date();
-  const [year, setYear] = useState(today.getFullYear());
-  const [month, setMonth] = useState(today.getMonth() + 1);
+  const today = useMemo(() => new Date(), []);
+  const [view, setView] = useState<ViewMode>("month");
+  const [anchor, setAnchor] = useState<Date>(today);
   const [events, setEvents] = useState<FamilyEvent[]>([]);
   const [open, setOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>("");
+
   const [form, setForm] = useState({
     title: "",
     eventType: "other" as EventType,
@@ -76,29 +169,62 @@ export default function CalendarPage() {
     allDay: true,
     startTime: "18:00",
     durationMinutes: 60,
-    recurring: "none",
+    recurring: "none" as RecurringMode,
+    recurringEndMode: "never" as RecurringEndMode,
+    recurringEndDate: "",
+    recurringCount: 4,
     notes: "",
   });
+
+  const year = anchor.getFullYear();
+  const month = anchor.getMonth() + 1;
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/events?month=${month}&year=${year}`);
     setEvents(await res.json());
   }, [month, year]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  function prevMonth() {
-    if (month === 1) { setYear((y) => y - 1); setMonth(12); }
-    else setMonth((m) => m - 1);
-  }
+  const windowRange = useMemo(() => {
+    if (view === "month") {
+      return {
+        start: new Date(year, month - 1, 1),
+        end: new Date(year, month, 0, 23, 59, 59),
+      };
+    }
+    if (view === "week") {
+      const s = startOfWeek(anchor);
+      return { start: s, end: addDays(s, 7) };
+    }
+    const d = new Date(anchor);
+    d.setHours(0, 0, 0, 0);
+    return { start: d, end: addDays(d, 1) };
+  }, [view, anchor, month, year]);
 
-  function nextMonth() {
-    if (month === 12) { setYear((y) => y + 1); setMonth(1); }
-    else setMonth((m) => m + 1);
-  }
+  const expanded: DisplayEvent[] = useMemo(
+    () => expandOccurrences(events, windowRange.start, windowRange.end),
+    [events, windowRange]
+  );
+
+  const eventsByDayKey = useMemo(() => {
+    const map = new Map<string, DisplayEvent[]>();
+    for (const e of expanded) {
+      const key = eventDateKey(e);
+      const arr = map.get(key) ?? [];
+      arr.push(e);
+      map.set(key, arr);
+    }
+    for (const arr of map.values()) {
+      arr.sort((a, b) => eventStartMillis(a) - eventStartMillis(b));
+    }
+    return map;
+  }, [expanded]);
 
   function openNewEvent(dateStr?: string) {
-    const d = dateStr ?? `${year}-${String(month).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    const d = dateStr ?? dateInputValue(anchor);
     setForm({
       title: "",
       eventType: "other",
@@ -107,31 +233,59 @@ export default function CalendarPage() {
       startTime: "18:00",
       durationMinutes: 60,
       recurring: "none",
+      recurringEndMode: "never",
+      recurringEndDate: "",
+      recurringCount: 4,
       notes: "",
     });
     setOpen(true);
   }
 
   async function saveEvent() {
-    if (!form.title || !form.date) { toast.error("Title and date required"); return; }
+    if (!form.title || !form.date) {
+      toast.error("Title and date required");
+      return;
+    }
     if (!form.allDay && form.durationMinutes <= 0) {
       toast.error("Duration must be at least 1 minute");
       return;
     }
-    const meta = EVENT_TYPE_META[form.eventType];
+    if (form.recurring !== "none" && form.recurringEndMode === "date" && !form.recurringEndDate) {
+      toast.error("Pick a date for the recurring end");
+      return;
+    }
+    if (form.recurring !== "none" && form.recurringEndMode === "count" && form.recurringCount < 1) {
+      toast.error("Number of times must be at least 1");
+      return;
+    }
+
+    const eMeta = meta(form.eventType);
+    const [y, mo, d] = form.date.split("-").map(Number);
 
     let startIso: string;
     let endIso: string | null;
     if (form.allDay) {
-      startIso = new Date(`${form.date}T00:00:00`).toISOString();
+      startIso = new Date(Date.UTC(y, mo - 1, d)).toISOString();
       endIso = null;
     } else {
-      const start = new Date(`${form.date}T${form.startTime}:00`);
+      const [hh, mm] = form.startTime.split(":").map(Number);
+      const start = new Date(y, mo - 1, d, hh, mm, 0);
       startIso = start.toISOString();
       endIso = new Date(start.getTime() + form.durationMinutes * 60_000).toISOString();
     }
 
-    await fetch("/api/events", {
+    let recurringEndDateIso: string | null = null;
+    let recurringCount: number | null = null;
+    if (form.recurring !== "none") {
+      if (form.recurringEndMode === "date" && form.recurringEndDate) {
+        const [ry, rmo, rd] = form.recurringEndDate.split("-").map(Number);
+        recurringEndDateIso = new Date(Date.UTC(ry, rmo - 1, rd, 23, 59, 59)).toISOString();
+      } else if (form.recurringEndMode === "count") {
+        recurringCount = form.recurringCount;
+      }
+    }
+
+    const res = await fetch("/api/events", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -141,43 +295,66 @@ export default function CalendarPage() {
         endDate: endIso,
         allDay: form.allDay,
         recurring: form.recurring,
+        recurringEndDate: recurringEndDateIso,
+        recurringCount,
         notes: form.notes,
-        color: meta.color,
-        icon: meta.icon,
+        color: eMeta.color,
+        icon: eMeta.icon,
       }),
     });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      toast.error(data?.error ?? "Could not add event");
+      return;
+    }
     toast.success("Event added!");
     setOpen(false);
     load();
   }
 
-  async function deleteEvent(id: number) {
-    await fetch(`/api/events?id=${id}`, { method: "DELETE" });
+  async function deleteEvent(displayEvent: DisplayEvent) {
+    const targetId = displayEvent._seriesId;
+    if (displayEvent._isOccurrence || displayEvent.recurring !== "none") {
+      const confirmed = window.confirm("This will delete the entire recurring series. Continue?");
+      if (!confirmed) return;
+    }
+    await fetch(`/api/events?id=${targetId}`, { method: "DELETE" });
     toast.success("Event removed");
     load();
   }
 
-  // Build calendar grid
-  const firstDay = new Date(year, month - 1, 1).getDay();
-  const daysInMonth = new Date(year, month, 0).getDate();
-  const cells: (number | null)[] = [
-    ...Array(firstDay).fill(null),
-    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
-  ];
-  while (cells.length % 7 !== 0) cells.push(null);
-
-  function eventsOnDay(day: number): FamilyEvent[] {
-    const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    return events
-      .filter((e) => localDateKey(e.date) === dateStr)
-      .sort((a, b) => eventStartMillis(a) - eventStartMillis(b));
+  function navigate(direction: -1 | 1) {
+    if (view === "month") {
+      setAnchor(addMonths(anchor, direction));
+    } else if (view === "week") {
+      setAnchor(addDays(anchor, 7 * direction));
+    } else {
+      setAnchor(addDays(anchor, direction));
+    }
+    setSelectedDate("");
   }
 
-  const selectedEvents = selectedDate
-    ? events
-        .filter((e) => localDateKey(e.date) === selectedDate)
-        .sort((a, b) => eventStartMillis(a) - eventStartMillis(b))
-    : [];
+  function goToday() {
+    setAnchor(new Date());
+    setSelectedDate("");
+  }
+
+  const headerLabel = useMemo(() => {
+    if (view === "month") return `${MONTHS[month - 1]} ${year}`;
+    if (view === "week") {
+      const s = startOfWeek(anchor);
+      const e = addDays(s, 6);
+      const sameMonth = s.getMonth() === e.getMonth();
+      const left = `${MONTHS[s.getMonth()].slice(0, 3)} ${s.getDate()}`;
+      const right = sameMonth
+        ? `${e.getDate()}, ${e.getFullYear()}`
+        : `${MONTHS[e.getMonth()].slice(0, 3)} ${e.getDate()}, ${e.getFullYear()}`;
+      return `${left} – ${right}`;
+    }
+    return anchor.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  }, [view, anchor, month, year]);
+
+  const selectedEvents = selectedDate ? eventsByDayKey.get(selectedDate) ?? [] : [];
 
   return (
     <div className="min-h-screen p-4 sm:p-6">
@@ -194,66 +371,68 @@ export default function CalendarPage() {
         </button>
       </div>
 
-      {/* Month navigation */}
-      <div className="flex items-center justify-between mb-4">
-        <button onClick={prevMonth} className="bg-white rounded-xl p-2 shadow-sm hover:shadow-md transition-shadow">
-          <ChevronLeft size={20} className="text-slate-600" />
-        </button>
-        <h2 className="text-xl font-black text-slate-800">{MONTHS[month - 1]} {year}</h2>
-        <button onClick={nextMonth} className="bg-white rounded-xl p-2 shadow-sm hover:shadow-md transition-shadow">
-          <ChevronRight size={20} className="text-slate-600" />
-        </button>
-      </div>
-
-      {/* Calendar grid */}
-      <div className="bg-white rounded-3xl shadow-sm overflow-hidden mb-6">
-        <div className="grid grid-cols-7 border-b border-slate-100">
-          {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((d) => (
-            <div key={d} className="py-2 text-center text-xs font-black text-slate-400">{d}</div>
+      {/* View tabs + nav */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-1 bg-white rounded-2xl p-1 shadow-sm">
+          {(["month", "week", "day"] as ViewMode[]).map((v) => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              className={`rounded-xl px-3 py-1.5 text-sm font-black capitalize transition-colors ${
+                view === v ? "bg-violet-500 text-white" : "text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              {v === "day" ? "Day agenda" : v}
+            </button>
           ))}
         </div>
-        <div className="grid grid-cols-7">
-          {cells.map((day, i) => {
-            if (!day) return <div key={i} className="min-h-[80px] border-b border-r border-slate-50" />;
-            const isToday = day === today.getDate() && month === today.getMonth() + 1 && year === today.getFullYear();
-            const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-            const dayEvents = eventsOnDay(day);
-
-            return (
-              <div
-                key={i}
-                className="min-h-[80px] border-b border-r border-slate-50 p-1 cursor-pointer hover:bg-slate-50 transition-colors"
-                onClick={() => setSelectedDate(selectedDate === dateStr ? "" : dateStr)}
-              >
-                <div className={`text-sm font-black mb-1 w-7 h-7 flex items-center justify-center rounded-full ${isToday ? "bg-violet-500 text-white" : "text-slate-700"}`}>
-                  {day}
-                </div>
-                <div className="space-y-0.5">
-                  {dayEvents.slice(0, 3).map((e) => {
-                    const time = eventTimeLabel(e);
-                    return (
-                      <div
-                        key={e.id}
-                        className="text-xs font-bold truncate rounded-md px-1 py-0.5 text-white"
-                        style={{ backgroundColor: e.color }}
-                      >
-                        {e.icon} {time ? `${time.split(" – ")[0]} ` : ""}{e.title}
-                      </div>
-                    );
-                  })}
-                  {dayEvents.length > 3 && (
-                    <div className="text-xs font-bold text-slate-400">+{dayEvents.length - 3} more</div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+        <div className="flex items-center gap-2">
+          <button onClick={goToday} className="bg-white rounded-xl px-3 py-1.5 text-sm font-black text-slate-600 shadow-sm hover:shadow-md">
+            Today
+          </button>
+          <button onClick={() => navigate(-1)} className="bg-white rounded-xl p-2 shadow-sm hover:shadow-md">
+            <ChevronLeft size={20} className="text-slate-600" />
+          </button>
+          <h2 className="text-lg font-black text-slate-800 min-w-[10rem] text-center">{headerLabel}</h2>
+          <button onClick={() => navigate(1)} className="bg-white rounded-xl p-2 shadow-sm hover:shadow-md">
+            <ChevronRight size={20} className="text-slate-600" />
+          </button>
         </div>
       </div>
 
-      {/* Selected day events */}
-      {selectedDate && (
-        <div className="mb-6">
+      {view === "month" && (
+        <MonthGrid
+          year={year}
+          month={month}
+          today={today}
+          eventsByDayKey={eventsByDayKey}
+          selectedDate={selectedDate}
+          onSelectDate={(d) => setSelectedDate(selectedDate === d ? "" : d)}
+        />
+      )}
+
+      {view === "week" && (
+        <WeekGrid
+          anchor={anchor}
+          today={today}
+          eventsByDayKey={eventsByDayKey}
+          onOpenNew={(d) => openNewEvent(d)}
+          onDeleteEvent={deleteEvent}
+        />
+      )}
+
+      {view === "day" && (
+        <DayAgenda
+          anchor={anchor}
+          eventsByDayKey={eventsByDayKey}
+          onOpenNew={(d) => openNewEvent(d)}
+          onDeleteEvent={deleteEvent}
+        />
+      )}
+
+      {/* Selected day events (month view) */}
+      {view === "month" && selectedDate && (
+        <div className="mt-6">
           <h2 className="font-black text-slate-700 mb-3">
             {new Date(selectedDate + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
           </h2>
@@ -266,44 +445,22 @@ export default function CalendarPage() {
             </div>
           ) : (
             <div className="space-y-2">
-              {selectedEvents.map((e) => {
-                const time = eventTimeLabel(e);
-                return (
-                  <div key={e.id} className="bg-white rounded-2xl p-4 shadow-sm flex items-start gap-3">
-                    <div
-                      className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
-                      style={{ backgroundColor: e.color + "22" }}
-                    >
-                      {e.icon}
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-black text-slate-800">{e.title}</p>
-                      <p className="text-xs font-bold text-slate-500 mt-0.5">
-                        {time ? `${time} • ` : ""}
-                        {EVENT_TYPE_META[e.eventType]?.label}
-                        {e.recurring !== "none" && ` • Repeats ${e.recurring}`}
-                      </p>
-                      {e.notes && <p className="text-sm text-slate-500 mt-1">{e.notes}</p>}
-                    </div>
-                    <button onClick={() => deleteEvent(e.id)} className="text-red-400 hover:text-red-600 p-1 transition-colors">
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                );
-              })}
+              {selectedEvents.map((e) => (
+                <EventRow key={`${e._seriesId}-${e.date}`} e={e} onDelete={() => deleteEvent(e)} />
+              ))}
             </div>
           )}
         </div>
       )}
 
       {/* Event type legend */}
-      <div className="bg-white/70 rounded-3xl p-4 shadow-sm">
+      <div className="bg-white/70 rounded-3xl p-4 shadow-sm mt-6">
         <h3 className="font-black text-slate-700 mb-3 text-sm">Event Types</h3>
         <div className="flex flex-wrap gap-2">
-          {(Object.entries(EVENT_TYPE_META) as [EventType, typeof EVENT_TYPE_META[EventType]][]).map(([key, meta]) => (
+          {(Object.entries(EVENT_TYPE_META) as [EventType, typeof EVENT_TYPE_META[EventType]][]).map(([key, m]) => (
             <div key={key} className="flex items-center gap-1 text-xs font-bold text-slate-600">
-              <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: meta.color }} />
-              {meta.icon} {meta.label}
+              <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: m.color }} />
+              {m.icon} {m.label}
             </div>
           ))}
         </div>
@@ -315,19 +472,19 @@ export default function CalendarPage() {
           <DialogHeader>
             <DialogTitle className="font-black">Add Family Event</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
             <div>
               <Label className="font-bold">Event Type</Label>
               <Select
                 value={form.eventType}
-                onValueChange={(v) => setForm((p) => ({ ...p, eventType: v as EventType }))}
+                onValueChange={(v) => setForm((p) => ({ ...p, eventType: (v ?? "other") as EventType }))}
               >
                 <SelectTrigger className="rounded-xl mt-1">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {(Object.entries(EVENT_TYPE_META) as [EventType, typeof EVENT_TYPE_META[EventType]][]).map(([key, meta]) => (
-                    <SelectItem key={key} value={key}>{meta.icon} {meta.label}</SelectItem>
+                  {(Object.entries(EVENT_TYPE_META) as [EventType, typeof EVENT_TYPE_META[EventType]][]).map(([key, m]) => (
+                    <SelectItem key={key} value={key}>{m.icon} {m.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -391,7 +548,10 @@ export default function CalendarPage() {
 
             <div>
               <Label className="font-bold">Repeats</Label>
-              <Select value={form.recurring} onValueChange={(v) => setForm((p) => ({ ...p, recurring: v ?? "none" }))}>
+              <Select
+                value={form.recurring}
+                onValueChange={(v) => setForm((p) => ({ ...p, recurring: ((v ?? "none") as RecurringMode) }))}
+              >
                 <SelectTrigger className="rounded-xl mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Does not repeat</SelectItem>
@@ -400,6 +560,68 @@ export default function CalendarPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            {form.recurring !== "none" && (
+              <div className="rounded-2xl bg-slate-50 p-3 space-y-3">
+                <p className="text-sm font-black text-slate-700">Ends</p>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="recurringEndMode"
+                      checked={form.recurringEndMode === "never"}
+                      onChange={() => setForm((p) => ({ ...p, recurringEndMode: "never" }))}
+                      className="h-4 w-4 text-violet-600 focus:ring-violet-400"
+                    />
+                    <span className="text-sm font-bold text-slate-600">Never</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="recurringEndMode"
+                      checked={form.recurringEndMode === "date"}
+                      onChange={() => setForm((p) => ({ ...p, recurringEndMode: "date" }))}
+                      className="h-4 w-4 text-violet-600 focus:ring-violet-400"
+                    />
+                    <span className="text-sm font-bold text-slate-600">On date</span>
+                    {form.recurringEndMode === "date" && (
+                      <Input
+                        type="date"
+                        value={form.recurringEndDate}
+                        onChange={(e) => setForm((p) => ({ ...p, recurringEndDate: e.target.value }))}
+                        className="rounded-xl ml-2 max-w-[170px]"
+                      />
+                    )}
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="recurringEndMode"
+                      checked={form.recurringEndMode === "count"}
+                      onChange={() => setForm((p) => ({ ...p, recurringEndMode: "count" }))}
+                      className="h-4 w-4 text-violet-600 focus:ring-violet-400"
+                    />
+                    <span className="text-sm font-bold text-slate-600">After</span>
+                    {form.recurringEndMode === "count" && (
+                      <>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={520}
+                          value={form.recurringCount}
+                          onChange={(e) =>
+                            setForm((p) => ({ ...p, recurringCount: Math.max(1, parseInt(e.target.value || "1", 10) || 1) }))
+                          }
+                          className="rounded-xl ml-2 w-20"
+                        />
+                        <span className="text-sm font-bold text-slate-600">times</span>
+                      </>
+                    )}
+                  </label>
+                </div>
+              </div>
+            )}
+
             <div>
               <Label className="font-bold">Notes (optional)</Label>
               <Textarea
@@ -419,6 +641,232 @@ export default function CalendarPage() {
           </div>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function MonthGrid({
+  year,
+  month,
+  today,
+  eventsByDayKey,
+  selectedDate,
+  onSelectDate,
+}: {
+  year: number;
+  month: number;
+  today: Date;
+  eventsByDayKey: Map<string, DisplayEvent[]>;
+  selectedDate: string;
+  onSelectDate: (key: string) => void;
+}) {
+  const firstDay = new Date(year, month - 1, 1).getDay();
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const cells: (number | null)[] = [
+    ...Array(firstDay).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  return (
+    <div className="bg-white rounded-3xl shadow-sm overflow-hidden">
+      <div className="grid grid-cols-7 border-b border-slate-100">
+        {DAY_LABELS_FULL.map((d) => (
+          <div key={d} className="py-2 text-center text-xs font-black text-slate-400">{d}</div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7">
+        {cells.map((day, i) => {
+          if (!day) return <div key={i} className="min-h-[80px] border-b border-r border-slate-50" />;
+          const isToday =
+            day === today.getDate() && month === today.getMonth() + 1 && year === today.getFullYear();
+          const dateStr = `${year}-${pad(month)}-${pad(day)}`;
+          const dayEvents = eventsByDayKey.get(dateStr) ?? [];
+          const isSelected = selectedDate === dateStr;
+
+          return (
+            <div
+              key={i}
+              onClick={() => onSelectDate(dateStr)}
+              className={`min-h-[80px] border-b border-r border-slate-50 p-1 cursor-pointer transition-colors ${
+                isSelected ? "bg-violet-50" : "hover:bg-slate-50"
+              }`}
+            >
+              <div
+                className={`text-sm font-black mb-1 w-7 h-7 flex items-center justify-center rounded-full ${
+                  isToday ? "bg-violet-500 text-white" : "text-slate-700"
+                }`}
+              >
+                {day}
+              </div>
+              <div className="space-y-0.5">
+                {dayEvents.slice(0, 3).map((e) => {
+                  const time = eventTimeLabel(e);
+                  return (
+                    <div
+                      key={`${e._seriesId}-${e.date}`}
+                      className="text-xs font-bold truncate rounded-md px-1 py-0.5 text-white"
+                      style={{ backgroundColor: e.color }}
+                    >
+                      {e.icon} {time ? `${time.split(" – ")[0]} ` : ""}
+                      {e.title}
+                    </div>
+                  );
+                })}
+                {dayEvents.length > 3 && (
+                  <div className="text-xs font-bold text-slate-400">+{dayEvents.length - 3} more</div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function WeekGrid({
+  anchor,
+  today,
+  eventsByDayKey,
+  onOpenNew,
+  onDeleteEvent,
+}: {
+  anchor: Date;
+  today: Date;
+  eventsByDayKey: Map<string, DisplayEvent[]>;
+  onOpenNew: (dateStr: string) => void;
+  onDeleteEvent: (e: DisplayEvent) => void;
+}) {
+  const start = startOfWeek(anchor);
+  const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-7 gap-3">
+      {days.map((d) => {
+        const key = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        const dayEvents = eventsByDayKey.get(key) ?? [];
+        const isToday =
+          d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+        return (
+          <div key={key} className="bg-white rounded-2xl shadow-sm p-3 min-h-[200px] flex flex-col">
+            <div className="flex items-center justify-between mb-2">
+              <div className={`flex items-center gap-2 ${isToday ? "text-violet-600" : "text-slate-700"}`}>
+                <span className="text-xs font-black uppercase">{DAY_LABELS_FULL[d.getDay()]}</span>
+                <span
+                  className={`text-sm font-black w-7 h-7 flex items-center justify-center rounded-full ${
+                    isToday ? "bg-violet-500 text-white" : ""
+                  }`}
+                >
+                  {d.getDate()}
+                </span>
+              </div>
+              <button
+                onClick={() => onOpenNew(key)}
+                className="text-violet-400 hover:text-violet-600 text-lg font-black leading-none"
+                title="Add event"
+              >
+                +
+              </button>
+            </div>
+            <div className="flex-1 space-y-1.5">
+              {dayEvents.length === 0 ? (
+                <p className="text-xs font-bold text-slate-300">No events</p>
+              ) : (
+                dayEvents.map((e) => {
+                  const time = eventTimeLabel(e);
+                  return (
+                    <div
+                      key={`${e._seriesId}-${e.date}`}
+                      className="rounded-xl p-2 text-xs font-bold flex items-start gap-1 group"
+                      style={{ backgroundColor: e.color + "22", color: "#0f172a" }}
+                    >
+                      <span className="text-base leading-none">{e.icon}</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate">{e.title}</p>
+                        {time && <p className="text-[10px] font-bold text-slate-500">{time}</p>}
+                      </div>
+                      <button
+                        onClick={() => onDeleteEvent(e)}
+                        className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-opacity"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function DayAgenda({
+  anchor,
+  eventsByDayKey,
+  onOpenNew,
+  onDeleteEvent,
+}: {
+  anchor: Date;
+  eventsByDayKey: Map<string, DisplayEvent[]>;
+  onOpenNew: (dateStr: string) => void;
+  onDeleteEvent: (e: DisplayEvent) => void;
+}) {
+  const key = `${anchor.getFullYear()}-${pad(anchor.getMonth() + 1)}-${pad(anchor.getDate())}`;
+  const dayEvents = eventsByDayKey.get(key) ?? [];
+
+  return (
+    <div className="bg-white rounded-3xl shadow-sm p-4">
+      {dayEvents.length === 0 ? (
+        <div className="text-center py-8">
+          <p className="text-slate-400 font-semibold mb-3">No events scheduled</p>
+          <button
+            onClick={() => onOpenNew(key)}
+            className="bg-violet-500 text-white rounded-xl px-4 py-2 font-bold hover:bg-violet-600"
+          >
+            + Add Event
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {dayEvents.map((e) => (
+            <EventRow key={`${e._seriesId}-${e.date}`} e={e} onDelete={() => onDeleteEvent(e)} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EventRow({ e, onDelete }: { e: DisplayEvent; onDelete: () => void }) {
+  const time = eventTimeLabel(e);
+  const m = meta(e.eventType);
+  return (
+    <div className="bg-white rounded-2xl p-4 shadow-sm flex items-start gap-3 border border-slate-50">
+      <div
+        className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
+        style={{ backgroundColor: e.color + "22" }}
+      >
+        {e.icon}
+      </div>
+      <div className="flex-1">
+        <p className="font-black text-slate-800">
+          {e.title}
+          {e._isOccurrence && <span className="ml-2 text-xs font-bold text-slate-400">↻</span>}
+        </p>
+        <p className="text-xs font-bold text-slate-500 mt-0.5">
+          {time ? `${time} • ` : ""}
+          {m?.label}
+          {e.recurring !== "none" && ` • Repeats ${e.recurring}`}
+        </p>
+        {e.notes && <p className="text-sm text-slate-500 mt-1">{e.notes}</p>}
+      </div>
+      <button onClick={onDelete} className="text-red-400 hover:text-red-600 p-1 transition-colors">
+        <Trash2 size={14} />
+      </button>
     </div>
   );
 }
