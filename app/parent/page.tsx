@@ -2,7 +2,7 @@
 
 import { type FormEvent, useState, useEffect } from "react";
 import Link from "next/link";
-import { Users, ListChecks, CalendarDays, DollarSign, BookOpen, Home, BarChart2, Gift, Wrench, Ticket, Mail, LockKeyhole, MonitorSmartphone, LogOut, Settings } from "lucide-react";
+import { Users, ListChecks, CalendarDays, DollarSign, BookOpen, Home, BarChart2, Gift, Wrench, Ticket, Mail, LockKeyhole, MonitorSmartphone, LogOut, Settings, UserPlus, Copy, Share2 } from "lucide-react";
 
 export default function ParentPanel() {
   const [unlocked, setUnlocked] = useState(false);
@@ -16,6 +16,9 @@ export default function ParentPanel() {
   const [confirmUrl, setConfirmUrl] = useState("");
   const [canResendConfirmation, setCanResendConfirmation] = useState(false);
   const [checking, setChecking] = useState(false);
+  const [inviteToken, setInviteToken] = useState("");
+  const [inviteUrl, setInviteUrl] = useState("");
+  const [inviteLoading, setInviteLoading] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -26,6 +29,12 @@ export default function ParentPanel() {
       setResetToken(token);
       setMode("reset");
       setNotice("Choose a new parent password.");
+    }
+    const invite = params.get("invite");
+    if (invite) {
+      setInviteToken(invite);
+      setMode("signup");
+      setNotice("Create a parent account to join this household.");
     }
 
     fetch("/api/parent/auth")
@@ -50,7 +59,7 @@ export default function ParentPanel() {
       const res = await fetch("/api/parent/auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, mode, householdName }),
+        body: JSON.stringify({ email, password, mode, householdName, inviteToken }),
       });
       const data = await res.json();
       if (data.ok && data.needsConfirmation) {
@@ -157,6 +166,44 @@ export default function ParentPanel() {
     setPassword("");
   }
 
+  async function loadInvite() {
+    setInviteLoading(true);
+    try {
+      const res = await fetch("/api/parent/invite");
+      const data = await res.json();
+      if (data.ok && data.inviteUrl) {
+        setInviteUrl(data.inviteUrl);
+        setNotice("");
+        setError("");
+      } else {
+        setError(data.error ?? "Could not create invite link.");
+      }
+    } catch {
+      setError("Could not create invite link.");
+    } finally {
+      setInviteLoading(false);
+    }
+  }
+
+  async function copyInvite() {
+    if (!inviteUrl) return;
+    await navigator.clipboard.writeText(inviteUrl);
+    setNotice("Invite link copied.");
+  }
+
+  async function shareInvite() {
+    if (!inviteUrl) return;
+    if (navigator.share) {
+      await navigator.share({
+        title: "Join my ChoresList household",
+        text: "Create a parent account to join our family chore app.",
+        url: inviteUrl,
+      });
+      return;
+    }
+    await copyInvite();
+  }
+
   if (!unlocked) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
@@ -176,7 +223,7 @@ export default function ParentPanel() {
           </p>
 
           <form onSubmit={submitLogin} className="space-y-4 text-left">
-            {mode === "signup" && (
+            {mode === "signup" && !inviteToken && (
               <label className="block">
                 <span className="text-sm font-bold text-slate-600">Household name</span>
                 <input
@@ -256,9 +303,11 @@ export default function ParentPanel() {
               type="button"
               onClick={() => {
                 setMode((current) => (current === "login" ? "signup" : "login"));
+                setInviteToken("");
                 setError("");
                 setNotice("");
                 setConfirmUrl("");
+                window.history.replaceState({}, "", "/parent");
               }}
               className="mt-4 text-sm font-bold text-violet-500 hover:text-violet-700"
             >
@@ -311,6 +360,14 @@ export default function ParentPanel() {
           <p className="text-slate-500 font-semibold">Manage your family&apos;s chore system</p>
         </div>
         <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={loadInvite}
+            disabled={inviteLoading}
+            className="flex items-center gap-2 bg-violet-500 text-white rounded-2xl px-4 py-2.5 shadow-sm font-bold hover:bg-violet-600 transition-colors disabled:opacity-60"
+          >
+            <UserPlus size={18} /> {inviteLoading ? "Loading..." : "Invite Family"}
+          </button>
           <Link
             href="/dashboard"
             className="flex items-center gap-2 bg-white rounded-2xl px-4 py-2.5 shadow-sm font-bold text-slate-600 hover:shadow-md transition-shadow"
@@ -326,6 +383,33 @@ export default function ParentPanel() {
           </button>
         </div>
       </div>
+
+      {inviteUrl && (
+        <div className="mb-6 rounded-3xl bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center">
+            <div className="min-w-0 flex-1">
+              <p className="font-black text-slate-800">Share parent access</p>
+              <p className="truncate text-sm font-semibold text-slate-500">{inviteUrl}</p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={copyInvite}
+                className="inline-flex items-center gap-2 rounded-2xl bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200"
+              >
+                <Copy size={16} /> Copy
+              </button>
+              <button
+                type="button"
+                onClick={shareInvite}
+                className="inline-flex items-center gap-2 rounded-2xl bg-violet-100 px-4 py-2 text-sm font-bold text-violet-700 hover:bg-violet-200"
+              >
+                <Share2 size={16} /> Share
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         {sections.map((s) => (

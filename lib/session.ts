@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from "crypto";
 
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
 const SESSION_COOKIE = "parent-session";
+const INVITE_TTL_SECONDS = 60 * 60 * 24 * 14;
 
 export type SessionPayload = {
   parentId: number;
@@ -78,3 +79,48 @@ export const parentSession = {
   name: SESSION_COOKIE,
   maxAge: SESSION_TTL_SECONDS,
 };
+
+export function createHouseholdInviteToken(householdId: number) {
+  const expiresAt = Math.floor(Date.now() / 1000) + INVITE_TTL_SECONDS;
+  const payload = Buffer.from(
+    JSON.stringify({
+      purpose: "household-invite",
+      householdId,
+      expiresAt,
+    })
+  ).toString("base64url");
+  return `${payload}.${sign(payload)}`;
+}
+
+export function verifyHouseholdInviteToken(token?: string): { householdId: number; expiresAt: number } | null {
+  if (!token) return null;
+
+  const [payload, signature] = token.split(".");
+  if (!payload || !signature) return null;
+
+  const expected = sign(payload);
+  const actualBuffer = Buffer.from(signature, "hex");
+  const expectedBuffer = Buffer.from(expected, "hex");
+  if (actualBuffer.length !== expectedBuffer.length || !timingSafeEqual(actualBuffer, expectedBuffer)) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
+      purpose?: string;
+      householdId?: unknown;
+      expiresAt?: unknown;
+    };
+    if (
+      parsed.purpose !== "household-invite" ||
+      typeof parsed.householdId !== "number" ||
+      typeof parsed.expiresAt !== "number" ||
+      parsed.expiresAt <= Math.floor(Date.now() / 1000)
+    ) {
+      return null;
+    }
+    return { householdId: parsed.householdId, expiresAt: parsed.expiresAt };
+  } catch {
+    return null;
+  }
+}

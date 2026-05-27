@@ -76,6 +76,14 @@ interface WeatherForecast {
   }[];
 }
 
+interface LocationSuggestion {
+  id: string;
+  label: string;
+  fullAddress: string;
+  latitude: number;
+  longitude: number;
+}
+
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAY_LABELS_FULL = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
@@ -260,6 +268,9 @@ function CalendarContent() {
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [selectedEvent, setSelectedEvent] = useState<DisplayEvent | null>(null);
   const [imageUploading, setImageUploading] = useState(false);
+  const [locationSuggestions, setLocationSuggestions] = useState<LocationSuggestion[]>([]);
+  const [locationStatus, setLocationStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [selectedLocation, setSelectedLocation] = useState("");
 
   const [form, setForm] = useState({
     title: "",
@@ -293,6 +304,37 @@ function CalendarContent() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    const query = form.location.trim();
+    if (!open || query.length < 4 || query === selectedLocation) {
+      setLocationSuggestions([]);
+      setLocationStatus("idle");
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(async () => {
+      setLocationStatus("loading");
+      try {
+        const params = new URLSearchParams({ q: query });
+        const res = await fetch(`/api/locations?${params.toString()}`, { signal: controller.signal });
+        if (!res.ok) throw new Error("Address lookup failed");
+        const data = (await res.json()) as { results?: LocationSuggestion[] };
+        setLocationSuggestions(Array.isArray(data.results) ? data.results : []);
+        setLocationStatus("idle");
+      } catch (error) {
+        if ((error as Error).name === "AbortError") return;
+        setLocationSuggestions([]);
+        setLocationStatus("error");
+      }
+    }, 350);
+
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [form.location, open, selectedLocation]);
 
   const windowRange = useMemo(() => {
     if (view === "month") {
@@ -351,6 +393,9 @@ function CalendarContent() {
       resources: "",
       notes: "",
     });
+    setSelectedLocation("");
+    setLocationSuggestions([]);
+    setLocationStatus("idle");
     setOpen(true);
   }
 
@@ -767,12 +812,48 @@ function CalendarContent() {
 
             <div>
               <Label className="font-bold">Location</Label>
-              <Input
-                value={form.location}
-                onChange={(e) => setForm((p) => ({ ...p, location: e.target.value }))}
-                placeholder="Church sanctuary, school gym..."
-                className="rounded-xl mt-1"
-              />
+              <div className="relative mt-1">
+                <Input
+                  value={form.location}
+                  onChange={(e) => {
+                    setSelectedLocation("");
+                    setForm((p) => ({ ...p, location: e.target.value }));
+                  }}
+                  placeholder="Start typing an address..."
+                  autoComplete="off"
+                  className="rounded-xl pr-9"
+                />
+                <MapPin size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                {(locationStatus === "loading" || locationStatus === "error" || locationSuggestions.length > 0) && (
+                  <div className="absolute left-0 right-0 top-[calc(100%+0.25rem)] z-20 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-lg">
+                    {locationStatus === "loading" && (
+                      <p className="px-3 py-2 text-sm font-bold text-slate-400">Looking up addresses...</p>
+                    )}
+                    {locationStatus === "error" && (
+                      <p className="px-3 py-2 text-sm font-bold text-red-400">Address lookup is unavailable</p>
+                    )}
+                    {locationStatus !== "loading" &&
+                      locationSuggestions.map((suggestion) => (
+                        <button
+                          key={suggestion.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedLocation(suggestion.label);
+                            setForm((p) => ({ ...p, location: suggestion.label }));
+                            setLocationSuggestions([]);
+                          }}
+                          className="flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-violet-50"
+                        >
+                          <MapPin size={15} className="mt-0.5 shrink-0 text-violet-400" />
+                          <span className="min-w-0">
+                            <span className="block text-sm font-black text-slate-700">{suggestion.label}</span>
+                            <span className="block truncate text-xs font-semibold text-slate-400">{suggestion.fullAddress}</span>
+                          </span>
+                        </button>
+                      ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 gap-3">

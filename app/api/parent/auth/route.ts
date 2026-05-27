@@ -6,7 +6,7 @@ import { sendConfirmationEmail } from "@/lib/email";
 import { seedHouseholdDefaults } from "@/lib/household-defaults";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
-import { createSessionToken, parentSession, verifySessionToken } from "@/lib/session";
+import { createSessionToken, parentSession, verifyHouseholdInviteToken, verifySessionToken } from "@/lib/session";
 
 export const runtime = "nodejs";
 
@@ -39,7 +39,7 @@ export const POST = withErrors(async (req: NextRequest) => {
   const limited = rateLimit(req, { key: "parent-auth", limit: 10, windowMs: 60_000 });
   if (limited) return limited;
 
-  const { email, password, mode, householdName } = await req.json();
+  const { email, password, mode, householdName, inviteToken } = await req.json();
 
   if (typeof email !== "string" || typeof password !== "string") {
     return NextResponse.json({ ok: false }, { status: 400 });
@@ -69,11 +69,37 @@ export const POST = withErrors(async (req: NextRequest) => {
       });
     }
 
+    const invite = typeof inviteToken === "string" ? verifyHouseholdInviteToken(inviteToken) : null;
+    if (inviteToken && !invite) {
+      return NextResponse.json({ ok: false, error: "Invite link is invalid or expired." }, { status: 400 });
+    }
+    if (invite) {
+      const household = await prisma.household.findUnique({ where: { id: invite.householdId } });
+      if (!household) {
+        return NextResponse.json({ ok: false, error: "Invite household no longer exists." }, { status: 400 });
+      }
+    }
+
     const { passwordHash, passwordSalt } = hashPassword(password);
     const { token: confirmationToken, tokenHash } = createConfirmationToken();
     const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24);
 
     await prisma.$transaction(async (tx) => {
+      if (invite) {
+        await tx.parentAccount.create({
+          data: {
+            email: normalizedEmail,
+            passwordHash,
+            passwordSalt,
+            householdId: invite.householdId,
+            confirmationTokens: {
+              create: { tokenHash, expiresAt },
+            },
+          },
+        });
+        return;
+      }
+
       const parent = await tx.parentAccount.create({
         data: {
           email: normalizedEmail,
