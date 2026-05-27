@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { ArrowLeft, Plus, Wand2, BookOpen, ChevronRight, Trash2, Pencil } from "lucide-react";
+import { ArrowLeft, Plus, Wand2, BookOpen, ChevronRight, Trash2, Pencil, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { CHORE_CATEGORIES, CHORE_EMOJIS } from "@/types";
+import { CHORE_CATEGORIES, CHORE_EMOJIS, CHORE_TEMPLATES_BY_AGE } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -37,6 +37,7 @@ export default function ChoresPage() {
   const [instructions, setInstructions] = useState<Instructions>({ steps: [], tips: [], safetyNotes: [] });
   const [generating, setGenerating] = useState(false);
   const [showNewChore, setShowNewChore] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
   const [newChore, setNewChore] = useState({ name: "", icon: "✅", color: "#e0e7ff", ageMin: 6, ageMax: 18, pointsValue: 10, category: "other", requiresPhoto: false });
   const [editingChore, setEditingChore] = useState<Chore | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState<"new" | "edit" | null>(null);
@@ -131,6 +132,34 @@ export default function ChoresPage() {
     load();
   }
 
+  async function addTemplateGroup(group: typeof CHORE_TEMPLATES_BY_AGE[number]) {
+    const existingNames = new Set(chores.map((chore) => chore.name.toLowerCase()));
+    const templates = group.chores.filter((chore) => !existingNames.has(chore.name.toLowerCase()));
+    if (templates.length === 0) {
+      toast.info("Those templates are already in your library");
+      return;
+    }
+
+    await Promise.all(
+      templates.map((template) =>
+        fetch("/api/chores", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...template,
+            ageMin: group.ageMin,
+            ageMax: group.ageMax,
+            requiresPhoto: false,
+          }),
+        })
+      )
+    );
+
+    toast.success(`Added ${templates.length} ${group.label} chores`);
+    setShowTemplates(false);
+    load();
+  }
+
   async function deleteChore(id: number) {
     if (!confirm("Delete this chore?")) return;
     await fetch(`/api/chores?id=${id}`, { method: "DELETE" });
@@ -158,6 +187,12 @@ export default function ChoresPage() {
           <ArrowLeft size={20} className="text-slate-600" />
         </Link>
         <h1 className="text-3xl font-black text-slate-800 flex-1">📋 Chore Library</h1>
+        <button
+          onClick={() => setShowTemplates(true)}
+          className="flex items-center gap-2 bg-violet-500 text-white rounded-2xl px-4 py-2.5 font-bold hover:bg-violet-600 transition-colors"
+        >
+          <Sparkles size={18} /> Quick Start
+        </button>
         <button
           onClick={() => setShowNewChore(true)}
           className="flex items-center gap-2 bg-blue-500 text-white rounded-2xl px-4 py-2.5 font-bold hover:bg-blue-600 transition-colors"
@@ -461,6 +496,44 @@ export default function ChoresPage() {
             >
               Add Chore
             </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick Start Templates Dialog */}
+      <Dialog open={showTemplates} onOpenChange={setShowTemplates}>
+        <DialogContent className="max-w-2xl rounded-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-black">Child Quick Start Templates</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {CHORE_TEMPLATES_BY_AGE.map((group) => (
+              <div key={group.label} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="font-black text-slate-800">{group.label}</h3>
+                    <p className="text-xs font-bold text-slate-400">{group.chores.length} ready-to-add chores</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => addTemplateGroup(group)}
+                    className="rounded-xl bg-violet-500 px-3 py-2 text-sm font-black text-white hover:bg-violet-600"
+                  >
+                    Add Set
+                  </button>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {group.chores.map((chore) => (
+                    <div key={chore.name} className="rounded-xl bg-white p-3">
+                      <p className="font-black text-slate-700">{chore.icon} {chore.name}</p>
+                      <p className="mt-1 text-xs font-semibold text-slate-400">
+                        {CHORE_CATEGORIES.find((category) => category.value === chore.category)?.icon} {chore.category} • ⭐ {chore.pointsValue}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         </DialogContent>
       </Dialog>

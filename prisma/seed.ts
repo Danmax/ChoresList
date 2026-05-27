@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { hashPassword, normalizeEmail } from "../lib/auth";
+import { CHORE_TEMPLATES_BY_AGE } from "../types";
 
 const prisma = new PrismaClient();
 
@@ -10,6 +11,8 @@ const skills = [
   { name: "Pet Care", icon: "🐾" },
   { name: "Cooking", icon: "🍳" },
   { name: "Laundry", icon: "👕" },
+  { name: "Tech", icon: "💻" },
+  { name: "Media", icon: "🎥" },
 ];
 
 const chores = [
@@ -44,6 +47,16 @@ const chores = [
   { name: "Wipe Down Counters", icon: "🧽", color: "#f0f9ff", ageMin: 8, ageMax: 18, pointsValue: 10, category: "cleaning", description: "Wipe kitchen and bathroom counters clean", skill: "Cleanliness" },
 ];
 
+const templateChores = CHORE_TEMPLATES_BY_AGE.flatMap((group) =>
+  group.chores.map((chore) => ({
+    ...chore,
+    ageMin: group.ageMin,
+    ageMax: group.ageMax,
+    skill: chore.category === "tech" ? "Tech" : chore.category === "media" ? "Media" : "Responsibility",
+    requiresPhoto: false,
+  }))
+);
+
 async function main() {
   console.log("🌱 Seeding database...");
 
@@ -75,7 +88,7 @@ async function main() {
     createdSkills[skill.name] = s.id;
   }
 
-  for (const chore of chores) {
+  for (const chore of [...chores, ...templateChores]) {
     const { skill, requiresPhoto = false, ...choreData } = chore;
     const created = await prisma.chore.create({
       data: { ...choreData, requiresPhoto, householdId: parent.householdId },
@@ -87,7 +100,7 @@ async function main() {
     }
   }
 
-  console.log(`✅ Seeded parent login, ${chores.length} chores, and ${skills.length} skill categories`);
+  console.log(`✅ Seeded parent login, ${chores.length + templateChores.length} chores, and ${skills.length} skill categories`);
 }
 
 main()

@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
+import { CHORE_TEMPLATES_BY_AGE } from "@/types";
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
@@ -9,6 +10,8 @@ const skills = [
   { name: "Pet Care", icon: "🐾" },
   { name: "Cooking", icon: "🍳" },
   { name: "Laundry", icon: "👕" },
+  { name: "Tech", icon: "💻" },
+  { name: "Media", icon: "🎥" },
 ];
 
 const chores = [
@@ -29,6 +32,16 @@ const chores = [
   { name: "Unload Dishwasher", icon: "🍶", color: "#ecfdf5", ageMin: 8, ageMax: 18, pointsValue: 10, category: "kitchen", description: "Put all clean dishes away in their right spots", skill: "Cooking" },
 ];
 
+const templateChores = CHORE_TEMPLATES_BY_AGE.flatMap((group) =>
+  group.chores.map((chore) => ({
+    ...chore,
+    ageMin: group.ageMin,
+    ageMax: group.ageMax,
+    skill: chore.category === "tech" ? "Tech" : chore.category === "media" ? "Media" : "Responsibility",
+    requiresPhoto: false,
+  }))
+);
+
 export async function seedHouseholdDefaults(db: Db, householdId: number) {
   const createdSkills: Record<string, number> = {};
 
@@ -37,7 +50,7 @@ export async function seedHouseholdDefaults(db: Db, householdId: number) {
     createdSkills[skill.name] = created.id;
   }
 
-  for (const chore of chores) {
+  for (const chore of [...chores, ...templateChores]) {
     const { skill, requiresPhoto = false, ...choreData } = chore;
     const created = await db.chore.create({ data: { ...choreData, requiresPhoto, householdId } });
 

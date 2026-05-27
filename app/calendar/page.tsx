@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { ParentPinGate } from "@/components/parent-pin-gate";
 
 type RecurringMode = "none" | "weekly" | "monthly";
 type RecurringEndMode = "never" | "date" | "count";
@@ -162,12 +163,21 @@ function meta(eventType: string) {
 }
 
 export default function CalendarPage() {
+  return (
+    <ParentPinGate>
+      <CalendarContent />
+    </ParentPinGate>
+  );
+}
+
+function CalendarContent() {
   const today = useMemo(() => new Date(), []);
   const [view, setView] = useState<ViewMode>("month");
   const [anchor, setAnchor] = useState<Date>(today);
   const [events, setEvents] = useState<FamilyEvent[]>([]);
   const [open, setOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>("");
+  const [selectedEvent, setSelectedEvent] = useState<DisplayEvent | null>(null);
 
   const [form, setForm] = useState({
     title: "",
@@ -436,6 +446,7 @@ export default function CalendarPage() {
           eventsByDayKey={eventsByDayKey}
           selectedDate={selectedDate}
           onSelectDate={(d) => setSelectedDate(selectedDate === d ? "" : d)}
+          onOpenEvent={setSelectedEvent}
         />
       )}
 
@@ -446,6 +457,7 @@ export default function CalendarPage() {
           eventsByDayKey={eventsByDayKey}
           onOpenNew={(d) => openNewEvent(d)}
           onDeleteEvent={deleteEvent}
+          onOpenEvent={setSelectedEvent}
         />
       )}
 
@@ -455,6 +467,7 @@ export default function CalendarPage() {
           eventsByDayKey={eventsByDayKey}
           onOpenNew={(d) => openNewEvent(d)}
           onDeleteEvent={deleteEvent}
+          onOpenEvent={setSelectedEvent}
         />
       )}
 
@@ -474,7 +487,7 @@ export default function CalendarPage() {
           ) : (
             <div className="space-y-2">
               {selectedEvents.map((e) => (
-                <EventRow key={`${e._seriesId}-${e.date}`} e={e} onDelete={() => deleteEvent(e)} />
+                <EventRow key={`${e._seriesId}-${e.date}`} e={e} onOpen={() => setSelectedEvent(e)} onDelete={() => deleteEvent(e)} />
               ))}
             </div>
           )}
@@ -744,6 +757,15 @@ export default function CalendarPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <EventDetailsDialog
+        event={selectedEvent}
+        onClose={() => setSelectedEvent(null)}
+        onDelete={(event) => {
+          setSelectedEvent(null);
+          deleteEvent(event);
+        }}
+      />
     </div>
   );
 }
@@ -755,6 +777,7 @@ function MonthGrid({
   eventsByDayKey,
   selectedDate,
   onSelectDate,
+  onOpenEvent,
 }: {
   year: number;
   month: number;
@@ -762,6 +785,7 @@ function MonthGrid({
   eventsByDayKey: Map<string, DisplayEvent[]>;
   selectedDate: string;
   onSelectDate: (key: string) => void;
+  onOpenEvent: (e: DisplayEvent) => void;
 }) {
   const firstDay = new Date(year, month - 1, 1).getDay();
   const daysInMonth = new Date(year, month, 0).getDate();
@@ -808,6 +832,10 @@ function MonthGrid({
                   return (
                     <div
                       key={`${e._seriesId}-${e.date}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onOpenEvent(e);
+                      }}
                       className="text-xs font-bold truncate rounded-md px-1 py-0.5 text-white"
                       style={{ backgroundColor: e.color }}
                     >
@@ -834,12 +862,14 @@ function WeekGrid({
   eventsByDayKey,
   onOpenNew,
   onDeleteEvent,
+  onOpenEvent,
 }: {
   anchor: Date;
   today: Date;
   eventsByDayKey: Map<string, DisplayEvent[]>;
   onOpenNew: (dateStr: string) => void;
   onDeleteEvent: (e: DisplayEvent) => void;
+  onOpenEvent: (e: DisplayEvent) => void;
 }) {
   const start = startOfWeek(anchor);
   const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
@@ -881,7 +911,8 @@ function WeekGrid({
                   return (
                     <div
                       key={`${e._seriesId}-${e.date}`}
-                      className="rounded-xl p-2 text-xs font-bold flex items-start gap-1 group"
+                      onClick={() => onOpenEvent(e)}
+                      className="rounded-xl p-2 text-xs font-bold flex items-start gap-1 group cursor-pointer hover:shadow-sm"
                       style={{ backgroundColor: e.color + "22", color: "#0f172a" }}
                     >
                       <span className="text-base leading-none">{e.icon}</span>
@@ -890,7 +921,10 @@ function WeekGrid({
                         {time && <p className="text-[10px] font-bold text-slate-500">{time}</p>}
                       </div>
                       <button
-                        onClick={() => onDeleteEvent(e)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onDeleteEvent(e);
+                        }}
                         className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-opacity"
                       >
                         <Trash2 size={12} />
@@ -912,11 +946,13 @@ function DayAgenda({
   eventsByDayKey,
   onOpenNew,
   onDeleteEvent,
+  onOpenEvent,
 }: {
   anchor: Date;
   eventsByDayKey: Map<string, DisplayEvent[]>;
   onOpenNew: (dateStr: string) => void;
   onDeleteEvent: (e: DisplayEvent) => void;
+  onOpenEvent: (e: DisplayEvent) => void;
 }) {
   const key = `${anchor.getFullYear()}-${pad(anchor.getMonth() + 1)}-${pad(anchor.getDate())}`;
   const dayEvents = eventsByDayKey.get(key) ?? [];
@@ -936,7 +972,7 @@ function DayAgenda({
       ) : (
         <div className="space-y-2">
           {dayEvents.map((e) => (
-            <EventRow key={`${e._seriesId}-${e.date}`} e={e} onDelete={() => onDeleteEvent(e)} />
+            <EventRow key={`${e._seriesId}-${e.date}`} e={e} onOpen={() => onOpenEvent(e)} onDelete={() => onDeleteEvent(e)} />
           ))}
         </div>
       )}
@@ -944,11 +980,14 @@ function DayAgenda({
   );
 }
 
-function EventRow({ e, onDelete }: { e: DisplayEvent; onDelete: () => void }) {
+function EventRow({ e, onOpen, onDelete }: { e: DisplayEvent; onOpen?: () => void; onDelete: () => void }) {
   const time = eventTimeLabel(e);
   const m = meta(e.eventType);
   return (
-    <div className="bg-white rounded-2xl p-4 shadow-sm flex items-start gap-3 border border-slate-50">
+    <div
+      onClick={onOpen}
+      className="bg-white rounded-2xl p-4 shadow-sm flex items-start gap-3 border border-slate-50 cursor-pointer hover:shadow-md transition-shadow"
+    >
       <div
         className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
         style={{ backgroundColor: e.color + "22" }}
@@ -986,9 +1025,87 @@ function EventRow({ e, onDelete }: { e: DisplayEvent; onDelete: () => void }) {
         )}
         {e.resources && <p className="mt-1 text-xs font-semibold text-slate-500">{e.resources}</p>}
       </div>
-      <button onClick={onDelete} className="text-red-400 hover:text-red-600 p-1 transition-colors">
+      <button
+        onClick={(event) => {
+          event.stopPropagation();
+          onDelete();
+        }}
+        className="text-red-400 hover:text-red-600 p-1 transition-colors"
+      >
         <Trash2 size={14} />
       </button>
+    </div>
+  );
+}
+
+function EventDetailsDialog({
+  event,
+  onClose,
+  onDelete,
+}: {
+  event: DisplayEvent | null;
+  onClose: () => void;
+  onDelete: (event: DisplayEvent) => void;
+}) {
+  const time = event ? eventTimeLabel(event) : null;
+  const m = event ? meta(event.eventType) : null;
+
+  return (
+    <Dialog open={!!event} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-lg rounded-3xl">
+        <DialogHeader>
+          <DialogTitle className="font-black">{event?.icon} {event?.title}</DialogTitle>
+        </DialogHeader>
+        {event && (
+          <div className="space-y-4">
+            <div className="rounded-2xl p-4" style={{ backgroundColor: event.color + "22" }}>
+              <p className="text-sm font-black text-slate-700">
+                {m?.label}
+                {time ? ` • ${time}` : event.allDay ? " • All day" : ""}
+                {event.recurring !== "none" ? ` • Repeats ${event.recurring}` : ""}
+              </p>
+              <p className="mt-1 text-sm font-semibold text-slate-500">
+                {new Date(event.date).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+              </p>
+              {event.location && (
+                <p className="mt-2 flex items-center gap-1 text-sm font-bold text-slate-600">
+                  <MapPin size={15} /> {event.location}
+                </p>
+              )}
+            </div>
+
+            {event.notes && <DetailBlock title="Event details" value={event.notes} />}
+            {event.registrationNotes && <DetailBlock title="Registration details" value={event.registrationNotes} />}
+            {event.resources && <DetailBlock title="Resources" value={event.resources} />}
+
+            {(event.meetingUrl || event.rsvpUrl || event.flyerUrl || event.registrationUrl) && (
+              <div className="flex flex-wrap gap-2">
+                {event.meetingUrl && <EventLink href={event.meetingUrl} label="Meeting link" />}
+                {event.rsvpUrl && <EventLink href={event.rsvpUrl} label="RSVP" />}
+                {event.flyerUrl && <EventLink href={event.flyerUrl} label="Flyer" />}
+                {event.registrationUrl && <EventLink href={event.registrationUrl} label="Register" />}
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => onDelete(event)}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-red-50 py-3 font-black text-red-500 hover:bg-red-100"
+            >
+              <Trash2 size={16} /> Delete Event
+            </button>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DetailBlock({ title, value }: { title: string; value: string }) {
+  return (
+    <div>
+      <p className="text-xs font-black uppercase text-slate-400">{title}</p>
+      <p className="mt-1 whitespace-pre-wrap text-sm font-semibold text-slate-600">{value}</p>
     </div>
   );
 }
