@@ -11,6 +11,7 @@ import {
   Link as LinkIcon,
   FileText,
   ImageIcon,
+  Wand2,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -201,6 +202,8 @@ function CalendarContent() {
   const [locationSuggestions, setLocationSuggestions] = useState<LocationSuggestion[]>([]);
   const [locationStatus, setLocationStatus] = useState<"idle" | "loading" | "error">("idle");
   const [selectedLocation, setSelectedLocation] = useState("");
+  const [eventPrompt, setEventPrompt] = useState("");
+  const [draftingEvent, setDraftingEvent] = useState(false);
 
   const [form, setForm] = useState({
     title: "",
@@ -326,7 +329,41 @@ function CalendarContent() {
     setSelectedLocation("");
     setLocationSuggestions([]);
     setLocationStatus("idle");
+    setEventPrompt("");
     setOpen(true);
+  }
+
+  async function generateEventDraft() {
+    if (eventPrompt.trim().length < 4) {
+      toast.error("Describe the event first");
+      return;
+    }
+    setDraftingEvent(true);
+    try {
+      const res = await fetch("/api/ai/draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "event", prompt: eventPrompt }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error ?? "Could not draft event");
+        return;
+      }
+      setForm((p) => ({
+        ...p,
+        ...data.draft,
+        date: data.draft.date || p.date,
+        recurring: p.recurring,
+        recurringEndMode: p.recurringEndMode,
+        recurringEndDate: p.recurringEndDate,
+        recurringCount: p.recurringCount,
+      }));
+      setSelectedLocation(data.draft.location ?? "");
+      toast.success("Event draft filled in");
+    } finally {
+      setDraftingEvent(false);
+    }
   }
 
   async function saveEvent() {
@@ -590,6 +627,24 @@ function CalendarContent() {
             <DialogTitle className="font-black">Add Family Event</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+            <div className="rounded-2xl bg-violet-50 p-3">
+              <Label className="font-bold text-violet-800">Prompt</Label>
+              <Textarea
+                value={eventPrompt}
+                onChange={(e) => setEventPrompt(e.target.value)}
+                placeholder="Example: Soccer practice next Tuesday at 6pm at Pine Park for 90 minutes"
+                className="mt-1 min-h-20 resize-none rounded-xl bg-white"
+              />
+              <button
+                type="button"
+                onClick={generateEventDraft}
+                disabled={draftingEvent || eventPrompt.trim().length < 4}
+                className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-violet-500 px-3 py-2 text-sm font-black text-white hover:bg-violet-600 disabled:opacity-50"
+              >
+                <Wand2 size={16} />
+                {draftingEvent ? "Filling fields..." : "Fill Fields with AI"}
+              </button>
+            </div>
             <div>
               <Label className="font-bold">Event Type</Label>
               <Select

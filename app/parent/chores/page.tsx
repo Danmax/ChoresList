@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
 interface Instructions {
   steps: string[];
@@ -38,9 +39,11 @@ export default function ChoresPage() {
   const [generating, setGenerating] = useState(false);
   const [showNewChore, setShowNewChore] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
-  const [newChore, setNewChore] = useState({ name: "", icon: "✅", color: "#e0e7ff", ageMin: 6, ageMax: 18, pointsValue: 10, category: "other", requiresPhoto: false });
+  const [newChore, setNewChore] = useState({ name: "", description: "", icon: "✅", color: "#e0e7ff", ageMin: 6, ageMax: 18, pointsValue: 10, category: "other", requiresPhoto: false });
   const [editingChore, setEditingChore] = useState<Chore | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState<"new" | "edit" | null>(null);
+  const [chorePrompt, setChorePrompt] = useState("");
+  const [draftingChore, setDraftingChore] = useState(false);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/chores");
@@ -128,8 +131,33 @@ export default function ChoresPage() {
     });
     toast.success("Chore added!");
     setShowNewChore(false);
-    setNewChore({ name: "", icon: "✅", color: "#e0e7ff", ageMin: 6, ageMax: 18, pointsValue: 10, category: "other", requiresPhoto: false });
+    setNewChore({ name: "", description: "", icon: "✅", color: "#e0e7ff", ageMin: 6, ageMax: 18, pointsValue: 10, category: "other", requiresPhoto: false });
+    setChorePrompt("");
     load();
+  }
+
+  async function generateChoreDraft() {
+    if (chorePrompt.trim().length < 4) {
+      toast.error("Describe the chore first");
+      return;
+    }
+    setDraftingChore(true);
+    try {
+      const res = await fetch("/api/ai/draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "chore", prompt: chorePrompt }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error ?? "Could not draft chore");
+        return;
+      }
+      setNewChore((p) => ({ ...p, ...data.draft }));
+      toast.success("Chore draft filled in");
+    } finally {
+      setDraftingChore(false);
+    }
   }
 
   async function addTemplateGroup(group: typeof CHORE_TEMPLATES_BY_AGE[number]) {
@@ -426,6 +454,23 @@ export default function ChoresPage() {
             <DialogTitle className="font-black">Add New Chore</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            <div className="rounded-2xl bg-violet-50 p-3">
+              <Label className="font-bold text-violet-800">Prompt</Label>
+              <Textarea
+                value={chorePrompt}
+                onChange={(e) => setChorePrompt(e.target.value)}
+                placeholder="Example: Create a chore for a 9 year old to tidy the living room before bedtime"
+                className="mt-1 min-h-20 resize-none rounded-xl bg-white"
+              />
+              <button
+                type="button"
+                onClick={generateChoreDraft}
+                disabled={draftingChore || chorePrompt.trim().length < 4}
+                className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-violet-500 px-3 py-2 text-sm font-black text-white hover:bg-violet-600 disabled:opacity-50"
+              >
+                <Wand2 size={16} /> {draftingChore ? "Filling fields..." : "Fill Fields with AI"}
+              </button>
+            </div>
             <div className="flex gap-3">
               <div className="w-20">
                 <Label className="font-bold">Icon</Label>
@@ -445,6 +490,16 @@ export default function ChoresPage() {
                   className="rounded-xl mt-1"
                 />
               </div>
+            </div>
+            <div>
+              <Label className="font-bold">Description</Label>
+              <Textarea
+                value={newChore.description}
+                onChange={(e) => setNewChore((p) => ({ ...p, description: e.target.value }))}
+                placeholder="What should this chore cover?"
+                className="rounded-xl mt-1 resize-none"
+                rows={2}
+              />
             </div>
             {showEmojiPicker === "new" && (
               <div className="flex flex-wrap gap-1.5 p-3 bg-slate-50 rounded-2xl max-h-40 overflow-y-auto border border-slate-200">
