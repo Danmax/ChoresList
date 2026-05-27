@@ -11,10 +11,6 @@ import {
   Link as LinkIcon,
   FileText,
   ImageIcon,
-  CloudSun,
-  CloudRain,
-  Navigation,
-  RefreshCw,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -25,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ParentPinGate } from "@/components/parent-pin-gate";
+import { TinyWeather } from "@/components/tiny-weather";
 
 type RecurringMode = "none" | "weekly" | "monthly";
 type RecurringEndMode = "never" | "date" | "count";
@@ -54,28 +51,6 @@ interface FamilyEvent {
 
 type DisplayEvent = FamilyEvent & { _seriesId: number; _isOccurrence: boolean };
 
-interface WeatherForecast {
-  fetchedAt: string;
-  current: {
-    temperature: number;
-    feelsLike: number;
-    humidity: number;
-    precipitation: number;
-    windSpeed: number;
-    windGusts: number;
-    cloudCover: number;
-    precipitationProbability: number;
-    weatherCode: number;
-  };
-  daily: {
-    date: string;
-    weatherCode: number;
-    temperatureMax: number;
-    temperatureMin: number;
-    precipitationProbability: number;
-  }[];
-}
-
 interface LocationSuggestion {
   id: string;
   label: string;
@@ -100,8 +75,6 @@ const DURATION_PRESETS: { label: string; minutes: number }[] = [
 ];
 
 const MAX_EXPAND = 520;
-const WEATHER_CACHE_KEY = "calendar-local-weather-v2";
-const WEATHER_CACHE_MS = 30 * 60 * 1000;
 
 function pad(n: number) {
   return String(n).padStart(2, "0");
@@ -206,49 +179,6 @@ function expandOccurrences(events: FamilyEvent[], windowStart: Date, windowEnd: 
 
 function meta(eventType: string) {
   return EVENT_TYPE_META[eventType as EventType];
-}
-
-function weatherSummary(code: number) {
-  if (code === 0) return "Clear";
-  if ([1, 2].includes(code)) return "Partly cloudy";
-  if (code === 3) return "Cloudy";
-  if ([45, 48].includes(code)) return "Fog";
-  if ([51, 53, 55, 56, 57].includes(code)) return "Drizzle";
-  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return "Rain";
-  if ([71, 73, 75, 77, 85, 86].includes(code)) return "Snow";
-  if ([95, 96, 99].includes(code)) return "Storms";
-  return "Forecast";
-}
-
-function weatherDescription(code: number) {
-  if (code === 0) return "Sunny";
-  if ([1, 2].includes(code)) return "Partly cloudy";
-  if (code === 3) return "Cloudy";
-  if ([45, 48].includes(code)) return "Foggy";
-  if ([51, 53, 55, 56, 57].includes(code)) return "Drizzling";
-  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return "Raining";
-  if ([71, 73, 75, 77, 85, 86].includes(code)) return "Snowing";
-  if ([95, 96, 99].includes(code)) return "Stormy";
-  return "Current weather";
-}
-
-function formatTemperature(value: number) {
-  return `${Math.round(value)}°`;
-}
-
-function formatPercent(value: number) {
-  return `${Math.round(value)}%`;
-}
-
-function isValidForecast(value: WeatherForecast) {
-  return (
-    Number.isFinite(value.current?.temperature) &&
-    Number.isFinite(value.current?.feelsLike) &&
-    Number.isFinite(value.current?.humidity) &&
-    Number.isFinite(value.current?.cloudCover) &&
-    Number.isFinite(value.current?.windSpeed) &&
-    Array.isArray(value.daily)
-  );
 }
 
 export default function CalendarPage() {
@@ -546,6 +476,7 @@ function CalendarContent() {
           <ArrowLeft size={20} className="text-slate-600" />
         </Link>
         <h1 className="text-3xl font-black text-slate-800 flex-1">📅 Family Calendar</h1>
+        <TinyWeather className="hidden sm:flex" />
         <button
           onClick={() => openNewEvent()}
           className="flex items-center gap-2 bg-violet-500 text-white rounded-2xl px-4 py-2.5 font-bold hover:bg-violet-600 transition-colors"
@@ -582,8 +513,6 @@ function CalendarContent() {
           </button>
         </div>
       </div>
-
-      <WeatherWidget />
 
       {view === "month" && (
         <MonthGrid
@@ -969,179 +898,6 @@ function CalendarContent() {
           deleteEvent(event);
         }}
       />
-    </div>
-  );
-}
-
-function WeatherWidget() {
-  const [forecast, setForecast] = useState<WeatherForecast | null>(null);
-  const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
-  const [error, setError] = useState("");
-
-  const loadWeather = useCallback((force = false) => {
-    if (!force) {
-      try {
-        const cached = localStorage.getItem(WEATHER_CACHE_KEY);
-        if (cached) {
-          const parsed = JSON.parse(cached) as WeatherForecast;
-          if (isValidForecast(parsed) && Date.now() - new Date(parsed.fetchedAt).getTime() < WEATHER_CACHE_MS) {
-            setForecast(parsed);
-            setStatus("idle");
-            return;
-          }
-          localStorage.removeItem(WEATHER_CACHE_KEY);
-        }
-      } catch {
-        localStorage.removeItem(WEATHER_CACHE_KEY);
-      }
-      setStatus("idle");
-      setError("");
-      return;
-    }
-
-    if (!("geolocation" in navigator)) {
-      setStatus("error");
-      setError("Location is not available in this browser");
-      return;
-    }
-
-    setStatus("loading");
-    setError("");
-
-    navigator.geolocation.getCurrentPosition(
-      async ({ coords }) => {
-        try {
-          const params = new URLSearchParams({
-            latitude: String(coords.latitude),
-            longitude: String(coords.longitude),
-            current:
-              "temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,cloud_cover,wind_speed_10m,wind_gusts_10m",
-            hourly: "precipitation_probability",
-            daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
-            temperature_unit: "fahrenheit",
-            wind_speed_unit: "mph",
-            precipitation_unit: "inch",
-            timezone: "auto",
-            forecast_days: "5",
-          });
-          const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`);
-          if (!res.ok) throw new Error("Could not load weather");
-          const data = await res.json();
-          const nextForecast: WeatherForecast = {
-            fetchedAt: new Date().toISOString(),
-            current: {
-              temperature: data.current.temperature_2m,
-              feelsLike: data.current.apparent_temperature,
-              humidity: data.current.relative_humidity_2m ?? 0,
-              precipitation: data.current.precipitation ?? 0,
-              windSpeed: data.current.wind_speed_10m,
-              windGusts: data.current.wind_gusts_10m ?? 0,
-              cloudCover: data.current.cloud_cover ?? 0,
-              precipitationProbability: data.hourly?.precipitation_probability?.[0] ?? 0,
-              weatherCode: data.current.weather_code,
-            },
-            daily: data.daily.time.map((date: string, index: number) => ({
-              date,
-              weatherCode: data.daily.weather_code[index],
-              temperatureMax: data.daily.temperature_2m_max[index],
-              temperatureMin: data.daily.temperature_2m_min[index],
-              precipitationProbability: data.daily.precipitation_probability_max[index] ?? 0,
-            })),
-          };
-
-          setForecast(nextForecast);
-          localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify(nextForecast));
-          setStatus("idle");
-        } catch {
-          setStatus("error");
-          setError("Weather is unavailable right now");
-        }
-      },
-      () => {
-        setStatus("error");
-        setError("Allow location to show local weather");
-      },
-      { enableHighAccuracy: false, maximumAge: WEATHER_CACHE_MS, timeout: 10_000 }
-    );
-  }, []);
-
-  useEffect(() => {
-    loadWeather();
-  }, [loadWeather]);
-
-  return (
-    <div className="mb-4 rounded-3xl bg-white/80 p-4 shadow-sm">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-sky-100 text-sky-600">
-            <CloudSun size={24} />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="font-black text-slate-800">Local Weather</h2>
-              <Navigation size={13} className="text-slate-400" />
-            </div>
-            {forecast ? (
-              <p className="text-sm font-bold text-slate-500">
-                {weatherDescription(forecast.current.weatherCode)} · Feels like {formatTemperature(forecast.current.feelsLike)}
-              </p>
-            ) : (
-              <p className="text-sm font-bold text-slate-500">
-                {status === "loading" ? "Finding your forecast..." : error || "Use location for local forecast"}
-              </p>
-            )}
-          </div>
-        </div>
-
-        {forecast && (
-          <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-3 lg:max-w-4xl lg:grid-cols-7">
-            <div className="rounded-2xl bg-sky-50 p-3">
-              <p className="text-xs font-black uppercase text-sky-500">Now</p>
-              <p className="text-3xl font-black text-slate-800">{formatTemperature(forecast.current.temperature)}</p>
-              <p className="mt-1 text-xs font-bold text-slate-500">{weatherDescription(forecast.current.weatherCode)}</p>
-            </div>
-            <div className="rounded-2xl bg-slate-50 p-3">
-              <p className="text-xs font-black uppercase text-slate-400">Humidity</p>
-              <p className="text-2xl font-black text-slate-800">{formatPercent(forecast.current.humidity)}</p>
-              <p className="mt-1 text-xs font-bold text-slate-500">{formatPercent(forecast.current.cloudCover)} clouds</p>
-            </div>
-            <div className="rounded-2xl bg-slate-50 p-3">
-              <p className="text-xs font-black uppercase text-slate-400">Rain</p>
-              <p className="text-2xl font-black text-slate-800">{formatPercent(forecast.current.precipitationProbability)}</p>
-              <p className="mt-1 text-xs font-bold text-slate-500">{forecast.current.precipitation.toFixed(2)} in now</p>
-            </div>
-            <div className="rounded-2xl bg-slate-50 p-3">
-              <p className="text-xs font-black uppercase text-slate-400">Wind</p>
-              <p className="text-2xl font-black text-slate-800">{Math.round(forecast.current.windSpeed)}</p>
-              <p className="mt-1 text-xs font-bold text-slate-500">gust {Math.round(forecast.current.windGusts)} mph</p>
-            </div>
-            {forecast.daily.slice(0, 3).map((day) => (
-              <div key={day.date} className="rounded-2xl bg-slate-50 p-3">
-                <p className="text-xs font-black uppercase text-slate-400">
-                  {new Date(day.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short" })}
-                </p>
-                <p className="mt-1 text-sm font-black text-slate-700">{weatherSummary(day.weatherCode)}</p>
-                <p className="text-sm font-bold text-slate-500">
-                  {formatTemperature(day.temperatureMax)} / {formatTemperature(day.temperatureMin)}
-                </p>
-                <p className="mt-1 flex items-center gap-1 text-xs font-bold text-slate-400">
-                  <CloudRain size={12} /> {Math.round(day.precipitationProbability)}%
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <button
-          type="button"
-          onClick={() => loadWeather(true)}
-          disabled={status === "loading"}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-100 px-3 py-2 text-sm font-black text-slate-600 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <RefreshCw size={15} className={status === "loading" ? "animate-spin" : ""} />
-          {forecast ? "Refresh" : "Use Location"}
-        </button>
-      </div>
     </div>
   );
 }

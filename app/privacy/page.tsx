@@ -33,8 +33,8 @@ const sections = [
   {
     title: "Location and Weather",
     body: [
-      "The weather widget may ask for browser location access. Location is used by the browser to request a local forecast and is not required to use ChoresList.",
-      "Weather forecast data may be cached in the browser for a short time to avoid repeated location prompts and forecast requests.",
+      "The weather widget uses the city or ZIP code you enter to request a local forecast. It does not request browser location access and is not required to use ChoresList.",
+      "The selected weather location may be saved in the browser so the small forecast can load again later.",
     ],
   },
   {

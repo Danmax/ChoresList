@@ -8,6 +8,7 @@ import { Settings, Trophy, Calendar, Star } from "lucide-react";
 import { getLevelFromPoints, getLevelTitle, getPointsForNextLevel } from "@/lib/points";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { TinyWeather } from "@/components/tiny-weather";
 
 interface Assignment {
   id: number;
@@ -89,7 +90,8 @@ export default function FamilyDashboard() {
           </p>
         </div>
         {!tvMode && (
-          <div className="flex gap-2 sm:gap-3">
+          <div className="flex flex-wrap justify-end gap-2 sm:gap-3">
+            <TinyWeather />
             <Link
               href="/calendar"
               className="flex items-center gap-1.5 bg-white rounded-2xl px-3 sm:px-4 py-2.5 shadow-sm font-bold text-slate-600 hover:shadow-md transition-shadow text-sm sm:text-base"
