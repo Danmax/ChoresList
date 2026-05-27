@@ -1,7 +1,20 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { ArrowLeft, Plus, ChevronLeft, ChevronRight, Trash2, MapPin, Link as LinkIcon, FileText } from "lucide-react";
+import {
+  ArrowLeft,
+  Plus,
+  ChevronLeft,
+  ChevronRight,
+  Trash2,
+  MapPin,
+  Link as LinkIcon,
+  FileText,
+  CloudSun,
+  CloudRain,
+  Navigation,
+  RefreshCw,
+} from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { EVENT_TYPE_META, type EventType } from "@/types";
@@ -40,6 +53,24 @@ interface FamilyEvent {
 
 type DisplayEvent = FamilyEvent & { _seriesId: number; _isOccurrence: boolean };
 
+interface WeatherForecast {
+  fetchedAt: string;
+  current: {
+    temperature: number;
+    feelsLike: number;
+    windSpeed: number;
+    precipitationProbability: number;
+    weatherCode: number;
+  };
+  daily: {
+    date: string;
+    weatherCode: number;
+    temperatureMax: number;
+    temperatureMin: number;
+    precipitationProbability: number;
+  }[];
+}
+
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAY_LABELS_FULL = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
@@ -56,6 +87,8 @@ const DURATION_PRESETS: { label: string; minutes: number }[] = [
 ];
 
 const MAX_EXPAND = 520;
+const WEATHER_CACHE_KEY = "calendar-local-weather";
+const WEATHER_CACHE_MS = 30 * 60 * 1000;
 
 function pad(n: number) {
   return String(n).padStart(2, "0");
@@ -160,6 +193,22 @@ function expandOccurrences(events: FamilyEvent[], windowStart: Date, windowEnd: 
 
 function meta(eventType: string) {
   return EVENT_TYPE_META[eventType as EventType];
+}
+
+function weatherSummary(code: number) {
+  if (code === 0) return "Clear";
+  if ([1, 2].includes(code)) return "Partly cloudy";
+  if (code === 3) return "Cloudy";
+  if ([45, 48].includes(code)) return "Fog";
+  if ([51, 53, 55, 56, 57].includes(code)) return "Drizzle";
+  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return "Rain";
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return "Snow";
+  if ([95, 96, 99].includes(code)) return "Storms";
+  return "Forecast";
+}
+
+function formatTemperature(value: number) {
+  return `${Math.round(value)}°`;
 }
 
 export default function CalendarPage() {
@@ -437,6 +486,8 @@ function CalendarContent() {
           </button>
         </div>
       </div>
+
+      <WeatherWidget />
 
       {view === "month" && (
         <MonthGrid
@@ -766,6 +817,154 @@ function CalendarContent() {
           deleteEvent(event);
         }}
       />
+    </div>
+  );
+}
+
+function WeatherWidget() {
+  const [forecast, setForecast] = useState<WeatherForecast | null>(null);
+  const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [error, setError] = useState("");
+
+  const loadWeather = useCallback((force = false) => {
+    if (!("geolocation" in navigator)) {
+      setStatus("error");
+      setError("Location is not available in this browser");
+      return;
+    }
+
+    if (!force) {
+      try {
+        const cached = localStorage.getItem(WEATHER_CACHE_KEY);
+        if (cached) {
+          const parsed = JSON.parse(cached) as WeatherForecast;
+          if (Date.now() - new Date(parsed.fetchedAt).getTime() < WEATHER_CACHE_MS) {
+            setForecast(parsed);
+            setStatus("idle");
+            return;
+          }
+        }
+      } catch {
+        localStorage.removeItem(WEATHER_CACHE_KEY);
+      }
+    }
+
+    setStatus("loading");
+    setError("");
+
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        try {
+          const params = new URLSearchParams({
+            latitude: String(coords.latitude),
+            longitude: String(coords.longitude),
+            current: "temperature_2m,apparent_temperature,weather_code,wind_speed_10m,precipitation_probability",
+            daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
+            temperature_unit: "fahrenheit",
+            wind_speed_unit: "mph",
+            precipitation_unit: "inch",
+            timezone: "auto",
+            forecast_days: "5",
+          });
+          const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`);
+          if (!res.ok) throw new Error("Could not load weather");
+          const data = await res.json();
+          const nextForecast: WeatherForecast = {
+            fetchedAt: new Date().toISOString(),
+            current: {
+              temperature: data.current.temperature_2m,
+              feelsLike: data.current.apparent_temperature,
+              windSpeed: data.current.wind_speed_10m,
+              precipitationProbability: data.current.precipitation_probability ?? 0,
+              weatherCode: data.current.weather_code,
+            },
+            daily: data.daily.time.map((date: string, index: number) => ({
+              date,
+              weatherCode: data.daily.weather_code[index],
+              temperatureMax: data.daily.temperature_2m_max[index],
+              temperatureMin: data.daily.temperature_2m_min[index],
+              precipitationProbability: data.daily.precipitation_probability_max[index] ?? 0,
+            })),
+          };
+
+          setForecast(nextForecast);
+          localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify(nextForecast));
+          setStatus("idle");
+        } catch {
+          setStatus("error");
+          setError("Weather is unavailable right now");
+        }
+      },
+      () => {
+        setStatus("error");
+        setError("Allow location to show local weather");
+      },
+      { enableHighAccuracy: false, maximumAge: WEATHER_CACHE_MS, timeout: 10_000 }
+    );
+  }, []);
+
+  useEffect(() => {
+    loadWeather();
+  }, [loadWeather]);
+
+  return (
+    <div className="mb-4 rounded-3xl bg-white/80 p-4 shadow-sm">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-sky-100 text-sky-600">
+            <CloudSun size={24} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="font-black text-slate-800">Local Weather</h2>
+              <Navigation size={13} className="text-slate-400" />
+            </div>
+            {forecast ? (
+              <p className="text-sm font-bold text-slate-500">
+                {weatherSummary(forecast.current.weatherCode)} · Feels like {formatTemperature(forecast.current.feelsLike)}
+              </p>
+            ) : (
+              <p className="text-sm font-bold text-slate-500">
+                {status === "loading" ? "Finding your forecast..." : error || "Use location for local forecast"}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {forecast && (
+          <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-3 lg:max-w-3xl lg:grid-cols-6">
+            <div className="rounded-2xl bg-sky-50 p-3">
+              <p className="text-xs font-black uppercase text-sky-500">Now</p>
+              <p className="text-3xl font-black text-slate-800">{formatTemperature(forecast.current.temperature)}</p>
+              <p className="mt-1 text-xs font-bold text-slate-500">{Math.round(forecast.current.windSpeed)} mph wind</p>
+            </div>
+            {forecast.daily.map((day) => (
+              <div key={day.date} className="rounded-2xl bg-slate-50 p-3">
+                <p className="text-xs font-black uppercase text-slate-400">
+                  {new Date(day.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short" })}
+                </p>
+                <p className="mt-1 text-sm font-black text-slate-700">{weatherSummary(day.weatherCode)}</p>
+                <p className="text-sm font-bold text-slate-500">
+                  {formatTemperature(day.temperatureMax)} / {formatTemperature(day.temperatureMin)}
+                </p>
+                <p className="mt-1 flex items-center gap-1 text-xs font-bold text-slate-400">
+                  <CloudRain size={12} /> {Math.round(day.precipitationProbability)}%
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={() => loadWeather(true)}
+          disabled={status === "loading"}
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-100 px-3 py-2 text-sm font-black text-slate-600 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <RefreshCw size={15} className={status === "loading" ? "animate-spin" : ""} />
+          Refresh
+        </button>
+      </div>
     </div>
   );
 }
