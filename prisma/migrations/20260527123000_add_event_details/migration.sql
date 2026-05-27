@@ -1,0 +1,8 @@
+ALTER TABLE `FamilyEvent`
+  ADD COLUMN `location` VARCHAR(255) NULL,
+  ADD COLUMN `meetingUrl` VARCHAR(512) NULL,
+  ADD COLUMN `rsvpUrl` VARCHAR(512) NULL,
+  ADD COLUMN `flyerUrl` VARCHAR(512) NULL,
+  ADD COLUMN `registrationUrl` VARCHAR(512) NULL,
+  ADD COLUMN `registrationNotes` TEXT NULL,
+  ADD COLUMN `resources` TEXT NULL;

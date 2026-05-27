@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { ArrowLeft, Plus, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, ChevronLeft, ChevronRight, Trash2, MapPin, Link as LinkIcon, FileText } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { EVENT_TYPE_META, type EventType } from "@/types";
@@ -25,6 +25,13 @@ interface FamilyEvent {
   recurring: string;
   recurringEndDate?: string | null;
   recurringCount?: number | null;
+  location?: string | null;
+  meetingUrl?: string | null;
+  rsvpUrl?: string | null;
+  flyerUrl?: string | null;
+  registrationUrl?: string | null;
+  registrationNotes?: string | null;
+  resources?: string | null;
   notes?: string | null;
   color: string;
   icon: string;
@@ -173,6 +180,13 @@ export default function CalendarPage() {
     recurringEndMode: "never" as RecurringEndMode,
     recurringEndDate: "",
     recurringCount: 4,
+    location: "",
+    meetingUrl: "",
+    rsvpUrl: "",
+    flyerUrl: "",
+    registrationUrl: "",
+    registrationNotes: "",
+    resources: "",
     notes: "",
   });
 
@@ -236,6 +250,13 @@ export default function CalendarPage() {
       recurringEndMode: "never",
       recurringEndDate: "",
       recurringCount: 4,
+      location: "",
+      meetingUrl: "",
+      rsvpUrl: "",
+      flyerUrl: "",
+      registrationUrl: "",
+      registrationNotes: "",
+      resources: "",
       notes: "",
     });
     setOpen(true);
@@ -297,6 +318,13 @@ export default function CalendarPage() {
         recurring: form.recurring,
         recurringEndDate: recurringEndDateIso,
         recurringCount,
+        location: form.location,
+        meetingUrl: form.meetingUrl,
+        rsvpUrl: form.rsvpUrl,
+        flyerUrl: form.flyerUrl,
+        registrationUrl: form.registrationUrl,
+        registrationNotes: form.registrationNotes,
+        resources: form.resources,
         notes: form.notes,
         color: eMeta.color,
         icon: eMeta.icon,
@@ -623,6 +651,81 @@ export default function CalendarPage() {
             )}
 
             <div>
+              <Label className="font-bold">Location</Label>
+              <Input
+                value={form.location}
+                onChange={(e) => setForm((p) => ({ ...p, location: e.target.value }))}
+                placeholder="Church sanctuary, school gym..."
+                className="rounded-xl mt-1"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-3">
+              <div>
+                <Label className="font-bold">Meeting link</Label>
+                <Input
+                  type="url"
+                  value={form.meetingUrl}
+                  onChange={(e) => setForm((p) => ({ ...p, meetingUrl: e.target.value }))}
+                  placeholder="https://meet.google.com/..."
+                  className="rounded-xl mt-1"
+                />
+              </div>
+              <div>
+                <Label className="font-bold">RSVP link</Label>
+                <Input
+                  type="url"
+                  value={form.rsvpUrl}
+                  onChange={(e) => setForm((p) => ({ ...p, rsvpUrl: e.target.value }))}
+                  placeholder="https://..."
+                  className="rounded-xl mt-1"
+                />
+              </div>
+              <div>
+                <Label className="font-bold">Flyer link</Label>
+                <Input
+                  type="url"
+                  value={form.flyerUrl}
+                  onChange={(e) => setForm((p) => ({ ...p, flyerUrl: e.target.value }))}
+                  placeholder="https://..."
+                  className="rounded-xl mt-1"
+                />
+              </div>
+              <div>
+                <Label className="font-bold">Registration link</Label>
+                <Input
+                  type="url"
+                  value={form.registrationUrl}
+                  onChange={(e) => setForm((p) => ({ ...p, registrationUrl: e.target.value }))}
+                  placeholder="https://..."
+                  className="rounded-xl mt-1"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label className="font-bold">Registration details</Label>
+              <Textarea
+                value={form.registrationNotes}
+                onChange={(e) => setForm((p) => ({ ...p, registrationNotes: e.target.value }))}
+                placeholder="Cost, deadline, what to bring..."
+                className="rounded-xl mt-1 resize-none"
+                rows={2}
+              />
+            </div>
+
+            <div>
+              <Label className="font-bold">Resources</Label>
+              <Textarea
+                value={form.resources}
+                onChange={(e) => setForm((p) => ({ ...p, resources: e.target.value }))}
+                placeholder="Links, supply list, leader contact..."
+                className="rounded-xl mt-1 resize-none"
+                rows={2}
+              />
+            </div>
+
+            <div>
               <Label className="font-bold">Notes (optional)</Label>
               <Textarea
                 value={form.notes}
@@ -862,11 +965,44 @@ function EventRow({ e, onDelete }: { e: DisplayEvent; onDelete: () => void }) {
           {m?.label}
           {e.recurring !== "none" && ` • Repeats ${e.recurring}`}
         </p>
+        {e.location && (
+          <p className="mt-1 flex items-center gap-1 text-xs font-bold text-slate-500">
+            <MapPin size={12} /> {e.location}
+          </p>
+        )}
         {e.notes && <p className="text-sm text-slate-500 mt-1">{e.notes}</p>}
+        {(e.meetingUrl || e.rsvpUrl || e.flyerUrl || e.registrationUrl) && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {e.meetingUrl && <EventLink href={e.meetingUrl} label="Meeting" />}
+            {e.rsvpUrl && <EventLink href={e.rsvpUrl} label="RSVP" />}
+            {e.flyerUrl && <EventLink href={e.flyerUrl} label="Flyer" />}
+            {e.registrationUrl && <EventLink href={e.registrationUrl} label="Register" />}
+          </div>
+        )}
+        {e.registrationNotes && (
+          <p className="mt-2 flex items-start gap-1 text-xs font-semibold text-slate-500">
+            <FileText size={12} className="mt-0.5 shrink-0" /> {e.registrationNotes}
+          </p>
+        )}
+        {e.resources && <p className="mt-1 text-xs font-semibold text-slate-500">{e.resources}</p>}
       </div>
       <button onClick={onDelete} className="text-red-400 hover:text-red-600 p-1 transition-colors">
         <Trash2 size={14} />
       </button>
     </div>
+  );
+}
+
+function EventLink({ href, label }: { href: string; label: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black text-slate-600 hover:bg-slate-200"
+      onClick={(event) => event.stopPropagation()}
+    >
+      <LinkIcon size={12} /> {label}
+    </a>
   );
 }

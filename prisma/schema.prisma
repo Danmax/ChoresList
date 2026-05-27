@@ -293,6 +293,13 @@ model FamilyEvent {
   recurring         String    @default("none") @db.VarChar(64)
   recurringEndDate  DateTime?
   recurringCount    Int?
+  location          String?   @db.VarChar(255)
+  meetingUrl        String?   @db.VarChar(512)
+  rsvpUrl           String?   @db.VarChar(512)
+  flyerUrl          String?   @db.VarChar(512)
+  registrationUrl   String?   @db.VarChar(512)
+  registrationNotes String?   @db.Text
+  resources         String?   @db.Text
   notes             String?   @db.Text
   color             String    @default("#fbbf24") @db.VarChar(32)
   icon              String    @default("📅") @db.VarChar(32)

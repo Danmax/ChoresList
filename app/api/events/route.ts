@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireParentSession, requireSession, withErrors } from "@/lib/api";
 
+function optionalText(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
 export const GET = withErrors(async (req: NextRequest) => {
   const { householdId } = requireSession(req);
   const { searchParams } = new URL(req.url);
@@ -58,6 +62,13 @@ export const POST = withErrors(async (req: NextRequest) => {
       recurring,
       recurringEndDate,
       recurringCount,
+      location: optionalText(body.location),
+      meetingUrl: optionalText(body.meetingUrl),
+      rsvpUrl: optionalText(body.rsvpUrl),
+      flyerUrl: optionalText(body.flyerUrl),
+      registrationUrl: optionalText(body.registrationUrl),
+      registrationNotes: optionalText(body.registrationNotes),
+      resources: optionalText(body.resources),
       notes: body.notes ?? null,
       color: body.color ?? "#fbbf24",
       icon: body.icon ?? "📅",
@@ -82,6 +93,13 @@ export const PUT = withErrors(async (req: NextRequest) => {
           : data.recurringEndDate
             ? new Date(data.recurringEndDate)
             : undefined,
+      ...(data.location !== undefined && { location: optionalText(data.location) }),
+      ...(data.meetingUrl !== undefined && { meetingUrl: optionalText(data.meetingUrl) }),
+      ...(data.rsvpUrl !== undefined && { rsvpUrl: optionalText(data.rsvpUrl) }),
+      ...(data.flyerUrl !== undefined && { flyerUrl: optionalText(data.flyerUrl) }),
+      ...(data.registrationUrl !== undefined && { registrationUrl: optionalText(data.registrationUrl) }),
+      ...(data.registrationNotes !== undefined && { registrationNotes: optionalText(data.registrationNotes) }),
+      ...(data.resources !== undefined && { resources: optionalText(data.resources) }),
     },
   });
   return NextResponse.json(event);
