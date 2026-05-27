@@ -34,6 +34,7 @@ export const GET = withErrors(async (req: NextRequest) => {
       OR: [
         { frequency: "daily" },
         { frequency: "weekly", dayOfWeek },
+        { frequency: "monthly", dueDate: { not: null } },
         { frequency: "one-time", dueDate: { gte: today } },
       ],
     },
@@ -49,10 +50,15 @@ export const GET = withErrors(async (req: NextRequest) => {
     orderBy: [{ member: { name: "asc" } }, { createdAt: "asc" }],
   });
 
+  const visibleAssignments = assignments.filter((assignment) => {
+    if (assignment.frequency !== "monthly") return true;
+    return assignment.dueDate?.getDate() === today.getDate();
+  });
+
   await prisma.householdDevice.update({
     where: { id: session.deviceId },
     data: { lastSeenAt: new Date() },
   });
 
-  return NextResponse.json(assignments);
+  return NextResponse.json(visibleAssignments);
 });

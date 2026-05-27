@@ -135,6 +135,7 @@ export default function KidPage() {
   const progress = getPointsForNextLevel(member.totalPoints);
   const dailyChores = assignments.filter((a) => a.frequency === "daily");
   const weeklyChores = assignments.filter((a) => a.frequency === "weekly");
+  const monthlyChores = assignments.filter((a) => a.frequency === "monthly");
   const specialChores = assignments.filter((a) => a.frequency === "one-time");
 
   const steps = selectedChore?.chore.instructions
@@ -206,6 +207,7 @@ export default function KidPage() {
       {[
         { label: "📋 Daily Chores", chores: dailyChores },
         { label: "📅 Weekly Chores", chores: weeklyChores },
+        { label: "🗓️ Monthly Chores", chores: monthlyChores },
         { label: "⭐ Special Tasks", chores: specialChores },
       ].map(({ label, chores }) =>
         chores.length === 0 ? null : (

@@ -2,8 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, LogOut, RefreshCw, Star } from "lucide-react";
+import { Camera, CheckCircle2, Download, Gift, LogOut, Plus, RefreshCw, Star } from "lucide-react";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { WISH_CATEGORIES, WISH_EMOJIS } from "@/types";
 
 type Device = {
   id: number;
@@ -37,6 +41,11 @@ type Assignment = {
 
 type Filter = "open" | "all" | "done";
 
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+};
+
 export default function TaskScreenPage() {
   const router = useRouter();
   const [device, setDevice] = useState<Device | null>(null);
@@ -45,6 +54,14 @@ export default function TaskScreenPage() {
   const [loading, setLoading] = useState(true);
   const [completingId, setCompletingId] = useState<number | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [showInstallHelp, setShowInstallHelp] = useState(false);
+  const [showWish, setShowWish] = useState(false);
+  const [wishMemberId, setWishMemberId] = useState("");
+  const [wish, setWish] = useState({ title: "", category: "toy", emoji: "🎮", note: "" });
+  const [showPhoto, setShowPhoto] = useState(false);
+  const [photoType, setPhotoType] = useState<"before" | "after">("before");
+  const [activeCompletionId, setActiveCompletionId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     const [sessionRes, tasksRes] = await Promise.all([
@@ -68,6 +85,22 @@ export default function TaskScreenPage() {
     const timer = window.setInterval(load, 45000);
     return () => window.clearInterval(timer);
   }, [load]);
+
+  useEffect(() => {
+    function handleBeforeInstallPrompt(event: Event) {
+      event.preventDefault();
+      setInstallPrompt(event as BeforeInstallPromptEvent);
+    }
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+  }, []);
+
+  useEffect(() => {
+    if (device?.mode === "member" && device.member) {
+      setWishMemberId(String(device.member.id));
+    }
+  }, [device]);
 
   const visibleAssignments = useMemo(() => {
     return assignments.filter((assignment) => {
@@ -98,13 +131,91 @@ export default function TaskScreenPage() {
         return;
       }
       toast.success(`+${data.pointsEarned} points`);
+      if (assignment.chore.requiresPhoto && data.completion?.id) {
+        setActiveCompletionId(data.completion.id);
+        setPhotoType("before");
+        setShowPhoto(true);
+      }
       await load();
     } finally {
       setCompletingId(null);
     }
   }
 
+  async function uploadPhoto(file: File, completionId: number, type: "before" | "after") {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("type", type);
+
+    const res = await fetch(`/api/kid-device/completions/${completionId}/photo`, { method: "POST", body: form });
+    const data = await res.json();
+    if (!res.ok) {
+      toast.error(data.error ?? "Could not save photo");
+      return;
+    }
+
+    toast.success(`${type === "before" ? "Before" : "After"} photo saved`);
+    if (type === "before") {
+      setPhotoType("after");
+    } else {
+      setShowPhoto(false);
+      setActiveCompletionId(null);
+    }
+  }
+
+  function openWish() {
+    setWish({ title: "", category: "toy", emoji: "🎮", note: "" });
+    setWishMemberId(device?.mode === "member" && device.member ? String(device.member.id) : "");
+    setShowWish(true);
+  }
+
+  function selectWishCategory(category: string) {
+    const meta = WISH_CATEGORIES.find((item) => item.value === category);
+    setWish((previous) => ({
+      ...previous,
+      category,
+      emoji: WISH_EMOJIS[category]?.[0] ?? meta?.emoji ?? "🎁",
+    }));
+  }
+
+  async function addWish() {
+    if (!wishMemberId) {
+      toast.error("Choose who this wish is for");
+      return;
+    }
+    if (!wish.title.trim()) {
+      toast.error("Add what you want");
+      return;
+    }
+
+    const res = await fetch("/api/kid-device/wishlist", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ memberId: Number(wishMemberId), ...wish }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      toast.error(data.error ?? "Could not add wish");
+      return;
+    }
+
+    toast.success("Added to wish list");
+    setShowWish(false);
+  }
+
+  async function installApp() {
+    if (!installPrompt) {
+      setShowInstallHelp(true);
+      return;
+    }
+
+    await installPrompt.prompt();
+    const choice = await installPrompt.userChoice;
+    if (choice.outcome === "accepted") setInstallPrompt(null);
+  }
+
   async function logout() {
+    if (!window.confirm("Unpair this device? It will need a new pairing code before it can show tasks again.")) return;
     await fetch("/api/device/session", { method: "DELETE" });
     router.replace("/pair");
   }
@@ -129,6 +240,20 @@ export default function TaskScreenPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={openWish}
+                className="flex items-center gap-2 rounded-2xl bg-amber-100 px-4 py-2 text-sm font-black text-amber-700 transition-colors hover:bg-amber-200"
+              >
+                <Gift size={16} /> Add Wish
+              </button>
+              <button
+                type="button"
+                onClick={installApp}
+                className="flex items-center gap-2 rounded-2xl bg-blue-100 px-4 py-2 text-sm font-black text-blue-700 transition-colors hover:bg-blue-200"
+              >
+                <Download size={16} /> Install
+              </button>
               {[
                 { value: "open", label: `Open ${stats.open}` },
                 { value: "all", label: `All ${stats.total}` },
@@ -203,7 +328,11 @@ export default function TaskScreenPage() {
                           </span>
                           <div>
                             <p className={`text-lg font-black ${done ? "line-through" : ""}`}>{assignment.chore.name}</p>
-                            {assignment.chore.requiresPhoto && <p className="text-xs font-bold text-blue-500">Photo task</p>}
+                            {assignment.chore.requiresPhoto && (
+                              <p className="flex items-center gap-1 text-xs font-bold text-blue-500">
+                                <Camera size={12} /> Before/after photos
+                              </p>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -247,6 +376,141 @@ export default function TaskScreenPage() {
           )}
         </div>
       </div>
+
+      <Dialog open={showWish} onOpenChange={setShowWish}>
+        <DialogContent className="max-w-md rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="font-black">Add Wish</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {device?.mode !== "member" && (
+              <div>
+                <Label className="font-bold text-slate-600">Child</Label>
+                <select
+                  value={wishMemberId}
+                  onChange={(event) => setWishMemberId(event.target.value)}
+                  className="mt-1 w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-3 py-2 font-bold text-slate-700 outline-none focus:border-amber-300"
+                >
+                  <option value="">Choose child</option>
+                  {Array.from(new Map(assignments.map((assignment) => [assignment.member.id, assignment.member])).values()).map((member) => (
+                    <option key={member.id} value={member.id}>
+                      {member.avatar} {member.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div>
+              <Label className="font-bold text-slate-600">Category</Label>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {WISH_CATEGORIES.map((category) => (
+                  <button
+                    key={category.value}
+                    type="button"
+                    onClick={() => selectWishCategory(category.value)}
+                    className={`rounded-xl border-2 px-3 py-2 text-left text-sm font-black transition-colors ${
+                      wish.category === category.value
+                        ? "border-amber-300 bg-amber-50 text-amber-700"
+                        : "border-slate-100 bg-slate-50 text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    {category.emoji} {category.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <Label className="font-bold text-slate-600">Emoji</Label>
+              <div className="mt-2 flex max-h-24 flex-wrap gap-1.5 overflow-y-auto rounded-2xl bg-slate-50 p-2">
+                {(WISH_EMOJIS[wish.category] ?? []).map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => setWish((previous) => ({ ...previous, emoji }))}
+                    className={`rounded-xl p-1.5 text-2xl transition-colors ${wish.emoji === emoji ? "bg-white ring-2 ring-amber-300" : "hover:bg-white"}`}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <Label className="font-bold text-slate-600">I want...</Label>
+              <Input
+                value={wish.title}
+                onChange={(event) => setWish((previous) => ({ ...previous, title: event.target.value }))}
+                className="mt-1 rounded-xl font-bold"
+                placeholder="LEGO set, shoes, movie night..."
+              />
+            </div>
+
+            <div>
+              <Label className="font-bold text-slate-600">Note</Label>
+              <Input
+                value={wish.note}
+                onChange={(event) => setWish((previous) => ({ ...previous, note: event.target.value }))}
+                className="mt-1 rounded-xl"
+                placeholder="Optional"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={addWish}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 py-3 font-black text-white transition-colors hover:bg-amber-600"
+            >
+              <Plus size={18} /> Add Wish
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showPhoto} onOpenChange={setShowPhoto}>
+        <DialogContent className="max-w-sm rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="font-black">
+              {photoType === "before" ? "Before" : "After"} Photo
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm font-semibold text-slate-500">
+            Take a {photoType} photo for this completed task.
+          </p>
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="block w-full text-sm text-slate-500 file:mr-4 file:rounded-xl file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-bold file:text-blue-700"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file && activeCompletionId) uploadPhoto(file, activeCompletionId, photoType);
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => setShowPhoto(false)}
+            className="w-full rounded-xl bg-slate-100 py-2 text-sm font-bold text-slate-600"
+          >
+            Skip for now
+          </button>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showInstallHelp} onOpenChange={setShowInstallHelp}>
+        <DialogContent className="max-w-sm rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="font-black">Install App</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm font-semibold text-slate-600">
+            <p>On iPhone or iPad, use Share, then Add to Home Screen.</p>
+            <p>On Android or desktop Chrome, use the browser menu, then Install app.</p>
+            <p>The installed shortcut opens this kids task board.</p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -2,10 +2,26 @@
   "name": "ChoresList",
   "short_name": "ChoresList",
   "description": "Fun family chore management with rewards, points, and skill tracking",
-  "start_url": "/",
+  "start_url": "/screen/tasks",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#faf5ff",
   "theme_color": "#a78bfa",
+  "shortcuts": [
+    {
+      "name": "Kids Task Board",
+      "short_name": "Tasks",
+      "description": "Open the paired kids task board",
+      "url": "/screen/tasks",
+      "icons": [
+        {
+          "src": "/Icon.png",
+          "sizes": "420x420",
+          "type": "image/png"
+        }
+      ]
+    }
+  ],
   "icons": [
     {
       "src": "/Icon.png",

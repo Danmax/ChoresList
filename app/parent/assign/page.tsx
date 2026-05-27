@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, RefreshCw, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -31,14 +31,14 @@ export default function AssignPage() {
   const [selectedMember, setSelectedMember] = useState<string>("");
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
-    memberId: "", choreId: "", frequency: "daily", dueDate: "", dayOfWeek: "1",
+    memberId: "", choreId: "", frequency: "daily", dueDate: "", dayOfWeeks: ["1"],
   });
 
   const load = useCallback(async () => {
     const [mRes, cRes, aRes] = await Promise.all([
       fetch("/api/members"),
       fetch("/api/chores"),
-      fetch("/api/assignments"),
+      fetch("/api/assignments?scope=all"),
     ]);
     setMembers(await mRes.json());
     setChores(await cRes.json());
@@ -49,7 +49,11 @@ export default function AssignPage() {
 
   async function assign() {
     if (!form.memberId || !form.choreId) { toast.error("Select member and chore"); return; }
-    await fetch("/api/assignments", {
+    if (form.frequency === "weekly" && form.dayOfWeeks.length === 0) {
+      toast.error("Choose at least one weekday");
+      return;
+    }
+    const res = await fetch("/api/assignments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -57,9 +61,14 @@ export default function AssignPage() {
         choreId: parseInt(form.choreId),
         frequency: form.frequency,
         dueDate: form.dueDate || null,
-        dayOfWeek: form.frequency === "weekly" ? parseInt(form.dayOfWeek) : null,
+        dayOfWeeks: form.frequency === "weekly" ? form.dayOfWeeks.map(Number) : [],
       }),
     });
+    const data = await res.json();
+    if (!res.ok) {
+      toast.error(data.error ?? "Could not assign chore");
+      return;
+    }
     toast.success("Chore assigned!");
     setOpen(false);
     load();
@@ -83,6 +92,19 @@ export default function AssignPage() {
       })
     : chores;
 
+  function resetForm() {
+    setForm({ memberId: "", choreId: "", frequency: "daily", dueDate: "", dayOfWeeks: ["1"] });
+  }
+
+  function toggleWeeklyDay(day: string) {
+    setForm((previous) => {
+      const selected = previous.dayOfWeeks.includes(day)
+        ? previous.dayOfWeeks.filter((value) => value !== day)
+        : [...previous.dayOfWeeks, day].sort((a, b) => Number(a) - Number(b));
+      return { ...previous, dayOfWeeks: selected };
+    });
+  }
+
   return (
     <div className="min-h-screen p-6">
       <div className="flex items-center gap-4 mb-6">
@@ -91,7 +113,14 @@ export default function AssignPage() {
         </Link>
         <h1 className="text-3xl font-black text-slate-800 flex-1">📅 Assign Chores</h1>
         <button
-          onClick={() => { setForm({ memberId: "", choreId: "", frequency: "daily", dueDate: "", dayOfWeek: "1" }); setOpen(true); }}
+          type="button"
+          onClick={load}
+          className="flex items-center gap-2 bg-white text-slate-600 rounded-2xl px-4 py-2.5 font-bold hover:bg-slate-50 transition-colors shadow-sm"
+        >
+          <RefreshCw size={18} /> Refresh
+        </button>
+        <button
+          onClick={() => { resetForm(); setOpen(true); }}
           className="flex items-center gap-2 bg-emerald-500 text-white rounded-2xl px-4 py-2.5 font-bold hover:bg-emerald-600 transition-colors"
         >
           <Plus size={18} /> Assign Chore
@@ -136,7 +165,12 @@ export default function AssignPage() {
                 {a.frequency === "weekly" && a.dayOfWeek !== null && (
                   <span>{DAYS[a.dayOfWeek]}</span>
                 )}
-                {a.dueDate && <span>Due: {new Date(a.dueDate).toLocaleDateString()}</span>}
+                {a.frequency === "monthly" && a.dueDate && (
+                  <span>Day {new Date(a.dueDate).getDate()}</span>
+                )}
+                {a.frequency === "one-time" && a.dueDate && (
+                  <span>Due: {new Date(a.dueDate).toLocaleDateString()}</span>
+                )}
                 <span>⭐ {a.chore.pointsValue} pts</span>
               </div>
             </div>
@@ -191,19 +225,43 @@ export default function AssignPage() {
                 <SelectContent>
                   <SelectItem value="daily">📋 Daily</SelectItem>
                   <SelectItem value="weekly">📅 Weekly</SelectItem>
+                  <SelectItem value="monthly">🗓️ Monthly</SelectItem>
                   <SelectItem value="one-time">⭐ Special / One-time</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             {form.frequency === "weekly" && (
               <div>
-                <Label className="font-bold">Day of Week</Label>
-                <Select value={form.dayOfWeek} onValueChange={(v) => setForm((p) => ({ ...p, dayOfWeek: v ?? "1" }))}>
-                  <SelectTrigger className="rounded-xl mt-1"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {DAYS.map((d, i) => <SelectItem key={i} value={String(i)}>{d}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Label className="font-bold">Days of Week</Label>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  {DAYS.map((day, index) => {
+                    const value = String(index);
+                    const selected = form.dayOfWeeks.includes(value);
+                    return (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() => toggleWeeklyDay(value)}
+                        className={`rounded-xl border-2 px-3 py-2 text-sm font-black transition-colors ${
+                          selected
+                            ? "border-emerald-400 bg-emerald-50 text-emerald-700"
+                            : "border-slate-100 bg-slate-50 text-slate-500 hover:bg-slate-100"
+                        }`}
+                      >
+                        {day}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {form.frequency === "monthly" && (
+              <div>
+                <Label className="font-bold">Monthly Date</Label>
+                <Input type="date" value={form.dueDate}
+                  onChange={(e) => setForm((p) => ({ ...p, dueDate: e.target.value }))}
+                  className="rounded-xl mt-1" />
+                <p className="mt-1 text-xs font-semibold text-slate-400">This repeats every month on the selected day number.</p>
               </div>
             )}
             {form.frequency === "one-time" && (
