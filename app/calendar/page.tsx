@@ -59,7 +59,11 @@ interface WeatherForecast {
   current: {
     temperature: number;
     feelsLike: number;
+    humidity: number;
+    precipitation: number;
     windSpeed: number;
+    windGusts: number;
+    cloudCover: number;
     precipitationProbability: number;
     weatherCode: number;
   };
@@ -88,7 +92,7 @@ const DURATION_PRESETS: { label: string; minutes: number }[] = [
 ];
 
 const MAX_EXPAND = 520;
-const WEATHER_CACHE_KEY = "calendar-local-weather";
+const WEATHER_CACHE_KEY = "calendar-local-weather-v2";
 const WEATHER_CACHE_MS = 30 * 60 * 1000;
 
 function pad(n: number) {
@@ -208,8 +212,35 @@ function weatherSummary(code: number) {
   return "Forecast";
 }
 
+function weatherDescription(code: number) {
+  if (code === 0) return "Sunny";
+  if ([1, 2].includes(code)) return "Partly cloudy";
+  if (code === 3) return "Cloudy";
+  if ([45, 48].includes(code)) return "Foggy";
+  if ([51, 53, 55, 56, 57].includes(code)) return "Drizzling";
+  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return "Raining";
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return "Snowing";
+  if ([95, 96, 99].includes(code)) return "Stormy";
+  return "Current weather";
+}
+
 function formatTemperature(value: number) {
   return `${Math.round(value)}°`;
+}
+
+function formatPercent(value: number) {
+  return `${Math.round(value)}%`;
+}
+
+function isValidForecast(value: WeatherForecast) {
+  return (
+    Number.isFinite(value.current?.temperature) &&
+    Number.isFinite(value.current?.feelsLike) &&
+    Number.isFinite(value.current?.humidity) &&
+    Number.isFinite(value.current?.cloudCover) &&
+    Number.isFinite(value.current?.windSpeed) &&
+    Array.isArray(value.daily)
+  );
 }
 
 export default function CalendarPage() {
@@ -872,11 +903,12 @@ function WeatherWidget() {
         const cached = localStorage.getItem(WEATHER_CACHE_KEY);
         if (cached) {
           const parsed = JSON.parse(cached) as WeatherForecast;
-          if (Date.now() - new Date(parsed.fetchedAt).getTime() < WEATHER_CACHE_MS) {
+          if (isValidForecast(parsed) && Date.now() - new Date(parsed.fetchedAt).getTime() < WEATHER_CACHE_MS) {
             setForecast(parsed);
             setStatus("idle");
             return;
           }
+          localStorage.removeItem(WEATHER_CACHE_KEY);
         }
       } catch {
         localStorage.removeItem(WEATHER_CACHE_KEY);
@@ -901,7 +933,9 @@ function WeatherWidget() {
           const params = new URLSearchParams({
             latitude: String(coords.latitude),
             longitude: String(coords.longitude),
-            current: "temperature_2m,apparent_temperature,weather_code,wind_speed_10m,precipitation_probability",
+            current:
+              "temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,cloud_cover,wind_speed_10m,wind_gusts_10m",
+            hourly: "precipitation_probability",
             daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
             temperature_unit: "fahrenheit",
             wind_speed_unit: "mph",
@@ -917,8 +951,12 @@ function WeatherWidget() {
             current: {
               temperature: data.current.temperature_2m,
               feelsLike: data.current.apparent_temperature,
+              humidity: data.current.relative_humidity_2m ?? 0,
+              precipitation: data.current.precipitation ?? 0,
               windSpeed: data.current.wind_speed_10m,
-              precipitationProbability: data.current.precipitation_probability ?? 0,
+              windGusts: data.current.wind_gusts_10m ?? 0,
+              cloudCover: data.current.cloud_cover ?? 0,
+              precipitationProbability: data.hourly?.precipitation_probability?.[0] ?? 0,
               weatherCode: data.current.weather_code,
             },
             daily: data.daily.time.map((date: string, index: number) => ({
@@ -964,7 +1002,7 @@ function WeatherWidget() {
             </div>
             {forecast ? (
               <p className="text-sm font-bold text-slate-500">
-                {weatherSummary(forecast.current.weatherCode)} · Feels like {formatTemperature(forecast.current.feelsLike)}
+                {weatherDescription(forecast.current.weatherCode)} · Feels like {formatTemperature(forecast.current.feelsLike)}
               </p>
             ) : (
               <p className="text-sm font-bold text-slate-500">
@@ -975,13 +1013,28 @@ function WeatherWidget() {
         </div>
 
         {forecast && (
-          <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-3 lg:max-w-3xl lg:grid-cols-6">
+          <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-3 lg:max-w-4xl lg:grid-cols-7">
             <div className="rounded-2xl bg-sky-50 p-3">
               <p className="text-xs font-black uppercase text-sky-500">Now</p>
               <p className="text-3xl font-black text-slate-800">{formatTemperature(forecast.current.temperature)}</p>
-              <p className="mt-1 text-xs font-bold text-slate-500">{Math.round(forecast.current.windSpeed)} mph wind</p>
+              <p className="mt-1 text-xs font-bold text-slate-500">{weatherDescription(forecast.current.weatherCode)}</p>
             </div>
-            {forecast.daily.map((day) => (
+            <div className="rounded-2xl bg-slate-50 p-3">
+              <p className="text-xs font-black uppercase text-slate-400">Humidity</p>
+              <p className="text-2xl font-black text-slate-800">{formatPercent(forecast.current.humidity)}</p>
+              <p className="mt-1 text-xs font-bold text-slate-500">{formatPercent(forecast.current.cloudCover)} clouds</p>
+            </div>
+            <div className="rounded-2xl bg-slate-50 p-3">
+              <p className="text-xs font-black uppercase text-slate-400">Rain</p>
+              <p className="text-2xl font-black text-slate-800">{formatPercent(forecast.current.precipitationProbability)}</p>
+              <p className="mt-1 text-xs font-bold text-slate-500">{forecast.current.precipitation.toFixed(2)} in now</p>
+            </div>
+            <div className="rounded-2xl bg-slate-50 p-3">
+              <p className="text-xs font-black uppercase text-slate-400">Wind</p>
+              <p className="text-2xl font-black text-slate-800">{Math.round(forecast.current.windSpeed)}</p>
+              <p className="mt-1 text-xs font-bold text-slate-500">gust {Math.round(forecast.current.windGusts)} mph</p>
+            </div>
+            {forecast.daily.slice(0, 3).map((day) => (
               <div key={day.date} className="rounded-2xl bg-slate-50 p-3">
                 <p className="text-xs font-black uppercase text-slate-400">
                   {new Date(day.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short" })}
