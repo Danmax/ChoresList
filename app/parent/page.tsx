@@ -2,7 +2,7 @@
 
 import { type FormEvent, useState, useEffect } from "react";
 import Link from "next/link";
-import { Users, ListChecks, CalendarDays, DollarSign, BookOpen, Home, BarChart2, Gift, Wrench, Ticket, Mail, LockKeyhole, MonitorSmartphone, LogOut } from "lucide-react";
+import { Users, ListChecks, CalendarDays, DollarSign, BookOpen, Home, BarChart2, Gift, Wrench, Ticket, Mail, LockKeyhole, MonitorSmartphone, LogOut, Settings } from "lucide-react";
 
 export default function ParentPanel() {
   const [unlocked, setUnlocked] = useState(false);
@@ -300,6 +300,7 @@ export default function ParentPanel() {
     { href: "/parent/devices", icon: MonitorSmartphone, label: "Device Screens", desc: "Pair QR task boards for kids", color: "#6366f1", bg: "#e0e7ff" },
     { href: "/parent/wishlist", icon: Gift, label: "Wish Lists", desc: "Grant kids' wishes & requests", color: "#f472b6", bg: "#fce7f3" },
     { href: "/calendar", icon: BookOpen, label: "Family Calendar", desc: "Schedule events & activities", color: "#f97316", bg: "#ffedd5" },
+    { href: "/parent/settings", icon: Settings, label: "Household Settings", desc: "Family, calendar, email & privacy", color: "#64748b", bg: "#f1f5f9" },
   ];
 
   return (

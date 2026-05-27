@@ -27,10 +27,22 @@ model ParentAccount {
 }
 
 model Household {
-  id        Int      @id @default(autoincrement())
-  name      String   @db.VarChar(255)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now()) @updatedAt
+  id                            Int      @id @default(autoincrement())
+  name                          String   @db.VarChar(255)
+  timeZone                      String   @default("America/New_York") @db.VarChar(64)
+  googleCalendarEnabled         Boolean  @default(false)
+  googleCalendarId              String?  @db.VarChar(255)
+  googleCalendarSyncAssignments Boolean  @default(false)
+  googleCalendarSyncEvents      Boolean  @default(true)
+  emailNotificationsEnabled     Boolean  @default(true)
+  emailDailySummary             Boolean  @default(false)
+  emailWeeklyReport             Boolean  @default(true)
+  privacyShowKidPoints          Boolean  @default(true)
+  privacyAllowKidWishlist       Boolean  @default(true)
+  privacyStoreCompletionPhotos  Boolean  @default(true)
+  privacyAnalyticsOptIn         Boolean  @default(false)
+  createdAt                     DateTime @default(now())
+  updatedAt                     DateTime @default(now()) @updatedAt
 
   parents           ParentAccount[]
   members           FamilyMember[]
