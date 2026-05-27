@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireParentSession, requireSession, withErrors } from "@/lib/api";
+import {
+  createGoogleCalendarEvent,
+  deleteGoogleCalendarEvent,
+  fetchFamilyEventForGoogleSync,
+  updateGoogleCalendarEvent,
+} from "@/lib/google-calendar";
 
 function optionalText(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
@@ -74,6 +80,10 @@ export const POST = withErrors(async (req: NextRequest) => {
       icon: body.icon ?? "📅",
     },
   });
+
+  const eventForSync = await fetchFamilyEventForGoogleSync(event.id);
+  if (eventForSync) await createGoogleCalendarEvent(eventForSync);
+
   return NextResponse.json(event, { status: 201 });
 });
 
@@ -102,6 +112,10 @@ export const PUT = withErrors(async (req: NextRequest) => {
       ...(data.resources !== undefined && { resources: optionalText(data.resources) }),
     },
   });
+
+  const eventForSync = await fetchFamilyEventForGoogleSync(event.id);
+  if (eventForSync) await updateGoogleCalendarEvent(eventForSync);
+
   return NextResponse.json(event);
 });
 
@@ -109,6 +123,12 @@ export const DELETE = withErrors(async (req: NextRequest) => {
   const { householdId } = await requireParentSession(req);
   const { searchParams } = new URL(req.url);
   const id = parseInt(searchParams.get("id") ?? "0");
+
+  const eventForSync = await fetchFamilyEventForGoogleSync(id);
+  if (eventForSync && eventForSync.householdId === householdId) {
+    await deleteGoogleCalendarEvent(eventForSync);
+  }
+
   await prisma.familyEvent.delete({ where: { id, householdId } });
   return NextResponse.json({ ok: true });
 });

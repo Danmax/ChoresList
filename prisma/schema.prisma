@@ -58,6 +58,23 @@ model Household {
   events            FamilyEvent[]
   devices           HouseholdDevice[]
   pairingCodes      DevicePairingCode[]
+  googleCalendarConnection GoogleCalendarConnection?
+}
+
+model GoogleCalendarConnection {
+  id                 String    @id @default(cuid())
+  householdId        Int       @unique
+  googleAccountEmail String?   @db.VarChar(255)
+  calendarId         String    @default("primary") @db.VarChar(255)
+  refreshToken       String    @db.Text
+  accessToken        String?   @db.Text
+  expiresAt          DateTime?
+  syncStatus         String?   @db.VarChar(64)
+  lastSyncAt         DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @default(now()) @updatedAt
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
 }
 
 model EmailConfirmationToken {
@@ -303,6 +320,9 @@ model FamilyEvent {
   notes             String?   @db.Text
   color             String    @default("#fbbf24") @db.VarChar(32)
   icon              String    @default("📅") @db.VarChar(32)
+  googleCalendarEventId   String?   @db.VarChar(255)
+  googleCalendarSyncedAt  DateTime?
+  googleCalendarSyncError String?   @db.Text
   createdAt         DateTime  @default(now())
 
   household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)

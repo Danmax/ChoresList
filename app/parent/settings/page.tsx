@@ -32,6 +32,13 @@ type Settings = {
   privacyAllowKidWishlist: boolean;
   privacyStoreCompletionPhotos: boolean;
   privacyAnalyticsOptIn: boolean;
+  googleCalendarConnection?: {
+    googleAccountEmail: string | null;
+    calendarId: string;
+    syncStatus: string | null;
+    lastSyncAt: string | null;
+    updatedAt: string;
+  } | null;
 };
 
 const DEFAULT_SETTINGS: Settings = {
@@ -49,6 +56,7 @@ const DEFAULT_SETTINGS: Settings = {
   privacyAllowKidWishlist: true,
   privacyStoreCompletionPhotos: true,
   privacyAnalyticsOptIn: false,
+  googleCalendarConnection: null,
 };
 
 export default function ParentSettingsPage() {
@@ -58,6 +66,11 @@ export default function ParentSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const connection = settings.googleCalendarConnection;
+  const calendarStatus = connection?.syncStatus ?? "not connected";
+  const lastSync = connection?.lastSyncAt
+    ? new Date(connection.lastSyncAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })
+    : null;
 
   const load = useCallback(async () => {
     const res = await fetch("/api/parent/settings");
@@ -204,6 +217,29 @@ export default function ParentSettingsPage() {
                 className="mt-1 w-full rounded-2xl border-2 border-slate-100 bg-slate-50 px-3 py-2 font-semibold text-slate-800 outline-none focus:border-orange-300"
               />
             </label>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <a
+              href="/api/google-calendar/connect"
+              className="inline-flex min-h-10 items-center justify-center rounded-2xl bg-slate-900 px-4 py-2 text-sm font-black text-white shadow-sm"
+            >
+              {connection ? "Reconnect Google Calendar" : "Connect Google Calendar"}
+            </a>
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide ${
+                calendarStatus === "synced" || calendarStatus === "connected"
+                  ? "bg-emerald-100 text-emerald-700"
+                  : calendarStatus === "disconnected"
+                    ? "bg-red-100 text-red-700"
+                    : "bg-slate-100 text-slate-600"
+              }`}
+            >
+              {calendarStatus === "synced" ? "Synced" : calendarStatus}
+            </span>
+            {connection?.googleAccountEmail && (
+              <span className="text-sm font-bold text-slate-500">{connection.googleAccountEmail}</span>
+            )}
+            {lastSync && <span className="text-sm font-bold text-slate-500">Last sync: {lastSync}</span>}
           </div>
         </section>
 

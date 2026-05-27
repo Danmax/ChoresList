@@ -21,7 +21,20 @@ function bool(value: unknown) {
 export const GET = withErrors(async (req: NextRequest) => {
   const { householdId, parentId } = await requireParentSession(req);
   const [household, parent] = await Promise.all([
-    prisma.household.findUnique({ where: { id: householdId } }),
+    prisma.household.findUnique({
+      where: { id: householdId },
+      include: {
+        googleCalendarConnection: {
+          select: {
+            googleAccountEmail: true,
+            calendarId: true,
+            syncStatus: true,
+            lastSyncAt: true,
+            updatedAt: true,
+          },
+        },
+      },
+    }),
     prisma.parentAccount.findUnique({ where: { id: parentId }, select: { email: true } }),
   ]);
 
@@ -39,15 +52,17 @@ export const PUT = withErrors(async (req: NextRequest) => {
     ? body.timeZone
     : "America/New_York";
 
+  const googleCalendarId = typeof body.googleCalendarId === "string" && body.googleCalendarId.trim()
+    ? body.googleCalendarId.trim()
+    : null;
+
   const household = await prisma.household.update({
     where: { id: householdId },
     data: {
       name,
       timeZone,
       googleCalendarEnabled: bool(body.googleCalendarEnabled),
-      googleCalendarId: typeof body.googleCalendarId === "string" && body.googleCalendarId.trim()
-        ? body.googleCalendarId.trim()
-        : null,
+      googleCalendarId,
       googleCalendarSyncAssignments: bool(body.googleCalendarSyncAssignments),
       googleCalendarSyncEvents: bool(body.googleCalendarSyncEvents),
       emailNotificationsEnabled: bool(body.emailNotificationsEnabled),
@@ -58,6 +73,11 @@ export const PUT = withErrors(async (req: NextRequest) => {
       privacyStoreCompletionPhotos: bool(body.privacyStoreCompletionPhotos),
       privacyAnalyticsOptIn: bool(body.privacyAnalyticsOptIn),
     },
+  });
+
+  await prisma.googleCalendarConnection.updateMany({
+    where: { householdId },
+    data: { calendarId: googleCalendarId || "primary" },
   });
 
   return NextResponse.json(household);
