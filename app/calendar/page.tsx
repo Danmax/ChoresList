@@ -10,6 +10,7 @@ import {
   MapPin,
   Link as LinkIcon,
   FileText,
+  ImageIcon,
   CloudSun,
   CloudRain,
   Navigation,
@@ -227,6 +228,7 @@ function CalendarContent() {
   const [open, setOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [selectedEvent, setSelectedEvent] = useState<DisplayEvent | null>(null);
+  const [imageUploading, setImageUploading] = useState(false);
 
   const [form, setForm] = useState({
     title: "",
@@ -397,6 +399,24 @@ function CalendarContent() {
     toast.success("Event added!");
     setOpen(false);
     load();
+  }
+
+  async function uploadEventImage(file: File) {
+    setImageUploading(true);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const res = await fetch("/api/events/image", { method: "POST", body });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error ?? "Could not upload image");
+        return;
+      }
+      setForm((p) => ({ ...p, flyerUrl: data.path }));
+      toast.success("Image optimized");
+    } finally {
+      setImageUploading(false);
+    }
   }
 
   async function deleteEvent(displayEvent: DisplayEvent) {
@@ -756,6 +776,26 @@ function CalendarContent() {
                 />
               </div>
               <div>
+                <Label className="font-bold">Flyer image</Label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  disabled={imageUploading}
+                  className="mt-1 block w-full text-sm text-slate-500 file:mr-4 file:rounded-xl file:border-0 file:bg-violet-50 file:px-4 file:py-2 file:text-sm file:font-bold file:text-violet-700 disabled:opacity-60"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) uploadEventImage(file);
+                    event.currentTarget.value = "";
+                  }}
+                />
+                {imageUploading && <p className="mt-1 text-xs font-bold text-slate-400">Optimizing image...</p>}
+                {form.flyerUrl.startsWith("/uploads/") && (
+                  <div className="mt-2 overflow-hidden rounded-2xl border border-slate-100">
+                    <img src={form.flyerUrl} alt="" className="h-36 w-full object-cover" />
+                  </div>
+                )}
+              </div>
+              <div>
                 <Label className="font-bold">Registration link</Label>
                 <Input
                   type="url"
@@ -827,12 +867,6 @@ function WeatherWidget() {
   const [error, setError] = useState("");
 
   const loadWeather = useCallback((force = false) => {
-    if (!("geolocation" in navigator)) {
-      setStatus("error");
-      setError("Location is not available in this browser");
-      return;
-    }
-
     if (!force) {
       try {
         const cached = localStorage.getItem(WEATHER_CACHE_KEY);
@@ -847,6 +881,15 @@ function WeatherWidget() {
       } catch {
         localStorage.removeItem(WEATHER_CACHE_KEY);
       }
+      setStatus("idle");
+      setError("");
+      return;
+    }
+
+    if (!("geolocation" in navigator)) {
+      setStatus("error");
+      setError("Location is not available in this browser");
+      return;
     }
 
     setStatus("loading");
@@ -962,7 +1005,7 @@ function WeatherWidget() {
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-100 px-3 py-2 text-sm font-black text-slate-600 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <RefreshCw size={15} className={status === "loading" ? "animate-spin" : ""} />
-          Refresh
+          {forecast ? "Refresh" : "Use Location"}
         </button>
       </div>
     </div>
@@ -1217,6 +1260,11 @@ function EventRow({ e, onOpen, onDelete }: { e: DisplayEvent; onOpen?: () => voi
             {e.registrationUrl && <EventLink href={e.registrationUrl} label="Register" />}
           </div>
         )}
+        {e.flyerUrl?.startsWith("/uploads/") && (
+          <div className="mt-3 overflow-hidden rounded-2xl border border-slate-100">
+            <img src={e.flyerUrl} alt="" className="h-36 w-full object-cover" />
+          </div>
+        )}
         {e.registrationNotes && (
           <p className="mt-2 flex items-start gap-1 text-xs font-semibold text-slate-500">
             <FileText size={12} className="mt-0.5 shrink-0" /> {e.registrationNotes}
@@ -1274,6 +1322,11 @@ function EventDetailsDialog({
             </div>
 
             {event.notes && <DetailBlock title="Event details" value={event.notes} />}
+            {event.flyerUrl?.startsWith("/uploads/") && (
+              <div className="overflow-hidden rounded-2xl border border-slate-100">
+                <img src={event.flyerUrl} alt="" className="max-h-80 w-full object-cover" />
+              </div>
+            )}
             {event.registrationNotes && <DetailBlock title="Registration details" value={event.registrationNotes} />}
             {event.resources && <DetailBlock title="Resources" value={event.resources} />}
 
@@ -1318,7 +1371,7 @@ function EventLink({ href, label }: { href: string; label: string }) {
       className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black text-slate-600 hover:bg-slate-200"
       onClick={(event) => event.stopPropagation()}
     >
-      <LinkIcon size={12} /> {label}
+      {href.startsWith("/uploads/") ? <ImageIcon size={12} /> : <LinkIcon size={12} />} {label}
     </a>
   );
 }

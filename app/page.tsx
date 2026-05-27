@@ -141,8 +141,16 @@ export default function LandingPage() {
       </div>
 
       {/* Footer */}
-      <div className="text-center py-6 text-slate-400 text-sm font-semibold">
-        ChoresList — built for your family 🏠
+      <div className="flex flex-col items-center justify-center gap-2 py-6 text-center text-sm font-semibold text-slate-400 sm:flex-row">
+        <span>ChoresList — built for your family 🏠</span>
+        <span className="hidden text-slate-300 sm:inline">•</span>
+        <Link href="/privacy" className="hover:text-violet-500">
+          Privacy Policy
+        </Link>
+        <span className="hidden text-slate-300 sm:inline">•</span>
+        <Link href="/terms" className="hover:text-violet-500">
+          Terms of Service
+        </Link>
       </div>
     </div>
   );

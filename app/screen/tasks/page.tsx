@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Camera, CheckCircle2, Download, Gift, LogOut, Plus, RefreshCw, Star } from "lucide-react";
+import { Camera, CheckCircle2, Download, Gift, ListPlus, LogOut, Plus, RefreshCw, Star } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -39,6 +39,17 @@ type Assignment = {
   completions: { id: number; completedAt: string }[];
 };
 
+type CatalogMember = { id: number; name: string; avatar: string; color: string };
+type CatalogChore = {
+  id: number;
+  name: string;
+  icon: string;
+  color: string;
+  pointsValue: number;
+  category: string;
+  requiresPhoto: boolean;
+};
+
 type Filter = "open" | "all" | "done";
 
 type BeforeInstallPromptEvent = Event & {
@@ -59,6 +70,13 @@ export default function TaskScreenPage() {
   const [showWish, setShowWish] = useState(false);
   const [wishMemberId, setWishMemberId] = useState("");
   const [wish, setWish] = useState({ title: "", category: "toy", emoji: "🎮", note: "" });
+  const [showTaskPicker, setShowTaskPicker] = useState(false);
+  const [catalogMembers, setCatalogMembers] = useState<CatalogMember[]>([]);
+  const [catalogChores, setCatalogChores] = useState<CatalogChore[]>([]);
+  const [taskMemberId, setTaskMemberId] = useState("");
+  const [taskChoreId, setTaskChoreId] = useState("");
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [addingTask, setAddingTask] = useState(false);
   const [showPhoto, setShowPhoto] = useState(false);
   const [photoType, setPhotoType] = useState<"before" | "after">("before");
   const [activeCompletionId, setActiveCompletionId] = useState<number | null>(null);
@@ -169,6 +187,32 @@ export default function TaskScreenPage() {
     setShowWish(true);
   }
 
+  async function openTaskPicker() {
+    setCatalogLoading(true);
+    setShowTaskPicker(true);
+    try {
+      const res = await fetch("/api/kid-device/tasks?catalog=1");
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error ?? "Could not load tasks");
+        setShowTaskPicker(false);
+        return;
+      }
+      setCatalogMembers(data.members ?? []);
+      setCatalogChores(data.chores ?? []);
+      const defaultMemberId =
+        device?.mode === "member" && device.member
+          ? String(device.member.id)
+          : data.members?.[0]?.id
+            ? String(data.members[0].id)
+            : "";
+      setTaskMemberId(defaultMemberId);
+      setTaskChoreId(data.chores?.[0]?.id ? String(data.chores[0].id) : "");
+    } finally {
+      setCatalogLoading(false);
+    }
+  }
+
   function selectWishCategory(category: string) {
     const meta = WISH_CATEGORIES.find((item) => item.value === category);
     setWish((previous) => ({
@@ -201,6 +245,37 @@ export default function TaskScreenPage() {
 
     toast.success("Added to wish list");
     setShowWish(false);
+  }
+
+  async function addOneTimeTask() {
+    if (!taskMemberId) {
+      toast.error("Choose who this task is for");
+      return;
+    }
+    if (!taskChoreId) {
+      toast.error("Choose a task");
+      return;
+    }
+
+    setAddingTask(true);
+    try {
+      const res = await fetch("/api/kid-device/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberId: Number(taskMemberId), choreId: Number(taskChoreId) }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error ?? "Could not add task");
+        return;
+      }
+
+      toast.success("Task added for today");
+      setShowTaskPicker(false);
+      await load();
+    } finally {
+      setAddingTask(false);
+    }
   }
 
   async function installApp() {
@@ -246,6 +321,13 @@ export default function TaskScreenPage() {
                 className="flex items-center gap-2 rounded-2xl bg-amber-100 px-4 py-2 text-sm font-black text-amber-700 transition-colors hover:bg-amber-200"
               >
                 <Gift size={16} /> Add Wish
+              </button>
+              <button
+                type="button"
+                onClick={openTaskPicker}
+                className="flex items-center gap-2 rounded-2xl bg-emerald-100 px-4 py-2 text-sm font-black text-emerald-700 transition-colors hover:bg-emerald-200"
+              >
+                <ListPlus size={16} /> Add Task
               </button>
               <button
                 type="button"
@@ -466,6 +548,79 @@ export default function TaskScreenPage() {
               <Plus size={18} /> Add Wish
             </button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showTaskPicker} onOpenChange={setShowTaskPicker}>
+        <DialogContent className="max-w-md rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="font-black">Add One-Time Task</DialogTitle>
+          </DialogHeader>
+
+          {catalogLoading ? (
+            <div className="py-8 text-center text-sm font-bold text-slate-500">Loading tasks...</div>
+          ) : (
+            <div className="space-y-4">
+              {device?.mode !== "member" && (
+                <div>
+                  <Label className="font-bold text-slate-600">Child</Label>
+                  <select
+                    value={taskMemberId}
+                    onChange={(event) => setTaskMemberId(event.target.value)}
+                    className="mt-1 w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-3 py-2 font-bold text-slate-700 outline-none focus:border-emerald-300"
+                  >
+                    <option value="">Choose child</option>
+                    {catalogMembers.map((member) => (
+                      <option key={member.id} value={member.id}>
+                        {member.avatar} {member.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <Label className="font-bold text-slate-600">Existing task</Label>
+                <div className="mt-2 max-h-72 space-y-2 overflow-y-auto rounded-2xl bg-slate-50 p-2">
+                  {catalogChores.map((chore) => (
+                    <button
+                      key={chore.id}
+                      type="button"
+                      onClick={() => setTaskChoreId(String(chore.id))}
+                      className={`flex w-full items-center gap-3 rounded-xl border-2 p-3 text-left transition-colors ${
+                        taskChoreId === String(chore.id)
+                          ? "border-emerald-300 bg-white"
+                          : "border-transparent hover:bg-white"
+                      }`}
+                    >
+                      <span
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-2xl"
+                        style={{ backgroundColor: chore.color }}
+                      >
+                        {chore.icon}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-black text-slate-800">{chore.name}</span>
+                        <span className="text-xs font-bold text-slate-400">+{chore.pointsValue} points</span>
+                      </span>
+                    </button>
+                  ))}
+                  {catalogChores.length === 0 && (
+                    <p className="py-8 text-center text-sm font-bold text-slate-400">No existing tasks found.</p>
+                  )}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={addOneTimeTask}
+                disabled={addingTask || catalogChores.length === 0}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 py-3 font-black text-white transition-colors hover:bg-emerald-600 disabled:bg-slate-200 disabled:text-slate-400"
+              >
+                <ListPlus size={18} /> {addingTask ? "Adding" : "Add for Today"}
+              </button>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
