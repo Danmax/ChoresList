@@ -136,7 +136,7 @@ export const POST = withErrors(async (req: NextRequest) => {
   }
 
   const response = await client.chat.completions.create({
-    model: "gpt-4o-mini",
+    model: "gpt-5-mini",
     response_format: { type: "json_object" },
     max_tokens: 900,
     messages: [
