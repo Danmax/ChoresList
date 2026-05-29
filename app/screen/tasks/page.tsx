@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Camera, CheckCircle2, Download, Gift, ListPlus, LogOut, Plus, RefreshCw, Star } from "lucide-react";
+import { BookOpen, Camera, CheckCircle2, Download, Gift, ListPlus, LogOut, Plus, RefreshCw, ShieldCheck, Sparkles, Star } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -35,8 +35,21 @@ type Assignment = {
     color: string;
     pointsValue: number;
     requiresPhoto: boolean;
+    instructions?: {
+      steps: string;
+      tips: string;
+      safetyNotes: string;
+    } | null;
   };
   completions: { id: number; completedAt: string }[];
+};
+
+type ChoreGuide = {
+  title: string;
+  icon: string;
+  steps: string[];
+  tips: string[];
+  safetyNotes: string[];
 };
 
 type CatalogMember = { id: number; name: string; avatar: string; color: string };
@@ -80,6 +93,7 @@ export default function TaskScreenPage() {
   const [showPhoto, setShowPhoto] = useState(false);
   const [photoType, setPhotoType] = useState<"before" | "after">("before");
   const [activeCompletionId, setActiveCompletionId] = useState<number | null>(null);
+  const [activeGuide, setActiveGuide] = useState<ChoreGuide | null>(null);
 
   const load = useCallback(async () => {
     const [sessionRes, tasksRes] = await Promise.all([
@@ -295,6 +309,28 @@ export default function TaskScreenPage() {
     router.replace("/pair");
   }
 
+  function parseGuideList(value?: string | null) {
+    if (!value) return [];
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function openGuide(assignment: Assignment) {
+    const instructions = assignment.chore.instructions;
+    if (!instructions) return;
+    setActiveGuide({
+      title: assignment.chore.name,
+      icon: assignment.chore.icon,
+      steps: parseGuideList(instructions.steps),
+      tips: parseGuideList(instructions.tips),
+      safetyNotes: parseGuideList(instructions.safetyNotes),
+    });
+  }
+
   if (loading) {
     return <div className="flex min-h-screen items-center justify-center text-xl font-black text-slate-500">Loading tasks...</div>;
   }
@@ -414,6 +450,15 @@ export default function TaskScreenPage() {
                               <p className="flex items-center gap-1 text-xs font-bold text-blue-500">
                                 <Camera size={12} /> Before/after photos
                               </p>
+                            )}
+                            {assignment.chore.instructions && (
+                              <button
+                                type="button"
+                                onClick={() => openGuide(assignment)}
+                                className="mt-1 inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-black text-indigo-600 hover:bg-indigo-100"
+                              >
+                                <BookOpen size={12} /> Guide
+                              </button>
                             )}
                           </div>
                         </div>
@@ -548,6 +593,76 @@ export default function TaskScreenPage() {
               <Plus size={18} /> Add Wish
             </button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!activeGuide} onOpenChange={(open) => !open && setActiveGuide(null)}>
+        <DialogContent className="max-w-lg rounded-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-black">
+              {activeGuide?.icon} {activeGuide?.title} Guide
+            </DialogTitle>
+          </DialogHeader>
+          {activeGuide && (
+            <div className="space-y-5">
+              {activeGuide.steps.length > 0 && (
+                <section>
+                  <div className="mb-2 flex items-center gap-2 text-slate-700">
+                    <BookOpen size={18} className="text-indigo-500" />
+                    <h3 className="font-black">Steps</h3>
+                  </div>
+                  <ol className="space-y-2">
+                    {activeGuide.steps.map((step, index) => (
+                      <li key={`${step}-${index}`} className="flex gap-3 rounded-2xl bg-slate-50 p-3">
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-500 text-sm font-black text-white">
+                          {index + 1}
+                        </span>
+                        <span className="font-bold text-slate-700">{step}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </section>
+              )}
+
+              {activeGuide.tips.length > 0 && (
+                <section>
+                  <div className="mb-2 flex items-center gap-2 text-slate-700">
+                    <Sparkles size={18} className="text-amber-500" />
+                    <h3 className="font-black">Tips</h3>
+                  </div>
+                  <div className="space-y-2">
+                    {activeGuide.tips.map((tip, index) => (
+                      <p key={`${tip}-${index}`} className="rounded-2xl bg-amber-50 p-3 font-bold text-amber-800">
+                        {tip}
+                      </p>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {activeGuide.safetyNotes.length > 0 && (
+                <section>
+                  <div className="mb-2 flex items-center gap-2 text-slate-700">
+                    <ShieldCheck size={18} className="text-emerald-500" />
+                    <h3 className="font-black">Safety</h3>
+                  </div>
+                  <div className="space-y-2">
+                    {activeGuide.safetyNotes.map((note, index) => (
+                      <p key={`${note}-${index}`} className="rounded-2xl bg-emerald-50 p-3 font-bold text-emerald-800">
+                        {note}
+                      </p>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {activeGuide.steps.length === 0 && activeGuide.tips.length === 0 && activeGuide.safetyNotes.length === 0 && (
+                <p className="rounded-2xl bg-slate-50 p-4 text-center font-bold text-slate-500">
+                  This guide does not have steps yet.
+                </p>
+              )}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

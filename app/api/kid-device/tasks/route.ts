@@ -74,7 +74,7 @@ export const GET = withErrors(async (req: NextRequest) => {
       ],
     },
     include: {
-      chore: true,
+      chore: { include: { instructions: true } },
       member: { select: { id: true, name: true, avatar: true, color: true, totalPoints: true, level: true } },
       completions: {
         where: { completedAt: { gte: today } },
@@ -140,7 +140,7 @@ export const POST = withErrors(async (req: NextRequest) => {
       dueDate: today,
     },
     include: {
-      chore: true,
+      chore: { include: { instructions: true } },
       member: { select: { id: true, name: true, avatar: true, color: true, totalPoints: true, level: true } },
       completions: true,
     },
