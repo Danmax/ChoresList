@@ -85,7 +85,7 @@ export async function generateChoreInstructions(
 ): Promise<ChoreInstructionData> {
   const response = await client.chat.completions.create({
     model: "gpt-5-mini",
-    max_tokens: 1024,
+    max_completion_tokens: 2000,
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: buildUserPrompt(choreName, category, ageMin, ageMax) },
@@ -104,7 +104,7 @@ export async function* streamChoreInstructions(
 ): AsyncGenerator<string> {
   const stream = await client.chat.completions.create({
     model: "gpt-5-mini",
-    max_tokens: 1024,
+    max_completion_tokens: 2000,
     stream: true,
     messages: [
       { role: "system", content: SYSTEM_PROMPT },

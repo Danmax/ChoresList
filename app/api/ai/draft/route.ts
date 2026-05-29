@@ -138,7 +138,7 @@ export const POST = withErrors(async (req: NextRequest) => {
   const response = await client.chat.completions.create({
     model: "gpt-5-mini",
     response_format: { type: "json_object" },
-    max_tokens: 900,
+    max_completion_tokens: 2000,
     messages: [
       {
         role: "system",
@@ -149,7 +149,12 @@ export const POST = withErrors(async (req: NextRequest) => {
     ],
   });
 
-  const raw = parseJson(response.choices[0]?.message?.content ?? "{}") as Record<string, unknown>;
+  const content = response.choices[0]?.message?.content ?? "";
+  if (!content.trim()) {
+    return NextResponse.json({ error: "AI returned an empty draft. Try a little more detail." }, { status: 502 });
+  }
+
+  const raw = parseJson(content) as Record<string, unknown>;
   const draft = kind === "chore" ? normalizeChore(raw) : normalizeEvent(raw);
 
   return NextResponse.json({ ok: true, kind, draft });
