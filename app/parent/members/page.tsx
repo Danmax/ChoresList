@@ -59,10 +59,27 @@ export default function MembersPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [editing, setEditing] = useState<Partial<Member> | null>(null);
   const [open, setOpen] = useState(false);
+  const [loadError, setLoadError] = useState("");
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/members");
-    setMembers(await res.json());
+    try {
+      const res = await fetch("/api/members");
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !Array.isArray(data)) {
+        const message =
+          data && typeof data === "object" && "error" in data && typeof data.error === "string"
+            ? data.error
+            : `Could not load members (HTTP ${res.status})`;
+        setLoadError(message);
+        setMembers([]);
+        return;
+      }
+      setLoadError("");
+      setMembers(data);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Could not load members");
+      setMembers([]);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -162,7 +179,17 @@ export default function MembersPage() {
         ))}
       </div>
 
-      {members.length === 0 && (
+      {loadError && (
+        <div className="rounded-3xl border-2 border-red-100 bg-red-50 p-5 text-sm">
+          <p className="font-black text-red-700">Could not load family members</p>
+          <p className="mt-1 break-words font-semibold text-red-600">{loadError}</p>
+          {loadError.includes("Database migrations") && (
+            <p className="mt-2 font-semibold text-red-600">Run `npm run db:deploy`, then reload this page.</p>
+          )}
+        </div>
+      )}
+
+      {members.length === 0 && !loadError && (
         <div className="text-center py-16">
           <div className="text-6xl mb-4">👶</div>
           <h2 className="text-xl font-bold text-slate-600">No family members yet</h2>

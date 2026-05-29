@@ -67,7 +67,8 @@ export default function KidPage() {
       fetch(`/api/assignments?memberId=${id}`),
       fetch(`/api/projects?memberId=${id}&status=open`),
     ]);
-    const members: Member[] = await membersRes.json();
+    const membersData = await membersRes.json().catch(() => []);
+    const members: Member[] = Array.isArray(membersData) ? membersData : [];
     const found = members.find((m) => m.id === parseInt(id));
     setMember(found ?? null);
     setAssignments(await assignRes.json());

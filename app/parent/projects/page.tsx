@@ -38,7 +38,10 @@ export default function ProjectsPage() {
   const load = useCallback(async () => {
     const [pRes, mRes] = await Promise.all([fetch("/api/projects"), fetch("/api/members")]);
     if (pRes.ok) setProjects(await pRes.json());
-    if (mRes.ok) setMembers(await mRes.json());
+    if (mRes.ok) {
+      const data = await mRes.json().catch(() => []);
+      setMembers(Array.isArray(data) ? data : []);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);

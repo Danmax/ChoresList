@@ -35,7 +35,9 @@ export default function AllowancePage() {
       fetch("/api/members"),
       fetch("/api/allowance"),
     ]);
-    const mData: Member[] = await mRes.json();
+    const mDataRaw = await mRes.json().catch(() => []);
+    const mData: Member[] = Array.isArray(mDataRaw) ? mDataRaw : [];
+    if (!Array.isArray(mDataRaw)) toast.error(mDataRaw.error ?? "Could not load members");
     setMembers(mData.filter((m) => (m as unknown as { role: string }).role === "child"));
     setAllowances(await aRes.json());
 

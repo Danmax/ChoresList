@@ -40,9 +40,15 @@ export default function AssignPage() {
       fetch("/api/chores"),
       fetch("/api/assignments?scope=all"),
     ]);
-    setMembers(await mRes.json());
-    setChores(await cRes.json());
-    setAssignments(await aRes.json());
+    const [membersData, choresData, assignmentsData] = await Promise.all([
+      mRes.json().catch(() => []),
+      cRes.json().catch(() => []),
+      aRes.json().catch(() => []),
+    ]);
+    if (!Array.isArray(membersData)) toast.error(membersData.error ?? "Could not load members");
+    setMembers(Array.isArray(membersData) ? membersData : []);
+    setChores(Array.isArray(choresData) ? choresData : []);
+    setAssignments(Array.isArray(assignmentsData) ? assignmentsData : []);
   }, []);
 
   useEffect(() => { load(); }, [load]);

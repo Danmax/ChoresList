@@ -45,27 +45,33 @@ async function syncBirthdayAges(householdId: number) {
   const day = today.getDate();
   const year = today.getFullYear();
 
-  await prisma.familyMember.updateMany({
-    where: {
-      householdId,
-      birthdayMonth: { not: null, lte: month },
-      birthdayDay: { not: null },
-      OR: [
-        { lastBirthdayAgeUpdateYear: null },
-        { lastBirthdayAgeUpdateYear: { lt: year } },
-      ],
-      NOT: {
-        AND: [
-          { birthdayMonth: month },
-          { birthdayDay: { gt: day } },
+  try {
+    await prisma.familyMember.updateMany({
+      where: {
+        householdId,
+        birthdayMonth: { not: null, lte: month },
+        birthdayDay: { not: null },
+        OR: [
+          { lastBirthdayAgeUpdateYear: null },
+          { lastBirthdayAgeUpdateYear: { lt: year } },
         ],
+        NOT: {
+          AND: [
+            { birthdayMonth: month },
+            { birthdayDay: { gt: day } },
+          ],
+        },
       },
-    },
-    data: {
-      age: { increment: 1 },
-      lastBirthdayAgeUpdateYear: year,
-    },
-  });
+      data: {
+        age: { increment: 1 },
+        lastBirthdayAgeUpdateYear: year,
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("Unknown argument `birthdayMonth`") || message.includes("Unknown column")) return;
+    throw error;
+  }
 }
 
 export const GET = withErrors(async (req: NextRequest) => {
