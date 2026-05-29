@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { ArrowLeft, Plus, Trash2, Save, ClipboardList } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Save, ClipboardList, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { AVATAR_OPTIONS, KID_COLORS, PARENT_AVATARS } from "@/types";
+import { AVATAR_OPTIONS, KID_COLORS, PARENT_AVATARS, STARTER_CHORE_TEMPLATES_BY_AGE, type StarterChoreFrequency, type StarterChoreTemplate } from "@/types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,6 +28,8 @@ interface Member {
   totalPoints: number;
   level: number;
 }
+
+type SavedMember = Member & { id: number };
 
 const MONTH_OPTIONS = [
   { value: 1, label: "January" },
@@ -55,11 +57,35 @@ function birthdayLabel(member: Pick<Member, "birthdayMonth" | "birthdayDay">) {
   return `${month} ${member.birthdayDay}`;
 }
 
+function starterBandForAge(age?: number) {
+  const safeAge = Number(age);
+  return STARTER_CHORE_TEMPLATES_BY_AGE.find((band) => safeAge >= band.ageMin && safeAge <= band.ageMax) ?? STARTER_CHORE_TEMPLATES_BY_AGE[0];
+}
+
+function defaultStarterSelection(age?: number) {
+  const band = starterBandForAge(age);
+  const selected = new Set<string>();
+  (["daily", "weekly", "monthly"] as StarterChoreFrequency[]).forEach((frequency) => {
+    const limit = frequency === "daily" ? band.dailyLimit : frequency === "weekly" ? band.weeklyLimit : band.monthlyLimit;
+    band.chores.filter((chore) => chore.frequency === frequency).slice(0, limit).forEach((chore) => selected.add(chore.name));
+  });
+  return selected;
+}
+
+function nextDateForMonthly() {
+  const next = new Date();
+  next.setDate(1);
+  next.setMonth(next.getMonth() + 1);
+  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-01`;
+}
+
 export default function MembersPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [editing, setEditing] = useState<Partial<Member> | null>(null);
   const [open, setOpen] = useState(false);
   const [loadError, setLoadError] = useState("");
+  const [assignStarter, setAssignStarter] = useState(true);
+  const [starterSelection, setStarterSelection] = useState<Set<string>>(defaultStarterSelection(8));
 
   const load = useCallback(async () => {
     try {
@@ -86,12 +112,86 @@ export default function MembersPage() {
 
   function openNew() {
     setEditing({ name: "", age: 8, birthdayMonth: null, birthdayDay: null, role: "child", avatar: "🧒", color: KID_COLORS[0] });
+    setAssignStarter(true);
+    setStarterSelection(defaultStarterSelection(8));
     setOpen(true);
   }
 
   function openEdit(m: Member) {
     setEditing({ ...m });
+    setAssignStarter(false);
     setOpen(true);
+  }
+
+  function updateAge(age: number) {
+    setEditing((p) => ({ ...p!, age }));
+    if (!editing?.id) {
+      setStarterSelection(defaultStarterSelection(age));
+    }
+  }
+
+  function toggleStarter(name: string) {
+    setStarterSelection((previous) => {
+      const next = new Set(previous);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }
+
+  async function ensureChore(template: StarterChoreTemplate, ageMin: number, ageMax: number) {
+    const res = await fetch("/api/chores");
+    const existing = await res.json().catch(() => []);
+    if (Array.isArray(existing)) {
+      const match = existing.find((chore) => chore.name?.toLowerCase() === template.name.toLowerCase());
+      if (match?.id) return match.id as number;
+    }
+
+    const createRes = await fetch("/api/chores", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: template.name,
+        description: template.description,
+        icon: template.icon,
+        color: "#ede9fe",
+        ageMin,
+        ageMax,
+        pointsValue: template.pointsValue,
+        category: template.category,
+        requiresPhoto: false,
+      }),
+    });
+    const created = await createRes.json();
+    if (!createRes.ok) throw new Error(created.error ?? `Could not create ${template.name}`);
+    return created.id as number;
+  }
+
+  async function assignStarterTasks(member: SavedMember) {
+    const band = starterBandForAge(member.age);
+    const selectedTemplates = band.chores.filter((chore) => starterSelection.has(chore.name));
+    if (selectedTemplates.length === 0) return;
+
+    const weeklyDays = [1, 3, 5];
+    let weeklyIndex = 0;
+
+    for (const template of selectedTemplates) {
+      const choreId = await ensureChore(template, band.ageMin, band.ageMax);
+      const body =
+        template.frequency === "weekly"
+          ? { memberId: member.id, choreId, frequency: "weekly", dayOfWeeks: [weeklyDays[weeklyIndex++ % weeklyDays.length]] }
+          : template.frequency === "monthly"
+            ? { memberId: member.id, choreId, frequency: "monthly", dueDate: nextDateForMonthly() }
+            : { memberId: member.id, choreId, frequency: "daily" };
+
+      const res = await fetch("/api/assignments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? `Could not assign ${template.name}`);
+    }
   }
 
   async function save() {
@@ -100,19 +200,34 @@ export default function MembersPage() {
       return;
     }
     if (editing.id) {
-      await fetch("/api/members", {
+      const res = await fetch("/api/members", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editing),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error ?? "Could not update member");
+        return;
+      }
       toast.success("Member updated!");
     } else {
-      await fetch("/api/members", {
+      const res = await fetch("/api/members", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editing),
       });
-      toast.success("Member added!");
+      const member = await res.json();
+      if (!res.ok) {
+        toast.error(member.error ?? "Could not add member");
+        return;
+      }
+      if (assignStarter && editing.role === "child") {
+        await assignStarterTasks(member);
+        toast.success("Member added with starter chores!");
+      } else {
+        toast.success("Member added!");
+      }
     }
     setOpen(false);
     load();
@@ -243,7 +358,7 @@ export default function MembersPage() {
                       value={editing.age ?? 8}
                       min={2}
                       max={99}
-                      onChange={(e) => setEditing((p) => ({ ...p!, age: parseInt(e.target.value) }))}
+                      onChange={(e) => updateAge(parseInt(e.target.value))}
                       className="rounded-xl mt-1"
                     />
                   </div>
@@ -284,6 +399,80 @@ export default function MembersPage() {
                       </select>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {!editing.id && editing.role === "child" && (
+                <div className="rounded-2xl bg-violet-50 p-3">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={assignStarter}
+                      onChange={(event) => setAssignStarter(event.target.checked)}
+                      className="h-4 w-4 rounded border-violet-300 text-violet-600 focus:ring-violet-400"
+                    />
+                    <span className="flex items-center gap-1 text-sm font-black text-violet-800">
+                      <Sparkles size={15} /> Assign starter chores
+                    </span>
+                  </label>
+                  {assignStarter && (
+                    <div className="mt-3 space-y-3">
+                      {(() => {
+                        const band = starterBandForAge(editing.age);
+                        return (
+                          <>
+                            <div>
+                              <p className="text-sm font-black text-slate-800">{band.label}</p>
+                              <p className="text-xs font-bold text-slate-500">
+                                Choose up to {band.dailyLimit} daily, {band.weeklyLimit} weekly, and {band.monthlyLimit} monthly tasks.
+                              </p>
+                            </div>
+                            {(["daily", "weekly", "monthly"] as StarterChoreFrequency[]).map((frequency) => {
+                              const limit = frequency === "daily" ? band.dailyLimit : frequency === "weekly" ? band.weeklyLimit : band.monthlyLimit;
+                              const templates = band.chores.filter((chore) => chore.frequency === frequency);
+                              const selectedCount = templates.filter((chore) => starterSelection.has(chore.name)).length;
+                              return (
+                                <div key={frequency}>
+                                  <p className="mb-1 text-xs font-black uppercase text-slate-400">
+                                    {frequency} {selectedCount}/{limit}
+                                  </p>
+                                  <div className="space-y-1.5">
+                                    {templates.map((template) => {
+                                      const checked = starterSelection.has(template.name);
+                                      const disabled = !checked && selectedCount >= limit;
+                                      return (
+                                        <button
+                                          key={template.name}
+                                          type="button"
+                                          disabled={disabled}
+                                          onClick={() => toggleStarter(template.name)}
+                                          className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-bold transition-colors disabled:opacity-40 ${
+                                            checked ? "bg-white text-violet-800 ring-2 ring-violet-200" : "bg-violet-100/60 text-slate-600 hover:bg-white"
+                                          }`}
+                                        >
+                                          <span>{checked ? "✓" : ""}</span>
+                                          <span className="text-lg">{template.icon}</span>
+                                          <span className="min-w-0 flex-1 truncate">{template.name}</span>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            <div>
+                              <p className="mb-1 text-xs font-black uppercase text-slate-400">Life skills</p>
+                              <ul className="space-y-1 text-xs font-bold text-slate-500">
+                                {band.lifeSkills.map((skill) => (
+                                  <li key={skill}>• {skill}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
                 </div>
               )}
 
