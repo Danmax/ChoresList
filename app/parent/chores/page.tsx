@@ -209,24 +209,26 @@ export default function ChoresPage() {
   const filtered = filterCat === "all" ? chores : chores.filter((c) => c.category === filterCat);
 
   return (
-    <div className="min-h-screen p-6">
-      <div className="flex items-center gap-4 mb-6">
+    <div className="min-h-screen p-4 sm:p-6">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
         <Link href="/parent" className="bg-white rounded-2xl p-2 shadow-sm hover:shadow-md transition-shadow">
           <ArrowLeft size={20} className="text-slate-600" />
         </Link>
-        <h1 className="text-3xl font-black text-slate-800 flex-1">📋 Chore Library</h1>
+        <h1 className="text-2xl sm:text-3xl font-black text-slate-800 flex-1">📋 Chore Library</h1>
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:w-auto">
         <button
           onClick={() => setShowTemplates(true)}
-          className="flex items-center gap-2 bg-violet-500 text-white rounded-2xl px-4 py-2.5 font-bold hover:bg-violet-600 transition-colors"
+          className="flex items-center justify-center gap-2 bg-violet-500 text-white rounded-2xl px-3 sm:px-4 py-2.5 font-bold hover:bg-violet-600 transition-colors"
         >
           <Sparkles size={18} /> Quick Start
         </button>
         <button
           onClick={() => setShowNewChore(true)}
-          className="flex items-center gap-2 bg-blue-500 text-white rounded-2xl px-4 py-2.5 font-bold hover:bg-blue-600 transition-colors"
+          className="flex items-center justify-center gap-2 bg-blue-500 text-white rounded-2xl px-3 sm:px-4 py-2.5 font-bold hover:bg-blue-600 transition-colors"
         >
           <Plus size={18} /> New Chore
         </button>
+        </div>
       </div>
 
       {/* Category filter */}
@@ -252,18 +254,18 @@ export default function ChoresPage() {
         {filtered.map((chore) => (
           <div
             key={chore.id}
-            className="rounded-2xl p-4 bg-white shadow-sm flex items-center gap-4"
+            className="rounded-2xl p-4 bg-white shadow-sm flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4"
             style={{ borderLeft: `4px solid ${chore.color}` }}
           >
             <div className="text-3xl">{chore.icon}</div>
-            <div className="flex-1">
+            <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-black text-slate-800">{chore.name}</span>
                 {chore.instructions && (
                   <Badge className="bg-emerald-100 text-emerald-700 text-xs font-bold">Has Guide ✓</Badge>
                 )}
               </div>
-              <div className="flex gap-3 mt-1 text-xs font-semibold text-slate-500 items-center">
+              <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-xs font-semibold text-slate-500 items-center">
                 <span>Ages {chore.ageMin}–{chore.ageMax}</span>
                 <span className="flex items-center gap-1">
                   <button
@@ -279,16 +281,16 @@ export default function ChoresPage() {
                 <span>{CHORE_CATEGORIES.find((c) => c.value === chore.category)?.icon} {chore.category}</span>
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
               <button
                 onClick={() => setEditingChore({ ...chore })}
-                className="flex items-center gap-1 bg-slate-50 text-slate-600 rounded-xl px-3 py-1.5 text-sm font-bold hover:bg-slate-100 transition-colors"
+                className="flex flex-1 items-center justify-center gap-1 bg-slate-50 text-slate-600 rounded-xl px-3 py-1.5 text-sm font-bold hover:bg-slate-100 transition-colors sm:flex-none"
               >
                 <Pencil size={14} /> Edit
               </button>
               <button
                 onClick={() => openInstructions(chore)}
-                className="flex items-center gap-1 bg-indigo-50 text-indigo-600 rounded-xl px-3 py-1.5 text-sm font-bold hover:bg-indigo-100 transition-colors"
+                className="flex flex-1 items-center justify-center gap-1 bg-indigo-50 text-indigo-600 rounded-xl px-3 py-1.5 text-sm font-bold hover:bg-indigo-100 transition-colors sm:flex-none"
               >
                 <BookOpen size={14} /> Guide
               </button>
@@ -449,7 +451,7 @@ export default function ChoresPage() {
 
       {/* New Chore Dialog */}
       <Dialog open={showNewChore} onOpenChange={setShowNewChore}>
-        <DialogContent className="max-w-md rounded-3xl">
+        <DialogContent className="max-w-md rounded-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-black">Add New Chore</DialogTitle>
           </DialogHeader>
@@ -595,7 +597,7 @@ export default function ChoresPage() {
 
       {/* Edit Chore Dialog */}
       <Dialog open={!!editingChore} onOpenChange={(o) => !o && setEditingChore(null)}>
-        <DialogContent className="max-w-md rounded-3xl">
+        <DialogContent className="max-w-md rounded-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-black">Edit Chore</DialogTitle>
           </DialogHeader>

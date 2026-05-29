@@ -85,20 +85,20 @@ export default function KidWishlistPage() {
   const granted = items.filter((i) => i.status === "granted");
 
   return (
-    <div className="min-h-screen p-6" style={{ background: member ? `${member.color}15` : "#f8fafc" }}>
-      <div className="flex items-center gap-4 mb-8">
+    <div className="min-h-screen p-4 sm:p-6" style={{ background: member ? `${member.color}15` : "#f8fafc" }}>
+      <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center">
         <Link
           href={`/kid/${id}`}
           className="bg-white rounded-2xl p-2 shadow-sm hover:shadow-md transition-shadow"
         >
           <ArrowLeft size={20} className="text-slate-600" />
         </Link>
-        <h1 className="text-3xl font-black text-slate-800 flex-1">
+        <h1 className="text-2xl sm:text-3xl font-black text-slate-800 flex-1">
           {member?.avatar} {member?.name}&apos;s Wish List
         </h1>
         <button
           onClick={openAdd}
-          className="flex items-center gap-2 text-white rounded-2xl px-4 py-2.5 font-bold shadow-sm hover:opacity-90 transition-opacity"
+          className="flex items-center justify-center gap-2 text-white rounded-2xl px-4 py-2.5 font-bold shadow-sm hover:opacity-90 transition-opacity"
           style={{ backgroundColor: member?.color ?? "#a78bfa" }}
         >
           <Plus size={18} /> Add Wish
@@ -176,7 +176,7 @@ export default function KidWishlistPage() {
 
       {/* Add Wish Dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-sm rounded-3xl">
+        <DialogContent className="max-w-sm rounded-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-black text-center text-xl">
               {step === "category" ? "What do you want? 🤩" : "Tell us more! ✏️"}

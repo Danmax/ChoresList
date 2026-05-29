@@ -65,7 +65,7 @@ export function TinyWeather({ className = "" }: { className?: string }) {
     return (
       <form
         onSubmit={submit}
-        className={`flex h-10 min-w-[13rem] items-center gap-2 rounded-2xl bg-white px-3 shadow-sm ${className}`}
+        className={`flex h-10 min-w-0 items-center gap-2 rounded-2xl bg-white px-3 shadow-sm sm:min-w-[13rem] ${className}`}
       >
         <MapPin size={15} className="shrink-0 text-slate-400" />
         <input
@@ -86,7 +86,7 @@ export function TinyWeather({ className = "" }: { className?: string }) {
   }
 
   return (
-    <div className={`flex h-10 items-center gap-2 rounded-2xl bg-white px-3 shadow-sm ${className}`}>
+    <div className={`flex h-10 min-w-0 items-center gap-2 rounded-2xl bg-white px-3 shadow-sm ${className}`}>
       <CloudSun size={17} className="shrink-0 text-amber-500" />
       {status === "loading" && !weather ? (
         <Loader2 size={16} className="animate-spin text-slate-400" />

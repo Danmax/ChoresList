@@ -91,21 +91,21 @@ export default function ProjectsPage() {
 
   return (
     <div className="min-h-screen p-4 sm:p-6">
-      <div className="flex items-center gap-3 mb-6">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
         <Link href="/parent" className="bg-white rounded-2xl p-2 shadow-sm hover:shadow-md transition-shadow shrink-0">
           <ArrowLeft size={20} className="text-slate-600" />
         </Link>
         <h1 className="text-2xl sm:text-3xl font-black text-slate-800 flex-1">🔧 House Projects</h1>
         <button
           onClick={() => setOpen(true)}
-          className="flex items-center gap-1.5 bg-orange-500 text-white rounded-2xl px-3 sm:px-4 py-2.5 font-bold hover:bg-orange-600 transition-colors text-sm sm:text-base"
+          className="flex items-center justify-center gap-1.5 bg-orange-500 text-white rounded-2xl px-3 sm:px-4 py-2.5 font-bold hover:bg-orange-600 transition-colors text-sm sm:text-base"
         >
           <Plus size={18} /> New Project
         </button>
       </div>
 
       {/* Status filter */}
-      <div className="flex gap-2 mb-6">
+      <div className="flex flex-wrap gap-2 mb-6">
         {[["open","Open"],["completed","Done"],["all","All"]].map(([v,l]) => (
           <button key={v} onClick={() => setFilterStatus(v)}
             className={`px-4 py-2 rounded-full font-bold text-sm transition-colors ${filterStatus === v ? "bg-slate-800 text-white" : "bg-white text-slate-600"}`}

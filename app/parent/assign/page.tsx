@@ -106,25 +106,27 @@ export default function AssignPage() {
   }
 
   return (
-    <div className="min-h-screen p-6">
-      <div className="flex items-center gap-4 mb-6">
+    <div className="min-h-screen p-4 sm:p-6">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
         <Link href="/parent" className="bg-white rounded-2xl p-2 shadow-sm hover:shadow-md transition-shadow">
           <ArrowLeft size={20} className="text-slate-600" />
         </Link>
-        <h1 className="text-3xl font-black text-slate-800 flex-1">📅 Assign Chores</h1>
+        <h1 className="text-2xl sm:text-3xl font-black text-slate-800 flex-1">📅 Assign Chores</h1>
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:w-auto">
         <button
           type="button"
           onClick={load}
-          className="flex items-center gap-2 bg-white text-slate-600 rounded-2xl px-4 py-2.5 font-bold hover:bg-slate-50 transition-colors shadow-sm"
+          className="flex items-center justify-center gap-2 bg-white text-slate-600 rounded-2xl px-3 sm:px-4 py-2.5 font-bold hover:bg-slate-50 transition-colors shadow-sm"
         >
           <RefreshCw size={18} /> Refresh
         </button>
         <button
           onClick={() => { resetForm(); setOpen(true); }}
-          className="flex items-center gap-2 bg-emerald-500 text-white rounded-2xl px-4 py-2.5 font-bold hover:bg-emerald-600 transition-colors"
+          className="flex items-center justify-center gap-2 bg-emerald-500 text-white rounded-2xl px-3 sm:px-4 py-2.5 font-bold hover:bg-emerald-600 transition-colors"
         >
           <Plus size={18} /> Assign Chore
         </button>
+        </div>
       </div>
 
       {/* Member filter */}
@@ -155,11 +157,11 @@ export default function AssignPage() {
 
       <div className="space-y-3">
         {filteredAssignments.map((a) => (
-          <div key={a.id} className="bg-white rounded-2xl p-4 shadow-sm flex items-center gap-4">
+          <div key={a.id} className="bg-white rounded-2xl p-4 shadow-sm flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
             <div className="text-3xl">{a.chore.icon}</div>
-            <div className="flex-1">
+            <div className="min-w-0 flex-1">
               <p className="font-black text-slate-800">{a.chore.name}</p>
-              <div className="flex gap-3 text-xs font-semibold text-slate-500 mt-1">
+              <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs font-semibold text-slate-500 mt-1">
                 <span>{a.member.avatar} {a.member.name}</span>
                 <span className="capitalize">{a.frequency}</span>
                 {a.frequency === "weekly" && a.dayOfWeek !== null && (
@@ -174,7 +176,7 @@ export default function AssignPage() {
                 <span>⭐ {a.chore.pointsValue} pts</span>
               </div>
             </div>
-            <button onClick={() => unassign(a.id)} className="text-red-400 hover:text-red-600 p-1 transition-colors">
+            <button onClick={() => unassign(a.id)} className="self-end text-red-400 hover:text-red-600 p-1 transition-colors sm:self-auto">
               <Trash2 size={16} />
             </button>
           </div>
@@ -182,7 +184,7 @@ export default function AssignPage() {
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-md rounded-3xl">
+        <DialogContent className="max-w-md rounded-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-black">Assign a Chore</DialogTitle>
           </DialogHeader>

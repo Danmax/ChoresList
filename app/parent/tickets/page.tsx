@@ -83,7 +83,7 @@ export default function TicketsPage() {
         )}
       </AnimatePresence>
 
-      <div className="flex items-center gap-3 mb-6">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
         <Link href="/parent" className="bg-white rounded-2xl p-2 shadow-sm hover:shadow-md transition-shadow">
           <ArrowLeft size={20} className="text-slate-600" />
         </Link>

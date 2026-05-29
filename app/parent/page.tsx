@@ -353,30 +353,30 @@ export default function ParentPanel() {
   ];
 
   return (
-    <div className="min-h-screen p-6">
-      <div className="flex items-center justify-between mb-8">
+    <div className="min-h-screen p-4 sm:p-6">
+      <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-3xl font-black text-slate-800">🔧 Parent Panel</h1>
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-800">🔧 Parent Panel</h1>
           <p className="text-slate-500 font-semibold">Manage your family&apos;s chore system</p>
         </div>
-        <div className="flex gap-3">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:flex">
           <button
             type="button"
             onClick={loadInvite}
             disabled={inviteLoading}
-            className="flex items-center gap-2 bg-violet-500 text-white rounded-2xl px-4 py-2.5 shadow-sm font-bold hover:bg-violet-600 transition-colors disabled:opacity-60"
+            className="flex items-center justify-center gap-2 bg-violet-500 text-white rounded-2xl px-4 py-2.5 shadow-sm font-bold hover:bg-violet-600 transition-colors disabled:opacity-60"
           >
             <UserPlus size={18} /> {inviteLoading ? "Loading..." : "Invite Family"}
           </button>
           <Link
             href="/dashboard"
-            className="flex items-center gap-2 bg-white rounded-2xl px-4 py-2.5 shadow-sm font-bold text-slate-600 hover:shadow-md transition-shadow"
+            className="flex items-center justify-center gap-2 bg-white rounded-2xl px-4 py-2.5 shadow-sm font-bold text-slate-600 hover:shadow-md transition-shadow"
           >
             <Home size={18} /> Dashboard
           </Link>
           <button
             onClick={lock}
-            className="flex items-center gap-2 bg-white rounded-2xl px-4 py-2.5 shadow-sm font-bold text-red-500 hover:shadow-md transition-shadow"
+            className="flex items-center justify-center gap-2 bg-white rounded-2xl px-4 py-2.5 shadow-sm font-bold text-red-500 hover:shadow-md transition-shadow"
             title="Sign out of the parent account on this device"
           >
             <LogOut size={18} /> Sign out

@@ -109,15 +109,15 @@ export default function MembersPage() {
   }
 
   return (
-    <div className="min-h-screen p-6">
-      <div className="flex items-center gap-4 mb-8">
+    <div className="min-h-screen p-4 sm:p-6">
+      <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center">
         <Link href="/parent" className="bg-white rounded-2xl p-2 shadow-sm hover:shadow-md transition-shadow">
           <ArrowLeft size={20} className="text-slate-600" />
         </Link>
-        <h1 className="text-3xl font-black text-slate-800 flex-1">👨‍👩‍👧‍👦 Family Members</h1>
+        <h1 className="text-2xl sm:text-3xl font-black text-slate-800 flex-1">👨‍👩‍👧‍👦 Family Members</h1>
         <button
           onClick={openNew}
-          className="flex items-center gap-2 bg-violet-500 text-white rounded-2xl px-4 py-2.5 font-bold hover:bg-violet-600 transition-colors"
+          className="flex items-center justify-center gap-2 bg-violet-500 text-white rounded-2xl px-4 py-2.5 font-bold hover:bg-violet-600 transition-colors sm:w-auto"
         >
           <Plus size={18} /> Add Member
         </button>
@@ -127,7 +127,7 @@ export default function MembersPage() {
         {members.map((m) => (
           <div
             key={m.id}
-            className="rounded-3xl p-5 bg-white shadow-sm flex items-center gap-4 cursor-pointer hover:shadow-md transition-shadow"
+            className="rounded-3xl p-5 bg-white shadow-sm flex items-start gap-4 cursor-pointer hover:shadow-md transition-shadow"
             style={{ border: `2px solid ${m.color}44` }}
             onClick={() => openEdit(m)}
           >
@@ -171,7 +171,7 @@ export default function MembersPage() {
       )}
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-md rounded-3xl">
+        <DialogContent className="max-w-md rounded-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-black">{editing?.id ? "Edit Member" : "Add Family Member"}</DialogTitle>
           </DialogHeader>

@@ -73,12 +73,12 @@ export default function ParentWishlistPage() {
   const granted = filtered.filter((i) => i.status === "granted");
 
   return (
-    <div className="min-h-screen p-6">
-      <div className="flex items-center gap-4 mb-8">
+    <div className="min-h-screen p-4 sm:p-6">
+      <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center">
         <Link href="/parent" className="bg-white rounded-2xl p-2 shadow-sm hover:shadow-md transition-shadow">
           <ArrowLeft size={20} className="text-slate-600" />
         </Link>
-        <h1 className="text-3xl font-black text-slate-800 flex-1">🎁 Family Wish Lists</h1>
+        <h1 className="text-2xl sm:text-3xl font-black text-slate-800 flex-1">🎁 Family Wish Lists</h1>
         <div className="text-sm font-bold text-slate-400">{pending.length} pending</div>
       </div>
 

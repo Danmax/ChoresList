@@ -79,12 +79,12 @@ export default function AllowancePage() {
   );
 
   return (
-    <div className="min-h-screen p-6">
+    <div className="min-h-screen p-4 sm:p-6">
       <div className="flex items-center gap-4 mb-8">
         <Link href="/parent" className="bg-white rounded-2xl p-2 shadow-sm hover:shadow-md transition-shadow">
           <ArrowLeft size={20} className="text-slate-600" />
         </Link>
-        <h1 className="text-3xl font-black text-slate-800">💰 Allowance</h1>
+        <h1 className="text-2xl sm:text-3xl font-black text-slate-800">💰 Allowance</h1>
       </div>
 
       {/* This week summary */}

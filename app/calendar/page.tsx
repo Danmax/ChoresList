@@ -574,22 +574,22 @@ function CalendarContent() {
 
   return (
     <div className="min-h-screen p-4 sm:p-6">
-      <div className="flex items-center gap-4 mb-6">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
         <Link href="/dashboard" className="bg-white rounded-2xl p-2 shadow-sm hover:shadow-md transition-shadow">
           <ArrowLeft size={20} className="text-slate-600" />
         </Link>
-        <h1 className="text-3xl font-black text-slate-800 flex-1">📅 Family Calendar</h1>
+        <h1 className="text-2xl sm:text-3xl font-black text-slate-800 flex-1">📅 Family Calendar</h1>
         <TinyWeather className="hidden sm:flex" />
         <button
           onClick={() => openNewEvent()}
-          className="flex items-center gap-2 bg-violet-500 text-white rounded-2xl px-4 py-2.5 font-bold hover:bg-violet-600 transition-colors"
+          className="flex items-center justify-center gap-2 bg-violet-500 text-white rounded-2xl px-4 py-2.5 font-bold hover:bg-violet-600 transition-colors"
         >
           <Plus size={18} /> Add Event
         </button>
       </div>
 
       {/* View tabs + nav */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+      <div className="flex flex-col gap-3 mb-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-1 bg-white rounded-2xl p-1 shadow-sm">
           {(["month", "week", "day"] as ViewMode[]).map((v) => (
             <button
@@ -603,14 +603,14 @@ function CalendarContent() {
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button onClick={goToday} className="bg-white rounded-xl px-3 py-1.5 text-sm font-black text-slate-600 shadow-sm hover:shadow-md">
             Today
           </button>
           <button onClick={() => navigate(-1)} className="bg-white rounded-xl p-2 shadow-sm hover:shadow-md">
             <ChevronLeft size={20} className="text-slate-600" />
           </button>
-          <h2 className="text-lg font-black text-slate-800 min-w-[10rem] text-center">{headerLabel}</h2>
+          <h2 className="text-base sm:text-lg font-black text-slate-800 min-w-0 flex-1 text-center sm:min-w-[10rem]">{headerLabel}</h2>
           <button onClick={() => navigate(1)} className="bg-white rounded-xl p-2 shadow-sm hover:shadow-md">
             <ChevronRight size={20} className="text-slate-600" />
           </button>
@@ -688,11 +688,11 @@ function CalendarContent() {
 
       {/* Add Event Dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-md rounded-3xl">
+        <DialogContent className="max-w-md rounded-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-black">Add Family Event</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+          <div className="space-y-4 pr-1">
             <div className="rounded-2xl bg-violet-50 p-3">
               <Label className="font-bold text-violet-800">Prompt</Label>
               <Textarea

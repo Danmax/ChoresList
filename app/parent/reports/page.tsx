@@ -78,13 +78,13 @@ export default function ReportsPage() {
     : null;
 
   return (
-    <div className="min-h-screen p-6">
-      <div className="flex items-center gap-4 mb-8">
+    <div className="min-h-screen p-4 sm:p-6">
+      <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center">
         <Link href="/parent" className="bg-white rounded-2xl p-2 shadow-sm hover:shadow-md transition-shadow">
           <ArrowLeft size={20} className="text-slate-600" />
         </Link>
-        <h1 className="text-3xl font-black text-slate-800 flex-1">📊 Reports</h1>
-        <div className="flex gap-2">
+        <h1 className="text-2xl sm:text-3xl font-black text-slate-800 flex-1">📊 Reports</h1>
+        <div className="grid grid-cols-3 gap-2 sm:flex">
           {RANGE_OPTIONS.map((r) => (
             <button
               key={r.value}
