@@ -20,11 +20,39 @@ interface Member {
   id: number;
   name: string;
   age: number;
+  birthdayMonth?: number | null;
+  birthdayDay?: number | null;
   role: string;
   avatar: string;
   color: string;
   totalPoints: number;
   level: number;
+}
+
+const MONTH_OPTIONS = [
+  { value: 1, label: "January" },
+  { value: 2, label: "February" },
+  { value: 3, label: "March" },
+  { value: 4, label: "April" },
+  { value: 5, label: "May" },
+  { value: 6, label: "June" },
+  { value: 7, label: "July" },
+  { value: 8, label: "August" },
+  { value: 9, label: "September" },
+  { value: 10, label: "October" },
+  { value: 11, label: "November" },
+  { value: 12, label: "December" },
+];
+
+function daysInMonth(month?: number | null) {
+  return month ? new Date(2024, month, 0).getDate() : 31;
+}
+
+function birthdayLabel(member: Pick<Member, "birthdayMonth" | "birthdayDay">) {
+  if (!member.birthdayMonth || !member.birthdayDay) return null;
+  const month = MONTH_OPTIONS.find((option) => option.value === member.birthdayMonth)?.label;
+  if (!month) return null;
+  return `${month} ${member.birthdayDay}`;
 }
 
 export default function MembersPage() {
@@ -40,7 +68,7 @@ export default function MembersPage() {
   useEffect(() => { load(); }, [load]);
 
   function openNew() {
-    setEditing({ name: "", age: 8, role: "child", avatar: "🧒", color: KID_COLORS[0] });
+    setEditing({ name: "", age: 8, birthdayMonth: null, birthdayDay: null, role: "child", avatar: "🧒", color: KID_COLORS[0] });
     setOpen(true);
   }
 
@@ -110,6 +138,9 @@ export default function MembersPage() {
                 {ROLE_OPTIONS.find((r) => r.value === m.role)?.label ?? m.role}
                 {m.role === "child" || m.role === "parent" ? ` • Age ${m.age}` : ""}
               </p>
+              {birthdayLabel(m) && (
+                <p className="text-slate-400 text-xs font-bold">🎂 {birthdayLabel(m)}</p>
+              )}
               <p className="text-slate-500 text-sm font-semibold">⭐ {m.totalPoints} pts • Lv.{m.level}</p>
             </div>
             <div className="flex flex-col gap-1.5 items-end shrink-0">
@@ -177,16 +208,55 @@ export default function MembersPage() {
               </div>
 
               {(editing.role === "child" || editing.role === "parent") && (
-                <div>
-                  <Label className="font-bold">Age</Label>
-                  <Input
-                    type="number"
-                    value={editing.age ?? 8}
-                    min={2}
-                    max={99}
-                    onChange={(e) => setEditing((p) => ({ ...p!, age: parseInt(e.target.value) }))}
-                    className="rounded-xl mt-1"
-                  />
+                <div className="space-y-3">
+                  <div>
+                    <Label className="font-bold">Age</Label>
+                    <Input
+                      type="number"
+                      value={editing.age ?? 8}
+                      min={2}
+                      max={99}
+                      onChange={(e) => setEditing((p) => ({ ...p!, age: parseInt(e.target.value) }))}
+                      className="rounded-xl mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label className="font-bold">Birthday</Label>
+                    <div className="mt-1 grid grid-cols-[1fr_6rem] gap-2">
+                      <select
+                        value={editing.birthdayMonth ?? ""}
+                        onChange={(e) => {
+                          const birthdayMonth = e.target.value ? parseInt(e.target.value, 10) : null;
+                          setEditing((p) => {
+                            const maxDay = daysInMonth(birthdayMonth);
+                            const currentDay = p?.birthdayDay ?? null;
+                            return {
+                              ...p!,
+                              birthdayMonth,
+                              birthdayDay: birthdayMonth ? (currentDay && currentDay <= maxDay ? currentDay : 1) : null,
+                            };
+                          });
+                        }}
+                        className="h-8 w-full rounded-xl border border-input bg-transparent px-2.5 py-1 text-sm font-semibold text-slate-800 outline-none focus:border-violet-300"
+                      >
+                        <option value="">Month</option>
+                        {MONTH_OPTIONS.map((month) => (
+                          <option key={month.value} value={month.value}>{month.label}</option>
+                        ))}
+                      </select>
+                      <select
+                        value={editing.birthdayDay ?? ""}
+                        disabled={!editing.birthdayMonth}
+                        onChange={(e) => setEditing((p) => ({ ...p!, birthdayDay: e.target.value ? parseInt(e.target.value, 10) : null }))}
+                        className="h-8 w-full rounded-xl border border-input bg-transparent px-2.5 py-1 text-sm font-semibold text-slate-800 outline-none focus:border-violet-300 disabled:opacity-50"
+                      >
+                        <option value="">Day</option>
+                        {Array.from({ length: daysInMonth(editing.birthdayMonth) }, (_, i) => i + 1).map((day) => (
+                          <option key={day} value={day}>{day}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                 </div>
               )}
 

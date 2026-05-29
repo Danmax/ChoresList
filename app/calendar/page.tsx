@@ -28,6 +28,13 @@ type RecurringMode = "none" | "weekly" | "monthly";
 type RecurringEndMode = "never" | "date" | "count";
 type ViewMode = "month" | "week" | "day";
 
+interface BirthdayMember {
+  id: number;
+  name: string;
+  birthdayMonth?: number | null;
+  birthdayDay?: number | null;
+}
+
 interface FamilyEvent {
   id: number;
   title: string;
@@ -50,7 +57,7 @@ interface FamilyEvent {
   icon: string;
 }
 
-type DisplayEvent = FamilyEvent & { _seriesId: number; _isOccurrence: boolean };
+type DisplayEvent = FamilyEvent & { _seriesId: number; _isOccurrence: boolean; _isBirthday?: boolean };
 
 interface LocationSuggestion {
   id: string;
@@ -182,6 +189,46 @@ function meta(eventType: string) {
   return EVENT_TYPE_META[eventType as EventType];
 }
 
+function birthdayEventsForWindow(members: BirthdayMember[], windowStart: Date, windowEnd: Date): FamilyEvent[] {
+  const years: number[] = [];
+  for (let year = windowStart.getFullYear(); year <= windowEnd.getFullYear(); year++) years.push(year);
+
+  return members.flatMap((member) => {
+    if (!member.birthdayMonth || !member.birthdayDay) return [];
+    const birthdayMonth = member.birthdayMonth;
+    const birthdayDay = member.birthdayDay;
+
+    return years.flatMap((year) => {
+      const maxDay = new Date(year, birthdayMonth, 0).getDate();
+      const day = Math.min(birthdayDay, maxDay);
+      const date = new Date(Date.UTC(year, birthdayMonth - 1, day));
+      if (date.getTime() < windowStart.getTime() || date.getTime() > windowEnd.getTime()) return [];
+
+      return [{
+        id: -(year * 100000 + member.id),
+        title: `${member.name}'s Birthday`,
+        eventType: "other" as EventType,
+        date: date.toISOString(),
+        endDate: null,
+        allDay: true,
+        recurring: "none",
+        recurringEndDate: null,
+        recurringCount: null,
+        location: null,
+        meetingUrl: null,
+        rsvpUrl: null,
+        flyerUrl: null,
+        registrationUrl: null,
+        registrationNotes: null,
+        resources: null,
+        notes: "Birthday celebration",
+        color: "#f472b6",
+        icon: "🎂",
+      }];
+    });
+  });
+}
+
 export default function CalendarPage() {
   return (
     <ParentPinGate>
@@ -195,6 +242,7 @@ function CalendarContent() {
   const [view, setView] = useState<ViewMode>("month");
   const [anchor, setAnchor] = useState<Date>(today);
   const [events, setEvents] = useState<FamilyEvent[]>([]);
+  const [birthdayMembers, setBirthdayMembers] = useState<BirthdayMember[]>([]);
   const [open, setOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [selectedEvent, setSelectedEvent] = useState<DisplayEvent | null>(null);
@@ -230,8 +278,15 @@ function CalendarContent() {
   const month = anchor.getMonth() + 1;
 
   const load = useCallback(async () => {
-    const res = await fetch(`/api/events?month=${month}&year=${year}`);
-    setEvents(await res.json());
+    const [eventsRes, membersRes] = await Promise.all([
+      fetch(`/api/events?month=${month}&year=${year}`),
+      fetch("/api/members"),
+    ]);
+    setEvents(await eventsRes.json());
+    if (membersRes.ok) {
+      const members = await membersRes.json();
+      setBirthdayMembers(Array.isArray(members) ? members : []);
+    }
   }, [month, year]);
 
   useEffect(() => {
@@ -285,10 +340,17 @@ function CalendarContent() {
     return { start: d, end: addDays(d, 1) };
   }, [view, anchor, month, year]);
 
-  const expanded: DisplayEvent[] = useMemo(
-    () => expandOccurrences(events, windowRange.start, windowRange.end),
-    [events, windowRange]
-  );
+  const expanded: DisplayEvent[] = useMemo(() => {
+    const birthdayEvents = birthdayEventsForWindow(birthdayMembers, windowRange.start, windowRange.end);
+    const expandedEvents = expandOccurrences(events, windowRange.start, windowRange.end);
+    const expandedBirthdays = birthdayEvents.map((event) => ({
+      ...event,
+      _seriesId: event.id,
+      _isOccurrence: false,
+      _isBirthday: true,
+    }));
+    return [...expandedEvents, ...expandedBirthdays];
+  }, [events, birthdayMembers, windowRange]);
 
   const eventsByDayKey = useMemo(() => {
     const map = new Map<string, DisplayEvent[]>();
@@ -463,6 +525,10 @@ function CalendarContent() {
   }
 
   async function deleteEvent(displayEvent: DisplayEvent) {
+    if (displayEvent._isBirthday) {
+      toast.info("Birthdays are managed from Family Members");
+      return;
+    }
     const targetId = displayEvent._seriesId;
     if (displayEvent._isOccurrence || displayEvent.recurring !== "none") {
       const confirmed = window.confirm("This will delete the entire recurring series. Continue?");
@@ -1222,7 +1288,8 @@ function EventRow({ e, onOpen, onDelete }: { e: DisplayEvent; onOpen?: () => voi
           event.stopPropagation();
           onDelete();
         }}
-        className="text-red-400 hover:text-red-600 p-1 transition-colors"
+        className={`p-1 transition-colors ${e._isBirthday ? "invisible" : "text-red-400 hover:text-red-600"}`}
+        disabled={e._isBirthday}
       >
         <Trash2 size={14} />
       </button>
@@ -1284,13 +1351,15 @@ function EventDetailsDialog({
               </div>
             )}
 
-            <button
-              type="button"
-              onClick={() => onDelete(event)}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-red-50 py-3 font-black text-red-500 hover:bg-red-100"
-            >
-              <Trash2 size={16} /> Delete Event
-            </button>
+            {!event._isBirthday && (
+              <button
+                type="button"
+                onClick={() => onDelete(event)}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-red-50 py-3 font-black text-red-500 hover:bg-red-100"
+              >
+                <Trash2 size={16} /> Delete Event
+              </button>
+            )}
           </div>
         )}
       </DialogContent>

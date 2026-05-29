@@ -104,6 +104,9 @@ model FamilyMember {
   householdId Int
   name        String   @db.VarChar(255)
   age         Int
+  birthdayMonth Int?
+  birthdayDay   Int?
+  lastBirthdayAgeUpdateYear Int?
   role        String   @default("child") @db.VarChar(64)
   avatar      String   @default("🧒") @db.VarChar(32)
   color       String   @default("#a78bfa") @db.VarChar(32)
