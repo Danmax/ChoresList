@@ -45,7 +45,8 @@ export default function KidWishlistPage() {
       fetch(`/api/wishlist?memberId=${memberId}`),
     ]);
     if (mRes.ok) {
-      const members: Member[] = await mRes.json();
+      const data = await mRes.json();
+      const members: Member[] = Array.isArray(data) ? data : Array.isArray(data?.members) ? data.members : [];
       setMember(members.find((m) => m.id === memberId) ?? null);
     }
     if (wRes.ok) setItems(await wRes.json());

@@ -8,6 +8,12 @@ type BirthdayInput = {
   birthdayDay?: unknown;
 };
 
+const ADULT_ROLES = new Set(["mom", "dad", "parent"]);
+
+function cleanRole(value: unknown) {
+  return typeof value === "string" && ADULT_ROLES.has(value) ? value : "child";
+}
+
 function cleanInt(value: unknown) {
   const n = Number(value);
   return Number.isFinite(n) ? Math.round(n) : null;
@@ -75,7 +81,7 @@ async function syncBirthdayAges(householdId: number) {
 }
 
 export const GET = withErrors(async (req: NextRequest) => {
-  const { householdId } = requireSession(req);
+  const { householdId, parentId, email } = requireSession(req);
   await syncBirthdayAges(householdId);
   const members = await prisma.familyMember.findMany({
     where: { householdId },
@@ -86,7 +92,10 @@ export const GET = withErrors(async (req: NextRequest) => {
     },
     orderBy: { name: "asc" },
   });
-  return NextResponse.json(members);
+  return NextResponse.json({
+    members,
+    currentParent: { id: parentId, email },
+  });
 });
 
 export const POST = withErrors(async (req: NextRequest) => {
@@ -100,7 +109,7 @@ export const POST = withErrors(async (req: NextRequest) => {
       age: body.age,
       ...birthday,
       lastBirthdayAgeUpdateYear: birthdayAgeUpdateYear(birthday.birthdayMonth, birthday.birthdayDay),
-      role: body.role ?? "child",
+      role: cleanRole(body.role),
       avatar: body.avatar ?? "🧒",
       color: body.color ?? "#a78bfa",
     },
@@ -112,6 +121,13 @@ export const PUT = withErrors(async (req: NextRequest) => {
   const { householdId } = await requireParentSession(req);
   const body = await req.json();
   const { id } = body;
+  const existing = await prisma.familyMember.findFirst({ where: { id, householdId }, select: { role: true } });
+  if (!existing) return NextResponse.json({ error: "Member not found" }, { status: 404 });
+  const role = body.role !== undefined
+    ? existing.role === "child"
+      ? "child"
+      : cleanRole(body.role)
+    : undefined;
   const level = body.totalPoints !== undefined ? getLevelFromPoints(body.totalPoints) : undefined;
   const birthday = body.birthdayMonth !== undefined || body.birthdayDay !== undefined ? birthdayFields(body) : undefined;
   const member = await prisma.familyMember.update({
@@ -119,7 +135,7 @@ export const PUT = withErrors(async (req: NextRequest) => {
     data: {
       ...(body.name !== undefined && { name: body.name }),
       ...(body.age !== undefined && { age: body.age }),
-      ...(body.role !== undefined && { role: body.role }),
+      ...(role !== undefined && { role }),
       ...(birthday !== undefined && {
         ...birthday,
         lastBirthdayAgeUpdateYear: birthdayAgeUpdateYear(birthday.birthdayMonth, birthday.birthdayDay),

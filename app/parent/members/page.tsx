@@ -29,6 +29,22 @@ interface Member {
   level: number;
 }
 
+type MembersResponse = Member[] | { members?: Member[]; currentParent?: { id: number; email: string } };
+
+function membersFromResponse(data: unknown) {
+  if (Array.isArray(data)) return data as Member[];
+  if (data && typeof data === "object" && "members" in data && Array.isArray((data as { members?: unknown }).members)) {
+    return (data as { members: Member[] }).members;
+  }
+  return null;
+}
+
+function currentParentEmailFromResponse(data: unknown) {
+  if (!data || typeof data !== "object" || !("currentParent" in data)) return "";
+  const currentParent = (data as { currentParent?: { email?: unknown } }).currentParent;
+  return typeof currentParent?.email === "string" ? currentParent.email : "";
+}
+
 type SavedMember = Member & { id: number };
 
 const MONTH_OPTIONS = [
@@ -81,6 +97,7 @@ function nextDateForMonthly() {
 
 export default function MembersPage() {
   const [members, setMembers] = useState<Member[]>([]);
+  const [currentParentEmail, setCurrentParentEmail] = useState("");
   const [editing, setEditing] = useState<Partial<Member> | null>(null);
   const [open, setOpen] = useState(false);
   const [loadError, setLoadError] = useState("");
@@ -91,7 +108,8 @@ export default function MembersPage() {
     try {
       const res = await fetch("/api/members");
       const data = await res.json().catch(() => null);
-      if (!res.ok || !Array.isArray(data)) {
+      const nextMembers = membersFromResponse(data);
+      if (!res.ok || !nextMembers) {
         const message =
           data && typeof data === "object" && "error" in data && typeof data.error === "string"
             ? data.error
@@ -101,7 +119,8 @@ export default function MembersPage() {
         return;
       }
       setLoadError("");
-      setMembers(data);
+      setMembers(nextMembers);
+      setCurrentParentEmail(currentParentEmailFromResponse(data));
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : "Could not load members");
       setMembers([]);
@@ -270,6 +289,9 @@ export default function MembersPage() {
                 {ROLE_OPTIONS.find((r) => r.value === m.role)?.label ?? m.role}
                 {m.role === "child" || m.role === "parent" ? ` • Age ${m.age}` : ""}
               </p>
+              {m.role !== "child" && currentParentEmail && (
+                <p className="text-slate-400 text-xs font-bold">Signed in as {currentParentEmail}</p>
+              )}
               {birthdayLabel(m) && (
                 <p className="text-slate-400 text-xs font-bold">🎂 {birthdayLabel(m)}</p>
               )}
@@ -323,9 +345,10 @@ export default function MembersPage() {
               <div>
                 <Label className="font-bold mb-2 block">Who is this?</Label>
                 <div className="grid grid-cols-2 gap-2">
-                  {ROLE_OPTIONS.map((r) => (
+                  {(editing.id && editing.role === "child" ? ROLE_OPTIONS.filter((r) => r.value === "child") : ROLE_OPTIONS).map((r) => (
                     <button
                       key={r.value}
+                      disabled={Boolean(editing.id && editing.role === "child" && r.value !== "child")}
                       onClick={() => setEditing((p) => ({ ...p!, role: r.value }))}
                       className={`py-2 px-3 rounded-xl font-bold text-sm transition-all border-2 ${
                         editing.role === r.value
@@ -337,6 +360,12 @@ export default function MembersPage() {
                     </button>
                   ))}
                 </div>
+                {editing.id && editing.role === "child" && (
+                  <p className="mt-2 text-xs font-bold text-slate-400">Child profiles stay child profiles. Invite adults from the Parent Panel for parent account access.</p>
+                )}
+                {!editing.id && editing.role !== "child" && (
+                  <p className="mt-2 text-xs font-bold text-slate-400">This creates an adult family profile only. Parent login access is added with Invite Family.</p>
+                )}
               </div>
 
               <div>

@@ -45,8 +45,9 @@ export default function AssignPage() {
       cRes.json().catch(() => []),
       aRes.json().catch(() => []),
     ]);
-    if (!Array.isArray(membersData)) toast.error(membersData.error ?? "Could not load members");
-    setMembers(Array.isArray(membersData) ? membersData : []);
+    const nextMembers = Array.isArray(membersData) ? membersData : Array.isArray(membersData?.members) ? membersData.members : [];
+    if (!Array.isArray(membersData) && !Array.isArray(membersData?.members)) toast.error(membersData.error ?? "Could not load members");
+    setMembers(nextMembers);
     setChores(Array.isArray(choresData) ? choresData : []);
     setAssignments(Array.isArray(assignmentsData) ? assignmentsData : []);
   }, []);

@@ -34,7 +34,7 @@ export default function ParentWishlistPage() {
     if (wRes.ok) setItems(await wRes.json());
     if (mRes.ok) {
       const data = await mRes.json().catch(() => []);
-      setMembers(Array.isArray(data) ? data : []);
+      setMembers(Array.isArray(data) ? data : Array.isArray(data?.members) ? data.members : []);
     }
   }, []);
 

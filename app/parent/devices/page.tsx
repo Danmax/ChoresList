@@ -45,7 +45,10 @@ export default function DevicesPage() {
       fetch("/api/members"),
       fetch("/api/parent/devices"),
     ]);
-    if (membersRes.ok) setMembers(await membersRes.json());
+    if (membersRes.ok) {
+      const data = await membersRes.json();
+      setMembers(Array.isArray(data) ? data : Array.isArray(data?.members) ? data.members : []);
+    }
     if (devicesRes.ok) setDevices(await devicesRes.json());
   }, []);
 

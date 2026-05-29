@@ -284,8 +284,9 @@ function CalendarContent() {
     ]);
     setEvents(await eventsRes.json());
     if (membersRes.ok) {
-      const members = await membersRes.json();
-      setBirthdayMembers(Array.isArray(members) ? members : []);
+      const data = await membersRes.json();
+      const members = Array.isArray(data) ? data : Array.isArray(data?.members) ? data.members : [];
+      setBirthdayMembers(members);
     }
   }, [month, year]);
 

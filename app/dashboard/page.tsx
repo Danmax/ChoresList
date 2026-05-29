@@ -37,7 +37,8 @@ export default function FamilyDashboard() {
     try {
       const res = await fetch("/api/members");
       const data = await res.json().catch(() => null);
-      if (!res.ok || !Array.isArray(data)) {
+      const nextMembers = Array.isArray(data) ? data : Array.isArray(data?.members) ? data.members : null;
+      if (!res.ok || !nextMembers) {
         setAuthRequired(res.status === 401);
         const msg = (data && typeof data === "object" && "error" in data && typeof data.error === "string")
           ? data.error
@@ -48,7 +49,7 @@ export default function FamilyDashboard() {
       }
       setAuthRequired(false);
       setApiError(null);
-      setMembers(data);
+      setMembers(nextMembers);
     } catch (e) {
       setAuthRequired(false);
       setApiError(e instanceof Error ? e.message : String(e));
