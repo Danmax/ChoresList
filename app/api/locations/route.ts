@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withErrors } from "@/lib/api";
+import { rateLimit } from "@/lib/rate-limit";
 
 type NominatimAddress = {
   house_number?: string;
@@ -33,6 +34,9 @@ function compactAddress(place: NominatimPlace) {
 }
 
 export const GET = withErrors(async (req: NextRequest) => {
+  const limited = rateLimit(req, { key: "location-lookup", limit: 60, windowMs: 60_000 });
+  if (limited) return limited;
+
   const query = req.nextUrl.searchParams.get("q")?.trim() ?? "";
   if (query.length < 4) return NextResponse.json({ results: [] });
 

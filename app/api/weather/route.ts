@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withErrors } from "@/lib/api";
+import { rateLimit } from "@/lib/rate-limit";
 
 type GeocodeResult = {
   name: string;
@@ -35,6 +36,9 @@ function conditionFromCode(code: number) {
 }
 
 export const GET = withErrors(async (req: NextRequest) => {
+  const limited = rateLimit(req, { key: "weather", limit: 60, windowMs: 60_000 });
+  if (limited) return limited;
+
   const query = req.nextUrl.searchParams.get("q")?.trim() ?? "";
   if (query.length < 2) {
     return NextResponse.json({ error: "Enter a city or ZIP code." }, { status: 400 });

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { AuthError } from "@/lib/auth-error";
+import { AuthError, ForbiddenError } from "@/lib/auth-error";
 import { parentSession, verifySessionToken, type SessionPayload } from "@/lib/session";
 import { ElevationRequiredError, requireElevation } from "@/lib/elevation";
+import { prisma } from "@/lib/prisma";
 
 export { AuthError };
 
@@ -51,5 +52,17 @@ export function authErrorResponse(error: unknown) {
 export async function requireParentSession(req: NextRequest): Promise<SessionPayload> {
   const session = requireSession(req);
   await requireElevation(req, session.parentId, session.householdId);
+  return session;
+}
+
+export async function requireOwnerSession(req: NextRequest): Promise<SessionPayload> {
+  const session = await requireParentSession(req);
+  const parent = await prisma.parentAccount.findFirst({
+    where: { id: session.parentId, householdId: session.householdId },
+    select: { accountRole: true },
+  });
+  if (!parent || parent.accountRole !== "owner") {
+    throw new ForbiddenError("Only the household owner can do that");
+  }
   return session;
 }

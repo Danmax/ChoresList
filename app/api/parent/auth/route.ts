@@ -92,6 +92,7 @@ export const POST = withErrors(async (req: NextRequest) => {
             passwordHash,
             passwordSalt,
             householdId: invite.householdId,
+            accountRole: "parent",
             confirmationTokens: {
               create: { tokenHash, expiresAt },
             },
@@ -126,8 +127,10 @@ export const POST = withErrors(async (req: NextRequest) => {
       needsConfirmation: true,
       message: emailResult.sent
         ? GENERIC_SIGNUP_MESSAGE
-        : "Account created. SMTP is not configured, so use the development confirmation link.",
-      confirmUrl: emailResult.sent ? undefined : confirmUrl.toString(),
+        : process.env.NODE_ENV === "production"
+          ? GENERIC_SIGNUP_MESSAGE
+          : "Account created. SMTP is not configured, so use the development confirmation link.",
+      confirmUrl: !emailResult.sent && process.env.NODE_ENV !== "production" ? confirmUrl.toString() : undefined,
     });
   }
 

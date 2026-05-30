@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireParentSession, withErrors } from "@/lib/api";
+import { requireOwnerSession, requireParentSession, withErrors } from "@/lib/api";
 import { parentSession } from "@/lib/session";
 
 const TIME_ZONES = new Set([
@@ -35,15 +35,20 @@ export const GET = withErrors(async (req: NextRequest) => {
         },
       },
     }),
-    prisma.parentAccount.findUnique({ where: { id: parentId }, select: { email: true } }),
+    prisma.parentAccount.findUnique({ where: { id: parentId }, select: { email: true, accountRole: true } }),
   ]);
 
   if (!household) return NextResponse.json({ error: "Household not found" }, { status: 404 });
-  return NextResponse.json({ ...household, parentEmail: parent?.email ?? "" });
+  return NextResponse.json({
+    ...household,
+    parentEmail: parent?.email ?? "",
+    accountRole: parent?.accountRole ?? "parent",
+    canManageHousehold: parent?.accountRole === "owner",
+  });
 });
 
 export const PUT = withErrors(async (req: NextRequest) => {
-  const { householdId } = await requireParentSession(req);
+  const { householdId } = await requireOwnerSession(req);
   const body = await req.json();
   const name = typeof body.name === "string" ? body.name.trim() : "";
   if (!name) return NextResponse.json({ error: "Family name is required" }, { status: 400 });
@@ -84,7 +89,7 @@ export const PUT = withErrors(async (req: NextRequest) => {
 });
 
 export const DELETE = withErrors(async (req: NextRequest) => {
-  const { householdId } = await requireParentSession(req);
+  const { householdId } = await requireOwnerSession(req);
   const body = await req.json();
   if (body.confirm !== "DELETE") {
     return NextResponse.json({ error: "Type DELETE to confirm account deletion" }, { status: 400 });

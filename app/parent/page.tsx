@@ -176,7 +176,11 @@ export default function ParentPanel() {
         setNotice("");
         setError("");
       } else {
-        setError(data.error ?? "Could not create invite link.");
+        setError(
+          data.needsPin
+            ? "Unlock the parent PIN in a parent section, then come back to create an invite."
+            : data.error ?? "Could not create invite link."
+        );
       }
     } catch {
       setError("Could not create invite link.");

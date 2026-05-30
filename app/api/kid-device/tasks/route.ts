@@ -102,54 +102,5 @@ export const POST = withErrors(async (req: NextRequest) => {
   const session = await verifyDevice(req);
   if (!session) return NextResponse.json({ error: "Device access revoked" }, { status: 401 });
 
-  const body = await req.json();
-  const memberId = Number(body.memberId);
-  const choreId = Number(body.choreId);
-
-  if (!Number.isInteger(memberId) || memberId <= 0) {
-    return NextResponse.json({ error: "Choose a child" }, { status: 400 });
-  }
-  if (!Number.isInteger(choreId) || choreId <= 0) {
-    return NextResponse.json({ error: "Choose a task" }, { status: 400 });
-  }
-  if (session.mode === "member" && session.memberId !== memberId) {
-    return NextResponse.json({ error: "This device can only add tasks for its paired child" }, { status: 403 });
-  }
-
-  const [member, chore] = await Promise.all([
-    prisma.familyMember.findFirst({
-      where: { id: memberId, householdId: session.householdId, role: "child" },
-      select: { id: true },
-    }),
-    prisma.chore.findFirst({
-      where: { id: choreId, householdId: session.householdId },
-      select: { id: true },
-    }),
-  ]);
-  if (!member || !chore) return NextResponse.json({ error: "Child or task not found" }, { status: 404 });
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const assignment = await prisma.choreAssignment.create({
-    data: {
-      householdId: session.householdId,
-      memberId,
-      choreId,
-      frequency: "one-time",
-      dueDate: today,
-    },
-    include: {
-      chore: { include: { instructions: true } },
-      member: { select: { id: true, name: true, avatar: true, color: true, totalPoints: true, level: true } },
-      completions: true,
-    },
-  });
-
-  await prisma.householdDevice.update({
-    where: { id: session.deviceId },
-    data: { lastSeenAt: new Date() },
-  });
-
-  return NextResponse.json(assignment, { status: 201 });
+  return NextResponse.json({ error: "Add tasks from the parent panel" }, { status: 403 });
 });

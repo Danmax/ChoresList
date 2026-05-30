@@ -53,7 +53,9 @@ export const POST = withErrors(async (req: NextRequest) => {
     needsConfirmation: true,
     message: emailResult.sent
       ? "Confirmation email sent."
-      : "SMTP is not configured, so use the development confirmation link.",
-    confirmUrl: emailResult.sent ? undefined : confirmUrl.toString(),
+      : process.env.NODE_ENV === "production"
+        ? "Confirmation email sent."
+        : "SMTP is not configured, so use the development confirmation link.",
+    confirmUrl: !emailResult.sent && process.env.NODE_ENV !== "production" ? confirmUrl.toString() : undefined,
   });
 });

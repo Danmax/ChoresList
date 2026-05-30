@@ -54,7 +54,7 @@ export const POST = withErrors(async (req: NextRequest) => {
 
   return NextResponse.json({
     ok: true,
-    resetUrl: emailResult.sent ? undefined : resetUrl.toString(),
+    resetUrl: !emailResult.sent && process.env.NODE_ENV !== "production" ? resetUrl.toString() : undefined,
   });
 });
 

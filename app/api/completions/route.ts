@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { calcPointsEarned, getLevelFromPoints } from "@/lib/points";
 import { getWeekStart } from "@/lib/allowance";
@@ -18,6 +19,13 @@ export const POST = withErrors(async (req: NextRequest) => {
   const memberId = assignment.memberId;
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
+  const existingCompletion = await prisma.taskCompletion.findFirst({
+    where: { assignmentId, householdId, completedAt: { gte: todayStart } },
+    select: { id: true },
+  });
+  if (existingCompletion) {
+    return NextResponse.json({ error: "Task already completed today" }, { status: 409 });
+  }
 
   const dailyAssignments = await prisma.choreAssignment.findMany({
     where: { householdId, memberId, isActive: true, frequency: "daily" },
@@ -30,25 +38,36 @@ export const POST = withErrors(async (req: NextRequest) => {
   const pts = calcPointsEarned(assignment.chore.pointsValue, !!withPhoto, allDone);
   const weekStart = getWeekStart();
 
-  const completion = await prisma.taskCompletion.create({
-    data: { householdId, assignmentId, memberId, pointsEarned: pts, weekStartDate: weekStart },
-  });
+  try {
+    const completion = await prisma.$transaction(async (tx) => {
+      const created = await tx.taskCompletion.create({
+        data: { householdId, assignmentId, memberId, completionDate: todayStart, pointsEarned: pts, weekStartDate: weekStart },
+      });
 
-  const member = await prisma.familyMember.findUnique({ where: { id: memberId, householdId } });
-  if (member) {
-    const newPoints = member.totalPoints + pts;
-    await prisma.familyMember.update({
-      where: { id: memberId, householdId },
-      data: { totalPoints: newPoints, level: getLevelFromPoints(newPoints) },
+      const member = await tx.familyMember.findUnique({ where: { id: memberId, householdId } });
+      if (member) {
+        const newPoints = member.totalPoints + pts;
+        await tx.familyMember.update({
+          where: { id: memberId, householdId },
+          data: { totalPoints: newPoints, level: getLevelFromPoints(newPoints) },
+        });
+        await tx.weeklyAllowance.upsert({
+          where: { memberId_weekStart: { memberId, weekStart } },
+          create: { householdId, memberId, weekStart, pointsEarned: pts, amountEarned: 0 },
+          update: { pointsEarned: { increment: pts } },
+        });
+      }
+
+      return created;
     });
-    await prisma.weeklyAllowance.upsert({
-      where: { memberId_weekStart: { memberId, weekStart } },
-      create: { householdId, memberId, weekStart, pointsEarned: pts, amountEarned: 0 },
-      update: { pointsEarned: { increment: pts } },
-    });
+
+    return NextResponse.json({ completion, pointsEarned: pts }, { status: 201 });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return NextResponse.json({ error: "Task already completed today" }, { status: 409 });
+    }
+    throw error;
   }
-
-  return NextResponse.json({ completion, pointsEarned: pts }, { status: 201 });
 });
 
 export const GET = withErrors(async (req: NextRequest) => {

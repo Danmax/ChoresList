@@ -5,3 +5,11 @@ export class AuthError extends Error {
     super(message);
   }
 }
+
+export class ForbiddenError extends AuthError {
+  status = 403;
+
+  constructor(message = "You do not have permission to do that") {
+    super(message);
+  }
+}

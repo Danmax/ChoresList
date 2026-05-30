@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getLevelFromPoints } from "@/lib/points";
 import { requireParentSession, requireSession, withErrors } from "@/lib/api";
 
 type BirthdayInput = {
@@ -14,9 +13,26 @@ function cleanRole(value: unknown) {
   return typeof value === "string" && ADULT_ROLES.has(value) ? value : "child";
 }
 
+function cleanAdultRole(value: unknown, fallback: string) {
+  return typeof value === "string" && ADULT_ROLES.has(value) ? value : fallback;
+}
+
+function cleanName(value: unknown) {
+  return typeof value === "string" ? value.trim().slice(0, 80) : "";
+}
+
 function cleanInt(value: unknown) {
   const n = Number(value);
   return Number.isFinite(n) ? Math.round(n) : null;
+}
+
+function cleanAge(value: unknown) {
+  const n = cleanInt(value);
+  return n === null ? null : Math.min(120, Math.max(0, n));
+}
+
+function cleanShortText(value: unknown, fallback: string, max = 32) {
+  return typeof value === "string" && value.trim() ? value.trim().slice(0, max) : fallback;
 }
 
 function validBirthday(month: number | null, day: number | null) {
@@ -101,17 +117,22 @@ export const GET = withErrors(async (req: NextRequest) => {
 export const POST = withErrors(async (req: NextRequest) => {
   const { householdId } = await requireParentSession(req);
   const body = await req.json();
+  const name = cleanName(body.name);
+  const age = cleanAge(body.age);
+  if (!name || age === null) {
+    return NextResponse.json({ error: "Name and age are required" }, { status: 400 });
+  }
   const birthday = birthdayFields(body);
   const member = await prisma.familyMember.create({
     data: {
       householdId,
-      name: body.name,
-      age: body.age,
+      name,
+      age,
       ...birthday,
       lastBirthdayAgeUpdateYear: birthdayAgeUpdateYear(birthday.birthdayMonth, birthday.birthdayDay),
       role: cleanRole(body.role),
-      avatar: body.avatar ?? "🧒",
-      color: body.color ?? "#a78bfa",
+      avatar: cleanShortText(body.avatar, "🧒"),
+      color: cleanShortText(body.color, "#a78bfa"),
     },
   });
   return NextResponse.json(member, { status: 201 });
@@ -126,24 +147,29 @@ export const PUT = withErrors(async (req: NextRequest) => {
   const role = body.role !== undefined
     ? existing.role === "child"
       ? "child"
-      : cleanRole(body.role)
+      : cleanAdultRole(body.role, existing.role)
     : undefined;
-  const level = body.totalPoints !== undefined ? getLevelFromPoints(body.totalPoints) : undefined;
+  const name = body.name !== undefined ? cleanName(body.name) : undefined;
+  const age = body.age !== undefined ? cleanAge(body.age) : undefined;
+  if (name !== undefined && !name) {
+    return NextResponse.json({ error: "Name is required" }, { status: 400 });
+  }
+  if (age === null) {
+    return NextResponse.json({ error: "Age must be a number" }, { status: 400 });
+  }
   const birthday = body.birthdayMonth !== undefined || body.birthdayDay !== undefined ? birthdayFields(body) : undefined;
   const member = await prisma.familyMember.update({
     where: { id, householdId },
     data: {
-      ...(body.name !== undefined && { name: body.name }),
-      ...(body.age !== undefined && { age: body.age }),
+      ...(name !== undefined && { name }),
+      ...(age !== undefined && { age }),
       ...(role !== undefined && { role }),
       ...(birthday !== undefined && {
         ...birthday,
         lastBirthdayAgeUpdateYear: birthdayAgeUpdateYear(birthday.birthdayMonth, birthday.birthdayDay),
       }),
-      ...(body.avatar !== undefined && { avatar: body.avatar }),
-      ...(body.color !== undefined && { color: body.color }),
-      ...(body.totalPoints !== undefined && { totalPoints: body.totalPoints }),
-      ...(level !== undefined && { level }),
+      ...(body.avatar !== undefined && { avatar: cleanShortText(body.avatar, "🧒") }),
+      ...(body.color !== undefined && { color: cleanShortText(body.color, "#a78bfa") }),
     },
   });
   return NextResponse.json(member);

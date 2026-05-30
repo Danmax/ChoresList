@@ -17,6 +17,7 @@ model ParentAccount {
   passwordSalt  String   @db.VarChar(255)
   pinHash       String?  @db.VarChar(255)
   pinSalt       String?  @db.VarChar(255)
+  accountRole   String   @default("owner") @db.VarChar(32)
   emailVerified Boolean  @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @default(now()) @updatedAt
@@ -169,6 +170,7 @@ model TaskCompletion {
   assignmentId     Int
   memberId         Int
   completedAt      DateTime @default(now())
+  completionDate   DateTime @default(now())
   photoBeforePath  String?
   photoAfterPath   String?
   pointsEarned     Int      @default(0)
@@ -178,6 +180,8 @@ model TaskCompletion {
   assignment ChoreAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   member     FamilyMember    @relation(fields: [memberId], references: [id], onDelete: Cascade)
   household  Household       @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@unique([assignmentId, completionDate])
 }
 
 model SkillCategory {

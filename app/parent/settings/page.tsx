@@ -21,6 +21,8 @@ type Settings = {
   name: string;
   timeZone: string;
   parentEmail: string;
+  accountRole: string;
+  canManageHousehold: boolean;
   googleCalendarEnabled: boolean;
   googleCalendarId: string;
   googleCalendarSyncAssignments: boolean;
@@ -45,6 +47,8 @@ const DEFAULT_SETTINGS: Settings = {
   name: "",
   timeZone: "America/New_York",
   parentEmail: "",
+  accountRole: "parent",
+  canManageHousehold: false,
   googleCalendarEnabled: false,
   googleCalendarId: "",
   googleCalendarSyncAssignments: false,
@@ -66,6 +70,7 @@ export default function ParentSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const canManage = settings.canManageHousehold;
   const connection = settings.googleCalendarConnection;
   const calendarStatus = connection?.syncStatus ?? "not connected";
   const lastSync = connection?.lastSyncAt
@@ -97,6 +102,10 @@ export default function ParentSettingsPage() {
   }
 
   async function save() {
+    if (!canManage) {
+      toast.error("Only the household owner can save household settings");
+      return;
+    }
     setSaving(true);
     try {
       const res = await fetch("/api/parent/settings", {
@@ -117,6 +126,10 @@ export default function ParentSettingsPage() {
   }
 
   async function deleteAccount() {
+    if (!canManage) {
+      toast.error("Only the household owner can delete the household");
+      return;
+    }
     if (deleteConfirm !== "DELETE") {
       toast.error("Type DELETE to confirm");
       return;
@@ -157,20 +170,30 @@ export default function ParentSettingsPage() {
           </Link>
           <div>
             <h1 className="text-2xl font-black text-slate-800 sm:text-3xl">Household Settings</h1>
-            <p className="text-sm font-semibold text-slate-500">{settings.parentEmail}</p>
+            <p className="text-sm font-semibold text-slate-500">
+              {settings.parentEmail} · {settings.accountRole === "owner" ? "Owner" : "Parent"}
+            </p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={save}
-          disabled={saving}
-          className="flex w-fit items-center gap-2 rounded-2xl bg-violet-500 px-4 py-2.5 font-black text-white transition-colors hover:bg-violet-600 disabled:opacity-40"
-        >
-          <Save size={18} /> {saving ? "Saving..." : "Save"}
-        </button>
+        {canManage && (
+          <button
+            type="button"
+            onClick={save}
+            disabled={saving}
+            className="flex w-fit items-center gap-2 rounded-2xl bg-violet-500 px-4 py-2.5 font-black text-white transition-colors hover:bg-violet-600 disabled:opacity-40"
+          >
+            <Save size={18} /> {saving ? "Saving..." : "Save"}
+          </button>
+        )}
       </div>
 
       <div className="space-y-5">
+        {!canManage && (
+          <section className="rounded-3xl bg-amber-50 p-5 text-sm font-bold text-amber-800">
+            You can view household settings, but only the household owner can change shared settings or delete the household.
+          </section>
+        )}
+
         <section className="rounded-3xl bg-white p-5 shadow-sm">
           <h2 className="mb-4 font-black text-slate-800">Family</h2>
           <div className="grid gap-4 md:grid-cols-2">
@@ -179,6 +202,7 @@ export default function ParentSettingsPage() {
               <input
                 value={settings.name}
                 onChange={(event) => update("name", event.target.value)}
+                disabled={!canManage}
                 className="mt-1 w-full rounded-2xl border-2 border-slate-100 bg-slate-50 px-3 py-2 font-semibold text-slate-800 outline-none focus:border-violet-300"
               />
             </label>
@@ -187,6 +211,7 @@ export default function ParentSettingsPage() {
               <select
                 value={settings.timeZone}
                 onChange={(event) => update("timeZone", event.target.value)}
+                disabled={!canManage}
                 className="mt-1 w-full rounded-2xl border-2 border-slate-100 bg-slate-50 px-3 py-2 font-semibold text-slate-800 outline-none focus:border-violet-300"
               >
                 {TIME_ZONES.map((zone) => (
@@ -205,26 +230,29 @@ export default function ParentSettingsPage() {
             <h2 className="font-black text-slate-800">Google Calendar</h2>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
-            <Toggle label="Enable Google Calendar integration" checked={settings.googleCalendarEnabled} onChange={(value) => update("googleCalendarEnabled", value)} />
-            <Toggle label="Sync chore assignments" checked={settings.googleCalendarSyncAssignments} onChange={(value) => update("googleCalendarSyncAssignments", value)} />
-            <Toggle label="Sync family calendar events" checked={settings.googleCalendarSyncEvents} onChange={(value) => update("googleCalendarSyncEvents", value)} />
+            <Toggle label="Enable Google Calendar integration" checked={settings.googleCalendarEnabled} disabled={!canManage} onChange={(value) => update("googleCalendarEnabled", value)} />
+            <Toggle label="Sync chore assignments" checked={settings.googleCalendarSyncAssignments} disabled={!canManage} onChange={(value) => update("googleCalendarSyncAssignments", value)} />
+            <Toggle label="Sync family calendar events" checked={settings.googleCalendarSyncEvents} disabled={!canManage} onChange={(value) => update("googleCalendarSyncEvents", value)} />
             <label className="block">
               <span className="text-sm font-bold text-slate-600">Google calendar ID</span>
               <input
                 value={settings.googleCalendarId}
                 onChange={(event) => update("googleCalendarId", event.target.value)}
+                disabled={!canManage}
                 placeholder="primary or family-calendar-id"
                 className="mt-1 w-full rounded-2xl border-2 border-slate-100 bg-slate-50 px-3 py-2 font-semibold text-slate-800 outline-none focus:border-orange-300"
               />
             </label>
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <a
-              href="/api/google-calendar/connect"
-              className="inline-flex min-h-10 items-center justify-center rounded-2xl bg-slate-900 px-4 py-2 text-sm font-black text-white shadow-sm"
-            >
-              {connection ? "Reconnect Google Calendar" : "Connect Google Calendar"}
-            </a>
+            {canManage && (
+              <a
+                href="/api/google-calendar/connect"
+                className="inline-flex min-h-10 items-center justify-center rounded-2xl bg-slate-900 px-4 py-2 text-sm font-black text-white shadow-sm"
+              >
+                {connection ? "Reconnect Google Calendar" : "Connect Google Calendar"}
+              </a>
+            )}
             <span
               className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide ${
                 calendarStatus === "synced" || calendarStatus === "connected"
@@ -251,9 +279,9 @@ export default function ParentSettingsPage() {
             <h2 className="font-black text-slate-800">Email Notifications</h2>
           </div>
           <div className="grid gap-3 md:grid-cols-3">
-            <Toggle label="Enable email notifications" checked={settings.emailNotificationsEnabled} onChange={(value) => update("emailNotificationsEnabled", value)} />
-            <Toggle label="Daily summary" checked={settings.emailDailySummary} onChange={(value) => update("emailDailySummary", value)} />
-            <Toggle label="Weekly report" checked={settings.emailWeeklyReport} onChange={(value) => update("emailWeeklyReport", value)} />
+            <Toggle label="Enable email notifications" checked={settings.emailNotificationsEnabled} disabled={!canManage} onChange={(value) => update("emailNotificationsEnabled", value)} />
+            <Toggle label="Daily summary" checked={settings.emailDailySummary} disabled={!canManage} onChange={(value) => update("emailDailySummary", value)} />
+            <Toggle label="Weekly report" checked={settings.emailWeeklyReport} disabled={!canManage} onChange={(value) => update("emailWeeklyReport", value)} />
           </div>
         </section>
 
@@ -265,14 +293,14 @@ export default function ParentSettingsPage() {
             <h2 className="font-black text-slate-800">Privacy</h2>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
-            <Toggle label="Show points on kid screens" checked={settings.privacyShowKidPoints} onChange={(value) => update("privacyShowKidPoints", value)} />
-            <Toggle label="Allow kids to add wish list items" checked={settings.privacyAllowKidWishlist} onChange={(value) => update("privacyAllowKidWishlist", value)} />
-            <Toggle label="Store completion photos" checked={settings.privacyStoreCompletionPhotos} onChange={(value) => update("privacyStoreCompletionPhotos", value)} />
-            <Toggle label="Opt in to product analytics" checked={settings.privacyAnalyticsOptIn} onChange={(value) => update("privacyAnalyticsOptIn", value)} />
+            <Toggle label="Show points on kid screens" checked={settings.privacyShowKidPoints} disabled={!canManage} onChange={(value) => update("privacyShowKidPoints", value)} />
+            <Toggle label="Allow kids to add wish list items" checked={settings.privacyAllowKidWishlist} disabled={!canManage} onChange={(value) => update("privacyAllowKidWishlist", value)} />
+            <Toggle label="Store completion photos" checked={settings.privacyStoreCompletionPhotos} disabled={!canManage} onChange={(value) => update("privacyStoreCompletionPhotos", value)} />
+            <Toggle label="Opt in to product analytics" checked={settings.privacyAnalyticsOptIn} disabled={!canManage} onChange={(value) => update("privacyAnalyticsOptIn", value)} />
           </div>
         </section>
 
-        <section className="rounded-3xl border-2 border-red-100 bg-white p-5 shadow-sm">
+        {canManage && <section className="rounded-3xl border-2 border-red-100 bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center gap-3">
             <div className="rounded-2xl bg-red-100 p-3 text-red-600">
               <Trash2 size={22} />
@@ -300,19 +328,20 @@ export default function ParentSettingsPage() {
               <Trash2 size={18} /> {deleting ? "Deleting..." : "Delete Account"}
             </button>
           </div>
-        </section>
+        </section>}
       </div>
     </div>
   );
 }
 
-function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
+function Toggle({ label, checked, disabled = false, onChange }: { label: string; checked: boolean; disabled?: boolean; onChange: (value: boolean) => void }) {
   return (
     <label className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-3">
       <span className="text-sm font-bold text-slate-700">{label}</span>
       <input
         type="checkbox"
         checked={checked}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.checked)}
         className="h-5 w-5 accent-violet-500"
       />

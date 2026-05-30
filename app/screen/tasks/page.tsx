@@ -360,13 +360,6 @@ export default function TaskScreenPage() {
               </button>
               <button
                 type="button"
-                onClick={openTaskPicker}
-                className="flex items-center gap-2 rounded-2xl bg-emerald-100 px-4 py-2 text-sm font-black text-emerald-700 transition-colors hover:bg-emerald-200"
-              >
-                <ListPlus size={16} /> Add Task
-              </button>
-              <button
-                type="button"
                 onClick={installApp}
                 className="flex items-center gap-2 rounded-2xl bg-blue-100 px-4 py-2 text-sm font-black text-blue-700 transition-colors hover:bg-blue-200"
               >
