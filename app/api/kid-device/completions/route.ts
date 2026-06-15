@@ -5,6 +5,7 @@ import { withErrors } from "@/lib/api";
 import { getWeekStart } from "@/lib/allowance";
 import { calcPointsEarned, getLevelFromPoints } from "@/lib/points";
 import { hashDeviceSecret, requireDeviceSession } from "@/lib/device-session";
+import { COMPLETION_EMOJIS } from "@/types";
 
 async function verifyDevice(req: NextRequest) {
   const session = requireDeviceSession(req);
@@ -26,6 +27,9 @@ export const POST = withErrors(async (req: NextRequest) => {
 
   const body = await req.json();
   const assignmentId = Number(body.assignmentId);
+  const reactionEmoji = typeof body.reactionEmoji === "string" && COMPLETION_EMOJIS.includes(body.reactionEmoji)
+    ? body.reactionEmoji
+    : null;
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
@@ -67,6 +71,7 @@ export const POST = withErrors(async (req: NextRequest) => {
           assignmentId: assignment.id,
           memberId: assignment.memberId,
           completionDate: todayStart,
+          reactionEmoji,
           pointsEarned,
           weekStartDate: weekStart,
         },

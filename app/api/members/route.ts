@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireParentSession, requireSession, withErrors } from "@/lib/api";
+import { childAccessWhere } from "@/lib/child-access";
 
 type BirthdayInput = {
   birthdayMonth?: unknown;
@@ -8,13 +9,20 @@ type BirthdayInput = {
 };
 
 const ADULT_ROLES = new Set(["mom", "dad", "parent"]);
+const MEMBER_ROLES = new Set(["child", "young-adult", "mom", "dad", "parent"]);
+const RELATIONSHIPS = new Set(["child", "step-child", "adopted-child", "foster-child", "young-adult", "other"]);
+const FAMILY_BRANCHES = new Set(["primary", "mom-side", "dad-side", "shared", "blended", "guardian"]);
 
 function cleanRole(value: unknown) {
-  return typeof value === "string" && ADULT_ROLES.has(value) ? value : "child";
+  return typeof value === "string" && MEMBER_ROLES.has(value) ? value : "child";
 }
 
 function cleanAdultRole(value: unknown, fallback: string) {
   return typeof value === "string" && ADULT_ROLES.has(value) ? value : fallback;
+}
+
+function cleanChildProfileRole(value: unknown, fallback: string) {
+  return value === "young-adult" || value === "child" ? value : fallback;
 }
 
 function cleanName(value: unknown) {
@@ -33,6 +41,18 @@ function cleanAge(value: unknown) {
 
 function cleanShortText(value: unknown, fallback: string, max = 32) {
   return typeof value === "string" && value.trim() ? value.trim().slice(0, max) : fallback;
+}
+
+function cleanOptionalText(value: unknown, max = 255) {
+  return typeof value === "string" && value.trim() ? value.trim().slice(0, max) : null;
+}
+
+function cleanRelationship(value: unknown, fallback = "child") {
+  return typeof value === "string" && RELATIONSHIPS.has(value) ? value : fallback;
+}
+
+function cleanFamilyBranch(value: unknown) {
+  return typeof value === "string" && FAMILY_BRANCHES.has(value) ? value : "primary";
 }
 
 function validBirthday(month: number | null, day: number | null) {
@@ -99,8 +119,22 @@ async function syncBirthdayAges(householdId: number) {
 export const GET = withErrors(async (req: NextRequest) => {
   const { householdId, parentId, email } = requireSession(req);
   await syncBirthdayAges(householdId);
+  const currentParent = await prisma.parentAccount.findFirst({
+    where: { id: parentId, householdId },
+    select: {
+      id: true,
+      email: true,
+      accountRole: true,
+      displayName: true,
+      parentType: true,
+      relationshipLabel: true,
+      childAccessMode: true,
+      childAccessMemberIds: true,
+    },
+  });
+  const accessWhere = await childAccessWhere(parentId, householdId);
   const members = await prisma.familyMember.findMany({
-    where: { householdId },
+    where: { householdId, ...accessWhere },
     include: {
       assignments: { where: { isActive: true }, include: { chore: true, completions: true } },
       skills: { include: { skill: true } },
@@ -110,7 +144,7 @@ export const GET = withErrors(async (req: NextRequest) => {
   });
   return NextResponse.json({
     members,
-    currentParent: { id: parentId, email },
+    currentParent: currentParent ?? { id: parentId, email },
   });
 });
 
@@ -131,6 +165,10 @@ export const POST = withErrors(async (req: NextRequest) => {
       ...birthday,
       lastBirthdayAgeUpdateYear: birthdayAgeUpdateYear(birthday.birthdayMonth, birthday.birthdayDay),
       role: cleanRole(body.role),
+      relationshipToHousehold: cleanRelationship(body.relationshipToHousehold, cleanRole(body.role) === "young-adult" ? "young-adult" : "child"),
+      familyBranch: cleanFamilyBranch(body.familyBranch),
+      custodySchedule: cleanOptionalText(body.custodySchedule, 128),
+      familyNotes: cleanOptionalText(body.familyNotes, 255),
       avatar: cleanShortText(body.avatar, "🧒"),
       color: cleanShortText(body.color, "#a78bfa"),
     },
@@ -145,8 +183,8 @@ export const PUT = withErrors(async (req: NextRequest) => {
   const existing = await prisma.familyMember.findFirst({ where: { id, householdId }, select: { role: true } });
   if (!existing) return NextResponse.json({ error: "Member not found" }, { status: 404 });
   const role = body.role !== undefined
-    ? existing.role === "child"
-      ? "child"
+    ? existing.role === "child" || existing.role === "young-adult"
+      ? cleanChildProfileRole(body.role, existing.role)
       : cleanAdultRole(body.role, existing.role)
     : undefined;
   const name = body.name !== undefined ? cleanName(body.name) : undefined;
@@ -164,6 +202,10 @@ export const PUT = withErrors(async (req: NextRequest) => {
       ...(name !== undefined && { name }),
       ...(age !== undefined && { age }),
       ...(role !== undefined && { role }),
+      ...(body.relationshipToHousehold !== undefined && { relationshipToHousehold: cleanRelationship(body.relationshipToHousehold, existing.role === "young-adult" ? "young-adult" : "child") }),
+      ...(body.familyBranch !== undefined && { familyBranch: cleanFamilyBranch(body.familyBranch) }),
+      ...(body.custodySchedule !== undefined && { custodySchedule: cleanOptionalText(body.custodySchedule, 128) }),
+      ...(body.familyNotes !== undefined && { familyNotes: cleanOptionalText(body.familyNotes, 255) }),
       ...(birthday !== undefined && {
         ...birthday,
         lastBirthdayAgeUpdateYear: birthdayAgeUpdateYear(birthday.birthdayMonth, birthday.birthdayDay),

@@ -119,6 +119,10 @@ export const POST = withErrors(async (req: NextRequest) => {
           data: {
             householdId: invite.householdId,
             accountRole: invite.accountRole,
+            parentType: invite.parentType,
+            relationshipLabel: invite.relationshipLabel ?? null,
+            childAccessMode: invite.childAccessMode,
+            childAccessMemberIds: invite.childAccessMode === "selected" ? invite.childAccessMemberIds : [],
           },
         });
       }
@@ -142,6 +146,10 @@ export const POST = withErrors(async (req: NextRequest) => {
             passwordSalt,
             householdId: invite.householdId,
             accountRole: invite.accountRole,
+            parentType: invite.parentType,
+            relationshipLabel: invite.relationshipLabel ?? null,
+            childAccessMode: invite.childAccessMode,
+            childAccessMemberIds: invite.childAccessMode === "selected" ? invite.childAccessMemberIds : [],
             confirmationTokens: {
               create: { tokenHash, expiresAt },
             },

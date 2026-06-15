@@ -1,19 +1,46 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { ArrowLeft, Plus, Trash2, Save, ClipboardList, Sparkles } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Save, ClipboardList, Sparkles, UserPlus, Copy } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { AVATAR_OPTIONS, KID_COLORS, PARENT_AVATARS, STARTER_CHORE_TEMPLATES_BY_AGE, type StarterChoreFrequency, type StarterChoreTemplate } from "@/types";
+import { AVATAR_OPTIONS, KID_COLORS, STARTER_CHORE_TEMPLATES_BY_AGE, type StarterChoreFrequency, type StarterChoreTemplate } from "@/types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 const ROLE_OPTIONS = [
   { value: "child", label: "👦 Child" },
-  { value: "mom", label: "👩 Mom" },
-  { value: "dad", label: "👨 Dad" },
-  { value: "parent", label: "🧑 Parent" },
+  { value: "young-adult", label: "🧑 Young Adult" },
+];
+
+const PARENT_TYPE_OPTIONS = [
+  { value: "mom", label: "Mom" },
+  { value: "dad", label: "Dad" },
+  { value: "parent", label: "Parent" },
+  { value: "stepmom", label: "Step Mom" },
+  { value: "stepdad", label: "Step Dad" },
+  { value: "guardian", label: "Guardian" },
+  { value: "grandparent", label: "Grandparent" },
+  { value: "other", label: "Other" },
+];
+
+const RELATIONSHIP_OPTIONS = [
+  { value: "child", label: "Child" },
+  { value: "step-child", label: "Step Child" },
+  { value: "adopted-child", label: "Adopted Child" },
+  { value: "foster-child", label: "Foster Child" },
+  { value: "young-adult", label: "Young Adult" },
+  { value: "other", label: "Other" },
+];
+
+const FAMILY_BRANCH_OPTIONS = [
+  { value: "primary", label: "Primary Household" },
+  { value: "mom-side", label: "Mom Side" },
+  { value: "dad-side", label: "Dad Side" },
+  { value: "shared", label: "Shared Custody" },
+  { value: "blended", label: "Blended Family" },
+  { value: "guardian", label: "Guardian Care" },
 ];
 
 interface Member {
@@ -23,13 +50,28 @@ interface Member {
   birthdayMonth?: number | null;
   birthdayDay?: number | null;
   role: string;
+  relationshipToHousehold?: string;
+  familyBranch?: string;
+  custodySchedule?: string | null;
+  familyNotes?: string | null;
   avatar: string;
   color: string;
   totalPoints: number;
   level: number;
 }
 
-type MembersResponse = Member[] | { members?: Member[]; currentParent?: { id: number; email: string } };
+type ParentProfile = {
+  id: number;
+  email: string;
+  accountRole?: string;
+  displayName?: string | null;
+  parentType?: string;
+  relationshipLabel?: string | null;
+  childAccessMode?: string;
+  childAccessMemberIds?: number[] | null;
+};
+
+type MembersResponse = Member[] | { members?: Member[]; currentParent?: ParentProfile };
 
 function membersFromResponse(data: unknown) {
   if (Array.isArray(data)) return data as Member[];
@@ -39,10 +81,10 @@ function membersFromResponse(data: unknown) {
   return null;
 }
 
-function currentParentEmailFromResponse(data: unknown) {
-  if (!data || typeof data !== "object" || !("currentParent" in data)) return "";
+function currentParentFromResponse(data: unknown) {
+  if (!data || typeof data !== "object" || !("currentParent" in data)) return null;
   const currentParent = (data as { currentParent?: { email?: unknown } }).currentParent;
-  return typeof currentParent?.email === "string" ? currentParent.email : "";
+  return currentParent && typeof currentParent.email === "string" ? currentParent as ParentProfile : null;
 }
 
 type SavedMember = Member & { id: number };
@@ -97,7 +139,18 @@ function nextDateForMonthly() {
 
 export default function MembersPage() {
   const [members, setMembers] = useState<Member[]>([]);
-  const [currentParentEmail, setCurrentParentEmail] = useState("");
+  const [currentParent, setCurrentParent] = useState<ParentProfile | null>(null);
+  const [profileDraft, setProfileDraft] = useState<Partial<ParentProfile>>({});
+  const [inviteDraft, setInviteDraft] = useState({
+    accountRole: "parent",
+    parentType: "parent",
+    relationshipLabel: "",
+    childAccessMode: "all",
+    childAccessMemberIds: [] as number[],
+  });
+  const [inviteUrl, setInviteUrl] = useState("");
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [creatingInvite, setCreatingInvite] = useState(false);
   const [editing, setEditing] = useState<Partial<Member> | null>(null);
   const [open, setOpen] = useState(false);
   const [loadError, setLoadError] = useState("");
@@ -120,7 +173,9 @@ export default function MembersPage() {
       }
       setLoadError("");
       setMembers(nextMembers);
-      setCurrentParentEmail(currentParentEmailFromResponse(data));
+      const parent = currentParentFromResponse(data);
+      setCurrentParent(parent);
+      if (parent) setProfileDraft(parent);
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : "Could not load members");
       setMembers([]);
@@ -130,7 +185,19 @@ export default function MembersPage() {
   useEffect(() => { load(); }, [load]);
 
   function openNew() {
-    setEditing({ name: "", age: 8, birthdayMonth: null, birthdayDay: null, role: "child", avatar: "🧒", color: KID_COLORS[0] });
+    setEditing({
+      name: "",
+      age: 8,
+      birthdayMonth: null,
+      birthdayDay: null,
+      role: "child",
+      relationshipToHousehold: "child",
+      familyBranch: "primary",
+      custodySchedule: "",
+      familyNotes: "",
+      avatar: "🧒",
+      color: KID_COLORS[0],
+    });
     setAssignStarter(true);
     setStarterSelection(defaultStarterSelection(8));
     setOpen(true);
@@ -241,7 +308,7 @@ export default function MembersPage() {
         toast.error(member.error ?? "Could not add member");
         return;
       }
-      if (assignStarter && editing.role === "child") {
+      if (assignStarter && (editing.role === "child" || editing.role === "young-adult")) {
         await assignStarterTasks(member);
         toast.success("Member added with starter chores!");
       } else {
@@ -259,6 +326,56 @@ export default function MembersPage() {
     load();
   }
 
+  async function saveParentProfile() {
+    setSavingProfile(true);
+    try {
+      const res = await fetch("/api/parent/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(profileDraft),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error ?? "Could not save parent profile");
+        return;
+      }
+      setCurrentParent(data);
+      setProfileDraft(data);
+      toast.success("Parent profile updated");
+    } finally {
+      setSavingProfile(false);
+    }
+  }
+
+  async function createInvite() {
+    setCreatingInvite(true);
+    try {
+      const res = await fetch("/api/parent/invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(inviteDraft),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.inviteUrl) {
+        toast.error(data.error ?? "Could not create invite");
+        return;
+      }
+      setInviteUrl(data.inviteUrl);
+      toast.success("Invite link created");
+    } finally {
+      setCreatingInvite(false);
+    }
+  }
+
+  function toggleInviteChild(id: number) {
+    setInviteDraft((previous) => ({
+      ...previous,
+      childAccessMemberIds: previous.childAccessMemberIds.includes(id)
+        ? previous.childAccessMemberIds.filter((memberId) => memberId !== id)
+        : [...previous.childAccessMemberIds, id],
+    }));
+  }
+
   return (
     <div className="min-h-screen p-4 sm:p-6">
       <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -274,6 +391,144 @@ export default function MembersPage() {
         </button>
       </div>
 
+      <div className="mb-6 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className="rounded-3xl bg-white p-5 shadow-sm">
+          <div className="mb-4">
+            <p className="text-lg font-black text-slate-800">Your Parent Account</p>
+            <p className="text-sm font-semibold text-slate-400">
+              {currentParent?.email} · {currentParent?.accountRole === "owner" ? "Owner" : currentParent?.accountRole === "grandparent" ? "Grandparent" : "Parent"}
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <Label className="font-bold">Display Name</Label>
+              <Input
+                value={profileDraft.displayName ?? ""}
+                onChange={(event) => setProfileDraft((previous) => ({ ...previous, displayName: event.target.value }))}
+                placeholder="How family sees you"
+                className="mt-1 rounded-xl"
+              />
+            </div>
+            <div>
+              <Label className="font-bold">Type</Label>
+              <select
+                value={profileDraft.parentType ?? "parent"}
+                onChange={(event) => setProfileDraft((previous) => ({ ...previous, parentType: event.target.value }))}
+                className="mt-1 h-10 w-full rounded-xl border border-input bg-transparent px-3 py-2 text-sm font-semibold text-slate-800 outline-none focus:border-violet-300"
+              >
+                {PARENT_TYPE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="sm:col-span-2">
+              <Label className="font-bold">Relationship Notes</Label>
+              <Input
+                value={profileDraft.relationshipLabel ?? ""}
+                onChange={(event) => setProfileDraft((previous) => ({ ...previous, relationshipLabel: event.target.value }))}
+                placeholder="Example: Dad, Step Mom, Grandma on Mom's side"
+                className="mt-1 rounded-xl"
+              />
+            </div>
+          </div>
+          <button
+            onClick={saveParentProfile}
+            disabled={savingProfile}
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-violet-500 py-3 font-black text-white transition-colors hover:bg-violet-600 disabled:bg-slate-200"
+          >
+            <Save size={18} /> {savingProfile ? "Saving" : "Save Parent Account"}
+          </button>
+        </div>
+
+        <div className="rounded-3xl bg-white p-5 shadow-sm">
+          <div className="mb-4">
+            <p className="text-lg font-black text-slate-800">Invite Spouse or Grandparent</p>
+            <p className="text-sm font-semibold text-slate-400">Link another adult account and choose child access.</p>
+          </div>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setInviteDraft((previous) => ({ ...previous, accountRole: "parent", parentType: previous.parentType === "grandparent" ? "parent" : previous.parentType }))}
+                className={`rounded-xl px-3 py-2 text-sm font-black ${inviteDraft.accountRole === "parent" ? "bg-violet-100 text-violet-700 ring-2 ring-violet-300" : "bg-slate-50 text-slate-500"}`}
+              >
+                Spouse / Parent
+              </button>
+              <button
+                type="button"
+                onClick={() => setInviteDraft((previous) => ({ ...previous, accountRole: "grandparent", parentType: "grandparent" }))}
+                className={`rounded-xl px-3 py-2 text-sm font-black ${inviteDraft.accountRole === "grandparent" ? "bg-violet-100 text-violet-700 ring-2 ring-violet-300" : "bg-slate-50 text-slate-500"}`}
+              >
+                Grandparent
+              </button>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <select
+                value={inviteDraft.parentType}
+                onChange={(event) => setInviteDraft((previous) => ({ ...previous, parentType: event.target.value }))}
+                className="h-10 rounded-xl border border-input bg-transparent px-3 py-2 text-sm font-semibold text-slate-800 outline-none focus:border-violet-300"
+              >
+                {PARENT_TYPE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+              <select
+                value={inviteDraft.childAccessMode}
+                onChange={(event) => setInviteDraft((previous) => ({ ...previous, childAccessMode: event.target.value }))}
+                className="h-10 rounded-xl border border-input bg-transparent px-3 py-2 text-sm font-semibold text-slate-800 outline-none focus:border-violet-300"
+              >
+                <option value="all">All children</option>
+                <option value="selected">Selected children</option>
+                <option value="none">No child task access</option>
+              </select>
+            </div>
+            <Input
+              value={inviteDraft.relationshipLabel}
+              onChange={(event) => setInviteDraft((previous) => ({ ...previous, relationshipLabel: event.target.value }))}
+              placeholder="Relationship label, like Spouse, Grandma, Co-parent"
+              className="rounded-xl"
+            />
+            {inviteDraft.childAccessMode === "selected" && (
+              <div className="rounded-2xl bg-slate-50 p-3">
+                <p className="mb-2 text-xs font-black uppercase text-slate-400">Child Access</p>
+                <div className="flex flex-wrap gap-2">
+                  {members.filter((member) => member.role === "child" || member.role === "young-adult").map((member) => (
+                    <button
+                      key={member.id}
+                      type="button"
+                      onClick={() => toggleInviteChild(member.id)}
+                      className={`rounded-xl px-3 py-2 text-sm font-black ${inviteDraft.childAccessMemberIds.includes(member.id) ? "bg-violet-100 text-violet-700 ring-2 ring-violet-300" : "bg-white text-slate-500"}`}
+                    >
+                      {member.avatar} {member.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <button
+              onClick={createInvite}
+              disabled={creatingInvite}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 py-3 font-black text-white transition-colors hover:bg-emerald-600 disabled:bg-slate-200"
+            >
+              <UserPlus size={18} /> {creatingInvite ? "Creating" : "Create Invite Link"}
+            </button>
+            {inviteUrl && (
+              <button
+                type="button"
+                onClick={async () => {
+                  await navigator.clipboard.writeText(inviteUrl);
+                  toast.success("Invite copied");
+                }}
+                className="flex w-full items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-left text-xs font-bold text-slate-500"
+              >
+                <Copy size={16} className="shrink-0" />
+                <span className="truncate">{inviteUrl}</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {members.map((m) => (
           <div
@@ -287,10 +542,13 @@ export default function MembersPage() {
               <p className="font-black text-slate-800 text-lg">{m.name}</p>
               <p className="text-slate-400 font-semibold text-sm capitalize">
                 {ROLE_OPTIONS.find((r) => r.value === m.role)?.label ?? m.role}
-                {m.role === "child" || m.role === "parent" ? ` • Age ${m.age}` : ""}
+                {m.role === "child" || m.role === "young-adult" ? ` • Age ${m.age}` : ""}
               </p>
-              {m.role !== "child" && currentParentEmail && (
-                <p className="text-slate-400 text-xs font-bold">Signed in as {currentParentEmail}</p>
+              {(m.relationshipToHousehold || m.familyBranch) && (
+                <p className="text-slate-400 text-xs font-bold">
+                  {RELATIONSHIP_OPTIONS.find((option) => option.value === m.relationshipToHousehold)?.label ?? m.relationshipToHousehold}
+                  {m.familyBranch && ` · ${FAMILY_BRANCH_OPTIONS.find((option) => option.value === m.familyBranch)?.label ?? m.familyBranch}`}
+                </p>
               )}
               {birthdayLabel(m) && (
                 <p className="text-slate-400 text-xs font-bold">🎂 {birthdayLabel(m)}</p>
@@ -345,11 +603,14 @@ export default function MembersPage() {
               <div>
                 <Label className="font-bold mb-2 block">Who is this?</Label>
                 <div className="grid grid-cols-2 gap-2">
-                  {(editing.id && editing.role === "child" ? ROLE_OPTIONS.filter((r) => r.value === "child") : ROLE_OPTIONS).map((r) => (
+                  {ROLE_OPTIONS.map((r) => (
                     <button
                       key={r.value}
-                      disabled={Boolean(editing.id && editing.role === "child" && r.value !== "child")}
-                      onClick={() => setEditing((p) => ({ ...p!, role: r.value }))}
+                      onClick={() => setEditing((p) => ({
+                        ...p!,
+                        role: r.value,
+                        relationshipToHousehold: r.value === "young-adult" ? "young-adult" : p?.relationshipToHousehold ?? "child",
+                      }))}
                       className={`py-2 px-3 rounded-xl font-bold text-sm transition-all border-2 ${
                         editing.role === r.value
                           ? "bg-violet-100 border-violet-400 text-violet-700"
@@ -360,12 +621,7 @@ export default function MembersPage() {
                     </button>
                   ))}
                 </div>
-                {editing.id && editing.role === "child" && (
-                  <p className="mt-2 text-xs font-bold text-slate-400">Child profiles stay child profiles. Invite adults from the Parent Panel for parent account access.</p>
-                )}
-                {!editing.id && editing.role !== "child" && (
-                  <p className="mt-2 text-xs font-bold text-slate-400">This creates an adult family profile only. Parent login access is added with Invite Family.</p>
-                )}
+                <p className="mt-2 text-xs font-bold text-slate-400">Adults should be invited as linked parent or grandparent accounts above.</p>
               </div>
 
               <div>
@@ -373,12 +629,12 @@ export default function MembersPage() {
                 <Input
                   value={editing.name ?? ""}
                   onChange={(e) => setEditing((p) => ({ ...p!, name: e.target.value }))}
-                  placeholder={editing.role === "mom" ? "Mom's name" : editing.role === "dad" ? "Dad's name" : "Child's name"}
+                  placeholder={editing.role === "young-adult" ? "Young adult's name" : "Child's name"}
                   className="rounded-xl mt-1"
                 />
               </div>
 
-              {(editing.role === "child" || editing.role === "parent") && (
+              {(editing.role === "child" || editing.role === "young-adult") && (
                 <div className="space-y-3">
                   <div>
                     <Label className="font-bold">Age</Label>
@@ -431,7 +687,54 @@ export default function MembersPage() {
                 </div>
               )}
 
-              {!editing.id && editing.role === "child" && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <Label className="font-bold">Relationship</Label>
+                  <select
+                    value={editing.relationshipToHousehold ?? (editing.role === "young-adult" ? "young-adult" : "child")}
+                    onChange={(event) => setEditing((p) => ({ ...p!, relationshipToHousehold: event.target.value }))}
+                    className="mt-1 h-10 w-full rounded-xl border border-input bg-transparent px-3 py-2 text-sm font-semibold text-slate-800 outline-none focus:border-violet-300"
+                  >
+                    {RELATIONSHIP_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label className="font-bold">Family Setup</Label>
+                  <select
+                    value={editing.familyBranch ?? "primary"}
+                    onChange={(event) => setEditing((p) => ({ ...p!, familyBranch: event.target.value }))}
+                    className="mt-1 h-10 w-full rounded-xl border border-input bg-transparent px-3 py-2 text-sm font-semibold text-slate-800 outline-none focus:border-violet-300"
+                  >
+                    {FAMILY_BRANCH_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <Label className="font-bold">Blended Family / Custody Schedule</Label>
+                <Input
+                  value={editing.custodySchedule ?? ""}
+                  onChange={(event) => setEditing((p) => ({ ...p!, custodySchedule: event.target.value }))}
+                  placeholder="Example: Week on/week off, summers, weekends"
+                  className="mt-1 rounded-xl"
+                />
+              </div>
+
+              <div>
+                <Label className="font-bold">Family Notes</Label>
+                <Input
+                  value={editing.familyNotes ?? ""}
+                  onChange={(event) => setEditing((p) => ({ ...p!, familyNotes: event.target.value }))}
+                  placeholder="Example: Shared household, step sibling, guardian notes"
+                  className="mt-1 rounded-xl"
+                />
+              </div>
+
+              {!editing.id && (editing.role === "child" || editing.role === "young-adult") && (
                 <div className="rounded-2xl bg-violet-50 p-3">
                   <label className="flex items-center gap-2">
                     <input
@@ -508,10 +811,7 @@ export default function MembersPage() {
               <div>
                 <Label className="font-bold mb-2 block">Avatar</Label>
                 <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-1 rounded-xl border border-slate-100 bg-slate-50">
-                  {(editing.role === "mom" || editing.role === "dad" || editing.role === "parent"
-                    ? PARENT_AVATARS
-                    : AVATAR_OPTIONS
-                  ).map((a) => (
+                  {AVATAR_OPTIONS.map((a) => (
                     <button
                       key={a}
                       onClick={() => setEditing((p) => ({ ...p!, avatar: a }))}

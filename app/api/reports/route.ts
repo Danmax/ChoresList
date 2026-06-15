@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSession, withErrors } from "@/lib/api";
+import { childAccessWhere } from "@/lib/child-access";
 
 function weekStart(date: Date): Date {
   const d = new Date(date);
@@ -15,7 +16,7 @@ function weekLabel(date: Date): string {
 }
 
 export const GET = withErrors(async (req: NextRequest) => {
-  const { householdId } = requireSession(req);
+  const { householdId, parentId } = requireSession(req);
   const { searchParams } = new URL(req.url);
   const range = searchParams.get("range") ?? "month";
 
@@ -29,10 +30,11 @@ export const GET = withErrors(async (req: NextRequest) => {
     startDate = weekStart(new Date(now.getTime() - 84 * 24 * 60 * 60 * 1000));
   }
 
+  const memberAccessWhere = await childAccessWhere(parentId, householdId);
   const [members, completions, assignments] = await Promise.all([
-    prisma.familyMember.findMany({ where: { householdId }, orderBy: { totalPoints: "desc" } }),
+    prisma.familyMember.findMany({ where: { householdId, ...memberAccessWhere }, orderBy: { totalPoints: "desc" } }),
     prisma.taskCompletion.findMany({
-      where: { householdId, completedAt: { gte: startDate } },
+      where: { householdId, member: memberAccessWhere, completedAt: { gte: startDate } },
       include: {
         member: { select: { id: true, name: true, color: true, avatar: true } },
         assignment: { include: { chore: { select: { name: true, icon: true, category: true } } } },
@@ -40,7 +42,7 @@ export const GET = withErrors(async (req: NextRequest) => {
       orderBy: { completedAt: "asc" },
     }),
     prisma.choreAssignment.findMany({
-      where: { householdId, isActive: true },
+      where: { householdId, isActive: true, member: memberAccessWhere },
       include: { chore: { select: { name: true, icon: true, category: true } } },
     }),
   ]);

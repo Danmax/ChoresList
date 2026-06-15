@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { WISH_CATEGORIES, WISH_EMOJIS } from "@/types";
+import { COMPLETION_EMOJIS, WISH_CATEGORIES, WISH_EMOJIS } from "@/types";
 
 type Device = {
   id: number;
@@ -41,7 +41,7 @@ type Assignment = {
       safetyNotes: string;
     } | null;
   };
-  completions: { id: number; completedAt: string }[];
+  completions: { id: number; completedAt: string; reactionEmoji?: string | null }[];
 };
 
 type ChoreGuide = {
@@ -94,6 +94,7 @@ export default function TaskScreenPage() {
   const [photoType, setPhotoType] = useState<"before" | "after">("before");
   const [activeCompletionId, setActiveCompletionId] = useState<number | null>(null);
   const [activeGuide, setActiveGuide] = useState<ChoreGuide | null>(null);
+  const [reactionAssignment, setReactionAssignment] = useState<Assignment | null>(null);
 
   const load = useCallback(async () => {
     const [sessionRes, tasksRes] = await Promise.all([
@@ -148,13 +149,14 @@ export default function TaskScreenPage() {
     return { done, total: assignments.length, open: assignments.length - done };
   }, [assignments]);
 
-  async function markDone(assignment: Assignment) {
+  async function markDone(assignment: Assignment, reactionEmoji: string) {
     setCompletingId(assignment.id);
+    setReactionAssignment(null);
     try {
       const res = await fetch("/api/kid-device/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assignmentId: assignment.id }),
+        body: JSON.stringify({ assignmentId: assignment.id, reactionEmoji }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -417,6 +419,7 @@ export default function TaskScreenPage() {
               <tbody className="divide-y divide-slate-100">
                 {visibleAssignments.map((assignment) => {
                   const done = assignment.completions.length > 0;
+                  const reactionEmoji = assignment.completions[0]?.reactionEmoji;
                   return (
                     <tr key={assignment.id} className={done ? "bg-emerald-50/50 text-slate-400" : "text-slate-800"}>
                       {device?.mode !== "member" && (
@@ -466,14 +469,14 @@ export default function TaskScreenPage() {
                         <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-black ${
                           done ? "bg-emerald-100 text-emerald-600" : "bg-amber-100 text-amber-700"
                         }`}>
-                          {done && <CheckCircle2 size={15} />} {done ? "Done" : "Open"}
+                          {done && (reactionEmoji ? <span>{reactionEmoji}</span> : <CheckCircle2 size={15} />)} {done ? "Done" : "Open"}
                         </span>
                       </td>
                       <td className="px-4 py-4 text-right">
                         <button
                           type="button"
                           disabled={done || completingId === assignment.id}
-                          onClick={() => markDone(assignment)}
+                          onClick={() => setReactionAssignment(assignment)}
                           className="inline-flex min-w-28 items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-5 py-3 text-base font-black text-white transition-colors hover:bg-emerald-600 disabled:bg-slate-200 disabled:text-slate-400"
                         >
                           <CheckCircle2 size={19} />
@@ -759,6 +762,31 @@ export default function TaskScreenPage() {
           >
             Skip for now
           </button>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!reactionAssignment} onOpenChange={(open) => !open && setReactionAssignment(null)}>
+        <DialogContent className="max-w-sm rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="font-black">How did it go?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm font-semibold text-slate-500">
+            Pick an emoji for {reactionAssignment?.chore.name}.
+          </p>
+          <div className="grid grid-cols-4 gap-2">
+            {COMPLETION_EMOJIS.map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                disabled={!reactionAssignment || completingId === reactionAssignment.id}
+                onClick={() => reactionAssignment && markDone(reactionAssignment, emoji)}
+                className="rounded-2xl bg-slate-50 p-3 text-3xl transition-all hover:scale-105 hover:bg-emerald-50 disabled:opacity-50"
+                aria-label={`Complete with ${emoji}`}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
         </DialogContent>
       </Dialog>
 

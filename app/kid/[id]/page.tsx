@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import Link from "next/link";
+import { COMPLETION_EMOJIS } from "@/types";
 
 interface Chore {
   id: number;
@@ -31,7 +32,7 @@ interface Assignment {
   frequency: string;
   dueDate: string | null;
   chore: Chore;
-  completions: { id: number; completedAt: string }[];
+  completions: { id: number; completedAt: string; reactionEmoji?: string | null }[];
 }
 
 interface Member {
@@ -60,6 +61,7 @@ export default function KidPage() {
   const [projects, setProjects] = useState<{id:number;title:string;emoji:string;rewardTitle:string;rewardEmoji:string;pointsBonus:number;status:string}[]>([]);
   const [earnedTicket, setEarnedTicket] = useState<{rewardTitle:string;rewardEmoji:string;projectTitle:string} | null>(null);
   const [ticketCelebration, setTicketCelebration] = useState(false);
+  const [reactionAssignment, setReactionAssignment] = useState<Assignment | null>(null);
 
   const loadData = useCallback(async () => {
     const [membersRes, assignRes, projRes] = await Promise.all([
@@ -92,13 +94,19 @@ export default function KidPage() {
     loadData();
   }, [loadData]);
 
-  async function markDone(assignment: Assignment) {
+  async function markDone(assignment: Assignment, reactionEmoji: string) {
+    setReactionAssignment(null);
     const res = await fetch("/api/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ assignmentId: assignment.id, memberId: parseInt(id) }),
+      body: JSON.stringify({ assignmentId: assignment.id, memberId: parseInt(id), reactionEmoji }),
     });
     const data = await res.json();
+    if (!res.ok) {
+      toast.error(data.error ?? "Could not complete task");
+      await loadData();
+      return;
+    }
     setCelebratePoints(data.pointsEarned);
     setTimeout(() => setCelebratePoints(null), 3000);
     await loadData();
@@ -217,6 +225,7 @@ export default function KidPage() {
             <div className="space-y-3">
               {chores.map((assignment) => {
                 const done = assignment.completions.length > 0;
+                const reactionEmoji = assignment.completions[0]?.reactionEmoji;
                 const hasInstructions = !!assignment.chore.instructions;
 
                 return (
@@ -263,14 +272,14 @@ export default function KidPage() {
                         )}
                         {!done ? (
                           <button
-                            onClick={() => markDone(assignment)}
+                            onClick={() => setReactionAssignment(assignment)}
                             className="bg-emerald-400 hover:bg-emerald-500 text-white rounded-xl px-4 py-2 font-bold text-sm transition-colors flex items-center gap-1"
                           >
                             <CheckCircle2 size={16} /> Done!
                           </button>
                         ) : (
                           <div className="bg-emerald-100 text-emerald-600 rounded-xl px-4 py-2 font-bold text-sm flex items-center gap-1">
-                            <CheckCircle2 size={16} /> Done ✓
+                            {reactionEmoji ? <span>{reactionEmoji}</span> : <CheckCircle2 size={16} />} Done ✓
                           </div>
                         )}
                       </div>
@@ -331,7 +340,7 @@ export default function KidPage() {
                   <button
                     onClick={() => {
                       setShowInstructions(false);
-                      markDone(selectedChore!);
+                      setReactionAssignment(selectedChore);
                     }}
                     className="flex-1 bg-emerald-500 text-white rounded-xl py-2 font-bold"
                   >
@@ -373,6 +382,31 @@ export default function KidPage() {
               <p className="text-sm">Ask a parent to add a guide!</p>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!reactionAssignment} onOpenChange={(open) => !open && setReactionAssignment(null)}>
+        <DialogContent className="max-w-sm rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="font-black">How did it go?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm font-semibold text-slate-500">
+            Pick an emoji for {reactionAssignment?.chore.name}.
+          </p>
+          <div className="grid grid-cols-4 gap-2">
+            {COMPLETION_EMOJIS.map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                disabled={!reactionAssignment}
+                onClick={() => reactionAssignment && markDone(reactionAssignment, emoji)}
+                className="rounded-2xl bg-slate-50 p-3 text-3xl transition-all hover:scale-105 hover:bg-emerald-50 disabled:opacity-50"
+                aria-label={`Complete with ${emoji}`}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
         </DialogContent>
       </Dialog>
 

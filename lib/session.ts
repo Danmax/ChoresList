@@ -17,6 +17,10 @@ export type HouseholdAccountRole = "owner" | "parent" | "grandparent";
 export type HouseholdInvitePayload = {
   householdId: number;
   accountRole: Exclude<HouseholdAccountRole, "owner">;
+  parentType: string;
+  relationshipLabel?: string;
+  childAccessMode: string;
+  childAccessMemberIds?: number[];
   expiresAt: number;
 };
 
@@ -100,16 +104,46 @@ function cleanHouseholdInviteRole(value: unknown): Exclude<HouseholdAccountRole,
   return value === "grandparent" ? "grandparent" : "parent";
 }
 
-export function createHouseholdInviteToken(
-  householdId: number,
-  accountRole: Exclude<HouseholdAccountRole, "owner"> = "parent"
-) {
+function cleanInviteText(value: unknown, fallback: string, max = 128) {
+  return typeof value === "string" && value.trim() ? value.trim().slice(0, max) : fallback;
+}
+
+function cleanChildAccessMode(value: unknown) {
+  return value === "selected" || value === "none" ? value : "all";
+}
+
+function cleanChildAccessMemberIds(value: unknown) {
+  return Array.isArray(value)
+    ? Array.from(new Set(value.map(Number).filter((id) => Number.isInteger(id) && id > 0)))
+    : [];
+}
+
+export function createHouseholdInviteToken({
+  householdId,
+  accountRole = "parent",
+  parentType,
+  relationshipLabel,
+  childAccessMode,
+  childAccessMemberIds,
+}: {
+  householdId: number;
+  accountRole?: Exclude<HouseholdAccountRole, "owner">;
+  parentType?: string;
+  relationshipLabel?: string;
+  childAccessMode?: string;
+  childAccessMemberIds?: number[];
+}) {
   const expiresAt = Math.floor(Date.now() / 1000) + INVITE_TTL_SECONDS;
+  const mode = cleanChildAccessMode(childAccessMode);
   const payload = Buffer.from(
     JSON.stringify({
       purpose: "household-invite",
       householdId,
       accountRole: cleanHouseholdInviteRole(accountRole),
+      parentType: cleanInviteText(parentType, accountRole === "grandparent" ? "grandparent" : "parent", 64),
+      relationshipLabel: cleanInviteText(relationshipLabel, "", 128),
+      childAccessMode: mode,
+      childAccessMemberIds: mode === "selected" ? cleanChildAccessMemberIds(childAccessMemberIds) : [],
       expiresAt,
     })
   ).toString("base64url");
@@ -134,6 +168,10 @@ export function verifyHouseholdInviteToken(token?: string): HouseholdInvitePaylo
       purpose?: string;
       householdId?: unknown;
       accountRole?: unknown;
+      parentType?: unknown;
+      relationshipLabel?: unknown;
+      childAccessMode?: unknown;
+      childAccessMemberIds?: unknown;
       expiresAt?: unknown;
     };
     if (
@@ -147,6 +185,10 @@ export function verifyHouseholdInviteToken(token?: string): HouseholdInvitePaylo
     return {
       householdId: parsed.householdId,
       accountRole: cleanHouseholdInviteRole(parsed.accountRole),
+      parentType: cleanInviteText(parsed.parentType, cleanHouseholdInviteRole(parsed.accountRole) === "grandparent" ? "grandparent" : "parent", 64),
+      relationshipLabel: cleanInviteText(parsed.relationshipLabel, "", 128) || undefined,
+      childAccessMode: cleanChildAccessMode(parsed.childAccessMode),
+      childAccessMemberIds: cleanChildAccessMemberIds(parsed.childAccessMemberIds),
       expiresAt: parsed.expiresAt,
     };
   } catch {

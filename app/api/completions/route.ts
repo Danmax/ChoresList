@@ -4,11 +4,16 @@ import { prisma } from "@/lib/prisma";
 import { calcPointsEarned, getLevelFromPoints } from "@/lib/points";
 import { getWeekStart } from "@/lib/allowance";
 import { requireParentSession, requireSession, withErrors } from "@/lib/api";
+import { canAccessMember, childAccessWhere } from "@/lib/child-access";
+import { COMPLETION_EMOJIS } from "@/types";
 
 export const POST = withErrors(async (req: NextRequest) => {
-  const { householdId } = requireSession(req);
+  const { householdId, parentId } = requireSession(req);
   const body = await req.json();
   const { assignmentId, withPhoto } = body;
+  const reactionEmoji = typeof body.reactionEmoji === "string" && COMPLETION_EMOJIS.includes(body.reactionEmoji)
+    ? body.reactionEmoji
+    : null;
 
   const assignment = await prisma.choreAssignment.findFirst({
     where: { id: assignmentId, householdId, isActive: true },
@@ -17,6 +22,9 @@ export const POST = withErrors(async (req: NextRequest) => {
   if (!assignment) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const memberId = assignment.memberId;
+  if (!(await canAccessMember(parentId, householdId, memberId))) {
+    return NextResponse.json({ error: "You do not have access to this family member" }, { status: 403 });
+  }
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   const existingCompletion = await prisma.taskCompletion.findFirst({
@@ -41,7 +49,7 @@ export const POST = withErrors(async (req: NextRequest) => {
   try {
     const completion = await prisma.$transaction(async (tx) => {
       const created = await tx.taskCompletion.create({
-        data: { householdId, assignmentId, memberId, completionDate: todayStart, pointsEarned: pts, weekStartDate: weekStart },
+        data: { householdId, assignmentId, memberId, completionDate: todayStart, reactionEmoji, pointsEarned: pts, weekStartDate: weekStart },
       });
 
       const member = await tx.familyMember.findUnique({ where: { id: memberId, householdId } });
@@ -71,7 +79,7 @@ export const POST = withErrors(async (req: NextRequest) => {
 });
 
 export const GET = withErrors(async (req: NextRequest) => {
-  const { householdId } = requireSession(req);
+  const { householdId, parentId } = requireSession(req);
   const { searchParams } = new URL(req.url);
   const memberId = searchParams.get("memberId");
   const week = searchParams.get("week");
@@ -83,6 +91,7 @@ export const GET = withErrors(async (req: NextRequest) => {
     where: {
       ...(memberId && { memberId: parseInt(memberId) }),
       householdId,
+      member: await childAccessWhere(parentId, householdId),
       completedAt: { gte: weekStart, lt: weekEnd },
     },
     include: { assignment: { include: { chore: true } }, member: true },

@@ -12,6 +12,12 @@ const skills = [
   { name: "Laundry", icon: "👕" },
   { name: "Tech", icon: "💻" },
   { name: "Media", icon: "🎥" },
+  { name: "Faith", icon: "🙏" },
+  { name: "Training", icon: "🏋️" },
+  { name: "Study", icon: "📚" },
+  { name: "Reading", icon: "📖" },
+  { name: "Playing", icon: "🎮" },
+  { name: "Resting", icon: "😴" },
 ];
 
 const chores = [
@@ -32,12 +38,23 @@ const chores = [
   { name: "Unload Dishwasher", icon: "🍶", color: "#ecfdf5", ageMin: 8, ageMax: 18, pointsValue: 10, category: "kitchen", description: "Put all clean dishes away in their right spots", skill: "Cooking" },
 ];
 
+const templateSkillByCategory: Record<string, string> = {
+  tech: "Tech",
+  media: "Media",
+  faith: "Faith",
+  training: "Training",
+  study: "Study",
+  reading: "Reading",
+  playing: "Playing",
+  resting: "Resting",
+};
+
 const templateChores = CHORE_TEMPLATES_BY_AGE.flatMap((group) =>
   group.chores.map((chore) => ({
     ...chore,
     ageMin: group.ageMin,
     ageMax: group.ageMax,
-    skill: chore.category === "tech" ? "Tech" : chore.category === "media" ? "Media" : "Responsibility",
+    skill: templateSkillByCategory[chore.category] ?? "Responsibility",
     requiresPhoto: false,
   }))
 );

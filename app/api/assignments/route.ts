@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireParentSession, requireSession, withErrors } from "@/lib/api";
+import { canAccessMember, childAccessWhere } from "@/lib/child-access";
 
 function dateFromInput(value: unknown) {
   if (typeof value !== "string" || !value) return null;
@@ -10,7 +11,7 @@ function dateFromInput(value: unknown) {
 }
 
 export const GET = withErrors(async (req: NextRequest) => {
-  const { householdId } = requireSession(req);
+  const { householdId, parentId } = requireSession(req);
   const { searchParams } = new URL(req.url);
   const memberId = searchParams.get("memberId");
   const scope = searchParams.get("scope");
@@ -22,6 +23,7 @@ export const GET = withErrors(async (req: NextRequest) => {
       isActive: true,
       householdId,
       ...(memberId && { memberId: parseInt(memberId) }),
+      member: await childAccessWhere(parentId, householdId),
       ...(scope === "all"
         ? {}
         : {
@@ -54,8 +56,11 @@ export const GET = withErrors(async (req: NextRequest) => {
 });
 
 export const POST = withErrors(async (req: NextRequest) => {
-  const { householdId } = await requireParentSession(req);
+  const { householdId, parentId } = await requireParentSession(req);
   const body = await req.json();
+  if (!(await canAccessMember(parentId, householdId, Number(body.memberId)))) {
+    return NextResponse.json({ error: "You do not have access to this family member" }, { status: 403 });
+  }
   const [member, chore] = await Promise.all([
     prisma.familyMember.findFirst({ where: { id: body.memberId, householdId } }),
     prisma.chore.findFirst({ where: { id: body.choreId, householdId } }),
@@ -102,9 +107,14 @@ export const POST = withErrors(async (req: NextRequest) => {
 });
 
 export const DELETE = withErrors(async (req: NextRequest) => {
-  const { householdId } = await requireParentSession(req);
+  const { householdId, parentId } = await requireParentSession(req);
   const { searchParams } = new URL(req.url);
   const id = parseInt(searchParams.get("id") ?? "0");
+  const assignment = await prisma.choreAssignment.findFirst({ where: { id, householdId }, select: { memberId: true } });
+  if (!assignment) return NextResponse.json({ error: "Assignment not found" }, { status: 404 });
+  if (!(await canAccessMember(parentId, householdId, assignment.memberId))) {
+    return NextResponse.json({ error: "You do not have access to this family member" }, { status: 403 });
+  }
   await prisma.choreAssignment.update({ where: { id, householdId }, data: { isActive: false } });
   return NextResponse.json({ ok: true });
 });

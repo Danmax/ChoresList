@@ -18,6 +18,11 @@ model ParentAccount {
   pinHash       String?  @db.VarChar(255)
   pinSalt       String?  @db.VarChar(255)
   accountRole   String   @default("owner") @db.VarChar(32)
+  displayName   String?  @db.VarChar(255)
+  parentType    String   @default("parent") @db.VarChar(64)
+  relationshipLabel String? @db.VarChar(128)
+  childAccessMode String @default("all") @db.VarChar(32)
+  childAccessMemberIds Json?
   emailVerified Boolean  @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @default(now()) @updatedAt
@@ -129,6 +134,10 @@ model FamilyMember {
   birthdayDay               Int?
   lastBirthdayAgeUpdateYear Int?
   role                      String   @default("child") @db.VarChar(64)
+  relationshipToHousehold   String   @default("child") @db.VarChar(64)
+  familyBranch              String   @default("primary") @db.VarChar(64)
+  custodySchedule           String?  @db.VarChar(128)
+  familyNotes               String?  @db.VarChar(255)
   avatar                    String   @default("🧒") @db.VarChar(32)
   color                     String   @default("#a78bfa") @db.VarChar(32)
   totalPoints               Int      @default(0)
@@ -193,6 +202,7 @@ model TaskCompletion {
   completionDate   DateTime @default(now())
   photoBeforePath  String?
   photoAfterPath   String?
+  reactionEmoji    String?  @db.VarChar(32)
   pointsEarned     Int      @default(0)
   verifiedByParent Boolean  @default(false)
   weekStartDate    DateTime @default(now())
