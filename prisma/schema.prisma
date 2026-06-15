@@ -413,6 +413,7 @@ model CommunityEvent {
   endDate           DateTime?
   allDay            Boolean   @default(false)
   location          String?   @db.VarChar(255)
+  imageUrl          String?   @db.VarChar(512)
   notes             String?   @db.Text
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @default(now()) @updatedAt

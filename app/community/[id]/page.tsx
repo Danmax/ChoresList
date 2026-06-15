@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, CalendarDays, CheckCircle2, MapPin, Plus, Trash2, UserPlus, Users } from "lucide-react";
+import { ArrowLeft, CalendarDays, CheckCircle2, MapPin, Pencil, Plus, Save, Trash2, UserPlus, Users, X, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,6 +14,14 @@ type CommunityRole = "owner" | "manager" | "member";
 type RsvpStatus = "going" | "maybe" | "not-going";
 
 type ParentRef = { id: number; email: string };
+type StarterItem = { title: string; quantity: string; note: string };
+type LocationSuggestion = {
+  id: string;
+  label: string;
+  fullAddress: string;
+  latitude: number;
+  longitude: number;
+};
 type CommunityMember = { id: number; parentId: number; role: CommunityRole; parent: ParentRef };
 type CommunityItem = {
   id: number;
@@ -41,6 +49,7 @@ type CommunityEvent = {
   endDate: string | null;
   allDay: boolean;
   location: string | null;
+  imageUrl: string | null;
   notes: string | null;
   rsvps: CommunityRsvp[];
   items: CommunityItem[];
@@ -87,11 +96,28 @@ const BLANK_EVENT = {
   date: "",
   endDate: "",
   location: "",
+  imageUrl: "",
   notes: "",
 };
 
 const BLANK_MEMBER = { email: "", role: "member" as CommunityRole };
 const BLANK_ITEM = { title: "", quantity: "", note: "", assignedToParentId: "" };
+const BLANK_GROUP_FORM = {
+  name: "",
+  groupType: "other",
+  description: "",
+  location: "",
+  visibility: "private",
+};
+const COMMON_POTLUCK_ITEMS: StarterItem[] = [
+  { title: "Main dish", quantity: "2 trays", note: "Enough to share" },
+  { title: "Side dish", quantity: "2 bowls", note: "" },
+  { title: "Dessert", quantity: "1 tray", note: "" },
+  { title: "Drinks", quantity: "24 pack", note: "Water or juice" },
+  { title: "Plates", quantity: "1 pack", note: "" },
+  { title: "Napkins", quantity: "1 pack", note: "" },
+  { title: "Utensils", quantity: "1 pack", note: "" },
+];
 
 function eventMeta(type: string) {
   return EVENT_TYPES.find((eventType) => eventType.value === type) ?? EVENT_TYPES[EVENT_TYPES.length - 1];
@@ -129,7 +155,16 @@ export default function CommunityGroupPage() {
   const [group, setGroup] = useState<CommunityGroup | null>(null);
   const [eventForm, setEventForm] = useState(BLANK_EVENT);
   const [memberForm, setMemberForm] = useState(BLANK_MEMBER);
+  const [groupForm, setGroupForm] = useState(BLANK_GROUP_FORM);
+  const [editingGroup, setEditingGroup] = useState(false);
   const [itemForms, setItemForms] = useState<Record<number, typeof BLANK_ITEM>>({});
+  const [eventPrompt, setEventPrompt] = useState("");
+  const [draftingEvent, setDraftingEvent] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [starterItems, setStarterItems] = useState<StarterItem[]>([]);
+  const [locationSuggestions, setLocationSuggestions] = useState<LocationSuggestion[]>([]);
+  const [locationStatus, setLocationStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [selectedLocation, setSelectedLocation] = useState("");
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -150,6 +185,48 @@ export default function CommunityGroupPage() {
   }, [groupId]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (!group || editingGroup) return;
+    setGroupForm({
+      name: group.name,
+      groupType: group.groupType,
+      description: group.description ?? "",
+      location: group.location ?? "",
+      visibility: group.visibility,
+    });
+  }, [group, editingGroup]);
+
+  useEffect(() => {
+    const query = eventForm.location.trim();
+    if (query.length < 4 || query === selectedLocation) {
+      setLocationSuggestions([]);
+      setLocationStatus("idle");
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(async () => {
+      setLocationStatus("loading");
+      try {
+        const params = new URLSearchParams({ q: query });
+        const res = await fetch(`/api/locations?${params.toString()}`, { signal: controller.signal });
+        if (!res.ok) throw new Error("Address lookup failed");
+        const data = (await res.json()) as { results?: LocationSuggestion[] };
+        setLocationSuggestions(Array.isArray(data.results) ? data.results : []);
+        setLocationStatus("idle");
+      } catch (error) {
+        if ((error as Error).name === "AbortError") return;
+        setLocationSuggestions([]);
+        setLocationStatus("error");
+      }
+    }, 350);
+
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [eventForm.location, selectedLocation]);
 
   const role = group?.currentMembership?.role ?? null;
   const canManage = role ? ROLE_RANK[role] >= ROLE_RANK.manager : false;
@@ -197,6 +274,101 @@ export default function CommunityGroupPage() {
     await load();
   }
 
+  function startEditingGroup() {
+    if (!group) return;
+    setGroupForm({
+      name: group.name,
+      groupType: group.groupType,
+      description: group.description ?? "",
+      location: group.location ?? "",
+      visibility: group.visibility,
+    });
+    setEditingGroup(true);
+  }
+
+  async function updateGroup() {
+    if (!group) return;
+    if (!groupForm.name.trim()) {
+      toast.error("Group name is required");
+      return;
+    }
+    const res = await fetch("/api/community/groups", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: group.id, ...groupForm }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      toast.error(data?.error ?? "Could not update group");
+      return;
+    }
+    toast.success("Community group updated");
+    setEditingGroup(false);
+    await load();
+  }
+
+  async function generateEventDraft() {
+    if (eventPrompt.trim().length < 4) {
+      toast.error("Describe the event first");
+      return;
+    }
+    setDraftingEvent(true);
+    try {
+      const res = await fetch("/api/community/ai/draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: eventPrompt }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        toast.error(data?.error ?? "Could not draft event");
+        return;
+      }
+
+      const draft = data.draft ?? {};
+      setEventForm((current) => ({
+        ...current,
+        title: draft.title ?? current.title,
+        eventType: draft.eventType ?? current.eventType,
+        date: draft.date || current.date,
+        endDate: draft.endDate || current.endDate,
+        location: draft.location ?? current.location,
+        notes: draft.notes ?? current.notes,
+      }));
+      setSelectedLocation(draft.location ?? "");
+      setStarterItems(Array.isArray(draft.items) ? draft.items : []);
+      toast.success("Event draft filled in");
+    } finally {
+      setDraftingEvent(false);
+    }
+  }
+
+  async function uploadCommunityEventImage(file: File) {
+    setImageUploading(true);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const res = await fetch("/api/community/image", { method: "POST", body });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        toast.error(data?.error ?? "Could not upload image");
+        return;
+      }
+      setEventForm((current) => ({ ...current, imageUrl: data.path }));
+      toast.success("Image optimized");
+    } finally {
+      setImageUploading(false);
+    }
+  }
+
+  function addCommonPotluckItems() {
+    setStarterItems((current) => {
+      const existing = new Set(current.map((item) => item.title.toLowerCase()));
+      const next = COMMON_POTLUCK_ITEMS.filter((item) => !existing.has(item.title.toLowerCase()));
+      return [...current, ...next];
+    });
+  }
+
   async function createEvent() {
     if (!eventForm.title.trim() || !eventForm.date) {
       toast.error("Event title and date are required");
@@ -205,7 +377,7 @@ export default function CommunityGroupPage() {
     const res = await fetch("/api/community/events", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ groupId, ...eventForm, endDate: eventForm.endDate || null }),
+      body: JSON.stringify({ groupId, ...eventForm, endDate: eventForm.endDate || null, items: starterItems }),
     });
     const data = await res.json().catch(() => null);
     if (!res.ok) {
@@ -214,6 +386,10 @@ export default function CommunityGroupPage() {
     }
     toast.success("Event created");
     setEventForm(BLANK_EVENT);
+    setEventPrompt("");
+    setStarterItems([]);
+    setSelectedLocation("");
+    setLocationSuggestions([]);
     await load();
   }
 
@@ -343,6 +519,15 @@ export default function CommunityGroupPage() {
                 Join Group
               </button>
             )}
+            {canManage && (
+              <button
+                type="button"
+                onClick={startEditingGroup}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 font-black text-slate-600 shadow-sm hover:shadow-md"
+              >
+                <Pencil size={17} /> Edit Group
+              </button>
+            )}
           </>
         )}
       </div>
@@ -350,9 +535,103 @@ export default function CommunityGroupPage() {
       {group && (
         <div className="grid gap-5 xl:grid-cols-[1fr_360px]">
           <div className="space-y-5">
+            {canManage && editingGroup && (
+              <div className="rounded-3xl bg-white p-4 shadow-sm sm:p-5">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <h2 className="font-black text-slate-800">Edit Community Group</h2>
+                  <button
+                    type="button"
+                    onClick={() => setEditingGroup(false)}
+                    className="rounded-xl bg-slate-100 p-2 text-slate-500 hover:bg-slate-200"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div>
+                    <Label className="text-sm font-bold">Group name</Label>
+                    <Input
+                      value={groupForm.name}
+                      onChange={(event) => setGroupForm((current) => ({ ...current, name: event.target.value }))}
+                      className="mt-1 rounded-2xl"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-sm font-bold">Type</Label>
+                    <Select
+                      value={groupForm.groupType}
+                      onValueChange={(value) => setGroupForm((current) => ({ ...current, groupType: value ?? "other" }))}
+                    >
+                      <SelectTrigger className="mt-1 rounded-2xl"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(GROUP_TYPE_META).map(([value, item]) => (
+                          <SelectItem key={value} value={value}>{item.icon} {item.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-bold">Location</Label>
+                    <Input
+                      value={groupForm.location}
+                      onChange={(event) => setGroupForm((current) => ({ ...current, location: event.target.value }))}
+                      placeholder="City, venue, or meeting area"
+                      className="mt-1 rounded-2xl"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-sm font-bold">Visibility</Label>
+                    <Select
+                      value={groupForm.visibility}
+                      onValueChange={(value) => setGroupForm((current) => ({ ...current, visibility: value ?? "private" }))}
+                    >
+                      <SelectTrigger className="mt-1 rounded-2xl"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="private">Private</SelectItem>
+                        <SelectItem value="public">Public discovery</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="md:col-span-2">
+                    <Label className="text-sm font-bold">Description</Label>
+                    <Textarea
+                      value={groupForm.description}
+                      onChange={(event) => setGroupForm((current) => ({ ...current, description: event.target.value }))}
+                      placeholder="Who this group is for and what you organize together."
+                      className="mt-1 rounded-2xl"
+                    />
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={updateGroup}
+                  className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-emerald-500 px-4 py-2.5 font-black text-white hover:bg-emerald-600"
+                >
+                  <Save size={17} /> Save Changes
+                </button>
+              </div>
+            )}
             {canManage && (
               <div className="rounded-3xl bg-white p-4 shadow-sm sm:p-5">
                 <h2 className="mb-4 flex items-center gap-2 font-black text-slate-800"><CalendarDays size={18} className="text-violet-500" /> New Event</h2>
+                <div className="mb-4 rounded-2xl bg-violet-50 p-3">
+                  <Label className="text-sm font-bold text-violet-800">AI event prompt</Label>
+                  <Textarea
+                    value={eventPrompt}
+                    onChange={(event) => setEventPrompt(event.target.value)}
+                    placeholder="Example: Church potluck next Friday at 6pm at 123 Main St. Add common things people should bring."
+                    className="mt-1 min-h-20 resize-none rounded-xl bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={generateEventDraft}
+                    disabled={draftingEvent || eventPrompt.trim().length < 4}
+                    className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-violet-500 px-3 py-2 text-sm font-black text-white hover:bg-violet-600 disabled:opacity-50"
+                  >
+                    <Wand2 size={16} />
+                    {draftingEvent ? "Filling fields..." : "Fill Event with AI"}
+                  </button>
+                </div>
                 <div className="grid gap-3 md:grid-cols-2">
                   <div>
                     <Label className="text-sm font-bold">Title</Label>
@@ -377,12 +656,103 @@ export default function CommunityGroupPage() {
                   </div>
                   <div className="md:col-span-2">
                     <Label className="text-sm font-bold">Location</Label>
-                    <Input value={eventForm.location} onChange={(event) => setEventForm((current) => ({ ...current, location: event.target.value }))} placeholder={group.location ?? "Where is it happening?"} className="mt-1 rounded-2xl" />
+                    <div className="relative mt-1">
+                      <Input
+                        value={eventForm.location}
+                        onChange={(event) => {
+                          setSelectedLocation("");
+                          setEventForm((current) => ({ ...current, location: event.target.value }));
+                        }}
+                        placeholder={group.location ?? "Start typing an address..."}
+                        autoComplete="off"
+                        className="rounded-2xl pr-9"
+                      />
+                      <MapPin size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      {(locationStatus === "loading" || locationStatus === "error" || locationSuggestions.length > 0) && (
+                        <div className="absolute left-0 right-0 top-[calc(100%+0.25rem)] z-20 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-lg">
+                          {locationStatus === "loading" && (
+                            <p className="px-3 py-2 text-sm font-bold text-slate-400">Looking up addresses...</p>
+                          )}
+                          {locationStatus === "error" && (
+                            <p className="px-3 py-2 text-sm font-bold text-red-400">Address lookup is unavailable</p>
+                          )}
+                          {locationStatus !== "loading" &&
+                            locationSuggestions.map((suggestion) => (
+                              <button
+                                key={suggestion.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedLocation(suggestion.label);
+                                  setEventForm((current) => ({ ...current, location: suggestion.label }));
+                                  setLocationSuggestions([]);
+                                }}
+                                className="flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-violet-50"
+                              >
+                                <MapPin size={15} className="mt-0.5 shrink-0 text-violet-400" />
+                                <span className="min-w-0">
+                                  <span className="block text-sm font-black text-slate-700">{suggestion.label}</span>
+                                  <span className="block truncate text-xs font-semibold text-slate-400">{suggestion.fullAddress}</span>
+                                </span>
+                              </button>
+                            ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div className="md:col-span-2">
                     <Label className="text-sm font-bold">Notes</Label>
                     <Textarea value={eventForm.notes} onChange={(event) => setEventForm((current) => ({ ...current, notes: event.target.value }))} placeholder="Details, instructions, or RSVP notes." className="mt-1 rounded-2xl" />
                   </div>
+                  <div className="md:col-span-2">
+                    <Label className="text-sm font-bold">Event image</Label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={imageUploading}
+                      className="mt-1 block w-full text-sm text-slate-500 file:mr-4 file:rounded-xl file:border-0 file:bg-violet-50 file:px-4 file:py-2 file:text-sm file:font-bold file:text-violet-700 disabled:opacity-60"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file) uploadCommunityEventImage(file);
+                        event.currentTarget.value = "";
+                      }}
+                    />
+                    {imageUploading && <p className="mt-1 text-xs font-bold text-slate-400">Optimizing image...</p>}
+                    {eventForm.imageUrl.startsWith("/uploads/") && (
+                      <div className="mt-2 overflow-hidden rounded-2xl border border-slate-100">
+                        <img src={eventForm.imageUrl} alt="" className="h-40 w-full object-cover" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-4 rounded-2xl bg-slate-50 p-3">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <p className="font-black text-slate-800">Starter items</p>
+                    <button
+                      type="button"
+                      onClick={addCommonPotluckItems}
+                      className="rounded-xl bg-white px-3 py-1.5 text-xs font-black text-violet-700 hover:bg-violet-50"
+                    >
+                      Add common potluck items
+                    </button>
+                  </div>
+                  {starterItems.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {starterItems.map((item, index) => (
+                        <span key={`${item.title}-${index}`} className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-black text-slate-600">
+                          {item.title}{item.quantity ? ` · ${item.quantity}` : ""}
+                          <button
+                            type="button"
+                            onClick={() => setStarterItems((current) => current.filter((_, i) => i !== index))}
+                            className="text-red-300 hover:text-red-500"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm font-bold text-slate-400">AI or the common-items button can prefill potluck supplies here.</p>
+                  )}
                 </div>
                 <button type="button" onClick={createEvent} className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-violet-500 px-4 py-2.5 font-black text-white hover:bg-violet-600">
                   <Plus size={17} /> Create Event
@@ -407,6 +777,11 @@ export default function CommunityGroupPage() {
                         </div>
                       </div>
                       {event.location && <p className="mt-2 flex items-center gap-1 text-sm font-bold text-slate-500"><MapPin size={15} /> {event.location}</p>}
+                      {event.imageUrl?.startsWith("/uploads/") && (
+                        <div className="mt-3 overflow-hidden rounded-2xl border border-slate-100">
+                          <img src={event.imageUrl} alt="" className="max-h-80 w-full object-cover" />
+                        </div>
+                      )}
                       {event.notes && <p className="mt-2 text-sm font-semibold text-slate-500">{event.notes}</p>}
                     </div>
                     {canManage && (

@@ -1,0 +1,1 @@
+ALTER TABLE `CommunityEvent` ADD COLUMN `imageUrl` VARCHAR(512) NULL;

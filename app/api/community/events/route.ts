@@ -24,6 +24,22 @@ function cleanDate(value: unknown) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function cleanStarterItems(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .slice(0, 20)
+    .map((item, index) => {
+      const raw = item && typeof item === "object" ? item as Record<string, unknown> : {};
+      return {
+        title: cleanRequiredText(raw.title, 120),
+        quantity: cleanText(raw.quantity, 64),
+        note: cleanText(raw.note, 500),
+        sortOrder: index,
+      };
+    })
+    .filter((item) => item.title);
+}
+
 const eventInclude = {
   group: { select: { id: true, name: true } },
   rsvps: { include: { parent: { select: { id: true, email: true } } } },
@@ -77,7 +93,11 @@ export const POST = withErrors(async (req: NextRequest) => {
       endDate: cleanDate(body.endDate),
       allDay: Boolean(body.allDay),
       location: cleanText(body.location, 180),
+      imageUrl: cleanText(body.imageUrl, 512),
       notes: cleanText(body.notes, 1000),
+      items: {
+        create: cleanStarterItems(body.items),
+      },
     },
     include: eventInclude,
   });
@@ -108,6 +128,7 @@ export const PUT = withErrors(async (req: NextRequest) => {
       ...(body.endDate !== undefined && { endDate: cleanDate(body.endDate) }),
       ...(body.allDay !== undefined && { allDay: Boolean(body.allDay) }),
       ...(body.location !== undefined && { location: cleanText(body.location, 180) }),
+      ...(body.imageUrl !== undefined && { imageUrl: cleanText(body.imageUrl, 512) }),
       ...(body.notes !== undefined && { notes: cleanText(body.notes, 1000) }),
     },
     include: eventInclude,

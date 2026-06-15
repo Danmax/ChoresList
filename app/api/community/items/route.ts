@@ -17,6 +17,12 @@ function cleanInt(value: unknown) {
   return Number.isFinite(n) ? Math.round(n) : null;
 }
 
+function cleanOptionalParentId(value: unknown) {
+  if (value === null || value === undefined || value === "") return null;
+  const n = cleanInt(value);
+  return n && n > 0 ? n : null;
+}
+
 const itemInclude = {
   assignedTo: { select: { id: true, email: true } },
   claimedBy: { select: { id: true, email: true } },
@@ -28,10 +34,21 @@ export const POST = withErrors(async (req: NextRequest) => {
   const body = await req.json();
   const eventId = cleanInt(body.eventId);
   if (!eventId || eventId <= 0) return NextResponse.json({ error: "Event is required" }, { status: 400 });
-  await requireEventCommunityRole(eventId, parentId, "manager");
+  const { event } = await requireEventCommunityRole(eventId, parentId, "manager");
 
   const title = cleanRequiredText(body.title, 120);
   if (!title) return NextResponse.json({ error: "Item title is required" }, { status: 400 });
+
+  const assignedToParentId = cleanOptionalParentId(body.assignedToParentId);
+  if (assignedToParentId) {
+    const assignedMember = await prisma.communityMember.findFirst({
+      where: { groupId: event.groupId, parentId: assignedToParentId, status: "active" },
+      select: { id: true },
+    });
+    if (!assignedMember) {
+      return NextResponse.json({ error: "Assigned person must be a group member" }, { status: 400 });
+    }
+  }
 
   const sortOrder = await prisma.communityEventItem.count({ where: { eventId } });
   const item = await prisma.communityEventItem.create({
@@ -40,8 +57,8 @@ export const POST = withErrors(async (req: NextRequest) => {
       title,
       quantity: cleanText(body.quantity, 64),
       note: cleanText(body.note, 500),
-      assignedToParentId: cleanInt(body.assignedToParentId),
-      status: body.assignedToParentId ? "assigned" : "open",
+      assignedToParentId,
+      status: assignedToParentId ? "assigned" : "open",
       sortOrder,
     },
     include: itemInclude,
@@ -97,7 +114,17 @@ export const PUT = withErrors(async (req: NextRequest) => {
   const title = body.title !== undefined ? cleanRequiredText(body.title, 120) : undefined;
   if (title !== undefined && !title) return NextResponse.json({ error: "Item title is required" }, { status: 400 });
 
-  const assignedToParentId = body.assignedToParentId === null ? null : cleanInt(body.assignedToParentId);
+  const assignedToParentId = cleanOptionalParentId(body.assignedToParentId);
+  if (assignedToParentId) {
+    const assignedMember = await prisma.communityMember.findFirst({
+      where: { groupId: existing.event.groupId, parentId: assignedToParentId, status: "active" },
+      select: { id: true },
+    });
+    if (!assignedMember) {
+      return NextResponse.json({ error: "Assigned person must be a group member" }, { status: 400 });
+    }
+  }
+
   const item = await prisma.communityEventItem.update({
     where: { id },
     data: {
