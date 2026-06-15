@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Star, Trophy, Calendar, DollarSign, Sparkles, ClipboardList, Gift, Wrench, BarChart2, Users } from "lucide-react";
+import { Star, Trophy, Calendar, DollarSign, Sparkles, ClipboardList, Gift, Wrench, BarChart2, Users, ShoppingCart, MonitorSmartphone, ShieldCheck } from "lucide-react";
 
 const features = [
   {
@@ -39,6 +39,26 @@ const features = [
     description: "Kids add items to their wish list and parents can track what they want.",
   },
   {
+    icon: "🛒",
+    title: "Grocery Lists",
+    description: "Build one-time and recurring shopping lists alongside the family schedule.",
+  },
+  {
+    icon: "📺",
+    title: "Kid Screens",
+    description: "Pair dedicated task boards so kids can check chores from a shared screen.",
+  },
+  {
+    icon: "👥",
+    title: "Community Events",
+    description: "Create groups, plan public or private events, manage RSVPs, and organize potlucks.",
+  },
+  {
+    icon: "🛡️",
+    title: "Admin Controls",
+    description: "Owners can review parent users, household profiles, and connected communities.",
+  },
+  {
     icon: "📊",
     title: "Reports",
     description: "See completion rates, points history, and skill growth over time.",
@@ -66,7 +86,7 @@ export default function LandingPage() {
             Make chores fun for the whole family
           </p>
           <p className="text-slate-400 text-base sm:text-lg mb-10 max-w-xl mx-auto">
-            Assign chores, earn points, level up, and track allowances — all in one cheerful family app.
+            Assign chores, earn points, plan groceries, coordinate community events, and manage parent controls in one family app.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -93,6 +113,9 @@ export default function LandingPage() {
             { icon: <Trophy size={22} className="text-yellow-500" />, label: "Points & Levels" },
             { icon: <Sparkles size={22} className="text-violet-500" />, label: "AI Instructions" },
             { icon: <DollarSign size={22} className="text-emerald-500" />, label: "Allowance Tracking" },
+            { icon: <ShoppingCart size={22} className="text-green-500" />, label: "Grocery Lists" },
+            { icon: <MonitorSmartphone size={22} className="text-indigo-500" />, label: "Kid Screens" },
+            { icon: <ShieldCheck size={22} className="text-slate-500" />, label: "Admin Controls" },
           ].map(({ icon, label }) => (
             <div key={label} className="flex flex-col items-center gap-1.5">
               {icon}
@@ -105,7 +128,7 @@ export default function LandingPage() {
       {/* Features grid */}
       <div className="max-w-4xl mx-auto px-6 py-16">
         <h2 className="text-3xl font-black text-slate-800 text-center mb-10">Everything your family needs</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {features.map((f) => (
             <div
               key={f.title}
@@ -123,7 +146,7 @@ export default function LandingPage() {
       <div className="bg-violet-500 text-white py-16 px-6 text-center">
         <div className="text-5xl mb-4">🎉</div>
         <h2 className="text-3xl font-black mb-3">Ready to get started?</h2>
-        <p className="text-violet-200 mb-8 text-lg">Jump into the parent panel to add your family members and assign first chores.</p>
+        <p className="text-violet-200 mb-8 text-lg">Jump into the parent panel to add family members, assign chores, and configure your household.</p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Link
             href="/dashboard"

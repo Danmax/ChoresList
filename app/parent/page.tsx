@@ -2,7 +2,7 @@
 
 import { type FormEvent, useState, useEffect } from "react";
 import Link from "next/link";
-import { Users, ListChecks, CalendarDays, DollarSign, BookOpen, Home, BarChart2, Gift, Wrench, Ticket, Mail, LockKeyhole, MonitorSmartphone, LogOut, Settings, UserPlus, Copy, Share2, CheckCircle2, ShoppingCart } from "lucide-react";
+import { Users, ListChecks, CalendarDays, DollarSign, BookOpen, Home, BarChart2, Gift, Wrench, Ticket, Mail, LockKeyhole, MonitorSmartphone, LogOut, Settings, UserPlus, Copy, Share2, CheckCircle2, ShoppingCart, ShieldCheck } from "lucide-react";
 
 export default function ParentPanel() {
   const [unlocked, setUnlocked] = useState(false);
@@ -409,6 +409,7 @@ export default function ParentPanel() {
     { href: "/parent/wishlist", icon: Gift, label: "Wish Lists", desc: "Grant kids' wishes & requests", color: "#f472b6", bg: "#fce7f3" },
     { href: "/calendar", icon: BookOpen, label: "Family Calendar", desc: "Schedule events & activities", color: "#f97316", bg: "#ffedd5" },
     { href: "/community", icon: Users, label: "Community", desc: "Groups, events, RSVP & potlucks", color: "#8b5cf6", bg: "#ede9fe" },
+    { href: "/parent/admin", icon: ShieldCheck, label: "Super Admin Config", desc: "Manage users & communities", color: "#0f172a", bg: "#e2e8f0" },
     { href: "/parent/settings", icon: Settings, label: "Household Settings", desc: "Family, calendar, email & privacy", color: "#64748b", bg: "#f1f5f9" },
   ];
 
