@@ -22,8 +22,8 @@ model ParentAccount {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @default(now()) @updatedAt
 
-  household          Household                @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  confirmationTokens EmailConfirmationToken[]
+  household           Household                @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  confirmationTokens  EmailConfirmationToken[]
   passwordResetTokens PasswordResetToken[]
 }
 
@@ -45,20 +45,22 @@ model Household {
   createdAt                     DateTime @default(now())
   updatedAt                     DateTime @default(now()) @updatedAt
 
-  parents           ParentAccount[]
-  members           FamilyMember[]
-  chores            Chore[]
-  assignments       ChoreAssignment[]
-  completions       TaskCompletion[]
-  skillCategories   SkillCategory[]
-  allowances        WeeklyAllowance[]
-  allowanceSettings AllowanceSettings[]
-  wishList          WishListItem[]
-  houseProjects     HouseProject[]
-  rewardTickets     RewardTicket[]
-  events            FamilyEvent[]
-  devices           HouseholdDevice[]
-  pairingCodes      DevicePairingCode[]
+  parents                  ParentAccount[]
+  members                  FamilyMember[]
+  chores                   Chore[]
+  assignments              ChoreAssignment[]
+  completions              TaskCompletion[]
+  skillCategories          SkillCategory[]
+  allowances               WeeklyAllowance[]
+  allowanceSettings        AllowanceSettings[]
+  wishList                 WishListItem[]
+  houseProjects            HouseProject[]
+  rewardTickets            RewardTicket[]
+  events                   FamilyEvent[]
+  devices                  HouseholdDevice[]
+  pairingCodes             DevicePairingCode[]
+  groceryLists             GroceryList[]
+  groceryTemplates         GroceryTemplate[]
   googleCalendarConnection GoogleCalendarConnection?
 }
 
@@ -101,19 +103,19 @@ model PasswordResetToken {
 }
 
 model FamilyMember {
-  id          Int      @id @default(autoincrement())
-  householdId Int
-  name        String   @db.VarChar(255)
-  age         Int
-  birthdayMonth Int?
-  birthdayDay   Int?
+  id                        Int      @id @default(autoincrement())
+  householdId               Int
+  name                      String   @db.VarChar(255)
+  age                       Int
+  birthdayMonth             Int?
+  birthdayDay               Int?
   lastBirthdayAgeUpdateYear Int?
-  role        String   @default("child") @db.VarChar(64)
-  avatar      String   @default("🧒") @db.VarChar(32)
-  color       String   @default("#a78bfa") @db.VarChar(32)
-  totalPoints Int      @default(0)
-  level       Int      @default(1)
-  createdAt   DateTime @default(now())
+  role                      String   @default("child") @db.VarChar(64)
+  avatar                    String   @default("🧒") @db.VarChar(32)
+  color                     String   @default("#a78bfa") @db.VarChar(32)
+  totalPoints               Int      @default(0)
+  level                     Int      @default(1)
+  createdAt                 DateTime @default(now())
 
   assignments      ChoreAssignment[]
   completions      TaskCompletion[]
@@ -121,11 +123,11 @@ model FamilyMember {
   skills           MemberSkill[]
   allowanceSetting AllowanceSettings?
   wishList         WishListItem[]
-  houseProjects    HouseProject[]     @relation("ProjectAssignee")
+  houseProjects    HouseProject[]      @relation("ProjectAssignee")
   rewardTickets    RewardTicket[]
   devices          HouseholdDevice[]
   pairingCodes     DevicePairingCode[]
-  household        Household          @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  household        Household           @relation(fields: [householdId], references: [id], onDelete: Cascade)
 }
 
 model Chore {
@@ -306,31 +308,90 @@ model RewardTicket {
   household Household    @relation(fields: [householdId], references: [id], onDelete: Cascade)
 }
 
+model GroceryList {
+  id               Int       @id @default(autoincrement())
+  householdId      Int
+  title            String    @db.VarChar(255)
+  status           String    @default("active") @db.VarChar(64)
+  sourceTemplateId Int?
+  completedAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @default(now()) @updatedAt
+
+  household      Household         @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  sourceTemplate GroceryTemplate?  @relation(fields: [sourceTemplateId], references: [id], onDelete: SetNull)
+  items          GroceryListItem[]
+}
+
+model GroceryListItem {
+  id        Int      @id @default(autoincrement())
+  listId    Int
+  name      String   @db.VarChar(255)
+  category  String   @default("other") @db.VarChar(64)
+  quantity  String?  @db.VarChar(64)
+  unit      String?  @db.VarChar(64)
+  note      String?  @db.Text
+  checked   Boolean  @default(false)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  list GroceryList @relation(fields: [listId], references: [id], onDelete: Cascade)
+}
+
+model GroceryTemplate {
+  id          Int       @id @default(autoincrement())
+  householdId Int
+  title       String    @db.VarChar(255)
+  cadence     String    @default("weekly") @db.VarChar(64)
+  isActive    Boolean   @default(true)
+  lastUsedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+
+  household Household             @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  lists     GroceryList[]
+  items     GroceryTemplateItem[]
+}
+
+model GroceryTemplateItem {
+  id         Int      @id @default(autoincrement())
+  templateId Int
+  name       String   @db.VarChar(255)
+  category   String   @default("other") @db.VarChar(64)
+  quantity   String?  @db.VarChar(64)
+  unit       String?  @db.VarChar(64)
+  note       String?  @db.Text
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  template GroceryTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+}
+
 model FamilyEvent {
-  id                Int       @id @default(autoincrement())
-  householdId       Int
-  title             String    @db.VarChar(255)
-  eventType         String    @default("other") @db.VarChar(64)
-  date              DateTime
-  endDate           DateTime?
-  allDay            Boolean   @default(true)
-  recurring         String    @default("none") @db.VarChar(64)
-  recurringEndDate  DateTime?
-  recurringCount    Int?
-  location          String?   @db.VarChar(255)
-  meetingUrl        String?   @db.VarChar(512)
-  rsvpUrl           String?   @db.VarChar(512)
-  flyerUrl          String?   @db.VarChar(512)
-  registrationUrl   String?   @db.VarChar(512)
-  registrationNotes String?   @db.Text
-  resources         String?   @db.Text
-  notes             String?   @db.Text
-  color             String    @default("#fbbf24") @db.VarChar(32)
-  icon              String    @default("📅") @db.VarChar(32)
+  id                      Int       @id @default(autoincrement())
+  householdId             Int
+  title                   String    @db.VarChar(255)
+  eventType               String    @default("other") @db.VarChar(64)
+  date                    DateTime
+  endDate                 DateTime?
+  allDay                  Boolean   @default(true)
+  recurring               String    @default("none") @db.VarChar(64)
+  recurringEndDate        DateTime?
+  recurringCount          Int?
+  location                String?   @db.VarChar(255)
+  meetingUrl              String?   @db.VarChar(512)
+  rsvpUrl                 String?   @db.VarChar(512)
+  flyerUrl                String?   @db.VarChar(512)
+  registrationUrl         String?   @db.VarChar(512)
+  registrationNotes       String?   @db.Text
+  resources               String?   @db.Text
+  notes                   String?   @db.Text
+  color                   String    @default("#fbbf24") @db.VarChar(32)
+  icon                    String    @default("📅") @db.VarChar(32)
   googleCalendarEventId   String?   @db.VarChar(255)
   googleCalendarSyncedAt  DateTime?
   googleCalendarSyncError String?   @db.Text
-  createdAt         DateTime  @default(now())
+  createdAt               DateTime  @default(now())
 
   household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
 }
