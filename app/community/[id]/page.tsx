@@ -100,6 +100,8 @@ const BLANK_EVENT = {
   notes: "",
 };
 
+type CommunityEventForm = typeof BLANK_EVENT;
+
 const BLANK_MEMBER = { email: "", role: "member" as CommunityRole };
 const BLANK_ITEM = { title: "", quantity: "", note: "", assignedToParentId: "" };
 const BLANK_GROUP_FORM = {
@@ -137,6 +139,14 @@ function formatDate(value: string) {
   });
 }
 
+function toDateTimeLocal(value: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 function emailName(email?: string | null) {
   return email ? email.split("@")[0] : "Someone";
 }
@@ -154,6 +164,8 @@ export default function CommunityGroupPage() {
   const groupId = Number.parseInt(params.id, 10);
   const [group, setGroup] = useState<CommunityGroup | null>(null);
   const [eventForm, setEventForm] = useState(BLANK_EVENT);
+  const [editEventForm, setEditEventForm] = useState<CommunityEventForm>(BLANK_EVENT);
+  const [editingEventId, setEditingEventId] = useState<number | null>(null);
   const [memberForm, setMemberForm] = useState(BLANK_MEMBER);
   const [groupForm, setGroupForm] = useState(BLANK_GROUP_FORM);
   const [editingGroup, setEditingGroup] = useState(false);
@@ -343,7 +355,7 @@ export default function CommunityGroupPage() {
     }
   }
 
-  async function uploadCommunityEventImage(file: File) {
+  async function uploadCommunityEventImage(file: File, target: "create" | "edit" = "create") {
     setImageUploading(true);
     try {
       const body = new FormData();
@@ -354,7 +366,11 @@ export default function CommunityGroupPage() {
         toast.error(data?.error ?? "Could not upload image");
         return;
       }
-      setEventForm((current) => ({ ...current, imageUrl: data.path }));
+      if (target === "edit") {
+        setEditEventForm((current) => ({ ...current, imageUrl: data.path }));
+      } else {
+        setEventForm((current) => ({ ...current, imageUrl: data.path }));
+      }
       toast.success("Image optimized");
     } finally {
       setImageUploading(false);
@@ -390,6 +406,45 @@ export default function CommunityGroupPage() {
     setStarterItems([]);
     setSelectedLocation("");
     setLocationSuggestions([]);
+    await load();
+  }
+
+  function startEditingEvent(event: CommunityEvent) {
+    setEditingEventId(event.id);
+    setEditEventForm({
+      title: event.title,
+      eventType: event.eventType,
+      date: toDateTimeLocal(event.date),
+      endDate: toDateTimeLocal(event.endDate),
+      location: event.location ?? "",
+      imageUrl: event.imageUrl ?? "",
+      notes: event.notes ?? "",
+    });
+  }
+
+  async function updateEvent() {
+    if (!editingEventId) return;
+    if (!editEventForm.title.trim() || !editEventForm.date) {
+      toast.error("Event title and date are required");
+      return;
+    }
+    const res = await fetch("/api/community/events", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: editingEventId,
+        ...editEventForm,
+        endDate: editEventForm.endDate || null,
+      }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      toast.error(data?.error ?? "Could not update event");
+      return;
+    }
+    toast.success("Event updated");
+    setEditingEventId(null);
+    setEditEventForm(BLANK_EVENT);
     await load();
   }
 
@@ -785,11 +840,118 @@ export default function CommunityGroupPage() {
                       {event.notes && <p className="mt-2 text-sm font-semibold text-slate-500">{event.notes}</p>}
                     </div>
                     {canManage && (
-                      <button type="button" onClick={() => deleteEvent(event.id)} className="self-start rounded-xl bg-red-50 p-2 text-red-400 hover:text-red-600">
-                        <Trash2 size={16} />
-                      </button>
+                      <div className="flex gap-2">
+                        <button type="button" onClick={() => startEditingEvent(event)} className="self-start rounded-xl bg-slate-100 p-2 text-slate-500 hover:bg-slate-200">
+                          <Pencil size={16} />
+                        </button>
+                        <button type="button" onClick={() => deleteEvent(event.id)} className="self-start rounded-xl bg-red-50 p-2 text-red-400 hover:text-red-600">
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     )}
                   </div>
+
+                  {canManage && editingEventId === event.id && (
+                    <div className="mb-4 rounded-2xl border border-violet-100 bg-violet-50 p-3">
+                      <div className="mb-3 flex items-center justify-between gap-2">
+                        <p className="font-black text-violet-900">Edit event</p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingEventId(null);
+                            setEditEventForm(BLANK_EVENT);
+                          }}
+                          className="rounded-xl bg-white p-2 text-slate-500 hover:bg-slate-100"
+                        >
+                          <X size={15} />
+                        </button>
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div>
+                          <Label className="text-sm font-bold">Title</Label>
+                          <Input
+                            value={editEventForm.title}
+                            onChange={(input) => setEditEventForm((current) => ({ ...current, title: input.target.value }))}
+                            className="mt-1 rounded-2xl bg-white"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm font-bold">Type</Label>
+                          <Select
+                            value={editEventForm.eventType}
+                            onValueChange={(value) => setEditEventForm((current) => ({ ...current, eventType: value ?? "other" }))}
+                          >
+                            <SelectTrigger className="mt-1 rounded-2xl bg-white"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {EVENT_TYPES.map((eventType) => (
+                                <SelectItem key={eventType.value} value={eventType.value}>{eventType.icon} {eventType.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-bold">Starts</Label>
+                          <Input
+                            type="datetime-local"
+                            value={editEventForm.date}
+                            onChange={(input) => setEditEventForm((current) => ({ ...current, date: input.target.value }))}
+                            className="mt-1 rounded-2xl bg-white"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm font-bold">Ends optional</Label>
+                          <Input
+                            type="datetime-local"
+                            value={editEventForm.endDate}
+                            onChange={(input) => setEditEventForm((current) => ({ ...current, endDate: input.target.value }))}
+                            className="mt-1 rounded-2xl bg-white"
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <Label className="text-sm font-bold">Location</Label>
+                          <Input
+                            value={editEventForm.location}
+                            onChange={(input) => setEditEventForm((current) => ({ ...current, location: input.target.value }))}
+                            className="mt-1 rounded-2xl bg-white"
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <Label className="text-sm font-bold">Notes</Label>
+                          <Textarea
+                            value={editEventForm.notes}
+                            onChange={(input) => setEditEventForm((current) => ({ ...current, notes: input.target.value }))}
+                            className="mt-1 rounded-2xl bg-white"
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <Label className="text-sm font-bold">Event image</Label>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            disabled={imageUploading}
+                            className="mt-1 block w-full text-sm text-slate-500 file:mr-4 file:rounded-xl file:border-0 file:bg-white file:px-4 file:py-2 file:text-sm file:font-bold file:text-violet-700 disabled:opacity-60"
+                            onChange={(input) => {
+                              const file = input.target.files?.[0];
+                              if (file) uploadCommunityEventImage(file, "edit");
+                              input.currentTarget.value = "";
+                            }}
+                          />
+                          {editEventForm.imageUrl.startsWith("/uploads/") && (
+                            <div className="mt-2 overflow-hidden rounded-2xl border border-violet-100">
+                              <img src={editEventForm.imageUrl} alt="" className="h-40 w-full object-cover" />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={updateEvent}
+                        className="mt-3 inline-flex items-center gap-2 rounded-2xl bg-emerald-500 px-4 py-2.5 font-black text-white hover:bg-emerald-600"
+                      >
+                        <Save size={17} /> Save Event
+                      </button>
+                    </div>
+                  )}
 
                   <div className="mb-4 rounded-2xl bg-slate-50 p-3">
                     <div className="mb-3 flex flex-wrap gap-2 text-xs font-black text-slate-500">
