@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, CalendarDays, Mail, Save, Shield, Trash2 } from "lucide-react";
+import { ArrowLeft, CalendarDays, LockKeyhole, Mail, Save, Shield, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 const TIME_ZONES = [
@@ -70,6 +70,10 @@ export default function ParentSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [pinForm, setPinForm] = useState({ currentPin: "", newPin: "", confirmPin: "" });
+  const [pinSaving, setPinSaving] = useState(false);
+  const [pinResetSending, setPinResetSending] = useState(false);
+  const [pinResetUrl, setPinResetUrl] = useState("");
   const canManage = settings.canManageHousehold;
   const connection = settings.googleCalendarConnection;
   const calendarStatus = connection?.syncStatus ?? "not connected";
@@ -157,6 +161,63 @@ export default function ParentSettingsPage() {
     }
   }
 
+  async function changePin() {
+    if (pinForm.newPin.length < 4) {
+      toast.error("New PIN must be at least 4 digits");
+      return;
+    }
+    if (pinForm.newPin !== pinForm.confirmPin) {
+      toast.error("New PINs do not match");
+      return;
+    }
+
+    setPinSaving(true);
+    try {
+      const res = await fetch("/api/parent/pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentPin: pinForm.currentPin,
+          newPin: pinForm.newPin,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        toast.error(data?.error ?? "Could not change PIN");
+        return;
+      }
+      setPinForm({ currentPin: "", newPin: "", confirmPin: "" });
+      toast.success("Parent PIN updated");
+    } finally {
+      setPinSaving(false);
+    }
+  }
+
+  async function sendPinReset() {
+    setPinResetSending(true);
+    setPinResetUrl("");
+    try {
+      const res = await fetch("/api/parent/pin-reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: settings.parentEmail }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        toast.error(data?.error ?? "Could not send PIN reset email");
+        return;
+      }
+      setPinResetUrl(typeof data?.resetUrl === "string" ? data.resetUrl : "");
+      toast.success("PIN reset email sent");
+    } finally {
+      setPinResetSending(false);
+    }
+  }
+
+  function updatePinField(key: keyof typeof pinForm, value: string) {
+    setPinForm((previous) => ({ ...previous, [key]: value.replace(/\D/g, "").slice(0, 8) }));
+  }
+
   if (loading) {
     return <div className="flex min-h-screen items-center justify-center text-xl font-black text-slate-500">Loading settings...</div>;
   }
@@ -220,6 +281,61 @@ export default function ParentSettingsPage() {
               </select>
             </label>
           </div>
+        </section>
+
+        <section className="rounded-3xl bg-white p-5 shadow-sm">
+          <div className="mb-4 flex items-center gap-3">
+            <div className="rounded-2xl bg-violet-100 p-3 text-violet-600">
+              <LockKeyhole size={22} />
+            </div>
+            <div>
+              <h2 className="font-black text-slate-800">Parent PIN</h2>
+              <p className="text-sm font-semibold text-slate-500">Change the PIN for protected parent sections, or send yourself a reset link.</p>
+            </div>
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            <PinInput
+              label="Current PIN"
+              value={pinForm.currentPin}
+              onChange={(value) => updatePinField("currentPin", value)}
+              autoComplete="current-password"
+            />
+            <PinInput
+              label="New PIN"
+              value={pinForm.newPin}
+              onChange={(value) => updatePinField("newPin", value)}
+              autoComplete="new-password"
+            />
+            <PinInput
+              label="Confirm new PIN"
+              value={pinForm.confirmPin}
+              onChange={(value) => updatePinField("confirmPin", value)}
+              autoComplete="new-password"
+            />
+          </div>
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <button
+              type="button"
+              onClick={changePin}
+              disabled={pinSaving || pinForm.currentPin.length < 4 || pinForm.newPin.length < 4 || pinForm.confirmPin.length < 4}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-violet-500 px-4 py-2.5 font-black text-white transition-colors hover:bg-violet-600 disabled:opacity-40"
+            >
+              <Save size={18} /> {pinSaving ? "Saving..." : "Change PIN"}
+            </button>
+            <button
+              type="button"
+              onClick={sendPinReset}
+              disabled={pinResetSending}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-100 px-4 py-2.5 font-black text-slate-700 transition-colors hover:bg-slate-200 disabled:opacity-40"
+            >
+              <Mail size={18} /> {pinResetSending ? "Sending..." : "Email PIN reset link"}
+            </button>
+          </div>
+          {pinResetUrl && (
+            <a href={pinResetUrl} className="mt-3 block break-all text-xs font-bold text-violet-500 hover:text-violet-700">
+              Development PIN reset link
+            </a>
+          )}
         </section>
 
         <section className="rounded-3xl bg-white p-5 shadow-sm">
@@ -344,6 +460,32 @@ function Toggle({ label, checked, disabled = false, onChange }: { label: string;
         disabled={disabled}
         onChange={(event) => onChange(event.target.checked)}
         className="h-5 w-5 accent-violet-500"
+      />
+    </label>
+  );
+}
+
+function PinInput({
+  label,
+  value,
+  autoComplete,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  autoComplete: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="text-sm font-bold text-slate-600">{label}</span>
+      <input
+        type="password"
+        inputMode="numeric"
+        autoComplete={autoComplete}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-1 w-full rounded-2xl border-2 border-slate-100 bg-slate-50 px-3 py-2 text-center font-mono text-xl font-black tracking-widest text-slate-800 outline-none focus:border-violet-300"
       />
     </label>
   );

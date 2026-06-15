@@ -21,6 +21,7 @@ export default function ParentPanel() {
   const [inviteLoading, setInviteLoading] = useState(false);
   const [communityInviteToken, setCommunityInviteToken] = useState("");
   const [communityReturnTo, setCommunityReturnTo] = useState("");
+  const [pinResetToken, setPinResetToken] = useState("");
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -45,6 +46,11 @@ export default function ParentPanel() {
       setMode("signup");
       setNotice("Sign in or create a parent account to join this community event.");
     }
+    const nextPinResetToken = params.get("pinReset") ?? "";
+    if (nextPinResetToken) {
+      setPinResetToken(nextPinResetToken);
+      resetPinFromEmail(nextPinResetToken);
+    }
 
     fetch("/api/parent/auth")
       .then((res) => res.json())
@@ -57,6 +63,28 @@ export default function ParentPanel() {
       })
       .catch(() => setUnlocked(false));
   }, []);
+
+  async function resetPinFromEmail(token = pinResetToken) {
+    if (!token) return;
+    try {
+      const res = await fetch("/api/parent/pin-reset", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(data?.error ?? "PIN reset link is invalid or expired.");
+        return;
+      }
+      setPinResetToken("");
+      setNotice("Parent PIN reset. Sign in, then open a parent section to set a new PIN.");
+      setError("");
+      window.history.replaceState({}, "", "/parent");
+    } catch {
+      setError("Could not reset parent PIN.");
+    }
+  }
 
   async function submitLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

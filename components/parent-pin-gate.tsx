@@ -12,6 +12,8 @@ export function ParentPinGate({ children }: { children: React.ReactNode }) {
   const [pin, setPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [resetUrl, setResetUrl] = useState("");
   const [busy, setBusy] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -61,6 +63,7 @@ export function ParentPinGate({ children }: { children: React.ReactNode }) {
     event.preventDefault();
     setBusy(true);
     setError("");
+    setNotice("");
     try {
       const res = await fetch("/api/parent/elevate", {
         method: "POST",
@@ -86,6 +89,7 @@ export function ParentPinGate({ children }: { children: React.ReactNode }) {
     event.preventDefault();
     setBusy(true);
     setError("");
+    setNotice("");
     if (pin.length < 4) {
       setError("PIN must be at least 4 digits.");
       setBusy(false);
@@ -124,6 +128,31 @@ export function ParentPinGate({ children }: { children: React.ReactNode }) {
     } finally {
       setBusy(false);
       setStatus("needs-pin");
+    }
+  }
+
+  async function requestPinReset() {
+    setBusy(true);
+    setError("");
+    setNotice("");
+    setResetUrl("");
+    try {
+      const res = await fetch("/api/parent/pin-reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(data?.error ?? "Could not send PIN reset email.");
+        return;
+      }
+      setNotice("PIN reset link sent to your parent email.");
+      if (typeof data?.resetUrl === "string") setResetUrl(data.resetUrl);
+    } catch {
+      setError("Could not send PIN reset email.");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -239,6 +268,20 @@ export function ParentPinGate({ children }: { children: React.ReactNode }) {
               Unlock
             </button>
           </form>
+          <button
+            type="button"
+            onClick={requestPinReset}
+            disabled={busy}
+            className="mt-3 block w-full text-sm font-bold text-violet-500 hover:text-violet-700 disabled:opacity-40"
+          >
+            Forgot PIN? Email reset link
+          </button>
+          {notice && <p className="mt-3 text-center text-sm font-bold text-emerald-600">{notice}</p>}
+          {resetUrl && (
+            <a href={resetUrl} className="mt-2 block break-all text-center text-xs font-bold text-violet-500 hover:text-violet-700">
+              Development PIN reset link
+            </a>
+          )}
           {error && <p className="mt-3 text-center text-sm font-bold text-red-500">{error}</p>}
         </div>
       </div>

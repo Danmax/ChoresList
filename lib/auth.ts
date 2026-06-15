@@ -38,3 +38,13 @@ export function createPasswordResetToken() {
 export function hashPasswordResetToken(token: string) {
   return hashPassword(token, "password-reset").passwordHash;
 }
+
+export function createPinResetToken() {
+  const token = randomBytes(32).toString("base64url");
+  const tokenHash = hashPassword(token, "pin-reset").passwordHash;
+  return { token, tokenHash };
+}
+
+export function hashPinResetToken(token: string) {
+  return hashPassword(token, "pin-reset").passwordHash;
+}

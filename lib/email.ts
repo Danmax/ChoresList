@@ -10,6 +10,11 @@ type PasswordResetEmail = {
   resetUrl: string;
 };
 
+type PinResetEmail = {
+  to: string;
+  resetUrl: string;
+};
+
 type CommunityInviteEmail = {
   to: string;
   inviteUrl: string;
@@ -88,6 +93,34 @@ export async function sendPasswordResetEmail({ to, resetUrl }: PasswordResetEmai
         <p>Use this link to choose a new parent password.</p>
         <p><a href="${resetUrl}" style="display:inline-block;background:#8b5cf6;color:#fff;padding:10px 14px;border-radius:10px;text-decoration:none;font-weight:700">Reset password</a></p>
         <p style="font-size:12px;color:#64748b">If the button does not work, paste this link into your browser:<br>${resetUrl}</p>
+        <p style="font-size:12px;color:#64748b">If you did not request this, you can ignore this email.</p>
+      </div>
+    `,
+  });
+
+  return { sent: true as const };
+}
+
+export async function sendPinResetEmail({ to, resetUrl }: PinResetEmail) {
+  if (!smtpConfigured()) {
+    console.info(`[email] SMTP not configured. PIN reset link for ${to}: ${resetUrl}`);
+    return { sent: false, reason: "smtp-not-configured" as const };
+  }
+
+  const transporter = createTransporter();
+  const safeResetUrl = escapeHtml(resetUrl);
+
+  await transporter.sendMail({
+    from: process.env.SMTP_FROM,
+    to,
+    subject: "Reset your ChoresList parent PIN",
+    text: `Use this link to reset your ChoresList parent PIN:\n\n${resetUrl}\n\nIf you did not request this, you can ignore this email.`,
+    html: `
+      <div style="font-family:Arial,sans-serif;line-height:1.5;color:#0f172a">
+        <h1 style="font-size:20px">Reset your ChoresList parent PIN</h1>
+        <p>Use this link to clear your current parent PIN. After it is cleared, sign in and set a new PIN.</p>
+        <p><a href="${safeResetUrl}" style="display:inline-block;background:#8b5cf6;color:#fff;padding:10px 14px;border-radius:10px;text-decoration:none;font-weight:700">Reset PIN</a></p>
+        <p style="font-size:12px;color:#64748b">If the button does not work, paste this link into your browser:<br>${safeResetUrl}</p>
         <p style="font-size:12px;color:#64748b">If you did not request this, you can ignore this email.</p>
       </div>
     `,

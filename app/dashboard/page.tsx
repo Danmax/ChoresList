@@ -4,7 +4,23 @@ import { useEffect, useState, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Settings, Trophy, Calendar, Star, Users } from "lucide-react";
+import {
+  ArrowRight,
+  Calendar,
+  CalendarDays,
+  CheckCircle2,
+  ClipboardList,
+  Compass,
+  Gift,
+  ListChecks,
+  MapPin,
+  Settings,
+  ShoppingCart,
+  Star,
+  Trophy,
+  Users,
+  Wrench,
+} from "lucide-react";
 import { getLevelFromPoints, getLevelTitle, getPointsForNextLevel } from "@/lib/points";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -27,9 +43,101 @@ interface Member {
   assignments: Assignment[];
 }
 
+type GroceryItem = {
+  id: number;
+  name: string;
+  quantity: string | null;
+  unit: string | null;
+  checked?: boolean;
+};
+
+type GroceryList = {
+  id: number;
+  title: string;
+  status: string;
+  items: GroceryItem[];
+};
+
+type CommunityEventItem = {
+  id: number;
+  title: string;
+  quantity: string | null;
+  status: string;
+  claimedBy?: { id: number; email: string } | null;
+};
+
+type CommunityEvent = {
+  id: number;
+  title: string;
+  date: string;
+  location: string | null;
+  items?: CommunityEventItem[];
+};
+
+type CommunityGroup = {
+  id: number;
+  name: string;
+  groupType: string;
+  location: string | null;
+  currentMembership: { id: number; role: string } | null;
+  events: CommunityEvent[];
+  _count?: { members: number; events: number };
+};
+
+type DashboardEventItem = CommunityEventItem & {
+  eventId: number;
+  eventTitle: string;
+  eventDate: string;
+  eventLocation: string | null;
+  groupId: number;
+  groupName: string;
+};
+
+const PARENT_ITEMS = [
+  { href: "/parent/tasks", Icon: CheckCircle2, label: "Parent Tasks", desc: "Complete parent chores", color: "#14b8a6", bg: "#ccfbf1" },
+  { href: "/parent/assign", Icon: CalendarDays, label: "Assign Chores", desc: "Plan daily and weekly work", color: "#34d399", bg: "#d1fae5" },
+  { href: "/parent/chores", Icon: ListChecks, label: "Chore Library", desc: "Edit chores and instructions", color: "#60a5fa", bg: "#dbeafe" },
+  { href: "/parent/projects", Icon: Wrench, label: "House Projects", desc: "Track bigger jobs", color: "#f97316", bg: "#ffedd5" },
+  { href: "/parent/wishlist", Icon: Gift, label: "Wish Lists", desc: "Review kid requests", color: "#f472b6", bg: "#fce7f3" },
+];
+
+const GROUP_META: Record<string, { label: string; icon: string; color: string; bg: string }> = {
+  church: { label: "Church", icon: "⛪", color: "#f59e0b", bg: "#fef3c7" },
+  nonprofit: { label: "Non-profit", icon: "🤝", color: "#10b981", bg: "#d1fae5" },
+  sports: { label: "Sports", icon: "🏀", color: "#f97316", bg: "#ffedd5" },
+  school: { label: "School", icon: "🏫", color: "#3b82f6", bg: "#dbeafe" },
+  hobby: { label: "Hobby", icon: "🎨", color: "#8b5cf6", bg: "#ede9fe" },
+  neighborhood: { label: "Neighborhood", icon: "🏘️", color: "#14b8a6", bg: "#ccfbf1" },
+  other: { label: "Community", icon: "👥", color: "#64748b", bg: "#f1f5f9" },
+};
+
+async function readJsonArray<T>(res: Response) {
+  if (!res.ok) return [];
+  const data = await res.json().catch(() => []);
+  return Array.isArray(data) ? data as T[] : [];
+}
+
+function amount(item: Pick<GroceryItem | CommunityEventItem, "quantity"> & { unit?: string | null }) {
+  return [item.quantity, item.unit].filter(Boolean).join(" ");
+}
+
+function formatShortDate(value: string) {
+  return new Date(value).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 export default function FamilyDashboard() {
   const [members, setMembers] = useState<Member[]>([]);
+  const [groceryLists, setGroceryLists] = useState<GroceryList[]>([]);
+  const [communityGroups, setCommunityGroups] = useState<CommunityGroup[]>([]);
+  const [discoverGroups, setDiscoverGroups] = useState<CommunityGroup[]>([]);
+  const [eventItems, setEventItems] = useState<DashboardEventItem[]>([]);
   const [tvMode, setTvMode] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
   const [authRequired, setAuthRequired] = useState(false);
 
@@ -45,15 +153,71 @@ export default function FamilyDashboard() {
           : `HTTP ${res.status}`;
         setApiError(msg);
         setMembers([]);
+        setGroceryLists([]);
+        setCommunityGroups([]);
+        setDiscoverGroups([]);
+        setEventItems([]);
+        setLoading(false);
         return;
       }
       setAuthRequired(false);
       setApiError(null);
       setMembers(nextMembers);
+
+      const [listsRes, groupsRes, discoverRes] = await Promise.all([
+        fetch("/api/groceries/lists?status=active"),
+        fetch("/api/community/groups"),
+        fetch("/api/community/groups?discover=true"),
+      ]);
+      const [nextLists, nextGroups, nextDiscoverGroups] = await Promise.all([
+        readJsonArray<GroceryList>(listsRes),
+        readJsonArray<CommunityGroup>(groupsRes),
+        readJsonArray<CommunityGroup>(discoverRes),
+      ]);
+      setGroceryLists(nextLists);
+      setCommunityGroups(nextGroups);
+      setDiscoverGroups(nextDiscoverGroups);
+
+      const detailedGroups = await Promise.all(
+        nextGroups.slice(0, 8).map(async (group) => {
+          const res = await fetch(`/api/community/groups?id=${group.id}`);
+          const data = await res.json().catch(() => null);
+          return res.ok && data && typeof data === "object" ? data as CommunityGroup : group;
+        })
+      );
+      const now = Date.now() - 60 * 60 * 1000;
+      const nextEventItems = detailedGroups.flatMap((group) =>
+        group.events
+          .filter((event) => new Date(event.date).getTime() >= now)
+          .flatMap((event) =>
+            (event.items ?? []).map((item) => ({
+              ...item,
+              eventId: event.id,
+              eventTitle: event.title,
+              eventDate: event.date,
+              eventLocation: event.location,
+              groupId: group.id,
+              groupName: group.name,
+            }))
+          )
+      )
+        .sort((a, b) => {
+          if (a.status === "claimed" && b.status !== "claimed") return 1;
+          if (a.status !== "claimed" && b.status === "claimed") return -1;
+          return new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime();
+        })
+        .slice(0, 6);
+      setEventItems(nextEventItems);
+      setLoading(false);
     } catch (e) {
       setAuthRequired(false);
       setApiError(e instanceof Error ? e.message : String(e));
       setMembers([]);
+      setGroceryLists([]);
+      setCommunityGroups([]);
+      setDiscoverGroups([]);
+      setEventItems([]);
+      setLoading(false);
     }
   }, []);
 
@@ -71,6 +235,13 @@ export default function FamilyDashboard() {
 
   const kids = members.filter((m) => m.role === "child");
   const sorted = [...kids].sort((a, b) => b.totalPoints - a.totalPoints);
+  const activeGroceryLists = groceryLists.filter((list) => list.status === "active");
+  const groceryItemCount = activeGroceryLists.reduce((total, list) => total + list.items.length, 0);
+  const remainingGroceryItemCount = activeGroceryLists.reduce(
+    (total, list) => total + list.items.filter((item) => !item.checked).length,
+    0
+  );
+  const publicGroupsToJoin = discoverGroups.filter((group) => !group.currentMembership);
 
   return (
     <div className={`min-h-screen ${tvMode ? "p-12" : "p-4 sm:p-6"}`}>
@@ -137,7 +308,7 @@ export default function FamilyDashboard() {
         </div>
       )}
 
-      {kids.length === 0 && !apiError && !authRequired && (
+      {kids.length === 0 && !apiError && !authRequired && !loading && (
         <div className="text-center py-24">
           <div className="text-8xl mb-6">👨‍👩‍👧‍👦</div>
           <h2 className="text-2xl font-bold text-slate-700 mb-2">No family members yet</h2>
@@ -156,6 +327,174 @@ export default function FamilyDashboard() {
               Set Up Family
             </Link>
           </div>
+        </div>
+      )}
+
+      {!authRequired && !tvMode && !apiError && !loading && (
+        <div className="mb-8 grid gap-5 xl:grid-cols-2">
+          <section className="rounded-3xl bg-white/80 p-5 shadow-sm">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="flex items-center gap-2 font-black text-slate-800">
+                  <ClipboardList size={18} className="text-violet-500" /> Parent Items
+                </h2>
+                <p className="text-xs font-bold text-slate-400">Quick access to parent workflows</p>
+              </div>
+              <Link href="/parent" className="inline-flex items-center gap-1 text-sm font-black text-violet-500 hover:text-violet-700">
+                View all <ArrowRight size={14} />
+              </Link>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {PARENT_ITEMS.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white/70 p-3 transition-colors hover:bg-white"
+                >
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl" style={{ backgroundColor: item.bg }}>
+                    <item.Icon size={20} style={{ color: item.color }} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate font-black text-slate-800">{item.label}</span>
+                    <span className="block truncate text-xs font-bold text-slate-400">{item.desc}</span>
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-3xl bg-white/80 p-5 shadow-sm">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="flex items-center gap-2 font-black text-slate-800">
+                  <ShoppingCart size={18} className="text-emerald-500" /> Shopping List
+                </h2>
+                <p className="text-xs font-bold text-slate-400">
+                  {activeGroceryLists.length} active lists · {remainingGroceryItemCount}/{groceryItemCount} items left
+                </p>
+              </div>
+              <Link href="/parent/groceries" className="inline-flex items-center gap-1 text-sm font-black text-emerald-500 hover:text-emerald-700">
+                Open <ArrowRight size={14} />
+              </Link>
+            </div>
+            <div className="space-y-3">
+              {activeGroceryLists.slice(0, 4).map((list) => {
+                const remaining = list.items.filter((item) => !item.checked);
+                return (
+                  <Link
+                    key={list.id}
+                    href="/parent/groceries"
+                    className="block rounded-2xl border border-slate-100 bg-white/70 p-3 transition-colors hover:bg-white"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate font-black text-slate-800">{list.title}</p>
+                        <p className="text-xs font-bold text-slate-400">{remaining.length} of {list.items.length} items remaining</p>
+                      </div>
+                      <Badge className="bg-emerald-100 text-emerald-700">{remaining.length === 0 ? "Done" : "Active"}</Badge>
+                    </div>
+                    {remaining[0] && (
+                      <p className="mt-2 truncate text-sm font-semibold text-slate-500">
+                        Next: {remaining[0].name}{amount(remaining[0]) ? ` · ${amount(remaining[0])}` : ""}
+                      </p>
+                    )}
+                  </Link>
+                );
+              })}
+              {activeGroceryLists.length === 0 && (
+                <Link href="/parent/groceries" className="block rounded-2xl border border-dashed border-slate-200 p-5 text-center font-bold text-slate-400 hover:bg-white/70">
+                  No active shopping lists. Create one in Groceries.
+                </Link>
+              )}
+            </div>
+          </section>
+
+          <section className="rounded-3xl bg-white/80 p-5 shadow-sm">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="flex items-center gap-2 font-black text-slate-800">
+                  <CalendarDays size={18} className="text-orange-500" /> Event Items
+                </h2>
+                <p className="text-xs font-bold text-slate-400">Things requested for upcoming community events</p>
+              </div>
+              <Link href="/community" className="inline-flex items-center gap-1 text-sm font-black text-orange-500 hover:text-orange-700">
+                Events <ArrowRight size={14} />
+              </Link>
+            </div>
+            <div className="space-y-3">
+              {eventItems.map((item) => (
+                <Link
+                  key={`${item.eventId}-${item.id}`}
+                  href={`/community/${item.groupId}?event=${item.eventId}`}
+                  className="block rounded-2xl border border-slate-100 bg-white/70 p-3 transition-colors hover:bg-white"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-black text-slate-800">{item.title}</p>
+                      <p className="truncate text-xs font-bold text-slate-400">{item.groupName} · {item.eventTitle}</p>
+                    </div>
+                    <Badge className={item.status === "claimed" ? "bg-emerald-100 text-emerald-700" : "bg-orange-100 text-orange-700"}>
+                      {item.status}
+                    </Badge>
+                  </div>
+                  <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-bold text-slate-500">
+                    <span>{formatShortDate(item.eventDate)}</span>
+                    {item.quantity && <span>{item.quantity}</span>}
+                    {item.eventLocation && <span className="inline-flex items-center gap-1"><MapPin size={12} /> {item.eventLocation}</span>}
+                  </p>
+                </Link>
+              ))}
+              {eventItems.length === 0 && (
+                <Link href="/community" className="block rounded-2xl border border-dashed border-slate-200 p-5 text-center font-bold text-slate-400 hover:bg-white/70">
+                  No upcoming event items yet.
+                </Link>
+              )}
+            </div>
+          </section>
+
+          <section className="rounded-3xl bg-white/80 p-5 shadow-sm">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="flex items-center gap-2 font-black text-slate-800">
+                  <Users size={18} className="text-violet-500" /> Communities
+                </h2>
+                <p className="text-xs font-bold text-slate-400">
+                  {communityGroups.length} joined · {publicGroupsToJoin.length} public to discover
+                </p>
+              </div>
+              <Link href="/community" className="inline-flex items-center gap-1 text-sm font-black text-violet-500 hover:text-violet-700">
+                Open <ArrowRight size={14} />
+              </Link>
+            </div>
+            <div className="space-y-3">
+              {communityGroups.slice(0, 4).map((group) => {
+                const meta = GROUP_META[group.groupType] ?? GROUP_META.other;
+                return (
+                  <Link
+                    key={group.id}
+                    href={`/community/${group.id}`}
+                    className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white/70 p-3 transition-colors hover:bg-white"
+                  >
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl" style={{ backgroundColor: meta.bg }}>
+                      {meta.icon}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-black text-slate-800">{group.name}</span>
+                      <span className="block truncate text-xs font-bold text-slate-400">
+                        {meta.label} · {group._count?.members ?? 0} members · {group.events.length} upcoming
+                      </span>
+                    </span>
+                    {group.location && <Compass size={16} className="shrink-0 text-slate-300" />}
+                  </Link>
+                );
+              })}
+              {communityGroups.length === 0 && (
+                <Link href="/community" className="block rounded-2xl border border-dashed border-slate-200 p-5 text-center font-bold text-slate-400 hover:bg-white/70">
+                  No joined communities yet. Create or join one.
+                </Link>
+              )}
+            </div>
+          </section>
         </div>
       )}
 
