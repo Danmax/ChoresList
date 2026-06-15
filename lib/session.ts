@@ -12,6 +12,14 @@ export type SessionPayload = {
   expiresAt: number;
 };
 
+export type HouseholdAccountRole = "owner" | "parent" | "grandparent";
+
+export type HouseholdInvitePayload = {
+  householdId: number;
+  accountRole: Exclude<HouseholdAccountRole, "owner">;
+  expiresAt: number;
+};
+
 export type CommunityInvitePayload = {
   groupId: number;
   role: "owner" | "manager" | "member";
@@ -88,19 +96,27 @@ export const parentSession = {
   maxAge: SESSION_TTL_SECONDS,
 };
 
-export function createHouseholdInviteToken(householdId: number) {
+function cleanHouseholdInviteRole(value: unknown): Exclude<HouseholdAccountRole, "owner"> {
+  return value === "grandparent" ? "grandparent" : "parent";
+}
+
+export function createHouseholdInviteToken(
+  householdId: number,
+  accountRole: Exclude<HouseholdAccountRole, "owner"> = "parent"
+) {
   const expiresAt = Math.floor(Date.now() / 1000) + INVITE_TTL_SECONDS;
   const payload = Buffer.from(
     JSON.stringify({
       purpose: "household-invite",
       householdId,
+      accountRole: cleanHouseholdInviteRole(accountRole),
       expiresAt,
     })
   ).toString("base64url");
   return `${payload}.${sign(payload)}`;
 }
 
-export function verifyHouseholdInviteToken(token?: string): { householdId: number; expiresAt: number } | null {
+export function verifyHouseholdInviteToken(token?: string): HouseholdInvitePayload | null {
   if (!token) return null;
 
   const [payload, signature] = token.split(".");
@@ -117,6 +133,7 @@ export function verifyHouseholdInviteToken(token?: string): { householdId: numbe
     const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
       purpose?: string;
       householdId?: unknown;
+      accountRole?: unknown;
       expiresAt?: unknown;
     };
     if (
@@ -127,7 +144,11 @@ export function verifyHouseholdInviteToken(token?: string): { householdId: numbe
     ) {
       return null;
     }
-    return { householdId: parsed.householdId, expiresAt: parsed.expiresAt };
+    return {
+      householdId: parsed.householdId,
+      accountRole: cleanHouseholdInviteRole(parsed.accountRole),
+      expiresAt: parsed.expiresAt,
+    };
   } catch {
     return null;
   }

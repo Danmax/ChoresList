@@ -4,7 +4,7 @@ import { requireOwnerSession, withErrors } from "@/lib/api";
 import { cleanCommunityRole } from "@/lib/community";
 import { prisma } from "@/lib/prisma";
 
-const ACCOUNT_ROLES = new Set(["owner", "parent"]);
+const ACCOUNT_ROLES = new Set(["owner", "parent", "grandparent"]);
 const COMMUNITY_VISIBILITIES = new Set(["private", "public"]);
 
 function cleanInt(value: unknown) {

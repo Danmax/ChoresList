@@ -21,6 +21,40 @@ const sessionCookieOptions = (maxAge: number) => ({
 const GENERIC_SIGNUP_MESSAGE =
   "If that email is available, we sent a confirmation link. Check your inbox to finish signup.";
 
+const ACCOUNT_ROLES = new Set(["owner", "parent", "grandparent"]);
+
+function cleanAccountRole(value: unknown) {
+  return typeof value === "string" && ACCOUNT_ROLES.has(value) ? value : "parent";
+}
+
+async function finalizeVerifiedParentAccount(parent: {
+  id: number;
+  householdId: number;
+  email: string;
+  accountRole: string;
+}) {
+  const [parentCount, ownerCount, choreCount, skillCount] = await Promise.all([
+    prisma.parentAccount.count({ where: { householdId: parent.householdId } }),
+    prisma.parentAccount.count({ where: { householdId: parent.householdId, accountRole: "owner" } }),
+    prisma.chore.count({ where: { householdId: parent.householdId } }),
+    prisma.skillCategory.count({ where: { householdId: parent.householdId } }),
+  ]);
+
+  const nextRole = parentCount <= 1 || ownerCount === 0 ? "owner" : cleanAccountRole(parent.accountRole);
+  const updated = nextRole !== parent.accountRole
+    ? await prisma.parentAccount.update({
+        where: { id: parent.id },
+        data: { accountRole: nextRole },
+      })
+    : parent;
+
+  if (nextRole === "owner" && choreCount === 0 && skillCount === 0) {
+    await seedHouseholdDefaults(prisma, parent.householdId);
+  }
+
+  return updated;
+}
+
 export const GET = withErrors(async (req: NextRequest) => {
   const confirmationToken = req.nextUrl.searchParams.get("confirm");
   if (confirmationToken) {
@@ -32,7 +66,13 @@ export const GET = withErrors(async (req: NextRequest) => {
 
   const token = req.cookies.get(parentSession.name)?.value;
   const session = verifySessionToken(token);
-  return NextResponse.json({ ok: Boolean(session), session });
+  const parent = session
+    ? await prisma.parentAccount.findFirst({
+        where: { id: session.parentId, householdId: session.householdId },
+        select: { accountRole: true },
+      })
+    : null;
+  return NextResponse.json({ ok: Boolean(session), session, accountRole: parent?.accountRole ?? null });
 });
 
 export const POST = withErrors(async (req: NextRequest) => {
@@ -60,15 +100,6 @@ export const POST = withErrors(async (req: NextRequest) => {
       return NextResponse.json({ ok: false, error: "Password must be at least 8 characters." }, { status: 400 });
     }
 
-    const existing = await prisma.parentAccount.findUnique({ where: { email: normalizedEmail } });
-    if (existing) {
-      return NextResponse.json({
-        ok: true,
-        needsConfirmation: true,
-        message: GENERIC_SIGNUP_MESSAGE,
-      });
-    }
-
     const invite = typeof inviteToken === "string" ? verifyHouseholdInviteToken(inviteToken) : null;
     if (inviteToken && !invite) {
       return NextResponse.json({ ok: false, error: "Invite link is invalid or expired." }, { status: 400 });
@@ -78,6 +109,24 @@ export const POST = withErrors(async (req: NextRequest) => {
       if (!household) {
         return NextResponse.json({ ok: false, error: "Invite household no longer exists." }, { status: 400 });
       }
+    }
+
+    const existing = await prisma.parentAccount.findUnique({ where: { email: normalizedEmail } });
+    if (existing) {
+      if (invite && !existing.emailVerified) {
+        await prisma.parentAccount.update({
+          where: { id: existing.id },
+          data: {
+            householdId: invite.householdId,
+            accountRole: invite.accountRole,
+          },
+        });
+      }
+      return NextResponse.json({
+        ok: true,
+        needsConfirmation: true,
+        message: GENERIC_SIGNUP_MESSAGE,
+      });
     }
 
     const { passwordHash, passwordSalt } = hashPassword(password);
@@ -92,7 +141,7 @@ export const POST = withErrors(async (req: NextRequest) => {
             passwordHash,
             passwordSalt,
             householdId: invite.householdId,
-            accountRole: "parent",
+            accountRole: invite.accountRole,
             confirmationTokens: {
               create: { tokenHash, expiresAt },
             },
@@ -109,6 +158,7 @@ export const POST = withErrors(async (req: NextRequest) => {
           household: {
             create: { name: typeof householdName === "string" && householdName.trim() ? householdName.trim() : "My Household" },
           },
+          accountRole: "owner",
           confirmationTokens: {
             create: { tokenHash, expiresAt },
           },
@@ -152,10 +202,11 @@ export const POST = withErrors(async (req: NextRequest) => {
     return NextResponse.json({ ok: false, needsConfirmation: true, error: "Please confirm your email first." }, { status: 403 });
   }
 
-  const response = NextResponse.json({ ok: true });
+  const verifiedParent = await finalizeVerifiedParentAccount(parent);
+  const response = NextResponse.json({ ok: true, accountRole: verifiedParent.accountRole });
   response.cookies.set({
     name: parentSession.name,
-    value: createSessionToken(parent),
+    value: createSessionToken(verifiedParent),
     ...sessionCookieOptions(parentSession.maxAge),
   });
   return response;
@@ -184,8 +235,9 @@ async function confirmEmail(token: string) {
     prisma.parentAccount.update({ where: { id: record.parentId }, data: { emailVerified: true } }),
     prisma.emailConfirmationToken.update({ where: { id: record.id }, data: { usedAt: new Date() } }),
   ]);
+  const parent = await finalizeVerifiedParentAccount(record.parent);
 
-  return { ok: true };
+  return { ok: true, accountRole: parent.accountRole };
 }
 
 export const DELETE = withErrors(async () => {

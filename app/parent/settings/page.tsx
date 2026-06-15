@@ -232,7 +232,7 @@ export default function ParentSettingsPage() {
           <div>
             <h1 className="text-2xl font-black text-slate-800 sm:text-3xl">Household Settings</h1>
             <p className="text-sm font-semibold text-slate-500">
-              {settings.parentEmail} · {settings.accountRole === "owner" ? "Owner" : "Parent"}
+              {settings.parentEmail} · {settings.accountRole === "owner" ? "Owner" : settings.accountRole === "grandparent" ? "Grandparent" : "Parent"}
             </p>
           </div>
         </div>

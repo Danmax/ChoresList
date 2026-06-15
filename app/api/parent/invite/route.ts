@@ -7,9 +7,10 @@ export const runtime = "nodejs";
 
 export const GET = withErrors(async (req: NextRequest) => {
   const { householdId } = await requireOwnerSession(req);
-  const token = createHouseholdInviteToken(householdId);
+  const role = req.nextUrl.searchParams.get("role") === "grandparent" ? "grandparent" : "parent";
+  const token = createHouseholdInviteToken(householdId, role);
   const inviteUrl = new URL("/parent", getBaseUrl(req));
   inviteUrl.searchParams.set("invite", token);
 
-  return NextResponse.json({ ok: true, inviteUrl: inviteUrl.toString() });
+  return NextResponse.json({ ok: true, inviteUrl: inviteUrl.toString(), role });
 });

@@ -4,8 +4,12 @@ import { type FormEvent, useState, useEffect } from "react";
 import Link from "next/link";
 import { Users, ListChecks, CalendarDays, DollarSign, BookOpen, Home, BarChart2, Gift, Wrench, Ticket, Mail, LockKeyhole, MonitorSmartphone, LogOut, Settings, UserPlus, Copy, Share2, CheckCircle2, ShoppingCart, ShieldCheck } from "lucide-react";
 
+type AccountRole = "owner" | "parent" | "grandparent";
+type InviteRole = "parent" | "grandparent";
+
 export default function ParentPanel() {
   const [unlocked, setUnlocked] = useState(false);
+  const [accountRole, setAccountRole] = useState<AccountRole>("parent");
   const [mode, setMode] = useState<"login" | "signup" | "forgot" | "reset">("login");
   const [householdName, setHouseholdName] = useState("");
   const [email, setEmail] = useState("");
@@ -18,6 +22,7 @@ export default function ParentPanel() {
   const [checking, setChecking] = useState(false);
   const [inviteToken, setInviteToken] = useState("");
   const [inviteUrl, setInviteUrl] = useState("");
+  const [inviteRole, setInviteRole] = useState<InviteRole>("parent");
   const [inviteLoading, setInviteLoading] = useState(false);
   const [communityInviteToken, setCommunityInviteToken] = useState("");
   const [communityReturnTo, setCommunityReturnTo] = useState("");
@@ -54,10 +59,13 @@ export default function ParentPanel() {
 
     fetch("/api/parent/auth")
       .then((res) => res.json())
-      .then(({ ok }) => {
+      .then(({ ok, accountRole: nextAccountRole }) => {
         if (ok && communityInvite) {
           acceptCommunityInvite(communityInvite, params.get("returnTo") ?? "");
           return;
+        }
+        if (nextAccountRole === "owner" || nextAccountRole === "parent" || nextAccountRole === "grandparent") {
+          setAccountRole(nextAccountRole);
         }
         setUnlocked(Boolean(ok));
       })
@@ -116,6 +124,9 @@ export default function ParentPanel() {
         if (communityInviteToken) {
           await acceptCommunityInvite();
           return;
+        }
+        if (data.accountRole === "owner" || data.accountRole === "parent" || data.accountRole === "grandparent") {
+          setAccountRole(data.accountRole);
         }
         setUnlocked(true);
         setError("");
@@ -245,10 +256,11 @@ export default function ParentPanel() {
     setPassword("");
   }
 
-  async function loadInvite() {
+  async function loadInvite(role: InviteRole = "parent") {
     setInviteLoading(true);
+    setInviteRole(role);
     try {
-      const res = await fetch("/api/parent/invite");
+      const res = await fetch(`/api/parent/invite?role=${role}`);
       const data = await res.json();
       if (data.ok && data.inviteUrl) {
         setInviteUrl(data.inviteUrl);
@@ -278,8 +290,10 @@ export default function ParentPanel() {
     if (!inviteUrl) return;
     if (navigator.share) {
       await navigator.share({
-        title: "Join my ChoresList household",
-        text: "Create a parent account to join our family chore app.",
+        title: inviteRole === "grandparent" ? "Join my ChoresList family as a grandparent" : "Join my ChoresList household",
+        text: inviteRole === "grandparent"
+          ? "Create a grandparent account to stay connected with our family chore app."
+          : "Create a parent account to join our family chore app.",
         url: inviteUrl,
       });
       return;
@@ -424,39 +438,58 @@ export default function ParentPanel() {
   }
 
   const sections = [
-    { href: "/parent/members", icon: Users, label: "Family Members", desc: "Add/edit kids and profiles", color: "#a78bfa", bg: "#ede9fe" },
-    { href: "/parent/chores", icon: ListChecks, label: "Chore Library", desc: "Browse, assign & AI instructions", color: "#60a5fa", bg: "#dbeafe" },
-    { href: "/parent/assign", icon: CalendarDays, label: "Assign Chores", desc: "Set daily, weekly & special tasks", color: "#34d399", bg: "#d1fae5" },
-    { href: "/parent/tasks", icon: CheckCircle2, label: "Parent Tasks", desc: "Complete chores assigned to parents", color: "#14b8a6", bg: "#ccfbf1" },
-    { href: "/parent/allowance", icon: DollarSign, label: "Allowance", desc: "Review points, pay out credits", color: "#fbbf24", bg: "#fef3c7" },
-    { href: "/parent/projects", icon: Wrench, label: "House Projects", desc: "Fix-it tasks with reward tickets", color: "#f97316", bg: "#ffedd5" },
-    { href: "/parent/groceries", icon: ShoppingCart, label: "Grocery Lists", desc: "Plan shopping & recurring staples", color: "#22c55e", bg: "#dcfce7" },
-    { href: "/parent/tickets", icon: Ticket, label: "Reward Tickets", desc: "Cash in earned rewards", color: "#eab308", bg: "#fefce8" },
-    { href: "/parent/reports", icon: BarChart2, label: "Reports", desc: "Charts, completions & points trends", color: "#10b981", bg: "#d1fae5" },
-    { href: "/parent/devices", icon: MonitorSmartphone, label: "Device Screens", desc: "Pair QR task boards for kids", color: "#6366f1", bg: "#e0e7ff" },
-    { href: "/parent/wishlist", icon: Gift, label: "Wish Lists", desc: "Grant kids' wishes & requests", color: "#f472b6", bg: "#fce7f3" },
-    { href: "/calendar", icon: BookOpen, label: "Family Calendar", desc: "Schedule events & activities", color: "#f97316", bg: "#ffedd5" },
-    { href: "/community", icon: Users, label: "Community", desc: "Groups, events, RSVP & potlucks", color: "#8b5cf6", bg: "#ede9fe" },
-    { href: "/parent/admin", icon: ShieldCheck, label: "Super Admin Config", desc: "Manage users & communities", color: "#0f172a", bg: "#e2e8f0" },
-    { href: "/parent/settings", icon: Settings, label: "Household Settings", desc: "Family, calendar, email & privacy", color: "#64748b", bg: "#f1f5f9" },
+    { href: "/parent/members", icon: Users, label: "Family Members", desc: "Add/edit kids and profiles", color: "#a78bfa", bg: "#ede9fe", roles: ["owner", "parent"] },
+    { href: "/parent/chores", icon: ListChecks, label: "Chore Library", desc: "Browse, assign & AI instructions", color: "#60a5fa", bg: "#dbeafe", roles: ["owner", "parent"] },
+    { href: "/parent/assign", icon: CalendarDays, label: "Assign Chores", desc: "Set daily, weekly & special tasks", color: "#34d399", bg: "#d1fae5", roles: ["owner", "parent"] },
+    { href: "/parent/tasks", icon: CheckCircle2, label: "Parent Tasks", desc: "Complete chores assigned to parents", color: "#14b8a6", bg: "#ccfbf1", roles: ["owner", "parent"] },
+    { href: "/parent/allowance", icon: DollarSign, label: "Allowance", desc: "Review points, pay out credits", color: "#fbbf24", bg: "#fef3c7", roles: ["owner", "parent"] },
+    { href: "/parent/projects", icon: Wrench, label: "House Projects", desc: "Fix-it tasks with reward tickets", color: "#f97316", bg: "#ffedd5", roles: ["owner", "parent"] },
+    { href: "/parent/groceries", icon: ShoppingCart, label: "Grocery Lists", desc: "Plan shopping & recurring staples", color: "#22c55e", bg: "#dcfce7", roles: ["owner", "parent"] },
+    { href: "/parent/tickets", icon: Ticket, label: "Reward Tickets", desc: "Cash in earned rewards", color: "#eab308", bg: "#fefce8", roles: ["owner", "parent", "grandparent"] },
+    { href: "/parent/reports", icon: BarChart2, label: "Reports", desc: "Charts, completions & points trends", color: "#10b981", bg: "#d1fae5", roles: ["owner", "parent", "grandparent"] },
+    { href: "/parent/devices", icon: MonitorSmartphone, label: "Device Screens", desc: "Pair QR task boards for kids", color: "#6366f1", bg: "#e0e7ff", roles: ["owner", "parent"] },
+    { href: "/parent/wishlist", icon: Gift, label: "Wish Lists", desc: "View kids' wishes & requests", color: "#f472b6", bg: "#fce7f3", roles: ["owner", "parent", "grandparent"] },
+    { href: "/calendar", icon: BookOpen, label: "Family Calendar", desc: "See family events & activities", color: "#f97316", bg: "#ffedd5", roles: ["owner", "parent", "grandparent"] },
+    { href: "/community", icon: Users, label: "Community", desc: "Groups, events, RSVP & potlucks", color: "#8b5cf6", bg: "#ede9fe", roles: ["owner", "parent", "grandparent"] },
+    { href: "/parent/admin", icon: ShieldCheck, label: "Super Admin Config", desc: "Manage users & communities", color: "#0f172a", bg: "#e2e8f0", roles: ["owner"] },
+    { href: "/parent/settings", icon: Settings, label: "Household Settings", desc: "Account, PIN, email & privacy", color: "#64748b", bg: "#f1f5f9", roles: ["owner", "parent", "grandparent"] },
   ];
+  const visibleSections = sections.filter((section) => section.roles.includes(accountRole));
+  const roleLabel = accountRole === "grandparent" ? "Grandparent Access" : accountRole === "owner" ? "Owner Access" : "Parent Access";
 
   return (
     <div className="min-h-screen p-4 sm:p-6">
       <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-800">🔧 Parent Panel</h1>
-          <p className="text-slate-500 font-semibold">Manage your family&apos;s chore system</p>
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-800">
+            {accountRole === "grandparent" ? "👵 Grandparent Access" : "🔧 Parent Panel"}
+          </h1>
+          <p className="text-slate-500 font-semibold">
+            {accountRole === "grandparent" ? "Stay connected with family progress and events" : "Manage your family's chore system"}
+          </p>
+          <p className="mt-1 text-xs font-black uppercase tracking-wide text-violet-500">{roleLabel}</p>
         </div>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:flex">
-          <button
-            type="button"
-            onClick={loadInvite}
-            disabled={inviteLoading}
-            className="flex items-center justify-center gap-2 bg-violet-500 text-white rounded-2xl px-4 py-2.5 shadow-sm font-bold hover:bg-violet-600 transition-colors disabled:opacity-60"
-          >
-            <UserPlus size={18} /> {inviteLoading ? "Loading..." : "Invite Family"}
-          </button>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:flex">
+          {accountRole === "owner" && (
+            <>
+              <button
+                type="button"
+                onClick={() => loadInvite("parent")}
+                disabled={inviteLoading}
+                className="flex items-center justify-center gap-2 bg-violet-500 text-white rounded-2xl px-4 py-2.5 shadow-sm font-bold hover:bg-violet-600 transition-colors disabled:opacity-60"
+              >
+                <UserPlus size={18} /> {inviteLoading && inviteRole === "parent" ? "Loading..." : "Invite Parent"}
+              </button>
+              <button
+                type="button"
+                onClick={() => loadInvite("grandparent")}
+                disabled={inviteLoading}
+                className="flex items-center justify-center gap-2 bg-emerald-500 text-white rounded-2xl px-4 py-2.5 shadow-sm font-bold hover:bg-emerald-600 transition-colors disabled:opacity-60"
+              >
+                <UserPlus size={18} /> {inviteLoading && inviteRole === "grandparent" ? "Loading..." : "Invite Grandparent"}
+              </button>
+            </>
+          )}
           <Link
             href="/dashboard"
             className="flex items-center justify-center gap-2 bg-white rounded-2xl px-4 py-2.5 shadow-sm font-bold text-slate-600 hover:shadow-md transition-shadow"
@@ -478,6 +511,9 @@ export default function ParentPanel() {
           <div className="flex flex-col gap-3 md:flex-row md:items-center">
             <div className="min-w-0 flex-1">
               <p className="font-black text-slate-800">Share parent access</p>
+              <p className="text-xs font-black uppercase tracking-wide text-violet-500">
+                {inviteRole === "grandparent" ? "Grandparent invite" : "Parent invite"}
+              </p>
               <p className="truncate text-sm font-semibold text-slate-500">{inviteUrl}</p>
             </div>
             <div className="flex gap-2">
@@ -501,7 +537,7 @@ export default function ParentPanel() {
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        {sections.map((s) => (
+        {visibleSections.map((s) => (
           <Link key={s.href} href={s.href}>
             <div
               className="rounded-3xl p-6 shadow-sm hover:shadow-lg transition-all hover:-translate-y-1 cursor-pointer"

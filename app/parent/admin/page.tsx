@@ -210,6 +210,7 @@ export default function SuperAdminConfigPage() {
                     >
                       <option value="owner">Owner</option>
                       <option value="parent">Parent</option>
+                      <option value="grandparent">Grandparent</option>
                     </select>
                   </div>
                 </div>

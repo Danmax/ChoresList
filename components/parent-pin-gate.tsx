@@ -1,14 +1,30 @@
 "use client";
 
 import { type FormEvent, useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { LockKeyhole, LogOut, ShieldCheck } from "lucide-react";
 
 type Status = "loading" | "elevated" | "needs-pin" | "needs-setup" | "signed-out";
+type AccountRole = "owner" | "parent" | "grandparent";
 
 const POLL_MS = 60_000;
+const GRANDPARENT_BLOCKED_PATHS = [
+  "/parent/admin",
+  "/parent/allowance",
+  "/parent/assign",
+  "/parent/chores",
+  "/parent/devices",
+  "/parent/groceries",
+  "/parent/members",
+  "/parent/projects",
+  "/parent/tasks",
+];
 
 export function ParentPinGate({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname() ?? "";
   const [status, setStatus] = useState<Status>("loading");
+  const [accountRole, setAccountRole] = useState<AccountRole>("parent");
   const [pin, setPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
   const [error, setError] = useState("");
@@ -24,6 +40,9 @@ export function ParentPinGate({ children }: { children: React.ReactNode }) {
         if (!data?.ok) {
           setStatus("signed-out");
           return;
+        }
+        if (data.accountRole === "owner" || data.accountRole === "parent" || data.accountRole === "grandparent") {
+          setAccountRole(data.accountRole);
         }
       } else {
         setStatus("signed-out");
@@ -283,6 +302,31 @@ export function ParentPinGate({ children }: { children: React.ReactNode }) {
             </a>
           )}
           {error && <p className="mt-3 text-center text-sm font-bold text-red-500">{error}</p>}
+        </div>
+      </div>
+    );
+  }
+
+  if (
+    accountRole === "grandparent" &&
+    GRANDPARENT_BLOCKED_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))
+  ) {
+    return (
+      <div className="flex min-h-screen items-center justify-center px-4">
+        <div className="w-full max-w-md rounded-3xl bg-white p-6 text-center shadow-xl">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-violet-100 text-violet-600">
+            <ShieldCheck size={32} />
+          </div>
+          <h1 className="mb-2 text-2xl font-black text-slate-800">Grandparent access</h1>
+          <p className="mb-5 text-sm font-semibold text-slate-500">
+            This section is reserved for parents who manage chores, devices, allowance, and household setup.
+          </p>
+          <Link
+            href="/parent"
+            className="inline-flex rounded-2xl bg-violet-500 px-5 py-2.5 font-black text-white hover:bg-violet-600"
+          >
+            Back to Grandparent Menu
+          </Link>
         </div>
       </div>
     );
