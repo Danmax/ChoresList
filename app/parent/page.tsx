@@ -2,10 +2,19 @@
 
 import { type FormEvent, useState, useEffect } from "react";
 import Link from "next/link";
-import { Users, ListChecks, CalendarDays, DollarSign, BookOpen, Home, BarChart2, Gift, Wrench, Ticket, Mail, LockKeyhole, MonitorSmartphone, LogOut, Settings, UserPlus, Copy, Share2, CheckCircle2, ShoppingCart, ShieldCheck } from "lucide-react";
+import { Users, ListChecks, CalendarDays, DollarSign, BookOpen, Home, BarChart2, Gift, Wrench, Ticket, Mail, LockKeyhole, MonitorSmartphone, LogOut, Settings, UserPlus, Copy, Share2, CheckCircle2, ShoppingCart, ShieldCheck, Network } from "lucide-react";
 
 type AccountRole = "owner" | "parent" | "grandparent";
 type InviteRole = "parent" | "grandparent";
+
+type Plugin = {
+  key: string;
+  label: string;
+  description: string;
+  route: string;
+  active: boolean;
+  roles: string[];
+};
 
 export default function ParentPanel() {
   const [unlocked, setUnlocked] = useState(false);
@@ -27,6 +36,7 @@ export default function ParentPanel() {
   const [communityInviteToken, setCommunityInviteToken] = useState("");
   const [communityReturnTo, setCommunityReturnTo] = useState("");
   const [pinResetToken, setPinResetToken] = useState("");
+  const [plugins, setPlugins] = useState<Plugin[]>([]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -68,6 +78,12 @@ export default function ParentPanel() {
           setAccountRole(nextAccountRole);
         }
         setUnlocked(Boolean(ok));
+        if (ok) {
+          fetch("/api/plugins")
+            .then((res) => res.ok ? res.json() : null)
+            .then((data) => setPlugins(Array.isArray(data?.plugins) ? data.plugins : []))
+            .catch(() => setPlugins([]));
+        }
       })
       .catch(() => setUnlocked(false));
   }, []);
@@ -437,8 +453,21 @@ export default function ParentPanel() {
     );
   }
 
+  const pluginSections = plugins
+    .filter((plugin) => plugin.active)
+    .map((plugin) => ({
+      href: plugin.route,
+      icon: Network,
+      label: plugin.label,
+      desc: plugin.description,
+      color: "#14b8a6",
+      bg: "#ccfbf1",
+      roles: plugin.roles,
+    }));
+
   const sections = [
     { href: "/parent/members", icon: Users, label: "Family Members", desc: "Add/edit kids and profiles", color: "#a78bfa", bg: "#ede9fe", roles: ["owner", "parent"] },
+    ...pluginSections,
     { href: "/parent/chores", icon: ListChecks, label: "Chore Library", desc: "Browse, assign & AI instructions", color: "#60a5fa", bg: "#dbeafe", roles: ["owner", "parent"] },
     { href: "/parent/assign", icon: CalendarDays, label: "Assign Chores", desc: "Set daily, weekly & special tasks", color: "#34d399", bg: "#d1fae5", roles: ["owner", "parent"] },
     { href: "/parent/tasks", icon: CheckCircle2, label: "Parent Tasks", desc: "Complete chores assigned to parents", color: "#14b8a6", bg: "#ccfbf1", roles: ["owner", "parent"] },

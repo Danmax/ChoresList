@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, CalendarDays, LockKeyhole, Mail, Save, Shield, Trash2 } from "lucide-react";
+import { ArrowLeft, CalendarDays, LockKeyhole, Mail, Puzzle, Save, Shield, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 const TIME_ZONES = [
@@ -43,6 +43,15 @@ type Settings = {
   } | null;
 };
 
+type Plugin = {
+  key: string;
+  label: string;
+  description: string;
+  route: string;
+  active: boolean;
+  status: "active" | "inactive";
+};
+
 const DEFAULT_SETTINGS: Settings = {
   name: "",
   timeZone: "America/New_York",
@@ -74,6 +83,8 @@ export default function ParentSettingsPage() {
   const [pinSaving, setPinSaving] = useState(false);
   const [pinResetSending, setPinResetSending] = useState(false);
   const [pinResetUrl, setPinResetUrl] = useState("");
+  const [plugins, setPlugins] = useState<Plugin[]>([]);
+  const [savingPlugin, setSavingPlugin] = useState("");
   const canManage = settings.canManageHousehold;
   const connection = settings.googleCalendarConnection;
   const calendarStatus = connection?.syncStatus ?? "not connected";
@@ -82,18 +93,25 @@ export default function ParentSettingsPage() {
     : null;
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/parent/settings");
-    if (!res.ok) {
+    const [settingsRes, pluginsRes] = await Promise.all([
+      fetch("/api/parent/settings"),
+      fetch("/api/plugins"),
+    ]);
+    if (!settingsRes.ok) {
       toast.error("Could not load household settings");
       setLoading(false);
       return;
     }
-    const data = await res.json();
+    const data = await settingsRes.json();
     setSettings({
       ...DEFAULT_SETTINGS,
       ...data,
       googleCalendarId: data.googleCalendarId ?? "",
     });
+    if (pluginsRes.ok) {
+      const pluginData = await pluginsRes.json().catch(() => null);
+      setPlugins(Array.isArray(pluginData?.plugins) ? pluginData.plugins : []);
+    }
     setLoading(false);
   }, []);
 
@@ -126,6 +144,30 @@ export default function ParentSettingsPage() {
       toast.success("Settings saved");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function setPluginStatus(plugin: Plugin, active: boolean) {
+    if (!canManage) {
+      toast.error("Only the household owner can manage plugins");
+      return;
+    }
+    setSavingPlugin(plugin.key);
+    try {
+      const res = await fetch("/api/plugins", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pluginKey: plugin.key, status: active ? "active" : "inactive" }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        toast.error(data?.error ?? "Could not update plugin");
+        return;
+      }
+      setPlugins(Array.isArray(data?.plugins) ? data.plugins : []);
+      toast.success(active ? `${plugin.label} activated` : `${plugin.label} deactivated`);
+    } finally {
+      setSavingPlugin("");
     }
   }
 
@@ -280,6 +322,51 @@ export default function ParentSettingsPage() {
                 ))}
               </select>
             </label>
+          </div>
+        </section>
+
+        <section className="rounded-3xl bg-white p-5 shadow-sm">
+          <div className="mb-4 flex items-center gap-3">
+            <div className="rounded-2xl bg-teal-100 p-3 text-teal-600">
+              <Puzzle size={22} />
+            </div>
+            <div>
+              <h2 className="font-black text-slate-800">Feature Plugins</h2>
+              <p className="text-sm font-semibold text-slate-500">Activate optional household tools when your family needs them.</p>
+            </div>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            {plugins.map((plugin) => (
+              <div key={plugin.key} className="rounded-2xl border-2 border-slate-100 bg-slate-50 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="font-black text-slate-800">{plugin.label}</h3>
+                    <p className="mt-1 text-sm font-semibold text-slate-500">{plugin.description}</p>
+                  </div>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-black uppercase ${plugin.active ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500"}`}>
+                    {plugin.active ? "Active" : "Off"}
+                  </span>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={!canManage || savingPlugin === plugin.key}
+                    onClick={() => setPluginStatus(plugin, !plugin.active)}
+                    className={`rounded-2xl px-4 py-2 text-sm font-black text-white transition-colors disabled:opacity-40 ${plugin.active ? "bg-slate-700 hover:bg-slate-800" : "bg-teal-500 hover:bg-teal-600"}`}
+                  >
+                    {savingPlugin === plugin.key ? "Saving..." : plugin.active ? "Deactivate" : "Activate"}
+                  </button>
+                  {plugin.active && (
+                    <Link href={plugin.route} className="rounded-2xl bg-white px-4 py-2 text-sm font-black text-teal-600 shadow-sm hover:text-teal-700">
+                      Open
+                    </Link>
+                  )}
+                </div>
+              </div>
+            ))}
+            {plugins.length === 0 && (
+              <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-400">No plugins are available yet.</p>
+            )}
           </div>
         </section>
 

@@ -37,6 +37,8 @@ model ParentAccount {
   communityRsvps         CommunityRsvp[]
   assignedCommunityItems CommunityEventItem[]     @relation("CommunityItemAssignee")
   claimedCommunityItems  CommunityEventItem[]     @relation("CommunityItemClaimer")
+  activatedPlugins       HouseholdPlugin[]        @relation("PluginActivator")
+  familyTreeNodes        FamilyTreeNode[]
 }
 
 model Household {
@@ -74,6 +76,27 @@ model Household {
   groceryLists             GroceryList[]
   groceryTemplates         GroceryTemplate[]
   googleCalendarConnection GoogleCalendarConnection?
+  plugins                  HouseholdPlugin[]
+  familyTreeNodes          FamilyTreeNode[]
+  familyTreeRelationships  FamilyTreeRelationship[]
+}
+
+model HouseholdPlugin {
+  id                  Int       @id @default(autoincrement())
+  householdId          Int
+  pluginKey            String    @db.VarChar(64)
+  status               String    @default("inactive") @db.VarChar(32)
+  settings             Json?
+  activatedAt          DateTime?
+  activatedByParentId  Int?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @default(now()) @updatedAt
+
+  household         Household      @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  activatedByParent ParentAccount? @relation("PluginActivator", fields: [activatedByParentId], references: [id], onDelete: SetNull)
+
+  @@unique([householdId, pluginKey])
+  @@index([pluginKey])
 }
 
 model GoogleCalendarConnection {
@@ -155,6 +178,55 @@ model FamilyMember {
   devices          HouseholdDevice[]
   pairingCodes     DevicePairingCode[]
   household        Household           @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  familyTreeNodes  FamilyTreeNode[]
+}
+
+model FamilyTreeNode {
+  id              Int      @id @default(autoincrement())
+  householdId     Int
+  kind            String   @default("external") @db.VarChar(32)
+  familyMemberId  Int?
+  parentAccountId Int?
+  name            String   @db.VarChar(255)
+  avatar          String   @default("👤") @db.VarChar(32)
+  color           String   @default("#a78bfa") @db.VarChar(32)
+  birthYear       Int?
+  birthdayMonth   Int?
+  birthdayDay     Int?
+  notes           String?  @db.Text
+  x               Int?
+  y               Int?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now()) @updatedAt
+
+  household        Household                @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  familyMember     FamilyMember?            @relation(fields: [familyMemberId], references: [id], onDelete: SetNull)
+  parentAccount    ParentAccount?           @relation(fields: [parentAccountId], references: [id], onDelete: SetNull)
+  outgoingRelations FamilyTreeRelationship[] @relation("FamilyTreeRelationshipFrom")
+  incomingRelations FamilyTreeRelationship[] @relation("FamilyTreeRelationshipTo")
+
+  @@unique([householdId, familyMemberId])
+  @@unique([householdId, parentAccountId])
+  @@index([householdId, kind])
+}
+
+model FamilyTreeRelationship {
+  id               Int      @id @default(autoincrement())
+  householdId      Int
+  fromNodeId       Int
+  toNodeId         Int
+  relationshipType String   @db.VarChar(64)
+  label            String?  @db.VarChar(128)
+  notes            String?  @db.Text
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @default(now()) @updatedAt
+
+  household Household      @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  fromNode  FamilyTreeNode @relation("FamilyTreeRelationshipFrom", fields: [fromNodeId], references: [id], onDelete: Cascade)
+  toNode    FamilyTreeNode @relation("FamilyTreeRelationshipTo", fields: [toNodeId], references: [id], onDelete: Cascade)
+
+  @@unique([fromNodeId, toNodeId, relationshipType])
+  @@index([householdId, relationshipType])
 }
 
 model Chore {
