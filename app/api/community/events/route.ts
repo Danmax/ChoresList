@@ -5,6 +5,7 @@ import { requireSession, withErrors } from "@/lib/api";
 import { requireCommunityRole, requireEventCommunityRole } from "@/lib/community";
 
 const EVENT_TYPES = new Set(["potluck", "service", "practice", "meeting", "game", "class", "social", "other"]);
+const VISIBILITIES = new Set(["private", "public"]);
 
 function cleanText(value: unknown, max: number) {
   return typeof value === "string" && value.trim() ? value.trim().slice(0, max) : null;
@@ -16,6 +17,10 @@ function cleanRequiredText(value: unknown, max: number) {
 
 function cleanType(value: unknown) {
   return typeof value === "string" && EVENT_TYPES.has(value) ? value : "other";
+}
+
+function cleanVisibility(value: unknown) {
+  return typeof value === "string" && VISIBILITIES.has(value) ? value : "private";
 }
 
 function cleanDate(value: unknown) {
@@ -94,6 +99,7 @@ export const POST = withErrors(async (req: NextRequest) => {
       allDay: Boolean(body.allDay),
       location: cleanText(body.location, 180),
       imageUrl: cleanText(body.imageUrl, 512),
+      visibility: cleanVisibility(body.visibility),
       notes: cleanText(body.notes, 1000),
       items: {
         create: cleanStarterItems(body.items),
@@ -129,6 +135,7 @@ export const PUT = withErrors(async (req: NextRequest) => {
       ...(body.allDay !== undefined && { allDay: Boolean(body.allDay) }),
       ...(body.location !== undefined && { location: cleanText(body.location, 180) }),
       ...(body.imageUrl !== undefined && { imageUrl: cleanText(body.imageUrl, 512) }),
+      ...(body.visibility !== undefined && { visibility: cleanVisibility(body.visibility) }),
       ...(body.notes !== undefined && { notes: cleanText(body.notes, 1000) }),
     },
     include: eventInclude,

@@ -36,6 +36,10 @@ export function requireSession(req: NextRequest): SessionPayload {
   return session;
 }
 
+export function optionalSession(req: NextRequest): SessionPayload | null {
+  return verifySessionToken(req.cookies.get(parentSession.name)?.value);
+}
+
 export function authErrorResponse(error: unknown) {
   if (error instanceof ElevationRequiredError) {
     return NextResponse.json(

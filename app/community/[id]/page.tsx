@@ -50,7 +50,9 @@ type CommunityEvent = {
   allDay: boolean;
   location: string | null;
   imageUrl: string | null;
+  visibility: string;
   notes: string | null;
+  publicInviteUrl: string | null;
   rsvps: CommunityRsvp[];
   items: CommunityItem[];
 };
@@ -61,7 +63,7 @@ type CommunityGroup = {
   description: string | null;
   location: string | null;
   visibility: string;
-  currentParentId: number;
+  currentParentId: number | null;
   currentMembership: { role: CommunityRole; parentId: number } | null;
   members: CommunityMember[];
   events: CommunityEvent[];
@@ -97,6 +99,7 @@ const BLANK_EVENT = {
   endDate: "",
   location: "",
   imageUrl: "",
+  visibility: "private",
   notes: "",
 };
 
@@ -177,6 +180,7 @@ export default function CommunityGroupPage() {
   const [draftingEvent, setDraftingEvent] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
   const [starterItems, setStarterItems] = useState<StarterItem[]>([]);
+  const [showCreateEvent, setShowCreateEvent] = useState(false);
   const [locationSuggestions, setLocationSuggestions] = useState<LocationSuggestion[]>([]);
   const [locationStatus, setLocationStatus] = useState<"idle" | "loading" | "error">("idle");
   const [selectedLocation, setSelectedLocation] = useState("");
@@ -188,7 +192,10 @@ export default function CommunityGroupPage() {
     if (!groupId) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/community/groups?id=${groupId}`);
+      const eventId = new URLSearchParams(window.location.search).get("event");
+      const query = new URLSearchParams({ id: String(groupId) });
+      if (eventId) query.set("event", eventId);
+      const res = await fetch(`/api/community/groups?${query.toString()}`);
       const data = await res.json().catch(() => null);
       if (!res.ok) {
         toast.error(data?.error ?? "Could not load community group");
@@ -501,6 +508,7 @@ export default function CommunityGroupPage() {
     setStarterItems([]);
     setSelectedLocation("");
     setLocationSuggestions([]);
+    setShowCreateEvent(false);
     await load();
   }
 
@@ -513,6 +521,7 @@ export default function CommunityGroupPage() {
       endDate: toDateTimeLocal(event.endDate),
       location: event.location ?? "",
       imageUrl: event.imageUrl ?? "",
+      visibility: event.visibility,
       notes: event.notes ?? "",
     });
   }
@@ -763,8 +772,20 @@ export default function CommunityGroupPage() {
             )}
             {canManage && (
               <div className="rounded-3xl bg-white p-4 shadow-sm sm:p-5">
-                <h2 className="mb-4 flex items-center gap-2 font-black text-slate-800"><CalendarDays size={18} className="text-violet-500" /> New Event</h2>
-                <div className="mb-4 rounded-2xl bg-violet-50 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h2 className="flex items-center gap-2 font-black text-slate-800"><CalendarDays size={18} className="text-violet-500" /> Events</h2>
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateEvent((current) => !current)}
+                    className="inline-flex items-center gap-2 rounded-2xl bg-violet-500 px-4 py-2.5 font-black text-white hover:bg-violet-600"
+                  >
+                    {showCreateEvent ? <X size={17} /> : <Plus size={17} />}
+                    {showCreateEvent ? "Close Form" : "Create Event"}
+                  </button>
+                </div>
+                {showCreateEvent && (
+                  <>
+                <div className="mt-4 mb-4 rounded-2xl bg-violet-50 p-3">
                   <Label className="text-sm font-bold text-violet-800">AI event prompt</Label>
                   <Textarea
                     value={eventPrompt}
@@ -803,6 +824,16 @@ export default function CommunityGroupPage() {
                   <div>
                     <Label className="text-sm font-bold">Ends optional</Label>
                     <Input type="datetime-local" value={eventForm.endDate} onChange={(event) => setEventForm((current) => ({ ...current, endDate: event.target.value }))} className="mt-1 rounded-2xl" />
+                  </div>
+                  <div>
+                    <Label className="text-sm font-bold">Visibility</Label>
+                    <Select value={eventForm.visibility} onValueChange={(value) => setEventForm((current) => ({ ...current, visibility: value ?? "private" }))}>
+                      <SelectTrigger className="mt-1 rounded-2xl"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="private">Private</SelectItem>
+                        <SelectItem value="public">Public event link</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="md:col-span-2">
                     <Label className="text-sm font-bold">Location</Label>
@@ -907,6 +938,8 @@ export default function CommunityGroupPage() {
                 <button type="button" onClick={createEvent} className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-violet-500 px-4 py-2.5 font-black text-white hover:bg-violet-600">
                   <Plus size={17} /> Create Event
                 </button>
+                  </>
+                )}
               </div>
             )}
 
@@ -1058,6 +1091,19 @@ export default function CommunityGroupPage() {
                             className="mt-1 rounded-2xl bg-white"
                           />
                         </div>
+                        <div>
+                          <Label className="text-sm font-bold">Visibility</Label>
+                          <Select
+                            value={editEventForm.visibility}
+                            onValueChange={(value) => setEditEventForm((current) => ({ ...current, visibility: value ?? "private" }))}
+                          >
+                            <SelectTrigger className="mt-1 rounded-2xl bg-white"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="private">Private</SelectItem>
+                              <SelectItem value="public">Public event link</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                         <div className="md:col-span-2">
                           <Label className="text-sm font-bold">Location</Label>
                           <Input
@@ -1127,6 +1173,13 @@ export default function CommunityGroupPage() {
                           </button>
                         ))}
                       </div>
+                    ) : event.publicInviteUrl ? (
+                      <a
+                        href={event.publicInviteUrl}
+                        className="inline-flex items-center justify-center rounded-xl bg-violet-500 px-3 py-2 text-sm font-black text-white hover:bg-violet-600"
+                      >
+                        Sign in to RSVP and claim items
+                      </a>
                     ) : (
                       <p className="text-sm font-bold text-slate-400">Join the group to RSVP.</p>
                     )}

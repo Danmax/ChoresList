@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireSession, withErrors } from "@/lib/api";
+import { optionalSession, requireSession, withErrors } from "@/lib/api";
+import { getBaseUrl } from "@/lib/base-url";
 import { requireCommunityRole } from "@/lib/community";
+import { createCommunityInviteToken } from "@/lib/session";
 
 const GROUP_TYPES = new Set(["church", "nonprofit", "sports", "school", "hobby", "neighborhood", "other"]);
 const VISIBILITIES = new Set(["private", "public"]);
@@ -45,10 +47,24 @@ const groupInclude = {
   },
 } satisfies Prisma.CommunityGroupInclude;
 
+function communityEventPath(groupId: number, eventId: number) {
+  return `/community/${groupId}?event=${eventId}`;
+}
+
+function publicInviteUrl(req: NextRequest, groupId: number, eventId: number) {
+  const token = createCommunityInviteToken({ groupId, role: "member", eventId });
+  const inviteUrl = new URL("/parent", getBaseUrl(req));
+  inviteUrl.searchParams.set("communityInvite", token);
+  inviteUrl.searchParams.set("returnTo", communityEventPath(groupId, eventId));
+  return inviteUrl.toString();
+}
+
 export const GET = withErrors(async (req: NextRequest) => {
-  const { parentId } = requireSession(req);
+  const session = optionalSession(req);
+  const parentId = session?.parentId ?? null;
   const { searchParams } = new URL(req.url);
   const id = Number.parseInt(searchParams.get("id") ?? "0", 10);
+  const eventId = Number.parseInt(searchParams.get("event") ?? "0", 10);
   const discover = searchParams.get("discover") === "true";
 
   if (id > 0) {
@@ -57,29 +73,57 @@ export const GET = withErrors(async (req: NextRequest) => {
         id,
         OR: [
           { visibility: "public" },
-          { members: { some: { parentId, status: "active" } } },
+          eventId > 0
+            ? { events: { some: { id: eventId, visibility: "public" } } }
+            : { events: { some: { visibility: "public" } } },
+          ...(parentId ? [{ members: { some: { parentId, status: "active" } } }] : []),
         ],
       },
       include: groupInclude,
     });
     if (!group) return NextResponse.json({ error: "Community group not found" }, { status: 404 });
-    const currentMembership = group.members.find((member) => member.parentId === parentId) ?? null;
-    return NextResponse.json({ ...group, currentMembership, currentParentId: parentId });
+    const currentMembership = parentId ? group.members.find((member) => member.parentId === parentId) ?? null : null;
+    const visibleEvents = currentMembership
+      ? group.events
+      : group.events.filter((event) => event.visibility === "public");
+    if (eventId > 0 && !visibleEvents.some((event) => event.id === eventId)) {
+      return NextResponse.json({ error: "Community event not found" }, { status: 404 });
+    }
+    return NextResponse.json({
+      ...group,
+      members: currentMembership ? group.members : [],
+      events: visibleEvents.map((event) => ({
+        ...event,
+        publicInviteUrl: event.visibility === "public" ? publicInviteUrl(req, group.id, event.id) : null,
+      })),
+      currentMembership,
+      currentParentId: parentId,
+    });
   }
+
+  if (!parentId && !discover) return NextResponse.json([]);
 
   const groups = await prisma.communityGroup.findMany({
     where: discover
       ? {
           OR: [
             { visibility: "public" },
-            { members: { some: { parentId, status: "active" } } },
+            { events: { some: { visibility: "public", date: { gte: new Date() } } } },
+            ...(parentId ? [{ members: { some: { parentId, status: "active" } } }] : []),
           ],
         }
-      : { members: { some: { parentId, status: "active" } } },
+      : { members: { some: { parentId: parentId!, status: "active" } } },
     include: {
       creator: { select: { id: true, email: true } },
       members: { where: { status: "active" }, select: { id: true, parentId: true, role: true } },
-      events: { where: { date: { gte: new Date() } }, orderBy: { date: "asc" }, take: 3 },
+      events: {
+        where: {
+          date: { gte: new Date() },
+          ...(discover ? { visibility: "public" } : {}),
+        },
+        orderBy: { date: "asc" },
+        take: 3,
+      },
       _count: { select: { members: true, events: true } },
     },
     orderBy: { updatedAt: "desc" },
@@ -87,7 +131,7 @@ export const GET = withErrors(async (req: NextRequest) => {
 
   return NextResponse.json(groups.map((group) => ({
     ...group,
-    currentMembership: group.members.find((member) => member.parentId === parentId) ?? null,
+    currentMembership: parentId ? group.members.find((member) => member.parentId === parentId) ?? null : null,
   })));
 });
 

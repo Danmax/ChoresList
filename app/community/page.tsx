@@ -23,6 +23,15 @@ type CommunityGroup = {
   _count?: { members: number; events: number };
 };
 
+type CurrentEvent = {
+  id: number;
+  groupId: number;
+  groupName: string;
+  title: string;
+  date: string;
+  location: string | null;
+};
+
 const GROUP_TYPES = [
   { value: "church", label: "Church", icon: "⛪", color: "#f59e0b", bg: "#fef3c7" },
   { value: "nonprofit", label: "Non-profit", icon: "🤝", color: "#10b981", bg: "#d1fae5" },
@@ -91,6 +100,26 @@ export default function CommunityPage() {
     () => discoverGroups.filter((group) => !group.currentMembership && group.visibility === "public"),
     [discoverGroups]
   );
+
+  const currentEvents = useMemo(() => {
+    const byId = new Map<number, CurrentEvent>();
+    [...groups, ...discoverGroups].forEach((group) => {
+      group.events.forEach((event) => {
+        byId.set(event.id, {
+          id: event.id,
+          groupId: group.id,
+          groupName: group.name,
+          title: event.title,
+          date: event.date,
+          location: event.location,
+        });
+      });
+    });
+    return [...byId.values()]
+      .filter((event) => new Date(event.date).getTime() >= Date.now() - 60 * 60 * 1000)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .slice(0, 6);
+  }, [groups, discoverGroups]);
 
   async function createGroup() {
     if (!form.name.trim()) {
@@ -216,6 +245,28 @@ export default function CommunityPage() {
           </button>
         </div>
       )}
+
+      <div className="mb-8">
+        <div className="mb-3 flex items-center gap-2">
+          <CalendarDays size={18} className="text-violet-500" />
+          <h2 className="font-black text-slate-800">Current Events</h2>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {currentEvents.map((event) => (
+            <Link key={event.id} href={`/community/${event.groupId}?event=${event.id}`} className="rounded-3xl bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
+              <p className="text-xs font-black uppercase tracking-wide text-violet-500">{event.groupName}</p>
+              <p className="mt-1 font-black text-slate-800">{event.title}</p>
+              <p className="mt-1 text-xs font-bold text-slate-500">{formatDate(event.date)}</p>
+              {event.location && <p className="mt-2 flex items-center gap-1 text-xs font-bold text-slate-400"><MapPin size={12} /> {event.location}</p>}
+            </Link>
+          ))}
+          {currentEvents.length === 0 && !loading && (
+            <div className="rounded-3xl bg-white p-6 text-center text-sm font-bold text-slate-400 md:col-span-2 xl:col-span-3">
+              No current community events.
+            </div>
+          )}
+        </div>
+      </div>
 
       <div className="mb-8">
         <div className="mb-3 flex items-center gap-2">
