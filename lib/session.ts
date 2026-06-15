@@ -3,11 +3,19 @@ import { createHmac, timingSafeEqual } from "crypto";
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
 const SESSION_COOKIE = "parent-session";
 const INVITE_TTL_SECONDS = 60 * 60 * 24 * 14;
+const COMMUNITY_INVITE_TTL_SECONDS = 60 * 60 * 24 * 14;
 
 export type SessionPayload = {
   parentId: number;
   householdId: number;
   email: string;
+  expiresAt: number;
+};
+
+export type CommunityInvitePayload = {
+  groupId: number;
+  role: "owner" | "manager" | "member";
+  eventId?: number;
   expiresAt: number;
 };
 
@@ -120,6 +128,66 @@ export function verifyHouseholdInviteToken(token?: string): { householdId: numbe
       return null;
     }
     return { householdId: parsed.householdId, expiresAt: parsed.expiresAt };
+  } catch {
+    return null;
+  }
+}
+
+export function createCommunityInviteToken({
+  groupId,
+  role = "member",
+  eventId,
+}: {
+  groupId: number;
+  role?: "owner" | "manager" | "member";
+  eventId?: number | null;
+}) {
+  const expiresAt = Math.floor(Date.now() / 1000) + COMMUNITY_INVITE_TTL_SECONDS;
+  const payload = Buffer.from(
+    JSON.stringify({
+      purpose: "community-invite",
+      groupId,
+      role,
+      ...(eventId ? { eventId } : {}),
+      expiresAt,
+    })
+  ).toString("base64url");
+  return `${payload}.${sign(payload)}`;
+}
+
+export function verifyCommunityInviteToken(token?: string): CommunityInvitePayload | null {
+  if (!token) return null;
+
+  const [payload, signature] = token.split(".");
+  if (!payload || !signature) return null;
+
+  const expected = sign(payload);
+  const actualBuffer = Buffer.from(signature, "hex");
+  const expectedBuffer = Buffer.from(expected, "hex");
+  if (actualBuffer.length !== expectedBuffer.length || !timingSafeEqual(actualBuffer, expectedBuffer)) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
+      purpose?: string;
+      groupId?: unknown;
+      role?: unknown;
+      eventId?: unknown;
+      expiresAt?: unknown;
+    };
+    const role = parsed.role === "owner" || parsed.role === "manager" || parsed.role === "member" ? parsed.role : null;
+    const eventId = typeof parsed.eventId === "number" ? parsed.eventId : undefined;
+    if (
+      parsed.purpose !== "community-invite" ||
+      typeof parsed.groupId !== "number" ||
+      !role ||
+      typeof parsed.expiresAt !== "number" ||
+      parsed.expiresAt <= Math.floor(Date.now() / 1000)
+    ) {
+      return null;
+    }
+    return { groupId: parsed.groupId, role, ...(eventId ? { eventId } : {}), expiresAt: parsed.expiresAt };
   } catch {
     return null;
   }

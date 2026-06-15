@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, CalendarDays, CheckCircle2, MapPin, Pencil, Plus, Save, Trash2, UserPlus, Users, X, Wand2 } from "lucide-react";
+import { ArrowLeft, CalendarDays, CheckCircle2, Copy, Mail, MapPin, Pencil, Plus, QrCode, Save, Share2, Trash2, UserPlus, Users, X, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -103,6 +103,7 @@ const BLANK_EVENT = {
 type CommunityEventForm = typeof BLANK_EVENT;
 
 const BLANK_MEMBER = { email: "", role: "member" as CommunityRole };
+const BLANK_INVITE = { email: "" };
 const BLANK_ITEM = { title: "", quantity: "", note: "", assignedToParentId: "" };
 const BLANK_GROUP_FORM = {
   name: "",
@@ -167,6 +168,8 @@ export default function CommunityGroupPage() {
   const [editEventForm, setEditEventForm] = useState<CommunityEventForm>(BLANK_EVENT);
   const [editingEventId, setEditingEventId] = useState<number | null>(null);
   const [memberForm, setMemberForm] = useState(BLANK_MEMBER);
+  const [eventInviteForms, setEventInviteForms] = useState<Record<number, typeof BLANK_INVITE>>({});
+  const [invitingEventId, setInvitingEventId] = useState<number | null>(null);
   const [groupForm, setGroupForm] = useState(BLANK_GROUP_FORM);
   const [editingGroup, setEditingGroup] = useState(false);
   const [itemForms, setItemForms] = useState<Record<number, typeof BLANK_ITEM>>({});
@@ -177,6 +180,8 @@ export default function CommunityGroupPage() {
   const [locationSuggestions, setLocationSuggestions] = useState<LocationSuggestion[]>([]);
   const [locationStatus, setLocationStatus] = useState<"idle" | "loading" | "error">("idle");
   const [selectedLocation, setSelectedLocation] = useState("");
+  const [origin, setOrigin] = useState("");
+  const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -197,6 +202,19 @@ export default function CommunityGroupPage() {
   }, [groupId]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    setOrigin(window.location.origin);
+    const eventId = Number.parseInt(new URLSearchParams(window.location.search).get("event") ?? "0", 10);
+    if (Number.isFinite(eventId) && eventId > 0) setSelectedEventId(eventId);
+  }, []);
+
+  useEffect(() => {
+    if (!group || !selectedEventId) return;
+    window.setTimeout(() => {
+      document.getElementById(`event-${selectedEventId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+  }, [group, selectedEventId]);
 
   useEffect(() => {
     if (!group || editingGroup) return;
@@ -246,10 +264,41 @@ export default function CommunityGroupPage() {
   const canParticipate = Boolean(role);
   const meta = group ? groupMeta(group.groupType) : GROUP_TYPE_META.other;
 
+  function eventSharePath(eventId: number) {
+    return `/community/${groupId}?event=${eventId}`;
+  }
+
+  function eventShareUrl(eventId: number) {
+    const path = eventSharePath(eventId);
+    return origin ? `${origin}${path}` : path;
+  }
+
+  function eventQrUrl(eventId: number) {
+    return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(eventShareUrl(eventId))}`;
+  }
+
   const upcomingEvents = useMemo(
     () => [...(group?.events ?? [])].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
     [group?.events]
   );
+
+  async function copyEventLink(eventId: number) {
+    await navigator.clipboard.writeText(eventShareUrl(eventId));
+    toast.success("Event link copied");
+  }
+
+  async function shareEvent(event: CommunityEvent) {
+    const url = eventShareUrl(event.id);
+    if (navigator.share) {
+      await navigator.share({
+        title: event.title,
+        text: `Join ${event.title} with ${group?.name ?? "our community group"}.`,
+        url,
+      });
+      return;
+    }
+    await copyEventLink(event.id);
+  }
 
   async function joinGroup() {
     const res = await fetch("/api/community/members", {
@@ -284,6 +333,52 @@ export default function CommunityGroupPage() {
     toast.success("Member added");
     setMemberForm(BLANK_MEMBER);
     await load();
+  }
+
+  async function emailGroupInvite() {
+    if (!memberForm.email.trim()) {
+      toast.error("Email is required");
+      return;
+    }
+    const res = await fetch("/api/community/invites", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ groupId, ...memberForm }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      toast.error(data?.error ?? "Could not email invite");
+      return;
+    }
+    toast.success(data?.sent ? "Invite email sent" : "Invite link created");
+    if (data?.inviteUrl) await navigator.clipboard.writeText(data.inviteUrl);
+    setMemberForm(BLANK_MEMBER);
+  }
+
+  async function emailEventInvite(event: CommunityEvent) {
+    const form = eventInviteForms[event.id] ?? BLANK_INVITE;
+    if (!form.email.trim()) {
+      toast.error("Email is required");
+      return;
+    }
+    setInvitingEventId(event.id);
+    try {
+      const res = await fetch("/api/community/invites", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ groupId, eventId: event.id, email: form.email, role: "member" }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        toast.error(data?.error ?? "Could not email invite");
+        return;
+      }
+      toast.success(data?.sent ? "Invite email sent" : "Invite link created");
+      if (data?.inviteUrl) await navigator.clipboard.writeText(data.inviteUrl);
+      setEventInviteForms((current) => ({ ...current, [event.id]: BLANK_INVITE }));
+    } finally {
+      setInvitingEventId(null);
+    }
   }
 
   function startEditingGroup() {
@@ -820,8 +915,14 @@ export default function CommunityGroupPage() {
               const myRsvp = event.rsvps.find((rsvpItem) => rsvpItem.parentId === group.currentParentId);
               const eMeta = eventMeta(event.eventType);
               const itemForm = itemForms[event.id] ?? BLANK_ITEM;
+              const inviteForm = eventInviteForms[event.id] ?? BLANK_INVITE;
+              const shareUrl = eventShareUrl(event.id);
               return (
-                <div key={event.id} className="rounded-3xl bg-white p-4 shadow-sm sm:p-5">
+                <div
+                  key={event.id}
+                  id={`event-${event.id}`}
+                  className={`scroll-mt-5 rounded-3xl bg-white p-4 shadow-sm sm:p-5 ${selectedEventId === event.id ? "ring-2 ring-violet-200" : ""}`}
+                >
                   <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-start">
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
@@ -849,6 +950,56 @@ export default function CommunityGroupPage() {
                         </button>
                       </div>
                     )}
+                  </div>
+
+                  <div className="mb-4 grid gap-3 rounded-2xl bg-violet-50 p-3 lg:grid-cols-[1fr_150px]">
+                    <div className="min-w-0">
+                      <p className="mb-1 flex items-center gap-2 text-sm font-black text-violet-900"><Share2 size={15} /> Share event</p>
+                      <p className="truncate rounded-xl bg-white px-3 py-2 text-xs font-bold text-slate-500">{shareUrl}</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => copyEventLink(event.id)}
+                          className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50"
+                        >
+                          <Copy size={14} /> Copy URL
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => shareEvent(event)}
+                          className="inline-flex items-center gap-2 rounded-xl bg-violet-500 px-3 py-2 text-xs font-black text-white hover:bg-violet-600"
+                        >
+                          <Share2 size={14} /> Share
+                        </button>
+                      </div>
+                      {canManage && (
+                        <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
+                          <div className="relative">
+                            <Input
+                              type="email"
+                              value={inviteForm.email}
+                              onChange={(input) => setEventInviteForms((current) => ({ ...current, [event.id]: { email: input.target.value } }))}
+                              placeholder="Invite by email"
+                              className="rounded-xl bg-white pl-9"
+                            />
+                            <Mail size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => emailEventInvite(event)}
+                            disabled={invitingEventId === event.id || !inviteForm.email.trim()}
+                            className="rounded-xl bg-emerald-500 px-3 py-2 text-sm font-black text-white hover:bg-emerald-600 disabled:opacity-50"
+                          >
+                            {invitingEventId === event.id ? "Sending..." : "Email Invite"}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 rounded-2xl bg-white p-3 lg:flex-col">
+                      <QrCode size={18} className="text-violet-500 lg:hidden" />
+                      <img src={eventQrUrl(event.id)} alt={`${event.title} QR code`} className="h-28 w-28 rounded-xl bg-white object-contain" />
+                      <p className="text-xs font-black text-slate-500 lg:text-center">Scan to open</p>
+                    </div>
                   </div>
 
                   {canManage && editingEventId === event.id && (
@@ -1083,9 +1234,14 @@ export default function CommunityGroupPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <button type="button" onClick={addMember} className="w-full rounded-2xl bg-emerald-500 py-2.5 font-black text-white hover:bg-emerald-600">
-                    Add Member
-                  </button>
+                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+                    <button type="button" onClick={addMember} className="rounded-2xl bg-emerald-500 py-2.5 font-black text-white hover:bg-emerald-600">
+                      Add Existing
+                    </button>
+                    <button type="button" onClick={emailGroupInvite} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-violet-500 py-2.5 font-black text-white hover:bg-violet-600">
+                      <Mail size={16} /> Email Invite
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

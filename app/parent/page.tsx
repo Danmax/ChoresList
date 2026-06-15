@@ -19,6 +19,8 @@ export default function ParentPanel() {
   const [inviteToken, setInviteToken] = useState("");
   const [inviteUrl, setInviteUrl] = useState("");
   const [inviteLoading, setInviteLoading] = useState(false);
+  const [communityInviteToken, setCommunityInviteToken] = useState("");
+  const [communityReturnTo, setCommunityReturnTo] = useState("");
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -36,10 +38,23 @@ export default function ParentPanel() {
       setMode("signup");
       setNotice("Create a parent account to join this household.");
     }
+    const communityInvite = params.get("communityInvite");
+    if (communityInvite) {
+      setCommunityInviteToken(communityInvite);
+      setCommunityReturnTo(params.get("returnTo") ?? "");
+      setMode("signup");
+      setNotice("Sign in or create a parent account to join this community event.");
+    }
 
     fetch("/api/parent/auth")
       .then((res) => res.json())
-      .then(({ ok }) => setUnlocked(Boolean(ok)))
+      .then(({ ok }) => {
+        if (ok && communityInvite) {
+          acceptCommunityInvite(communityInvite, params.get("returnTo") ?? "");
+          return;
+        }
+        setUnlocked(Boolean(ok));
+      })
       .catch(() => setUnlocked(false));
   }, []);
 
@@ -70,6 +85,10 @@ export default function ParentPanel() {
         setPassword("");
         setError("");
       } else if (data.ok) {
+        if (communityInviteToken) {
+          await acceptCommunityInvite();
+          return;
+        }
         setUnlocked(true);
         setError("");
         setNotice("");
@@ -83,6 +102,38 @@ export default function ParentPanel() {
       setPassword("");
     } finally {
       setChecking(false);
+    }
+  }
+
+  async function acceptCommunityInvite(token = communityInviteToken, returnTo = communityReturnTo) {
+    try {
+      const res = await fetch("/api/community/invites", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setUnlocked(true);
+        setError(data?.error ?? "Could not accept the community invite.");
+        return false;
+      }
+      const destination = data?.returnTo ?? returnTo;
+      if (typeof destination === "string" && destination.startsWith("/")) {
+        window.location.assign(destination);
+        return true;
+      }
+      setCommunityInviteToken("");
+      setCommunityReturnTo("");
+      window.history.replaceState({}, "", "/parent");
+      setUnlocked(true);
+      setError("");
+      setNotice("Community invite accepted.");
+      return false;
+    } catch {
+      setUnlocked(true);
+      setError("Could not accept the community invite.");
+      return false;
     }
   }
 
@@ -307,11 +358,13 @@ export default function ParentPanel() {
               type="button"
               onClick={() => {
                 setMode((current) => (current === "login" ? "signup" : "login"));
-                setInviteToken("");
+                if (!communityInviteToken) {
+                  setInviteToken("");
+                  window.history.replaceState({}, "", "/parent");
+                }
                 setError("");
                 setNotice("");
                 setConfirmUrl("");
-                window.history.replaceState({}, "", "/parent");
               }}
               className="mt-4 text-sm font-bold text-violet-500 hover:text-violet-700"
             >
