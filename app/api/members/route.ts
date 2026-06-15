@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireParentSession, requireSession, withErrors } from "@/lib/api";
 import { childAccessWhere } from "@/lib/child-access";
+import { syncFamilyTreeForMember } from "@/lib/family-tree";
 
 type BirthdayInput = {
   birthdayMonth?: unknown;
@@ -157,6 +158,7 @@ export const POST = withErrors(async (req: NextRequest) => {
     return NextResponse.json({ error: "Name and age are required" }, { status: 400 });
   }
   const birthday = birthdayFields(body);
+  const role = cleanRole(body.role);
   const member = await prisma.familyMember.create({
     data: {
       householdId,
@@ -164,8 +166,8 @@ export const POST = withErrors(async (req: NextRequest) => {
       age,
       ...birthday,
       lastBirthdayAgeUpdateYear: birthdayAgeUpdateYear(birthday.birthdayMonth, birthday.birthdayDay),
-      role: cleanRole(body.role),
-      relationshipToHousehold: cleanRelationship(body.relationshipToHousehold, cleanRole(body.role) === "young-adult" ? "young-adult" : "child"),
+      role,
+      relationshipToHousehold: cleanRelationship(body.relationshipToHousehold, role === "young-adult" ? "young-adult" : "child"),
       familyBranch: cleanFamilyBranch(body.familyBranch),
       custodySchedule: cleanOptionalText(body.custodySchedule, 128),
       familyNotes: cleanOptionalText(body.familyNotes, 255),
@@ -173,6 +175,7 @@ export const POST = withErrors(async (req: NextRequest) => {
       color: cleanShortText(body.color, "#a78bfa"),
     },
   });
+  await syncFamilyTreeForMember(member);
   return NextResponse.json(member, { status: 201 });
 });
 
@@ -214,6 +217,7 @@ export const PUT = withErrors(async (req: NextRequest) => {
       ...(body.color !== undefined && { color: cleanShortText(body.color, "#a78bfa") }),
     },
   });
+  await syncFamilyTreeForMember(member);
   return NextResponse.json(member);
 });
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireParentSession, requireSession, withErrors } from "@/lib/api";
 import { requirePluginActive } from "@/lib/plugins/registry";
+import { syncHouseholdFamilyTree } from "@/lib/family-tree";
 
 const NODE_KINDS = new Set(["external"]);
 const RELATIONSHIP_TYPES = new Set([
@@ -39,72 +40,8 @@ function cleanBirthday(monthValue: unknown, dayValue: unknown) {
   return { birthdayMonth, birthdayDay };
 }
 
-function parentAvatar(parentType: string) {
-  if (parentType === "mom" || parentType === "stepmom") return "👩";
-  if (parentType === "dad" || parentType === "stepdad") return "👨";
-  if (parentType === "grandparent") return "👵";
-  return "👤";
-}
-
-async function seedTreeNodes(householdId: number) {
-  const [members, parents, existingNodes] = await Promise.all([
-    prisma.familyMember.findMany({
-      where: { householdId },
-      select: {
-        id: true,
-        name: true,
-        avatar: true,
-        color: true,
-        birthdayMonth: true,
-        birthdayDay: true,
-        familyNotes: true,
-      },
-    }),
-    prisma.parentAccount.findMany({
-      where: { householdId },
-      select: { id: true, email: true, displayName: true, parentType: true, relationshipLabel: true },
-    }),
-    prisma.familyTreeNode.findMany({
-      where: { householdId },
-      select: { familyMemberId: true, parentAccountId: true },
-    }),
-  ]);
-
-  const existingMemberIds = new Set(existingNodes.map((node) => node.familyMemberId).filter((id): id is number => id !== null));
-  const existingParentIds = new Set(existingNodes.map((node) => node.parentAccountId).filter((id): id is number => id !== null));
-
-  const memberRows = members
-    .filter((member) => !existingMemberIds.has(member.id))
-    .map((member) => ({
-      householdId,
-      kind: "member",
-      familyMemberId: member.id,
-      name: member.name,
-      avatar: member.avatar,
-      color: member.color,
-      birthdayMonth: member.birthdayMonth,
-      birthdayDay: member.birthdayDay,
-      notes: member.familyNotes,
-    }));
-
-  const parentRows = parents
-    .filter((parent) => !existingParentIds.has(parent.id))
-    .map((parent) => ({
-      householdId,
-      kind: "parent_account",
-      parentAccountId: parent.id,
-      name: parent.displayName || parent.relationshipLabel || parent.email.split("@")[0] || "Parent",
-      avatar: parentAvatar(parent.parentType),
-      color: "#14b8a6",
-      notes: parent.relationshipLabel,
-    }));
-
-  if (memberRows.length) await prisma.familyTreeNode.createMany({ data: memberRows, skipDuplicates: true });
-  if (parentRows.length) await prisma.familyTreeNode.createMany({ data: parentRows, skipDuplicates: true });
-}
-
 async function treePayload(householdId: number) {
-  await seedTreeNodes(householdId);
+  await syncHouseholdFamilyTree(householdId);
   const [nodes, relationships] = await Promise.all([
     prisma.familyTreeNode.findMany({ where: { householdId }, orderBy: [{ kind: "asc" }, { name: "asc" }] }),
     prisma.familyTreeRelationship.findMany({ where: { householdId }, orderBy: [{ relationshipType: "asc" }, { id: "asc" }] }),
