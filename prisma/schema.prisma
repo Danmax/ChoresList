@@ -22,9 +22,15 @@ model ParentAccount {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @default(now()) @updatedAt
 
-  household           Household                @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  confirmationTokens  EmailConfirmationToken[]
-  passwordResetTokens PasswordResetToken[]
+  household              Household                @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  confirmationTokens     EmailConfirmationToken[]
+  passwordResetTokens    PasswordResetToken[]
+  createdCommunities     CommunityGroup[]         @relation("CommunityCreator")
+  communityMemberships   CommunityMember[]
+  createdCommunityEvents CommunityEvent[]         @relation("CommunityEventCreator")
+  communityRsvps         CommunityRsvp[]
+  assignedCommunityItems CommunityEventItem[]     @relation("CommunityItemAssignee")
+  claimedCommunityItems  CommunityEventItem[]     @relation("CommunityItemClaimer")
 }
 
 model Household {
@@ -365,6 +371,91 @@ model GroceryTemplateItem {
   createdAt  DateTime @default(now())
 
   template GroceryTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+}
+
+model CommunityGroup {
+  id              Int      @id @default(autoincrement())
+  creatorParentId Int
+  name            String   @db.VarChar(255)
+  groupType       String   @default("other") @db.VarChar(64)
+  description     String?  @db.Text
+  location        String?  @db.VarChar(255)
+  visibility      String   @default("private") @db.VarChar(64)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now()) @updatedAt
+
+  creator ParentAccount     @relation("CommunityCreator", fields: [creatorParentId], references: [id], onDelete: Cascade)
+  members CommunityMember[]
+  events  CommunityEvent[]
+}
+
+model CommunityMember {
+  id       Int      @id @default(autoincrement())
+  groupId  Int
+  parentId Int
+  role     String   @default("member") @db.VarChar(64)
+  status   String   @default("active") @db.VarChar(64)
+  joinedAt DateTime @default(now())
+
+  group  CommunityGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  parent ParentAccount  @relation(fields: [parentId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, parentId])
+}
+
+model CommunityEvent {
+  id                Int       @id @default(autoincrement())
+  groupId           Int
+  createdByParentId Int?
+  title             String    @db.VarChar(255)
+  eventType         String    @default("other") @db.VarChar(64)
+  date              DateTime
+  endDate           DateTime?
+  allDay            Boolean   @default(false)
+  location          String?   @db.VarChar(255)
+  notes             String?   @db.Text
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @default(now()) @updatedAt
+
+  group     CommunityGroup       @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdBy ParentAccount?       @relation("CommunityEventCreator", fields: [createdByParentId], references: [id], onDelete: SetNull)
+  rsvps     CommunityRsvp[]
+  items     CommunityEventItem[]
+}
+
+model CommunityRsvp {
+  id        Int      @id @default(autoincrement())
+  eventId   Int
+  parentId  Int
+  status    String   @default("going") @db.VarChar(64)
+  guests    Int      @default(0)
+  note      String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  event  CommunityEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  parent ParentAccount  @relation(fields: [parentId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, parentId])
+}
+
+model CommunityEventItem {
+  id                 Int      @id @default(autoincrement())
+  eventId            Int
+  title              String   @db.VarChar(255)
+  quantity           String?  @db.VarChar(64)
+  note               String?  @db.Text
+  assignedToParentId Int?
+  claimedByParentId  Int?
+  claimNote          String?  @db.Text
+  status             String   @default("open") @db.VarChar(64)
+  sortOrder          Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @default(now()) @updatedAt
+
+  event      CommunityEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  assignedTo ParentAccount? @relation("CommunityItemAssignee", fields: [assignedToParentId], references: [id], onDelete: SetNull)
+  claimedBy  ParentAccount? @relation("CommunityItemClaimer", fields: [claimedByParentId], references: [id], onDelete: SetNull)
 }
 
 model FamilyEvent {

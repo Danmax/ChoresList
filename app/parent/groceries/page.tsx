@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-type Cadence = "weekly" | "monthly";
+type Cadence = "weekly" | "biweekly" | "monthly";
 type Tab = "active" | "recurring" | "history";
 
 type GroceryItem = {
@@ -66,6 +66,12 @@ const GROCERY_CATEGORIES = [
 
 const BLANK_ITEM = { name: "", quantity: "", unit: "", category: "produce", note: "" };
 const BLANK_TEMPLATE = { title: "", cadence: "weekly" as Cadence };
+
+const CADENCE_META: Record<Cadence, { label: string; icon: string }> = {
+  weekly: { label: "Weekly", icon: "📆" },
+  biweekly: { label: "Biweekly", icon: "🔁" },
+  monthly: { label: "Monthly", icon: "🗓️" },
+};
 
 function categoryMeta(category: string) {
   return GROCERY_CATEGORIES.find((c) => c.value === category) ?? GROCERY_CATEGORIES[GROCERY_CATEGORIES.length - 1];
@@ -266,7 +272,7 @@ export default function ParentGroceriesPage() {
         </Link>
         <div className="flex-1">
           <h1 className="text-2xl sm:text-3xl font-black text-slate-800">🛒 Grocery Shopping</h1>
-          <p className="text-sm font-semibold text-slate-500">Build shopping lists and reuse weekly or monthly staples.</p>
+          <p className="text-sm font-semibold text-slate-500">Build shopping lists and reuse weekly, biweekly, or monthly staples.</p>
         </div>
         <div className="flex gap-2">
           <Input
@@ -501,6 +507,7 @@ export default function ParentGroceriesPage() {
                     <SelectTrigger className="mt-1 rounded-2xl"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="weekly">Weekly</SelectItem>
+                      <SelectItem value="biweekly">Biweekly</SelectItem>
                       <SelectItem value="monthly">Monthly</SelectItem>
                     </SelectContent>
                   </Select>
@@ -525,11 +532,11 @@ export default function ParentGroceriesPage() {
                 }`}
               >
                 <div className="flex items-start gap-3">
-                  <span className="text-3xl">{template.cadence === "weekly" ? "📆" : "🗓️"}</span>
+                  <span className="text-3xl">{CADENCE_META[template.cadence]?.icon ?? "📆"}</span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-black text-slate-800">{template.title}</p>
                     <p className="text-xs font-bold text-slate-400">
-                      {template.cadence} · {template.items.length} items
+                      {CADENCE_META[template.cadence]?.label ?? template.cadence} · {template.items.length} items
                     </p>
                   </div>
                 </div>
@@ -544,7 +551,7 @@ export default function ParentGroceriesPage() {
                   <div className="flex-1">
                     <h2 className="text-xl font-black text-slate-800">{selectedTemplate.title}</h2>
                     <p className="text-sm font-bold text-slate-400">
-                      {selectedTemplate.cadence} recurring list · {selectedTemplate.items.length} items
+                      {CADENCE_META[selectedTemplate.cadence]?.label ?? selectedTemplate.cadence} recurring list · {selectedTemplate.items.length} items
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -641,7 +648,7 @@ export default function ParentGroceriesPage() {
             ) : (
               <div className="py-16 text-center">
                 <div className="text-6xl mb-4">📆</div>
-                <p className="font-bold text-slate-500">Create a weekly or monthly recurring list.</p>
+                <p className="font-bold text-slate-500">Create a weekly, biweekly, or monthly recurring list.</p>
               </div>
             )}
           </div>

@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Settings, Trophy, Calendar, Star } from "lucide-react";
+import { Settings, Trophy, Calendar, Star, Users } from "lucide-react";
 import { getLevelFromPoints, getLevelTitle, getPointsForNextLevel } from "@/lib/points";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -98,6 +98,12 @@ export default function FamilyDashboard() {
               className="flex items-center gap-1.5 bg-white rounded-2xl px-3 sm:px-4 py-2.5 shadow-sm font-bold text-slate-600 hover:shadow-md transition-shadow text-sm sm:text-base"
             >
               <Calendar size={16} /> <span className="hidden sm:inline">Calendar</span>
+            </Link>
+            <Link
+              href="/community"
+              className="flex items-center gap-1.5 bg-white rounded-2xl px-3 sm:px-4 py-2.5 shadow-sm font-bold text-slate-600 hover:shadow-md transition-shadow text-sm sm:text-base"
+            >
+              <Users size={16} /> <span className="hidden sm:inline">Community</span>
             </Link>
             <Link
               href="/parent"

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireParentSession, requireSession, withErrors } from "@/lib/api";
 
-const CADENCES = new Set(["weekly", "monthly"]);
+const CADENCES = new Set(["weekly", "biweekly", "monthly"]);
 
 function cleanText(value: unknown, max: number) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";

@@ -355,6 +355,7 @@ export default function ParentPanel() {
     { href: "/parent/devices", icon: MonitorSmartphone, label: "Device Screens", desc: "Pair QR task boards for kids", color: "#6366f1", bg: "#e0e7ff" },
     { href: "/parent/wishlist", icon: Gift, label: "Wish Lists", desc: "Grant kids' wishes & requests", color: "#f472b6", bg: "#fce7f3" },
     { href: "/calendar", icon: BookOpen, label: "Family Calendar", desc: "Schedule events & activities", color: "#f97316", bg: "#ffedd5" },
+    { href: "/community", icon: Users, label: "Community", desc: "Groups, events, RSVP & potlucks", color: "#8b5cf6", bg: "#ede9fe" },
     { href: "/parent/settings", icon: Settings, label: "Household Settings", desc: "Family, calendar, email & privacy", color: "#64748b", bg: "#f1f5f9" },
   ];
 
