@@ -14,6 +14,7 @@ import {
   ShoppingCart,
   Trash2,
   Users,
+  Wand2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
@@ -97,6 +98,8 @@ export default function ParentRecipesPage() {
   const [uploading, setUploading] = useState(false);
   const [selectedPotluckId, setSelectedPotluckId] = useState("");
   const [loadError, setLoadError] = useState("");
+  const [recipePrompt, setRecipePrompt] = useState("");
+  const [draftingRecipe, setDraftingRecipe] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -262,6 +265,56 @@ export default function ParentRecipesPage() {
     }
   }
 
+  async function generateRecipeDraft() {
+    if (recipePrompt.trim().length < 4) {
+      toast.error("Describe the recipe first");
+      return;
+    }
+    setDraftingRecipe(true);
+    try {
+      const res = await fetch("/api/recipes/ai/draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: recipePrompt }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        toast.error(data?.error ?? "Could not generate recipe");
+        return;
+      }
+      const draft = data?.draft;
+      if (!draft) {
+        toast.error("AI did not return a usable recipe");
+        return;
+      }
+      setForm({
+        id: null,
+        title: draft.title ?? "",
+        description: draft.description ?? "",
+        servings: draft.servings ?? "4",
+        prepMinutes: draft.prepMinutes ?? "",
+        cookMinutes: draft.cookMinutes ?? "",
+        photoUrl: draft.photoUrl ?? "",
+        instructions: draft.instructions ?? "",
+        visibility: draft.visibility === "public" ? "public" : "private",
+        ingredients: Array.isArray(draft.ingredients) && draft.ingredients.length > 0
+          ? draft.ingredients.map((ingredient: Ingredient) => ({
+              name: ingredient.name ?? "",
+              quantity: ingredient.quantity ?? "",
+              unit: ingredient.unit ?? "",
+              category: ingredient.category ?? "pantry",
+              note: ingredient.note ?? "",
+            }))
+          : [{ ...BLANK_INGREDIENT }],
+      });
+      setSelectedId(null);
+      setTab("mine");
+      toast.success("Recipe draft ready");
+    } finally {
+      setDraftingRecipe(false);
+    }
+  }
+
   async function createShoppingList(recipe: Recipe) {
     const res = await fetch("/api/recipes/actions", {
       method: "POST",
@@ -423,6 +476,30 @@ export default function ParentRecipesPage() {
               <div>
                 <h2 className="font-black text-slate-800">{form.id ? "Edit Recipe" : "Create Recipe"}</h2>
                 <p className="text-sm font-semibold text-slate-500">Save a dish with ingredients, a photo, and prep instructions.</p>
+              </div>
+            </div>
+
+            <div className="mb-5 rounded-lg border border-red-100 bg-red-50 p-3">
+              <div className="mb-2 flex items-center gap-2">
+                <Wand2 size={18} className="text-red-600" />
+                <h3 className="font-black text-slate-800">Generate from Prompt</h3>
+              </div>
+              <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
+                <Textarea
+                  value={recipePrompt}
+                  onChange={(event) => setRecipePrompt(event.target.value)}
+                  rows={3}
+                  placeholder="Easy taco pasta for 6, kid friendly, no peanuts, ready in 30 minutes"
+                  className="bg-white"
+                />
+                <button
+                  type="button"
+                  onClick={generateRecipeDraft}
+                  disabled={draftingRecipe}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-500 px-4 py-2.5 font-black text-white hover:bg-red-600 disabled:opacity-60 md:self-start"
+                >
+                  <Wand2 size={18} /> {draftingRecipe ? "Generating..." : "Generate"}
+                </button>
               </div>
             </div>
 
