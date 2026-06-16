@@ -184,7 +184,12 @@ export default function KidPage() {
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-2">
                 <h1 className="text-xl sm:text-2xl font-black text-slate-800 truncate">{member.name}&apos;s Chores</h1>
-                <Link href={`/kid/${id}/wishlist`} className="shrink-0 text-xl" title="Wish List">🌟</Link>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Link href={`/kid/${id}/academy`} className="rounded-full bg-blue-100 p-2 text-blue-600" title="Academy">
+                    <BookOpen size={18} />
+                  </Link>
+                  <Link href={`/kid/${id}/wishlist`} className="text-xl" title="Wish List">🌟</Link>
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <Badge style={{ backgroundColor: member.color }} className="text-white font-bold text-xs">

@@ -1,7 +1,7 @@
 import { ForbiddenError } from "@/lib/auth-error";
 import { prisma } from "@/lib/prisma";
 
-export type PluginKey = "family-tree";
+export type PluginKey = "family-tree" | "education-academy";
 export type PluginStatus = "active" | "inactive";
 
 export type PluginDefinition = {
@@ -25,6 +25,17 @@ export const PLUGIN_REGISTRY: PluginDefinition[] = [
     route: "/parent/family-tree",
     color: "#14b8a6",
     bg: "#ccfbf1",
+    roles: ["owner", "parent", "grandparent"],
+    defaultStatus: "inactive",
+  },
+  {
+    key: "education-academy",
+    label: "Merit Education Academy",
+    description: "Assign daily learning drills, flashcards, trivia, exams, real-life exercises, and projects.",
+    icon: "GraduationCap",
+    route: "/parent/academy",
+    color: "#2563eb",
+    bg: "#dbeafe",
     roles: ["owner", "parent", "grandparent"],
     defaultStatus: "inactive",
   },

@@ -79,6 +79,10 @@ model Household {
   plugins                  HouseholdPlugin[]
   familyTreeNodes          FamilyTreeNode[]
   familyTreeRelationships  FamilyTreeRelationship[]
+  educationMaterialSets    EducationMaterialSet[]
+  educationAssignments     EducationAssignment[]
+  educationAttempts        EducationAttempt[]
+  educationProjects        EducationProject[]
 }
 
 model HouseholdPlugin {
@@ -179,6 +183,104 @@ model FamilyMember {
   pairingCodes     DevicePairingCode[]
   household        Household           @relation(fields: [householdId], references: [id], onDelete: Cascade)
   familyTreeNodes  FamilyTreeNode[]
+  educationAssignments EducationAssignment[]
+  educationAttempts    EducationAttempt[]
+  educationProjects    EducationProject[]
+}
+
+model EducationMaterialSet {
+  id            Int      @id @default(autoincrement())
+  householdId   Int
+  title         String   @db.VarChar(255)
+  subject       String   @default("vocabulary") @db.VarChar(64)
+  mode          String   @default("drill") @db.VarChar(64)
+  description   String?  @db.Text
+  passingScore  Int      @default(85)
+  pointsReward  Int      @default(10)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  household   Household             @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  materials   EducationMaterial[]
+  assignments EducationAssignment[]
+
+  @@index([householdId, subject])
+}
+
+model EducationMaterial {
+  id          Int      @id @default(autoincrement())
+  setId       Int
+  prompt      String   @db.Text
+  answer      String   @db.Text
+  choices     Json?
+  explanation String?  @db.Text
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  set EducationMaterialSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+}
+
+model EducationAssignment {
+  id           Int       @id @default(autoincrement())
+  householdId  Int
+  memberId     Int
+  setId        Int
+  title        String    @db.VarChar(255)
+  dueDate      DateTime?
+  status       String    @default("assigned") @db.VarChar(64)
+  passingScore Int       @default(85)
+  pointsReward Int       @default(10)
+  completedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @default(now()) @updatedAt
+
+  household Household            @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  member    FamilyMember         @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  set       EducationMaterialSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+  attempts  EducationAttempt[]
+
+  @@index([householdId, memberId, status])
+}
+
+model EducationAttempt {
+  id           Int      @id @default(autoincrement())
+  householdId  Int
+  assignmentId Int
+  memberId     Int
+  score        Int      @default(0)
+  correctCount Int      @default(0)
+  totalCount   Int      @default(0)
+  passed       Boolean  @default(false)
+  answers      Json?
+  completedAt  DateTime @default(now())
+
+  household  Household           @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  assignment EducationAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  member     FamilyMember        @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([householdId, memberId, completedAt])
+}
+
+model EducationProject {
+  id           Int       @id @default(autoincrement())
+  householdId  Int
+  memberId     Int?
+  title        String    @db.VarChar(255)
+  subject      String    @default("project") @db.VarChar(64)
+  description  String?   @db.Text
+  rubric       String?   @db.Text
+  status       String    @default("open") @db.VarChar(64)
+  dueDate      DateTime?
+  pointsReward Int       @default(25)
+  completedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @default(now()) @updatedAt
+
+  household Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  member    FamilyMember? @relation(fields: [memberId], references: [id], onDelete: SetNull)
+
+  @@index([householdId, status])
 }
 
 model FamilyTreeNode {
