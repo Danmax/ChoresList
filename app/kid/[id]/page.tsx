@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Camera, CheckCircle2, ChevronRight, Lightbulb, Shield, BookOpen } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, Camera, CheckCircle2, ChevronRight, Gift, GraduationCap, Lightbulb, ListChecks, Shield, Trophy, Wrench } from "lucide-react";
 import { getLevelFromPoints, getLevelTitle, getPointsForNextLevel } from "@/lib/points";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -45,6 +45,37 @@ interface Member {
   age: number;
 }
 
+type EducationAssignment = {
+  id: number;
+  title: string;
+  status: string;
+  dueDate?: string | null;
+  passingScore: number;
+  pointsReward: number;
+  set: {
+    id: number;
+    title: string;
+    subject: string;
+    mode: string;
+    materials: { id: number }[];
+  };
+  attempts: { id: number; score: number; passed: boolean; completedAt: string }[];
+};
+
+type EducationProject = {
+  id: number;
+  title: string;
+  subject: string;
+  description?: string | null;
+  status: string;
+  pointsReward: number;
+  dueDate?: string | null;
+};
+
+function formatDate(value?: string | null) {
+  return value ? new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "No due date";
+}
+
 export default function KidPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -62,12 +93,16 @@ export default function KidPage() {
   const [earnedTicket, setEarnedTicket] = useState<{rewardTitle:string;rewardEmoji:string;projectTitle:string} | null>(null);
   const [ticketCelebration, setTicketCelebration] = useState(false);
   const [reactionAssignment, setReactionAssignment] = useState<Assignment | null>(null);
+  const [academyEnabled, setAcademyEnabled] = useState(false);
+  const [educationAssignments, setEducationAssignments] = useState<EducationAssignment[]>([]);
+  const [educationProjects, setEducationProjects] = useState<EducationProject[]>([]);
 
   const loadData = useCallback(async () => {
-    const [membersRes, assignRes, projRes] = await Promise.all([
+    const [membersRes, assignRes, projRes, educationRes] = await Promise.all([
       fetch("/api/members"),
       fetch(`/api/assignments?memberId=${id}`),
       fetch(`/api/projects?memberId=${id}&status=open`),
+      fetch(`/api/education/kid?memberId=${id}`),
     ]);
     const membersData = await membersRes.json().catch(() => []);
     const members: Member[] = Array.isArray(membersData) ? membersData : Array.isArray(membersData?.members) ? membersData.members : [];
@@ -75,6 +110,16 @@ export default function KidPage() {
     setMember(found ?? null);
     setAssignments(await assignRes.json());
     if (projRes.ok) setProjects(await projRes.json());
+    if (educationRes.ok) {
+      const data = await educationRes.json().catch(() => null);
+      setAcademyEnabled(true);
+      setEducationAssignments(Array.isArray(data?.assignments) ? data.assignments : []);
+      setEducationProjects(Array.isArray(data?.projects) ? data.projects : []);
+    } else {
+      setAcademyEnabled(false);
+      setEducationAssignments([]);
+      setEducationProjects([]);
+    }
   }, [id]);
 
   async function completeProject(project: typeof projects[0]) {
@@ -146,6 +191,47 @@ export default function KidPage() {
   const weeklyChores = assignments.filter((a) => a.frequency === "weekly");
   const monthlyChores = assignments.filter((a) => a.frequency === "monthly");
   const specialChores = assignments.filter((a) => a.frequency === "one-time");
+  const choreDoneCount = assignments.filter((a) => a.completions.length > 0).length;
+  const openEducationAssignments = educationAssignments.filter((assignment) => assignment.status !== "completed" && assignment.status !== "archived");
+  const completedEducationAssignments = educationAssignments.filter((assignment) => assignment.status === "completed");
+  const openEducationProjects = educationProjects.filter((project) => project.status === "open");
+  const openHouseProjects = projects.length;
+  const nextLesson = openEducationAssignments[0];
+  const nextChore = assignments.find((assignment) => assignment.completions.length === 0);
+  const portalItems = [
+    {
+      href: nextChore ? `#chore-${nextChore.id}` : `/kid/${id}`,
+      Icon: ListChecks,
+      label: "Chores",
+      value: `${choreDoneCount}/${assignments.length}`,
+      color: "#6366f1",
+      bg: "#eef2ff",
+    },
+    {
+      href: academyEnabled ? `/kid/${id}/academy` : `/kid/${id}`,
+      Icon: GraduationCap,
+      label: "Academy",
+      value: academyEnabled ? `${openEducationAssignments.length} open` : "Off",
+      color: "#2563eb",
+      bg: "#dbeafe",
+    },
+    {
+      href: openHouseProjects > 0 ? "#house-projects" : openEducationProjects.length > 0 ? `/kid/${id}/academy` : `/kid/${id}`,
+      Icon: Wrench,
+      label: "Projects",
+      value: `${openHouseProjects + openEducationProjects.length} open`,
+      color: "#f97316",
+      bg: "#ffedd5",
+    },
+    {
+      href: `/kid/${id}/wishlist`,
+      Icon: Gift,
+      label: "Wishlist",
+      value: "Open",
+      color: "#f472b6",
+      bg: "#fce7f3",
+    },
+  ];
 
   const steps = selectedChore?.chore.instructions
     ? (JSON.parse(selectedChore.chore.instructions.steps) as string[])
@@ -173,9 +259,8 @@ export default function KidPage() {
         )}
       </AnimatePresence>
 
-      {/* Header */}
       <div className="flex items-start gap-3 mb-6">
-        <button onClick={() => router.push("/")} className="bg-white rounded-2xl p-2 shadow-sm hover:shadow-md transition-shadow mt-1 shrink-0">
+        <button onClick={() => router.push("/dashboard")} className="bg-white rounded-2xl p-2 shadow-sm hover:shadow-md transition-shadow mt-1 shrink-0">
           <ArrowLeft size={20} className="text-slate-600" />
         </button>
         <div className="flex-1 min-w-0">
@@ -183,7 +268,7 @@ export default function KidPage() {
             <span className="text-4xl">{member.avatar}</span>
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-2">
-                <h1 className="text-xl sm:text-2xl font-black text-slate-800 truncate">{member.name}&apos;s Chores</h1>
+                <h1 className="text-xl sm:text-2xl font-black text-slate-800 truncate">{member.name}&apos;s Student Portal</h1>
                 <div className="flex shrink-0 items-center gap-2">
                   <Link href={`/kid/${id}/academy`} className="rounded-full bg-blue-100 p-2 text-blue-600" title="Academy">
                     <BookOpen size={18} />
@@ -209,7 +294,96 @@ export default function KidPage() {
         </div>
       </div>
 
-      {/* Chore sections */}
+      <section className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {portalItems.map((item) => (
+          <Link
+            key={item.label}
+            href={item.href}
+            className="flex items-center gap-3 rounded-3xl bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+          >
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl" style={{ backgroundColor: item.bg }}>
+              <item.Icon size={22} style={{ color: item.color }} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-black text-slate-800">{item.label}</span>
+              <span className="block text-sm font-bold" style={{ color: item.color }}>{item.value}</span>
+            </span>
+            <ArrowRight size={16} className="text-slate-300" />
+          </Link>
+        ))}
+      </section>
+
+      <section className="mb-8 grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
+        <div className="rounded-3xl bg-white p-5 shadow-sm">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="flex items-center gap-2 font-black text-slate-800">
+                <Trophy size={20} className="text-yellow-500" /> Today
+              </h2>
+              <p className="text-sm font-bold text-slate-400">{choreDoneCount}/{assignments.length} chores done · {completedEducationAssignments.length} academy lessons passed</p>
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {nextLesson && (
+              <Link href={`/kid/${id}/academy`} className="rounded-2xl border-2 border-blue-100 bg-blue-50 p-4 transition-colors hover:bg-blue-100">
+                <p className="mb-1 flex items-center gap-2 text-sm font-black text-blue-600">
+                  <GraduationCap size={16} /> Next lesson
+                </p>
+                <h3 className="font-black text-slate-800">{nextLesson.title}</h3>
+                <p className="mt-1 text-xs font-bold text-slate-500">
+                  {nextLesson.set.materials.length} cards · Pass {nextLesson.passingScore}% · {nextLesson.pointsReward} pts
+                </p>
+              </Link>
+            )}
+            {nextChore && (
+              <a href={`#chore-${nextChore.id}`} className="rounded-2xl border-2 border-violet-100 bg-violet-50 p-4 transition-colors hover:bg-violet-100">
+                <p className="mb-1 flex items-center gap-2 text-sm font-black text-violet-600">
+                  <ListChecks size={16} /> Next chore
+                </p>
+                <h3 className="font-black text-slate-800">{nextChore.chore.icon} {nextChore.chore.name}</h3>
+                <p className="mt-1 text-xs font-bold text-slate-500">{nextChore.chore.pointsValue} pts</p>
+              </a>
+            )}
+            {!nextLesson && !nextChore && (
+              <div className="rounded-2xl border-2 border-emerald-100 bg-emerald-50 p-4 sm:col-span-2">
+                <p className="font-black text-emerald-700">Everything is clear.</p>
+                <p className="text-sm font-bold text-emerald-600">Check projects or your wishlist when you are ready.</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {academyEnabled && (
+          <div className="rounded-3xl bg-white p-5 shadow-sm">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 className="flex items-center gap-2 font-black text-slate-800">
+                <GraduationCap size={20} className="text-blue-600" /> Academy
+              </h2>
+              <Link href={`/kid/${id}/academy`} className="text-sm font-black text-blue-600 hover:text-blue-800">Open</Link>
+            </div>
+            <div className="space-y-3">
+              {openEducationAssignments.slice(0, 3).map((assignment) => (
+                <Link key={assignment.id} href={`/kid/${id}/academy`} className="block rounded-2xl bg-blue-50 p-3 hover:bg-blue-100">
+                  <p className="font-black text-slate-800">{assignment.title}</p>
+                  <p className="text-xs font-bold text-blue-500">
+                    {assignment.set.mode} · {assignment.set.materials.length} cards · Due {formatDate(assignment.dueDate)}
+                  </p>
+                </Link>
+              ))}
+              {openEducationProjects.slice(0, 2).map((project) => (
+                <Link key={project.id} href={`/kid/${id}/academy`} className="block rounded-2xl bg-amber-50 p-3 hover:bg-amber-100">
+                  <p className="font-black text-slate-800">{project.title}</p>
+                  <p className="text-xs font-bold text-amber-600">Project · Due {formatDate(project.dueDate)} · {project.pointsReward} pts</p>
+                </Link>
+              ))}
+              {openEducationAssignments.length === 0 && openEducationProjects.length === 0 && (
+                <p className="rounded-2xl border-2 border-dashed border-slate-100 p-4 text-center text-sm font-bold text-slate-400">No academy work open.</p>
+              )}
+            </div>
+          </div>
+        )}
+      </section>
+
       {assignments.length === 0 && (
         <div className="text-center py-16">
           <div className="text-6xl mb-4">🎈</div>
@@ -236,6 +410,7 @@ export default function KidPage() {
                 return (
                   <motion.div
                     key={assignment.id}
+                    id={`chore-${assignment.id}`}
                     layout
                     className="rounded-2xl p-4 shadow-sm relative overflow-hidden"
                     style={{
@@ -447,7 +622,7 @@ export default function KidPage() {
 
       {/* Projects section */}
       {projects.length > 0 && (
-        <div className="mt-8">
+        <div id="house-projects" className="mt-8">
           <h2 className="text-xl font-black text-slate-700 mb-3">🔧 House Projects</h2>
           <div className="space-y-3">
             {projects.map((p) => (

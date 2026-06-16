@@ -12,6 +12,7 @@ import {
   ClipboardList,
   Compass,
   Gift,
+  GraduationCap,
   ListChecks,
   MapPin,
   Settings,
@@ -93,10 +94,25 @@ type DashboardEventItem = CommunityEventItem & {
   groupName: string;
 };
 
+type EducationAssignment = {
+  id: number;
+  status: string;
+  dueDate?: string | null;
+  member: { id: number; name: string; avatar: string; color: string };
+  set: { id: number; title: string; subject: string; mode: string };
+};
+
+type EducationProject = {
+  id: number;
+  status: string;
+  member?: { id: number; name: string; avatar: string; color: string } | null;
+};
+
 const PARENT_ITEMS = [
   { href: "/parent/tasks", Icon: CheckCircle2, label: "Parent Tasks", desc: "Complete parent chores", color: "#14b8a6", bg: "#ccfbf1" },
   { href: "/parent/assign", Icon: CalendarDays, label: "Assign Chores", desc: "Plan daily and weekly work", color: "#34d399", bg: "#d1fae5" },
   { href: "/parent/chores", Icon: ListChecks, label: "Chore Library", desc: "Edit chores and instructions", color: "#60a5fa", bg: "#dbeafe" },
+  { href: "/parent/academy", Icon: GraduationCap, label: "Education Academy", desc: "AI lessons, drills, and projects", color: "#2563eb", bg: "#dbeafe" },
   { href: "/parent/projects", Icon: Wrench, label: "House Projects", desc: "Track bigger jobs", color: "#f97316", bg: "#ffedd5" },
   { href: "/parent/wishlist", Icon: Gift, label: "Wish Lists", desc: "Review kid requests", color: "#f472b6", bg: "#fce7f3" },
 ];
@@ -136,6 +152,10 @@ export default function FamilyDashboard() {
   const [communityGroups, setCommunityGroups] = useState<CommunityGroup[]>([]);
   const [discoverGroups, setDiscoverGroups] = useState<CommunityGroup[]>([]);
   const [eventItems, setEventItems] = useState<DashboardEventItem[]>([]);
+  const [educationAssignments, setEducationAssignments] = useState<EducationAssignment[]>([]);
+  const [educationProjects, setEducationProjects] = useState<EducationProject[]>([]);
+  const [educationSetCount, setEducationSetCount] = useState(0);
+  const [educationEnabled, setEducationEnabled] = useState(false);
   const [tvMode, setTvMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -157,6 +177,10 @@ export default function FamilyDashboard() {
         setCommunityGroups([]);
         setDiscoverGroups([]);
         setEventItems([]);
+        setEducationAssignments([]);
+        setEducationProjects([]);
+        setEducationSetCount(0);
+        setEducationEnabled(false);
         setLoading(false);
         return;
       }
@@ -164,19 +188,25 @@ export default function FamilyDashboard() {
       setApiError(null);
       setMembers(nextMembers);
 
-      const [listsRes, groupsRes, discoverRes] = await Promise.all([
+      const [listsRes, groupsRes, discoverRes, educationRes] = await Promise.all([
         fetch("/api/groceries/lists?status=active"),
         fetch("/api/community/groups"),
         fetch("/api/community/groups?discover=true"),
+        fetch("/api/education/parent"),
       ]);
       const [nextLists, nextGroups, nextDiscoverGroups] = await Promise.all([
         readJsonArray<GroceryList>(listsRes),
         readJsonArray<CommunityGroup>(groupsRes),
         readJsonArray<CommunityGroup>(discoverRes),
       ]);
+      const educationData = educationRes.ok ? await educationRes.json().catch(() => null) : null;
       setGroceryLists(nextLists);
       setCommunityGroups(nextGroups);
       setDiscoverGroups(nextDiscoverGroups);
+      setEducationEnabled(Boolean(educationData));
+      setEducationAssignments(Array.isArray(educationData?.assignments) ? educationData.assignments : []);
+      setEducationProjects(Array.isArray(educationData?.projects) ? educationData.projects : []);
+      setEducationSetCount(Array.isArray(educationData?.sets) ? educationData.sets.length : 0);
 
       const detailedGroups = await Promise.all(
         nextGroups.slice(0, 8).map(async (group) => {
@@ -217,6 +247,10 @@ export default function FamilyDashboard() {
       setCommunityGroups([]);
       setDiscoverGroups([]);
       setEventItems([]);
+      setEducationAssignments([]);
+      setEducationProjects([]);
+      setEducationSetCount(0);
+      setEducationEnabled(false);
       setLoading(false);
     }
   }, []);
@@ -242,6 +276,22 @@ export default function FamilyDashboard() {
     0
   );
   const publicGroupsToJoin = discoverGroups.filter((group) => !group.currentMembership);
+  const openEducationAssignments = educationAssignments.filter((assignment) => assignment.status !== "completed" && assignment.status !== "archived");
+  const openEducationProjects = educationProjects.filter((project) => project.status === "open");
+  const academyByMember = new Map<number, { assignments: number; projects: number; completed: number }>();
+  kids.forEach((member) => academyByMember.set(member.id, { assignments: 0, projects: 0, completed: 0 }));
+  educationAssignments.forEach((assignment) => {
+    const summary = academyByMember.get(assignment.member.id);
+    if (!summary) return;
+    if (assignment.status === "completed") summary.completed += 1;
+    if (assignment.status !== "completed" && assignment.status !== "archived") summary.assignments += 1;
+  });
+  openEducationProjects.forEach((project) => {
+    const memberId = project.member?.id;
+    if (!memberId) return;
+    const summary = academyByMember.get(memberId);
+    if (summary) summary.projects += 1;
+  });
 
   return (
     <div className={`min-h-screen ${tvMode ? "p-12" : "p-4 sm:p-6"}`}>
@@ -332,6 +382,44 @@ export default function FamilyDashboard() {
 
       {!authRequired && !tvMode && !apiError && !loading && (
         <div className="mb-8 grid gap-5 xl:grid-cols-2">
+          {educationEnabled && (
+            <section className="rounded-3xl bg-white/80 p-5 shadow-sm xl:col-span-2">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="flex items-center gap-2 font-black text-slate-800">
+                    <GraduationCap size={18} className="text-blue-600" /> Education Academy
+                  </h2>
+                  <p className="text-xs font-bold text-slate-400">
+                    {openEducationAssignments.length} open assignments · {openEducationProjects.length} open projects · {educationSetCount} lesson sets
+                  </p>
+                </div>
+                <Link href="/parent/academy" className="inline-flex items-center gap-1 text-sm font-black text-blue-600 hover:text-blue-800">
+                  Manage <ArrowRight size={14} />
+                </Link>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {kids.map((member) => {
+                  const academy = academyByMember.get(member.id) ?? { assignments: 0, projects: 0, completed: 0 };
+                  return (
+                    <Link
+                      key={member.id}
+                      href={`/kid/${member.id}/academy`}
+                      className="flex items-center gap-3 rounded-2xl border border-blue-100 bg-blue-50/70 p-3 transition-colors hover:bg-blue-50"
+                    >
+                      <span className="text-2xl">{member.avatar}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-black text-slate-800">{member.name}</span>
+                        <span className="block truncate text-xs font-bold text-blue-500">
+                          {academy.assignments} lessons · {academy.projects} projects · {academy.completed} passed
+                        </span>
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
           <section className="rounded-3xl bg-white/80 p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
@@ -532,6 +620,8 @@ export default function FamilyDashboard() {
             const todayDone = member.assignments.filter((a) => a.completions.length > 0).length;
             const todayTotal = member.assignments.length;
             const allDone = todayTotal > 0 && todayDone === todayTotal;
+            const academy = academyByMember.get(member.id) ?? { assignments: 0, projects: 0, completed: 0 };
+            const academyOpen = academy.assignments + academy.projects;
 
             return (
               <motion.div
@@ -582,6 +672,16 @@ export default function FamilyDashboard() {
                       {todayDone}/{todayTotal} chores ✓
                     </span>
                   </div>
+                  {educationEnabled && (
+                    <div className="mt-3 flex items-center justify-between rounded-2xl bg-white/60 px-3 py-2 text-sm font-bold">
+                      <span className="flex items-center gap-1 text-slate-500">
+                        <GraduationCap size={15} className="text-blue-600" /> Academy
+                      </span>
+                      <span className={academyOpen > 0 ? "text-blue-600" : "text-emerald-600"}>
+                        {academyOpen > 0 ? `${academyOpen} open` : "Clear"}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </Link>
               </motion.div>
