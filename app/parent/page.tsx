@@ -18,6 +18,29 @@ type Plugin = {
   roles: string[];
 };
 
+type CommunityInvitePreview = {
+  role: "owner" | "manager" | "member";
+  returnTo: string;
+  group: {
+    id: number;
+    name: string;
+    groupType: string;
+    description: string | null;
+    location: string | null;
+  };
+  event: {
+    id: number;
+    title: string;
+    eventType: string;
+    date: string;
+    endDate: string | null;
+    allDay: boolean;
+    location: string | null;
+    imageUrl: string | null;
+    notes: string | null;
+  } | null;
+};
+
 export default function ParentPanel() {
   const [unlocked, setUnlocked] = useState(false);
   const [accountRole, setAccountRole] = useState<AccountRole>("parent");
@@ -37,6 +60,7 @@ export default function ParentPanel() {
   const [inviteLoading, setInviteLoading] = useState(false);
   const [communityInviteToken, setCommunityInviteToken] = useState("");
   const [communityReturnTo, setCommunityReturnTo] = useState("");
+  const [communityInvitePreview, setCommunityInvitePreview] = useState<CommunityInvitePreview | null>(null);
   const [pinResetToken, setPinResetToken] = useState("");
   const [plugins, setPlugins] = useState<Plugin[]>([]);
 
@@ -62,6 +86,10 @@ export default function ParentPanel() {
       setCommunityReturnTo(params.get("returnTo") ?? "");
       setMode("signup");
       setNotice("Sign in or create a parent account to join this community event.");
+      fetch(`/api/community/invites?token=${encodeURIComponent(communityInvite)}`)
+        .then((res) => res.ok ? res.json() : null)
+        .then((data) => setCommunityInvitePreview(data?.invite ?? null))
+        .catch(() => setCommunityInvitePreview(null));
     }
     const nextPinResetToken = params.get("pinReset") ?? "";
     if (nextPinResetToken) {
@@ -319,16 +347,86 @@ export default function ParentPanel() {
     await copyInvite();
   }
 
+  function communityEventDate() {
+    const date = communityInvitePreview?.event?.date;
+    if (!date) return "";
+    return new Date(date).toLocaleString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
+
   if (!unlocked) {
+    const isCommunityInvite = Boolean(communityInviteToken);
+    const inviteEvent = communityInvitePreview?.event;
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
-        <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-sm text-center">
+        <div className={`grid w-full gap-4 ${isCommunityInvite ? "max-w-5xl lg:grid-cols-[minmax(0,1fr)_400px]" : "max-w-sm"}`}>
+          {isCommunityInvite && (
+            <section className="overflow-hidden rounded-3xl bg-white text-left shadow-xl">
+              {inviteEvent?.imageUrl?.startsWith("/uploads/") && (
+                <img src={inviteEvent.imageUrl} alt="" className="h-52 w-full object-cover" />
+              )}
+              <div className="p-6 sm:p-8">
+                <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-violet-100 px-3 py-1 text-sm font-black text-violet-700">
+                  <Users size={16} /> Potluck invite
+                </div>
+                <h1 className="text-3xl font-black text-slate-800">
+                  {inviteEvent?.title ?? `Join ${communityInvitePreview?.group.name ?? "this community"}`}
+                </h1>
+                <div className="mt-3 space-y-2 text-sm font-bold text-slate-500">
+                  {communityInvitePreview?.group.name && (
+                    <p className="inline-flex items-center gap-2"><Users size={16} /> {communityInvitePreview.group.name}</p>
+                  )}
+                  {communityEventDate() && (
+                    <p className="inline-flex items-center gap-2"><CalendarDays size={16} /> {communityEventDate()}</p>
+                  )}
+                  {(inviteEvent?.location || communityInvitePreview?.group.location) && (
+                    <p>{inviteEvent?.location ?? communityInvitePreview?.group.location}</p>
+                  )}
+                </div>
+                {inviteEvent?.notes && <p className="mt-4 whitespace-pre-wrap text-sm font-semibold leading-6 text-slate-600">{inviteEvent.notes}</p>}
+
+                <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-2xl bg-slate-50 p-4">
+                    <CheckCircle2 size={20} className="mb-2 text-emerald-500" />
+                    <p className="text-sm font-black text-slate-800">RSVP</p>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">Let the host know who is coming.</p>
+                  </div>
+                  <div className="rounded-2xl bg-slate-50 p-4">
+                    <ShoppingCart size={20} className="mb-2 text-emerald-500" />
+                    <p className="text-sm font-black text-slate-800">Claim items</p>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">Choose a dish or supplies to bring.</p>
+                  </div>
+                  <div className="rounded-2xl bg-slate-50 p-4">
+                    <CalendarDays size={20} className="mb-2 text-emerald-500" />
+                    <p className="text-sm font-black text-slate-800">Stay updated</p>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">See event details after you join.</p>
+                  </div>
+                </div>
+
+                <div className="mt-6 rounded-2xl bg-violet-50 p-4">
+                  <h2 className="font-black text-slate-800">What is ChoresList?</h2>
+                  <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+                    ChoresList helps families and groups coordinate chores, calendars, grocery lists, community events, and potluck items from one private account.
+                  </p>
+                </div>
+              </div>
+            </section>
+          )}
+
+        <div className="bg-white rounded-3xl shadow-xl p-8 w-full text-center">
           <div className="text-6xl mb-4">🔒</div>
           <h1 className="text-2xl font-black text-slate-800 mb-2">
-            {mode === "signup" ? "Create Household" : mode === "forgot" ? "Reset Password" : mode === "reset" ? "New Password" : "Parent Panel"}
+            {isCommunityInvite && mode === "signup" ? "Join Potluck" : mode === "signup" ? "Create Household" : mode === "forgot" ? "Reset Password" : mode === "reset" ? "New Password" : "Parent Panel"}
           </h1>
           <p className="text-slate-500 font-semibold mb-6">
-            {mode === "signup"
+            {isCommunityInvite && mode === "signup"
+              ? "Create an account to RSVP and participate"
+              : mode === "signup"
               ? "Start a private family workspace"
               : mode === "forgot"
                 ? "Send a password reset link"
@@ -347,7 +445,7 @@ export default function ParentPanel() {
                   onChange={(event) => setHouseholdName(event.target.value)}
                   autoComplete="organization"
                   className="mt-1 w-full rounded-2xl border-2 border-slate-200 bg-slate-50 px-3 py-2 font-semibold text-slate-800 outline-none focus:border-violet-400"
-                  placeholder="The Maldonado Family"
+                  placeholder={isCommunityInvite ? "Your family or name" : "The Maldonado Family"}
                 />
               </label>
             )}
@@ -391,7 +489,7 @@ export default function ParentPanel() {
               disabled={checking || (mode === "forgot" && !email) || (mode === "reset" && !password)}
               className="w-full bg-violet-500 hover:bg-violet-600 text-white rounded-2xl py-3 text-lg font-bold transition-colors disabled:opacity-40"
             >
-              {checking ? "Checking..." : mode === "forgot" ? "Send Reset Link" : mode === "reset" ? "Update Password" : mode === "signup" ? "Create Account" : "Sign In"}
+              {checking ? "Checking..." : mode === "forgot" ? "Send Reset Link" : mode === "reset" ? "Update Password" : mode === "signup" ? (isCommunityInvite ? "Create Account & Join" : "Create Account") : "Sign In"}
             </button>
           </form>
 
@@ -428,7 +526,7 @@ export default function ParentPanel() {
               }}
               className="mt-4 text-sm font-bold text-violet-500 hover:text-violet-700"
             >
-              {mode === "signup" ? "Already have an account? Sign in" : "Create a household account"}
+              {mode === "signup" ? "Already have an account? Sign in" : isCommunityInvite ? "Create an account to join" : "Create a household account"}
             </button>
           )}
 
@@ -450,6 +548,7 @@ export default function ParentPanel() {
           <Link href="/dashboard" className="block mt-4 text-slate-400 text-sm font-semibold hover:text-slate-600">
             ← Back to Dashboard
           </Link>
+        </div>
         </div>
       </div>
     );

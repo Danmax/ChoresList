@@ -28,6 +28,48 @@ function communityPath(groupId: number, eventId?: number | null) {
   return eventId ? `${path}?event=${eventId}` : path;
 }
 
+export const GET = withErrors(async (req: NextRequest) => {
+  const { searchParams } = new URL(req.url);
+  const invite = verifyCommunityInviteToken(searchParams.get("token") ?? undefined);
+  if (!invite) return NextResponse.json({ error: "Community invite is invalid or expired" }, { status: 400 });
+
+  const group = await prisma.communityGroup.findUnique({
+    where: { id: invite.groupId },
+    select: { id: true, name: true, groupType: true, description: true, location: true },
+  });
+  if (!group) return NextResponse.json({ error: "Community group not found" }, { status: 404 });
+
+  const event = invite.eventId
+    ? await prisma.communityEvent.findFirst({
+        where: { id: invite.eventId, groupId: invite.groupId },
+        select: {
+          id: true,
+          title: true,
+          eventType: true,
+          date: true,
+          endDate: true,
+          allDay: true,
+          location: true,
+          imageUrl: true,
+          notes: true,
+        },
+      })
+    : null;
+  if (invite.eventId && !event) {
+    return NextResponse.json({ error: "Community event not found" }, { status: 404 });
+  }
+
+  return NextResponse.json({
+    ok: true,
+    invite: {
+      role: invite.role,
+      returnTo: communityPath(invite.groupId, invite.eventId),
+      group,
+      event,
+    },
+  });
+});
+
 export const POST = withErrors(async (req: NextRequest) => {
   const { parentId, email: inviterEmail } = requireSession(req);
   const body = await req.json();
