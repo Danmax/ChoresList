@@ -2,7 +2,7 @@
 
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, BookOpenCheck, ClipboardList, GraduationCap, Plus, Trophy } from "lucide-react";
+import { ArrowLeft, BookOpenCheck, ClipboardList, GraduationCap, Plus, Trophy, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 
 type Member = {
@@ -114,6 +114,8 @@ export default function ParentAcademyPage() {
   const [setDraft, setSetDraft] = useState(DEFAULT_SET);
   const [assignmentDraft, setAssignmentDraft] = useState(DEFAULT_ASSIGNMENT);
   const [projectDraft, setProjectDraft] = useState(DEFAULT_PROJECT);
+  const [lessonPrompt, setLessonPrompt] = useState("");
+  const [lessonItemCount, setLessonItemCount] = useState(10);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState("");
   const [loadError, setLoadError] = useState("");
@@ -167,6 +169,31 @@ export default function ParentAcademyPage() {
     event.preventDefault();
     const ok = await post(setDraft, "Material set created", "set");
     if (ok) setSetDraft(DEFAULT_SET);
+  }
+
+  async function generateLessonDraft() {
+    if (lessonPrompt.trim().length < 4) {
+      toast.error("Describe the lesson topic first");
+      return;
+    }
+
+    setSaving("lesson-ai");
+    try {
+      const res = await fetch("/api/education/ai/draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: lessonPrompt, itemCount: lessonItemCount }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        toast.error(data?.error ?? "Could not draft lesson");
+        return;
+      }
+      setSetDraft((current) => ({ ...current, ...data.draft }));
+      toast.success("Lesson draft filled in");
+    } finally {
+      setSaving("");
+    }
   }
 
   async function createAssignment(event: FormEvent<HTMLFormElement>) {
@@ -376,6 +403,44 @@ export default function ParentAcademyPage() {
         <aside className="space-y-5">
           <section className="rounded-3xl bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center gap-2">
+              <Wand2 size={18} className="text-blue-600" />
+              <h2 className="font-black text-slate-800">Build Lesson with AI</h2>
+            </div>
+            <div className="space-y-3">
+              <textarea
+                value={lessonPrompt}
+                onChange={(e) => setLessonPrompt(e.target.value)}
+                placeholder="Topic, age, and goal. Example: 10 third-grade questions about fractions with real-life food examples"
+                rows={4}
+                className="w-full rounded-2xl border-2 border-slate-100 bg-slate-50 px-3 py-2 font-semibold outline-none focus:border-blue-300"
+              />
+              <div className="grid grid-cols-[1fr_120px] gap-2">
+                <div className="rounded-2xl bg-slate-50 px-3 py-2">
+                  <p className="text-xs font-black uppercase text-slate-400">Cards</p>
+                  <p className="font-black text-slate-700">{lessonItemCount} items</p>
+                </div>
+                <input
+                  type="number"
+                  min={4}
+                  max={24}
+                  value={lessonItemCount}
+                  onChange={(e) => setLessonItemCount(Math.min(24, Math.max(4, Number(e.target.value) || 10)))}
+                  className="rounded-2xl border-2 border-slate-100 bg-slate-50 px-3 py-2 font-semibold outline-none focus:border-blue-300"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={generateLessonDraft}
+                disabled={saving === "lesson-ai"}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-2.5 font-black text-white hover:bg-blue-700 disabled:opacity-40"
+              >
+                <Wand2 size={18} /> {saving === "lesson-ai" ? "Building..." : "Draft Lesson"}
+              </button>
+            </div>
+          </section>
+
+          <section className="rounded-3xl bg-white p-5 shadow-sm">
+            <div className="mb-4 flex items-center gap-2">
               <Plus size={18} className="text-blue-600" />
               <h2 className="font-black text-slate-800">Load Daily Material</h2>
             </div>
@@ -389,6 +454,7 @@ export default function ParentAcademyPage() {
                   {MODES.map((mode) => <option key={mode.value} value={mode.value}>{mode.label}</option>)}
                 </select>
               </div>
+              <textarea value={setDraft.description} onChange={(e) => setSetDraft((d) => ({ ...d, description: e.target.value }))} placeholder="Lesson description" rows={3} className="w-full rounded-2xl border-2 border-slate-100 bg-slate-50 px-3 py-2 font-semibold outline-none focus:border-blue-300" />
               <div className="grid grid-cols-2 gap-2">
                 <input type="number" min={1} max={100} value={setDraft.passingScore} onChange={(e) => setSetDraft((d) => ({ ...d, passingScore: Number(e.target.value) }))} className="rounded-2xl border-2 border-slate-100 bg-slate-50 px-3 py-2 font-semibold outline-none focus:border-blue-300" />
                 <input type="number" min={0} value={setDraft.pointsReward} onChange={(e) => setSetDraft((d) => ({ ...d, pointsReward: Number(e.target.value) }))} className="rounded-2xl border-2 border-slate-100 bg-slate-50 px-3 py-2 font-semibold outline-none focus:border-blue-300" />
