@@ -2,7 +2,7 @@
 
 import { type FormEvent, useState, useEffect } from "react";
 import Link from "next/link";
-import { Users, ListChecks, CalendarDays, DollarSign, BookOpen, Home, BarChart2, Gift, Wrench, Ticket, Mail, LockKeyhole, MonitorSmartphone, LogOut, Settings, UserPlus, Copy, Share2, CheckCircle2, ShoppingCart, ShieldCheck, Network, GraduationCap, ChefHat } from "lucide-react";
+import { Users, ListChecks, CalendarDays, DollarSign, BookOpen, Home, BarChart2, Gift, Wrench, Ticket, Mail, LockKeyhole, MonitorSmartphone, LogOut, Settings, UserPlus, Copy, Share2, CheckCircle2, ShoppingCart, Network, GraduationCap, ChefHat } from "lucide-react";
 
 type AccountRole = "owner" | "parent" | "grandparent";
 type InviteRole = "parent" | "grandparent";
@@ -581,7 +581,6 @@ export default function ParentPanel() {
     { href: "/parent/wishlist", icon: Gift, label: "Wish Lists", desc: "View kids' wishes & requests", color: "#f472b6", bg: "#fce7f3", roles: ["owner", "parent", "grandparent"] },
     { href: "/calendar", icon: BookOpen, label: "Family Calendar", desc: "See family events & activities", color: "#f97316", bg: "#ffedd5", roles: ["owner", "parent", "grandparent"] },
     { href: "/community", icon: Users, label: "Community", desc: "Groups, events, RSVP & potlucks", color: "#8b5cf6", bg: "#ede9fe", roles: ["owner", "parent", "grandparent"] },
-    { href: "/parent/admin", icon: ShieldCheck, label: "Super Admin Config", desc: "Manage users & communities", color: "#0f172a", bg: "#e2e8f0", roles: ["owner"] },
     { href: "/parent/settings", icon: Settings, label: "Household Settings", desc: "Account, PIN, email & privacy", color: "#64748b", bg: "#f1f5f9", roles: ["owner", "parent", "grandparent"] },
   ];
   const visibleSections = sections.filter((section) => section.roles.includes(accountRole));
