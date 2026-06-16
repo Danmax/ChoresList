@@ -2,7 +2,7 @@
 
 import { type FormEvent, useState, useEffect } from "react";
 import Link from "next/link";
-import { Users, ListChecks, CalendarDays, DollarSign, BookOpen, Home, BarChart2, Gift, Wrench, Ticket, Mail, LockKeyhole, MonitorSmartphone, LogOut, Settings, UserPlus, Copy, Share2, CheckCircle2, ShoppingCart, ShieldCheck, Network, GraduationCap } from "lucide-react";
+import { Users, ListChecks, CalendarDays, DollarSign, BookOpen, Home, BarChart2, Gift, Wrench, Ticket, Mail, LockKeyhole, MonitorSmartphone, LogOut, Settings, UserPlus, Copy, Share2, CheckCircle2, ShoppingCart, ShieldCheck, Network, GraduationCap, ChefHat } from "lucide-react";
 
 type AccountRole = "owner" | "parent" | "grandparent";
 type InviteRole = "parent" | "grandparent";
@@ -459,7 +459,7 @@ export default function ParentPanel() {
     .filter((plugin) => plugin.active)
     .map((plugin) => ({
       href: plugin.route,
-      icon: plugin.key === "education-academy" ? GraduationCap : Network,
+      icon: plugin.key === "education-academy" ? GraduationCap : plugin.key === "recipes" ? ChefHat : Network,
       label: plugin.label,
       desc: plugin.description,
       color: plugin.color ?? "#14b8a6",

@@ -1,7 +1,7 @@
 import { ForbiddenError } from "@/lib/auth-error";
 import { prisma } from "@/lib/prisma";
 
-export type PluginKey = "family-tree" | "education-academy";
+export type PluginKey = "family-tree" | "education-academy" | "recipes";
 export type PluginStatus = "active" | "inactive";
 
 export type PluginDefinition = {
@@ -36,6 +36,17 @@ export const PLUGIN_REGISTRY: PluginDefinition[] = [
     route: "/parent/academy",
     color: "#2563eb",
     bg: "#dbeafe",
+    roles: ["owner", "parent", "grandparent"],
+    defaultStatus: "inactive",
+  },
+  {
+    key: "recipes",
+    label: "Recipes",
+    description: "Save dishes, prep instructions, dish photos, shopping lists, potluck items, and shared public recipes.",
+    icon: "ChefHat",
+    route: "/parent/recipes",
+    color: "#dc2626",
+    bg: "#fee2e2",
     roles: ["owner", "parent", "grandparent"],
     defaultStatus: "inactive",
   },

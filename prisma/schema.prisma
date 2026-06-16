@@ -10,22 +10,22 @@ datasource db {
 }
 
 model ParentAccount {
-  id            Int      @id @default(autoincrement())
-  householdId   Int
-  email         String   @unique @db.VarChar(255)
-  passwordHash  String   @db.VarChar(255)
-  passwordSalt  String   @db.VarChar(255)
-  pinHash       String?  @db.VarChar(255)
-  pinSalt       String?  @db.VarChar(255)
-  accountRole   String   @default("owner") @db.VarChar(32)
-  displayName   String?  @db.VarChar(255)
-  parentType    String   @default("parent") @db.VarChar(64)
-  relationshipLabel String? @db.VarChar(128)
-  childAccessMode String @default("all") @db.VarChar(32)
+  id                   Int      @id @default(autoincrement())
+  householdId          Int
+  email                String   @unique @db.VarChar(255)
+  passwordHash         String   @db.VarChar(255)
+  passwordSalt         String   @db.VarChar(255)
+  pinHash              String?  @db.VarChar(255)
+  pinSalt              String?  @db.VarChar(255)
+  accountRole          String   @default("owner") @db.VarChar(32)
+  displayName          String?  @db.VarChar(255)
+  parentType           String   @default("parent") @db.VarChar(64)
+  relationshipLabel    String?  @db.VarChar(128)
+  childAccessMode      String   @default("all") @db.VarChar(32)
   childAccessMemberIds Json?
-  emailVerified Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @default(now()) @updatedAt
+  emailVerified        Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @default(now()) @updatedAt
 
   household              Household                @relation(fields: [householdId], references: [id], onDelete: Cascade)
   confirmationTokens     EmailConfirmationToken[]
@@ -39,6 +39,7 @@ model ParentAccount {
   claimedCommunityItems  CommunityEventItem[]     @relation("CommunityItemClaimer")
   activatedPlugins       HouseholdPlugin[]        @relation("PluginActivator")
   familyTreeNodes        FamilyTreeNode[]
+  createdRecipes         Recipe[]                 @relation("RecipeCreator")
 }
 
 model Household {
@@ -83,18 +84,19 @@ model Household {
   educationAssignments     EducationAssignment[]
   educationAttempts        EducationAttempt[]
   educationProjects        EducationProject[]
+  recipes                  Recipe[]
 }
 
 model HouseholdPlugin {
   id                  Int       @id @default(autoincrement())
-  householdId          Int
-  pluginKey            String    @db.VarChar(64)
-  status               String    @default("inactive") @db.VarChar(32)
-  settings             Json?
-  activatedAt          DateTime?
-  activatedByParentId  Int?
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @default(now()) @updatedAt
+  householdId         Int
+  pluginKey           String    @db.VarChar(64)
+  status              String    @default("inactive") @db.VarChar(32)
+  settings            Json?
+  activatedAt         DateTime?
+  activatedByParentId Int?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @default(now()) @updatedAt
 
   household         Household      @relation(fields: [householdId], references: [id], onDelete: Cascade)
   activatedByParent ParentAccount? @relation("PluginActivator", fields: [activatedByParentId], references: [id], onDelete: SetNull)
@@ -171,35 +173,35 @@ model FamilyMember {
   level                     Int      @default(1)
   createdAt                 DateTime @default(now())
 
-  assignments      ChoreAssignment[]
-  completions      TaskCompletion[]
-  allowances       WeeklyAllowance[]
-  skills           MemberSkill[]
-  allowanceSetting AllowanceSettings?
-  wishList         WishListItem[]
-  houseProjects    HouseProject[]      @relation("ProjectAssignee")
-  rewardTickets    RewardTicket[]
-  devices          HouseholdDevice[]
-  pairingCodes     DevicePairingCode[]
-  household        Household           @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  familyTreeNodes  FamilyTreeNode[]
+  assignments          ChoreAssignment[]
+  completions          TaskCompletion[]
+  allowances           WeeklyAllowance[]
+  skills               MemberSkill[]
+  allowanceSetting     AllowanceSettings?
+  wishList             WishListItem[]
+  houseProjects        HouseProject[]        @relation("ProjectAssignee")
+  rewardTickets        RewardTicket[]
+  devices              HouseholdDevice[]
+  pairingCodes         DevicePairingCode[]
+  household            Household             @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  familyTreeNodes      FamilyTreeNode[]
   educationAssignments EducationAssignment[]
   educationAttempts    EducationAttempt[]
   educationProjects    EducationProject[]
 }
 
 model EducationMaterialSet {
-  id            Int      @id @default(autoincrement())
-  householdId   Int
-  title         String   @db.VarChar(255)
-  subject       String   @default("vocabulary") @db.VarChar(64)
-  mode          String   @default("drill") @db.VarChar(64)
-  description   String?  @db.Text
-  passingScore  Int      @default(85)
-  pointsReward  Int      @default(10)
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @default(now()) @updatedAt
+  id           Int      @id @default(autoincrement())
+  householdId  Int
+  title        String   @db.VarChar(255)
+  subject      String   @default("vocabulary") @db.VarChar(64)
+  mode         String   @default("drill") @db.VarChar(64)
+  description  String?  @db.Text
+  passingScore Int      @default(85)
+  pointsReward Int      @default(10)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
 
   household   Household             @relation(fields: [householdId], references: [id], onDelete: Cascade)
   materials   EducationMaterial[]
@@ -301,9 +303,9 @@ model FamilyTreeNode {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @default(now()) @updatedAt
 
-  household        Household                @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  familyMember     FamilyMember?            @relation(fields: [familyMemberId], references: [id], onDelete: SetNull)
-  parentAccount    ParentAccount?           @relation(fields: [parentAccountId], references: [id], onDelete: SetNull)
+  household         Household                @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  familyMember      FamilyMember?            @relation(fields: [familyMemberId], references: [id], onDelete: SetNull)
+  parentAccount     ParentAccount?           @relation(fields: [parentAccountId], references: [id], onDelete: SetNull)
   outgoingRelations FamilyTreeRelationship[] @relation("FamilyTreeRelationshipFrom")
   incomingRelations FamilyTreeRelationship[] @relation("FamilyTreeRelationshipTo")
 
@@ -567,6 +569,43 @@ model GroceryTemplateItem {
   createdAt  DateTime @default(now())
 
   template GroceryTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+}
+
+model Recipe {
+  id                Int      @id @default(autoincrement())
+  householdId       Int
+  createdByParentId Int?
+  title             String   @db.VarChar(255)
+  description       String?  @db.Text
+  servings          Int      @default(4)
+  prepMinutes       Int?
+  cookMinutes       Int?
+  photoUrl          String?  @db.VarChar(512)
+  instructions      String?  @db.Text
+  visibility        String   @default("private") @db.VarChar(64)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @default(now()) @updatedAt
+
+  household   Household          @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  createdBy   ParentAccount?     @relation("RecipeCreator", fields: [createdByParentId], references: [id], onDelete: SetNull)
+  ingredients RecipeIngredient[]
+
+  @@index([householdId, visibility])
+  @@index([visibility, createdAt])
+}
+
+model RecipeIngredient {
+  id        Int      @id @default(autoincrement())
+  recipeId  Int
+  name      String   @db.VarChar(255)
+  quantity  String?  @db.VarChar(64)
+  unit      String?  @db.VarChar(64)
+  category  String   @default("pantry") @db.VarChar(64)
+  note      String?  @db.Text
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
 }
 
 model CommunityGroup {
