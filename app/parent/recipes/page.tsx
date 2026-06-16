@@ -86,6 +86,17 @@ function ingredientAmount(ingredient: Ingredient) {
   return [ingredient.quantity, ingredient.unit].filter(Boolean).join(" ");
 }
 
+function recipeImageSrc(value: string | null | undefined, householdId?: number) {
+  const clean = typeof value === "string" ? value.trim() : "";
+  if (!clean) return "";
+  if (/^https?:\/\//i.test(clean) || clean.startsWith("/")) return clean;
+  if (clean.startsWith("uploads/")) return `/${clean}`;
+  if (householdId && !clean.includes("/") && /\.(avif|gif|heic|heif|jpe?g|png|webp)$/i.test(clean)) {
+    return `/uploads/recipes/${householdId}/${clean}`;
+  }
+  return clean;
+}
+
 export default function ParentRecipesPage() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [publicRecipes, setPublicRecipes] = useState<Recipe[]>([]);
@@ -215,7 +226,7 @@ export default function ParentRecipesPage() {
           servings: form.servings,
           prepMinutes: form.prepMinutes,
           cookMinutes: form.cookMinutes,
-          photoUrl: form.photoUrl,
+          photoUrl: recipeImageSrc(form.photoUrl, selectedRecipe?.householdId),
           instructions: form.instructions,
           visibility: form.visibility,
           ingredients,
@@ -357,7 +368,7 @@ export default function ParentRecipesPage() {
         servings: recipe.servings,
         prepMinutes: recipe.prepMinutes,
         cookMinutes: recipe.cookMinutes,
-        photoUrl: recipe.photoUrl,
+        photoUrl: recipeImageSrc(recipe.photoUrl, recipe.householdId),
         instructions: recipe.instructions,
         visibility: "private",
         ingredients: recipe.ingredients,
@@ -541,7 +552,11 @@ export default function ParentRecipesPage() {
               <Label>Dish photo</Label>
               <div className="mt-2 grid gap-3 md:grid-cols-[180px_minmax(0,1fr)]">
                 <div className="flex aspect-[4/3] items-center justify-center overflow-hidden rounded-lg bg-slate-100">
-                  {form.photoUrl ? <img src={form.photoUrl} alt="" className="h-full w-full object-cover" /> : <Camera className="text-slate-300" />}
+                  {recipeImageSrc(form.photoUrl, selectedRecipe?.householdId) ? (
+                    <img src={recipeImageSrc(form.photoUrl, selectedRecipe?.householdId)} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <Camera className="text-slate-300" />
+                  )}
                 </div>
                 <div className="space-y-3">
                   <Input value={form.photoUrl} onChange={(event) => updateForm("photoUrl", event.target.value)} placeholder="/uploads/recipes/..." />
@@ -628,8 +643,8 @@ export default function ParentRecipesPage() {
               </div>
               {selectedRecipe ? (
                 <div>
-                  {selectedRecipe.photoUrl && (
-                    <img src={selectedRecipe.photoUrl} alt="" className="mb-3 aspect-[4/3] w-full rounded-lg object-cover" />
+                  {recipeImageSrc(selectedRecipe.photoUrl, selectedRecipe.householdId) && (
+                    <img src={recipeImageSrc(selectedRecipe.photoUrl, selectedRecipe.householdId)} alt="" className="mb-3 aspect-[4/3] w-full rounded-lg object-cover" />
                   )}
                   <h3 className="text-xl font-black text-slate-800">{selectedRecipe.title}</h3>
                   <p className="mt-1 text-sm font-semibold text-slate-500">

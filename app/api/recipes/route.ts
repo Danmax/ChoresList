@@ -9,6 +9,17 @@ function cleanText(value: unknown, max: number) {
   return typeof value === "string" && value.trim() ? value.trim().slice(0, max) : null;
 }
 
+function cleanPhotoUrl(value: unknown, householdId: number) {
+  if (typeof value !== "string" || !value.trim()) return null;
+  const clean = value.trim().slice(0, 512);
+  if (/^https?:\/\//i.test(clean) || clean.startsWith("/")) return clean;
+  if (clean.startsWith("uploads/")) return `/${clean}`;
+  if (!clean.includes("/") && /\.(avif|gif|heic|heif|jpe?g|png|webp)$/i.test(clean)) {
+    return `/uploads/recipes/${householdId}/${clean}`;
+  }
+  return clean;
+}
+
 function cleanRequiredText(value: unknown, max: number) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
 }
@@ -47,6 +58,10 @@ const recipeInclude = {
   ingredients: { orderBy: [{ sortOrder: "asc" as const }, { createdAt: "asc" as const }] },
 };
 
+function normalizeRecipePhotoUrl<T extends { householdId: number; photoUrl: string | null }>(recipe: T): T {
+  return { ...recipe, photoUrl: cleanPhotoUrl(recipe.photoUrl, recipe.householdId) };
+}
+
 export const GET = withErrors(async (req: NextRequest) => {
   const { householdId, parentId } = requireSession(req);
   await requirePluginActive(householdId, "recipes");
@@ -83,7 +98,11 @@ export const GET = withErrors(async (req: NextRequest) => {
     }),
   ]);
 
-  return NextResponse.json({ recipes, publicRecipes, potluckEvents });
+  return NextResponse.json({
+    recipes: recipes.map(normalizeRecipePhotoUrl),
+    publicRecipes: publicRecipes.map(normalizeRecipePhotoUrl),
+    potluckEvents,
+  });
 });
 
 export const POST = withErrors(async (req: NextRequest) => {
@@ -103,7 +122,7 @@ export const POST = withErrors(async (req: NextRequest) => {
       servings: cleanInt(body.servings, 4, 1, 200) ?? 4,
       prepMinutes: cleanInt(body.prepMinutes, null, 0, 1440),
       cookMinutes: cleanInt(body.cookMinutes, null, 0, 1440),
-      photoUrl: cleanText(body.photoUrl, 512),
+      photoUrl: cleanPhotoUrl(body.photoUrl, householdId),
       instructions: cleanText(body.instructions, 10000),
       visibility: cleanVisibility(body.visibility),
       ingredients: { create: ingredients },
@@ -142,7 +161,7 @@ export const PUT = withErrors(async (req: NextRequest) => {
         ...(body.servings !== undefined && { servings: cleanInt(body.servings, 4, 1, 200) ?? 4 }),
         ...(body.prepMinutes !== undefined && { prepMinutes: cleanInt(body.prepMinutes, null, 0, 1440) }),
         ...(body.cookMinutes !== undefined && { cookMinutes: cleanInt(body.cookMinutes, null, 0, 1440) }),
-        ...(body.photoUrl !== undefined && { photoUrl: cleanText(body.photoUrl, 512) }),
+        ...(body.photoUrl !== undefined && { photoUrl: cleanPhotoUrl(body.photoUrl, householdId) }),
         ...(body.instructions !== undefined && { instructions: cleanText(body.instructions, 10000) }),
         ...(body.visibility !== undefined && { visibility: cleanVisibility(body.visibility) }),
         ...(replaceIngredients && { ingredients: { create: cleanIngredients(body.ingredients) } }),
