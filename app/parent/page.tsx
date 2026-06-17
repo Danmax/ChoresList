@@ -22,14 +22,14 @@ type CommunityInvitePreview = {
   role: "owner" | "manager" | "member";
   returnTo: string;
   group: {
-    id: number;
+    id: string;
     name: string;
     groupType: string;
     description: string | null;
     location: string | null;
   };
   event: {
-    id: number;
+    id: string;
     title: string;
     eventType: string;
     date: string;
@@ -85,7 +85,7 @@ export default function ParentPanel() {
       setCommunityInviteToken(communityInvite);
       setCommunityReturnTo(params.get("returnTo") ?? "");
       setMode("signup");
-      setNotice("Sign in or create a parent account to join this community event.");
+      setNotice("Sign in or create a parent account to join this community.");
       fetch(`/api/community/invites?token=${encodeURIComponent(communityInvite)}`)
         .then((res) => res.ok ? res.json() : null)
         .then((data) => setCommunityInvitePreview(data?.invite ?? null))
@@ -362,6 +362,7 @@ export default function ParentPanel() {
   if (!unlocked) {
     const isCommunityInvite = Boolean(communityInviteToken);
     const inviteEvent = communityInvitePreview?.event;
+    const isCommunityEventInvite = Boolean(inviteEvent);
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
         <div className={`grid w-full gap-4 ${isCommunityInvite ? "max-w-5xl lg:grid-cols-[minmax(0,1fr)_400px]" : "max-w-sm"}`}>
@@ -372,7 +373,7 @@ export default function ParentPanel() {
               )}
               <div className="p-6 sm:p-8">
                 <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-violet-100 px-3 py-1 text-sm font-black text-violet-700">
-                  <Users size={16} /> Potluck invite
+                  <Users size={16} /> {isCommunityEventInvite ? "Community event invite" : "Community invite"}
                 </div>
                 <h1 className="text-3xl font-black text-slate-800">
                   {inviteEvent?.title ?? `Join ${communityInvitePreview?.group.name ?? "this community"}`}
@@ -393,13 +394,13 @@ export default function ParentPanel() {
                 <div className="mt-6 grid gap-3 sm:grid-cols-3">
                   <div className="rounded-2xl bg-slate-50 p-4">
                     <CheckCircle2 size={20} className="mb-2 text-emerald-500" />
-                    <p className="text-sm font-black text-slate-800">RSVP</p>
-                    <p className="mt-1 text-xs font-semibold text-slate-500">Let the host know who is coming.</p>
+                    <p className="text-sm font-black text-slate-800">{isCommunityEventInvite ? "RSVP" : "Join group"}</p>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">{isCommunityEventInvite ? "Let the host know who is coming." : "Become a member after account setup."}</p>
                   </div>
                   <div className="rounded-2xl bg-slate-50 p-4">
                     <ShoppingCart size={20} className="mb-2 text-emerald-500" />
-                    <p className="text-sm font-black text-slate-800">Claim items</p>
-                    <p className="mt-1 text-xs font-semibold text-slate-500">Choose a dish or supplies to bring.</p>
+                    <p className="text-sm font-black text-slate-800">{isCommunityEventInvite ? "Claim items" : "See events"}</p>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">{isCommunityEventInvite ? "Choose a dish or supplies to bring." : "View group events and details."}</p>
                   </div>
                   <div className="rounded-2xl bg-slate-50 p-4">
                     <CalendarDays size={20} className="mb-2 text-emerald-500" />
@@ -421,11 +422,11 @@ export default function ParentPanel() {
         <div className="bg-white rounded-3xl shadow-xl p-8 w-full text-center">
           <div className="text-6xl mb-4">🔒</div>
           <h1 className="text-2xl font-black text-slate-800 mb-2">
-            {isCommunityInvite && mode === "signup" ? "Join Potluck" : mode === "signup" ? "Create Household" : mode === "forgot" ? "Reset Password" : mode === "reset" ? "New Password" : "Parent Panel"}
+            {isCommunityInvite && mode === "signup" ? (isCommunityEventInvite ? "Join Event" : "Join Group") : mode === "signup" ? "Create Household" : mode === "forgot" ? "Reset Password" : mode === "reset" ? "New Password" : "Parent Panel"}
           </h1>
           <p className="text-slate-500 font-semibold mb-6">
             {isCommunityInvite && mode === "signup"
-              ? "Create an account to RSVP and participate"
+              ? isCommunityEventInvite ? "Create an account to RSVP and participate" : "Create an account to join this community group"
               : mode === "signup"
               ? "Start a private family workspace"
               : mode === "forgot"

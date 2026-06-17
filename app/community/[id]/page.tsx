@@ -63,6 +63,7 @@ type CommunityGroup = {
   description: string | null;
   location: string | null;
   visibility: string;
+  groupInviteUrl: string | null;
   currentParentId: string | null;
   currentMembership: { role: CommunityRole; parentId: string } | null;
   members: CommunityMember[];
@@ -284,6 +285,11 @@ export default function CommunityGroupPage() {
     return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(eventShareUrl(eventId))}`;
   }
 
+  function groupQrUrl() {
+    if (!group?.groupInviteUrl) return "";
+    return `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(group.groupInviteUrl)}`;
+  }
+
   const upcomingEvents = useMemo(
     () => [...(group?.events ?? [])].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
     [group?.events]
@@ -292,6 +298,25 @@ export default function CommunityGroupPage() {
   async function copyEventLink(eventId: string) {
     await navigator.clipboard.writeText(eventShareUrl(eventId));
     toast.success("Event link copied");
+  }
+
+  async function copyGroupInviteLink() {
+    if (!group?.groupInviteUrl) return;
+    await navigator.clipboard.writeText(group.groupInviteUrl);
+    toast.success("Group invite link copied");
+  }
+
+  async function shareGroupInvite() {
+    if (!group?.groupInviteUrl) return;
+    if (navigator.share) {
+      await navigator.share({
+        title: `Join ${group.name}`,
+        text: `Create an account and join ${group.name} on ChoresList.`,
+        url: group.groupInviteUrl,
+      });
+      return;
+    }
+    await copyGroupInviteLink();
   }
 
   async function shareEvent(event: CommunityEvent) {
@@ -1267,6 +1292,35 @@ export default function CommunityGroupPage() {
                 ))}
               </div>
             </div>
+
+            {canManage && group.groupInviteUrl && (
+              <div className="rounded-3xl bg-white p-4 shadow-sm">
+                <h2 className="mb-3 flex items-center gap-2 font-black text-slate-800"><QrCode size={18} className="text-violet-500" /> Group Join QR</h2>
+                <div className="rounded-2xl bg-violet-50 p-3">
+                  <img src={groupQrUrl()} alt={`${group.name} join QR code`} className="mx-auto h-52 w-52 rounded-xl bg-white p-2 object-contain" />
+                </div>
+                <p className="mt-3 text-sm font-semibold leading-6 text-slate-500">
+                  Scan to create a parent account or sign in, then join this group as a member.
+                </p>
+                <p className="mt-2 truncate rounded-2xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-500">{group.groupInviteUrl}</p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+                  <button
+                    type="button"
+                    onClick={copyGroupInviteLink}
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-100 py-2.5 font-black text-slate-700 hover:bg-slate-200"
+                  >
+                    <Copy size={16} /> Copy Link
+                  </button>
+                  <button
+                    type="button"
+                    onClick={shareGroupInvite}
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-violet-500 py-2.5 font-black text-white hover:bg-violet-600"
+                  >
+                    <Share2 size={16} /> Share
+                  </button>
+                </div>
+              </div>
+            )}
 
             {canManage && (
               <div className="rounded-3xl bg-white p-4 shadow-sm">

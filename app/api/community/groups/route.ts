@@ -47,15 +47,16 @@ const groupInclude = {
   },
 } satisfies Prisma.CommunityGroupInclude;
 
-function communityEventPath(groupId: string, eventId: string) {
-  return `/community/${groupId}?event=${eventId}`;
+function communityPath(groupId: string, eventId?: string | null) {
+  const path = `/community/${groupId}`;
+  return eventId ? `${path}?event=${eventId}` : path;
 }
 
-function publicInviteUrl(req: NextRequest, groupId: string, eventId: string) {
+function publicInviteUrl(req: NextRequest, groupId: string, eventId?: string | null) {
   const token = createCommunityInviteToken({ groupId, role: "member", eventId });
   const inviteUrl = new URL("/parent", getBaseUrl(req));
   inviteUrl.searchParams.set("communityInvite", token);
-  inviteUrl.searchParams.set("returnTo", communityEventPath(groupId, eventId));
+  inviteUrl.searchParams.set("returnTo", communityPath(groupId, eventId));
   return inviteUrl.toString();
 }
 
@@ -96,6 +97,9 @@ export const GET = withErrors(async (req: NextRequest) => {
         ...event,
         publicInviteUrl: event.visibility === "public" ? publicInviteUrl(req, group.id, event.id) : null,
       })),
+      groupInviteUrl: currentMembership && ["owner", "manager"].includes(currentMembership.role)
+        ? publicInviteUrl(req, group.id)
+        : null,
       currentMembership,
       currentParentId: parentId,
     });
