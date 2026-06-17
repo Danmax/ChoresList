@@ -94,7 +94,7 @@ export default function AssignPage() {
   const selectedMemberObj = members.find((m) => m.id === parseInt(form.memberId));
   const availableChores = selectedMemberObj
     ? chores.filter((c) => {
-        const isParent = selectedMemberObj.role === "parent" || selectedMemberObj.role === "mom" || selectedMemberObj.role === "dad";
+        const isParent = selectedMemberObj.role === "parent" || selectedMemberObj.role === "mom" || selectedMemberObj.role === "dad" || selectedMemberObj.role === "grandparent";
         return isParent ? true : c.ageMin <= selectedMemberObj.age && c.ageMax >= selectedMemberObj.age;
       })
     : chores;

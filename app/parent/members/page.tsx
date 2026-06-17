@@ -25,6 +25,7 @@ const PARENT_TYPE_OPTIONS = [
   { value: "stepdad", label: "Step Dad" },
   { value: "guardian", label: "Guardian" },
   { value: "grandparent", label: "Grandparent" },
+  { value: "young-adult", label: "Young Adult" },
   { value: "other", label: "Other" },
 ];
 
@@ -37,6 +38,7 @@ const RELATIONSHIP_OPTIONS = [
   { value: "mom", label: "Mom" },
   { value: "dad", label: "Dad" },
   { value: "parent", label: "Parent" },
+  { value: "grandparent", label: "Grandparent" },
   { value: "other", label: "Other" },
 ];
 
@@ -151,6 +153,7 @@ function placeholderForRole(role?: string | null) {
   if (role === "mom") return "Mom's name";
   if (role === "dad") return "Dad's name";
   if (role === "parent") return "Parent's name";
+  if (role === "grandparent") return "Grandparent's name";
   return "Child's name";
 }
 
@@ -466,15 +469,15 @@ export default function MembersPage() {
 
         <div className="rounded-3xl bg-white p-5 shadow-sm">
           <div className="mb-4">
-            <p className="text-lg font-black text-slate-800">Invite Spouse or Grandparent</p>
-            <p className="text-sm font-semibold text-slate-400">Link another adult account and choose child access.</p>
+            <p className="text-lg font-black text-slate-800">Invite Household Account</p>
+            <p className="text-sm font-semibold text-slate-400">Link another spouse, grandparent, or young adult account and choose access.</p>
           </div>
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
-                onClick={() => setInviteDraft((previous) => ({ ...previous, accountRole: "parent", parentType: previous.parentType === "grandparent" ? "parent" : previous.parentType }))}
-                className={`rounded-xl px-3 py-2 text-sm font-black ${inviteDraft.accountRole === "parent" ? "bg-violet-100 text-violet-700 ring-2 ring-violet-300" : "bg-slate-50 text-slate-500"}`}
+                onClick={() => setInviteDraft((previous) => ({ ...previous, accountRole: "parent", parentType: previous.parentType === "grandparent" || previous.parentType === "young-adult" ? "parent" : previous.parentType }))}
+                className={`rounded-xl px-3 py-2 text-sm font-black ${inviteDraft.accountRole === "parent" && inviteDraft.parentType !== "young-adult" ? "bg-violet-100 text-violet-700 ring-2 ring-violet-300" : "bg-slate-50 text-slate-500"}`}
               >
                 Spouse / Parent
               </button>
@@ -484,6 +487,13 @@ export default function MembersPage() {
                 className={`rounded-xl px-3 py-2 text-sm font-black ${inviteDraft.accountRole === "grandparent" ? "bg-violet-100 text-violet-700 ring-2 ring-violet-300" : "bg-slate-50 text-slate-500"}`}
               >
                 Grandparent
+              </button>
+              <button
+                type="button"
+                onClick={() => setInviteDraft((previous) => ({ ...previous, accountRole: "grandparent", parentType: "young-adult", childAccessMode: "none" }))}
+                className={`rounded-xl px-3 py-2 text-sm font-black ${inviteDraft.parentType === "young-adult" ? "bg-violet-100 text-violet-700 ring-2 ring-violet-300" : "bg-slate-50 text-slate-500"}`}
+              >
+                Young Adult
               </button>
             </div>
             <div className="grid gap-2 sm:grid-cols-2">

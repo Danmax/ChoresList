@@ -10,9 +10,9 @@ type BirthdayInput = {
   birthdayDay?: unknown;
 };
 
-const ADULT_ROLES = new Set(["mom", "dad", "parent"]);
-const MEMBER_ROLES = new Set(["child", "young-adult", "mom", "dad", "parent"]);
-const RELATIONSHIPS = new Set(["child", "step-child", "adopted-child", "foster-child", "young-adult", "mom", "dad", "parent", "other"]);
+const ADULT_ROLES = new Set(["mom", "dad", "parent", "grandparent"]);
+const MEMBER_ROLES = new Set(["child", "young-adult", "mom", "dad", "parent", "grandparent"]);
+const RELATIONSHIPS = new Set(["child", "step-child", "adopted-child", "foster-child", "young-adult", "mom", "dad", "parent", "grandparent", "other"]);
 const FAMILY_BRANCHES = new Set(["primary", "mom-side", "dad-side", "shared", "blended", "guardian"]);
 
 function cleanRole(value: unknown) {
@@ -59,6 +59,7 @@ function cleanFamilyBranch(value: unknown) {
 
 function defaultRelationshipForRole(role: string) {
   if (role === "young-adult") return "young-adult";
+  if (role === "grandparent") return "grandparent";
   if (role === "mom" || role === "dad" || role === "parent") return role;
   return "child";
 }

@@ -3,7 +3,7 @@ import { requireParentSession, withErrors } from "@/lib/api";
 import { ensureParentFamilyMember } from "@/lib/parent-member";
 import { prisma } from "@/lib/prisma";
 
-const PARENT_TYPES = new Set(["mom", "dad", "parent", "stepmom", "stepdad", "guardian", "grandparent", "other"]);
+const PARENT_TYPES = new Set(["mom", "dad", "parent", "stepmom", "stepdad", "guardian", "grandparent", "young-adult", "other"]);
 const ACCESS_MODES = new Set(["all", "selected", "none"]);
 
 function cleanText(value: unknown, fallback = "", max = 128) {

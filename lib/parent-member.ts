@@ -12,18 +12,22 @@ type ParentForMember = {
 function parentMemberRole(parentType: string) {
   if (parentType === "mom" || parentType === "stepmom") return "mom";
   if (parentType === "dad" || parentType === "stepdad") return "dad";
+  if (parentType === "grandparent") return "grandparent";
+  if (parentType === "young-adult") return "young-adult";
   return "parent";
 }
 
 function parentAvatar(parentType: string) {
   if (parentType === "mom" || parentType === "stepmom") return "👩";
   if (parentType === "dad" || parentType === "stepdad") return "👨";
+  if (parentType === "grandparent") return "👵";
+  if (parentType === "young-adult") return "🧑";
   return "🧑";
 }
 
 function parentDisplayName(parent: ParentForMember) {
   const role = parentMemberRole(parent.parentType);
-  const roleLabel = role === "mom" ? "Mom" : role === "dad" ? "Dad" : "Parent";
+  const roleLabel = role === "mom" ? "Mom" : role === "dad" ? "Dad" : role === "grandparent" ? "Grandparent" : role === "young-adult" ? "Young Adult" : "Parent";
   return parent.displayName || parent.relationshipLabel || roleLabel || parent.email.split("@")[0] || "Parent";
 }
 
