@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireParentSession, withErrors } from "@/lib/api";
+import { ensureParentFamilyMember } from "@/lib/parent-member";
 import { prisma } from "@/lib/prisma";
 
 const PARENT_TYPES = new Set(["mom", "dad", "parent", "stepmom", "stepdad", "guardian", "grandparent", "other"]);
@@ -75,6 +76,8 @@ export const PUT = withErrors(async (req: NextRequest) => {
       childAccessMemberIds: true,
     },
   });
+
+  await ensureParentFamilyMember(parentId, householdId);
 
   return NextResponse.json(parent);
 });

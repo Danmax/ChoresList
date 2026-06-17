@@ -1,6 +1,9 @@
 import { prisma } from "@/lib/prisma";
 
-type ChildAccessWhere = {} | { id: -1 } | { id: { in: number[] } };
+type ChildAccessWhere =
+  | {}
+  | { parentAccountId: number }
+  | { OR: Array<{ id: { in: number[] } } | { parentAccountId: number }> };
 
 function idsFromJson(value: unknown) {
   return Array.isArray(value)
@@ -15,15 +18,21 @@ export async function childAccessWhere(parentId: number, householdId: number): P
   });
 
   if (!parent || parent.childAccessMode === "all") return {};
-  if (parent.childAccessMode === "none") return { id: -1 };
+  if (parent.childAccessMode === "none") return { parentAccountId: parentId };
 
   const ids = idsFromJson(parent.childAccessMemberIds);
-  return { id: { in: ids.length ? ids : [-1] } };
+  return { OR: [{ id: { in: ids.length ? ids : [-1] } }, { parentAccountId: parentId }] };
 }
 
 export async function canAccessMember(parentId: number, householdId: number, memberId: number) {
+  const member = await prisma.familyMember.findFirst({
+    where: { id: memberId, householdId },
+    select: { parentAccountId: true },
+  });
+  if (member?.parentAccountId === parentId) return true;
+
   const where = await childAccessWhere(parentId, householdId);
-  if (!("id" in where)) return true;
-  if (where.id === -1) return false;
-  return where.id.in.includes(memberId);
+  if (!("OR" in where) && !("parentAccountId" in where)) return true;
+  if ("parentAccountId" in where) return false;
+  return where.OR.some((clause) => "id" in clause && clause.id.in.includes(memberId));
 }

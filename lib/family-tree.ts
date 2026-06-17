@@ -5,6 +5,7 @@ const CHILD_RELATIONSHIPS = new Set(["child", "step-child", "adopted-child", "fo
 type MemberForTree = {
   id: number;
   householdId: number;
+  parentAccountId: number | null;
   name: string;
   role: string;
   relationshipToHousehold: string;
@@ -20,6 +21,17 @@ function parentAvatar(parentType: string) {
   if (parentType === "dad" || parentType === "stepdad") return "👨";
   if (parentType === "grandparent") return "👵";
   return "👤";
+}
+
+function parentName(parent: { email: string; displayName: string | null; parentType: string; relationshipLabel: string | null }) {
+  const fallback = parent.parentType === "mom" || parent.parentType === "stepmom"
+    ? "Mom"
+    : parent.parentType === "dad" || parent.parentType === "stepdad"
+      ? "Dad"
+      : parent.parentType === "grandparent"
+        ? "Grandparent"
+        : "Parent";
+  return parent.displayName || parent.relationshipLabel || fallback || parent.email.split("@")[0] || "Parent";
 }
 
 function isChildLike(member: Pick<MemberForTree, "role" | "relationshipToHousehold">) {
@@ -72,13 +84,13 @@ async function ensureParentNodes(householdId: number) {
           householdId,
           kind: "parent_account",
           parentAccountId: parent.id,
-          name: parent.displayName || parent.relationshipLabel || parent.email.split("@")[0] || "Parent",
+          name: parentName(parent),
           avatar: parentAvatar(parent.parentType),
           color: "#14b8a6",
           notes: parent.relationshipLabel,
         },
         update: {
-          name: parent.displayName || parent.relationshipLabel || parent.email.split("@")[0] || "Parent",
+          name: parentName(parent),
           avatar: parentAvatar(parent.parentType),
           notes: parent.relationshipLabel,
         },
@@ -90,6 +102,19 @@ async function ensureParentNodes(householdId: number) {
 }
 
 export async function syncFamilyTreeForMember(member: MemberForTree) {
+  if (member.parentAccountId) {
+    await ensureParentNodes(member.householdId);
+    const parentNode = await prisma.familyTreeNode.findUnique({
+      where: {
+        householdId_parentAccountId: {
+          householdId: member.householdId,
+          parentAccountId: member.parentAccountId,
+        },
+      },
+    });
+    if (parentNode) return parentNode;
+  }
+
   const memberNode = await ensureMemberNode(member);
   if (!isChildLike(member)) return memberNode;
 
@@ -124,6 +149,7 @@ export async function syncHouseholdFamilyTree(householdId: number) {
     select: {
       id: true,
       householdId: true,
+      parentAccountId: true,
       name: true,
       role: true,
       relationshipToHousehold: true,

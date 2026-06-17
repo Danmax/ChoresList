@@ -4,6 +4,7 @@ import { createConfirmationToken, hashConfirmationToken, hashPassword, normalize
 import { getBaseUrl } from "@/lib/base-url";
 import { sendConfirmationEmail } from "@/lib/email";
 import { seedHouseholdDefaults } from "@/lib/household-defaults";
+import { ensureParentFamilyMember } from "@/lib/parent-member";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 import { createSessionToken, parentSession, verifyHouseholdInviteToken, verifySessionToken } from "@/lib/session";
@@ -51,6 +52,8 @@ async function finalizeVerifiedParentAccount(parent: {
   if (nextRole === "owner" && choreCount === 0 && skillCount === 0) {
     await seedHouseholdDefaults(prisma, parent.householdId);
   }
+
+  await ensureParentFamilyMember(parent.id, parent.householdId);
 
   return updated;
 }

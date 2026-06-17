@@ -1,0 +1,95 @@
+import { prisma } from "@/lib/prisma";
+
+type ParentForMember = {
+  id: number;
+  householdId: number;
+  email: string;
+  displayName: string | null;
+  parentType: string;
+  relationshipLabel: string | null;
+};
+
+function parentMemberRole(parentType: string) {
+  if (parentType === "mom" || parentType === "stepmom") return "mom";
+  if (parentType === "dad" || parentType === "stepdad") return "dad";
+  return "parent";
+}
+
+function parentAvatar(parentType: string) {
+  if (parentType === "mom" || parentType === "stepmom") return "👩";
+  if (parentType === "dad" || parentType === "stepdad") return "👨";
+  return "🧑";
+}
+
+function parentDisplayName(parent: ParentForMember) {
+  const role = parentMemberRole(parent.parentType);
+  const roleLabel = role === "mom" ? "Mom" : role === "dad" ? "Dad" : "Parent";
+  return parent.displayName || parent.relationshipLabel || roleLabel || parent.email.split("@")[0] || "Parent";
+}
+
+async function parentRecord(parentId: number, householdId: number) {
+  return prisma.parentAccount.findFirst({
+    where: { id: parentId, householdId },
+    select: {
+      id: true,
+      householdId: true,
+      email: true,
+      displayName: true,
+      parentType: true,
+      relationshipLabel: true,
+    },
+  });
+}
+
+export async function ensureParentFamilyMember(parentId: number, householdId: number) {
+  const parent = await parentRecord(parentId, householdId);
+  if (!parent) return null;
+
+  const role = parentMemberRole(parent.parentType);
+  const name = parentDisplayName(parent);
+  const data = {
+    name,
+    role,
+    relationshipToHousehold: role,
+    avatar: parentAvatar(parent.parentType),
+    color: "#14b8a6",
+    familyNotes: parent.relationshipLabel,
+  };
+
+  const linked = await prisma.familyMember.findUnique({ where: { parentAccountId: parent.id } });
+  if (linked) {
+    return prisma.familyMember.update({
+      where: { id: linked.id },
+      data,
+    });
+  }
+
+  const reusable = await prisma.familyMember.findFirst({
+    where: {
+      householdId,
+      parentAccountId: null,
+      role,
+      name,
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  if (reusable) {
+    return prisma.familyMember.update({
+      where: { id: reusable.id },
+      data: { ...data, parentAccountId: parent.id },
+    });
+  }
+
+  return prisma.familyMember.create({
+    data: {
+      householdId,
+      parentAccountId: parent.id,
+      age: 18,
+      level: 1,
+      totalPoints: 0,
+      familyBranch: "primary",
+      ...data,
+    },
+  });
+}

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireParentSession, requireSession, withErrors } from "@/lib/api";
 import { childAccessWhere } from "@/lib/child-access";
 import { syncFamilyTreeForMember } from "@/lib/family-tree";
+import { ensureParentFamilyMember } from "@/lib/parent-member";
 
 type BirthdayInput = {
   birthdayMonth?: unknown;
@@ -126,6 +127,7 @@ async function syncBirthdayAges(householdId: number) {
 export const GET = withErrors(async (req: NextRequest) => {
   const { householdId, parentId, email } = requireSession(req);
   await syncBirthdayAges(householdId);
+  await ensureParentFamilyMember(parentId, householdId);
   const currentParent = await prisma.parentAccount.findFirst({
     where: { id: parentId, householdId },
     select: {
