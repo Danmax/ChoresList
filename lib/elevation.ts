@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { AuthError } from "@/lib/auth-error";
 import { prisma } from "@/lib/prisma";
 
-const ELEVATION_TTL_SECONDS = 60 * 15;
+const ELEVATION_TTL_SECONDS = 60 * 30;
 const ELEVATION_COOKIE = "parent-elevation";
 
 const PLACEHOLDER_SECRETS = new Set([
