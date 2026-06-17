@@ -156,7 +156,7 @@ export default function ParentPanel() {
       const res = await fetch("/api/parent/auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, mode, householdName, inviteToken }),
+        body: JSON.stringify({ email, password, mode, householdName, inviteToken, communityInviteToken, communityReturnTo }),
       });
       const data = await res.json();
       if (data.ok && data.needsConfirmation) {
@@ -278,7 +278,7 @@ export default function ParentPanel() {
       const res = await fetch("/api/parent/resend-confirmation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, communityInviteToken, communityReturnTo }),
       });
       const data = await res.json();
       if (data.ok) {

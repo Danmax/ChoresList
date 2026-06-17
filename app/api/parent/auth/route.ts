@@ -7,7 +7,7 @@ import { seedHouseholdDefaults } from "@/lib/household-defaults";
 import { ensureParentFamilyMember } from "@/lib/parent-member";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
-import { createSessionToken, parentSession, verifyHouseholdInviteToken, verifySessionToken } from "@/lib/session";
+import { createSessionToken, parentSession, verifyCommunityInviteToken, verifyHouseholdInviteToken, verifySessionToken } from "@/lib/session";
 
 export const runtime = "nodejs";
 
@@ -26,6 +26,17 @@ const ACCOUNT_ROLES = new Set(["owner", "parent", "grandparent"]);
 
 function cleanAccountRole(value: unknown) {
   return typeof value === "string" && ACCOUNT_ROLES.has(value) ? value : "parent";
+}
+
+function cleanInternalPath(value: unknown) {
+  return typeof value === "string" && value.startsWith("/") && !value.startsWith("//") ? value : "";
+}
+
+function appendCommunityInviteParams(url: URL, inviteToken: unknown, returnTo: unknown) {
+  if (typeof inviteToken !== "string" || !verifyCommunityInviteToken(inviteToken)) return;
+  url.searchParams.set("communityInvite", inviteToken);
+  const cleanReturnTo = cleanInternalPath(returnTo);
+  if (cleanReturnTo) url.searchParams.set("returnTo", cleanReturnTo);
 }
 
 async function finalizeVerifiedParentAccount(parent: {
@@ -64,6 +75,11 @@ export const GET = withErrors(async (req: NextRequest) => {
     const result = await confirmEmail(confirmationToken);
     const redirectUrl = new URL("/parent", getBaseUrl(req));
     redirectUrl.searchParams.set(result.ok ? "confirmed" : "confirmError", "1");
+    appendCommunityInviteParams(
+      redirectUrl,
+      req.nextUrl.searchParams.get("communityInvite"),
+      req.nextUrl.searchParams.get("returnTo")
+    );
     return NextResponse.redirect(redirectUrl);
   }
 
@@ -82,7 +98,7 @@ export const POST = withErrors(async (req: NextRequest) => {
   const limited = rateLimit(req, { key: "parent-auth", limit: 10, windowMs: 60_000 });
   if (limited) return limited;
 
-  const { email, password, mode, householdName, inviteToken } = await req.json();
+  const { email, password, mode, householdName, inviteToken, communityInviteToken, communityReturnTo } = await req.json();
 
   if (typeof email !== "string" || typeof password !== "string") {
     return NextResponse.json({ ok: false }, { status: 400 });
@@ -181,6 +197,7 @@ export const POST = withErrors(async (req: NextRequest) => {
 
     const confirmUrl = new URL("/api/parent/auth", getBaseUrl(req));
     confirmUrl.searchParams.set("confirm", confirmationToken);
+    appendCommunityInviteParams(confirmUrl, communityInviteToken, communityReturnTo);
     const emailResult = await sendConfirmationEmail({ to: normalizedEmail, confirmUrl: confirmUrl.toString() });
 
     return NextResponse.json({
