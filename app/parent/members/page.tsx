@@ -12,6 +12,9 @@ import { Label } from "@/components/ui/label";
 const ROLE_OPTIONS = [
   { value: "child", label: "👦 Child" },
   { value: "young-adult", label: "🧑 Young Adult" },
+  { value: "mom", label: "👩 Mom" },
+  { value: "dad", label: "👨 Dad" },
+  { value: "parent", label: "🧑 Parent" },
 ];
 
 const PARENT_TYPE_OPTIONS = [
@@ -31,6 +34,9 @@ const RELATIONSHIP_OPTIONS = [
   { value: "adopted-child", label: "Adopted Child" },
   { value: "foster-child", label: "Foster Child" },
   { value: "young-adult", label: "Young Adult" },
+  { value: "mom", label: "Mom" },
+  { value: "dad", label: "Dad" },
+  { value: "parent", label: "Parent" },
   { value: "other", label: "Other" },
 ];
 
@@ -128,6 +134,24 @@ function defaultStarterSelection(age?: number) {
     band.chores.filter((chore) => chore.frequency === frequency).slice(0, limit).forEach((chore) => selected.add(chore.name));
   });
   return selected;
+}
+
+function isChildRole(role?: string | null) {
+  return role === "child" || role === "young-adult";
+}
+
+function relationshipForRole(role: string, current?: string | null) {
+  if (role === "young-adult") return "young-adult";
+  if (role === "mom" || role === "dad" || role === "parent") return role;
+  return current ?? "child";
+}
+
+function placeholderForRole(role?: string | null) {
+  if (role === "young-adult") return "Young adult's name";
+  if (role === "mom") return "Mom's name";
+  if (role === "dad") return "Dad's name";
+  if (role === "parent") return "Parent's name";
+  return "Child's name";
 }
 
 function nextDateForMonthly() {
@@ -308,7 +332,7 @@ export default function MembersPage() {
         toast.error(member.error ?? "Could not add member");
         return;
       }
-      if (assignStarter && (editing.role === "child" || editing.role === "young-adult")) {
+      if (assignStarter && isChildRole(editing.role)) {
         await assignStarterTasks(member);
         toast.success("Member added with starter chores!");
       } else {
@@ -542,7 +566,7 @@ export default function MembersPage() {
               <p className="font-black text-slate-800 text-lg">{m.name}</p>
               <p className="text-slate-400 font-semibold text-sm capitalize">
                 {ROLE_OPTIONS.find((r) => r.value === m.role)?.label ?? m.role}
-                {m.role === "child" || m.role === "young-adult" ? ` • Age ${m.age}` : ""}
+                {isChildRole(m.role) ? ` • Age ${m.age}` : ""}
               </p>
               {(m.relationshipToHousehold || m.familyBranch) && (
                 <p className="text-slate-400 text-xs font-bold">
@@ -609,7 +633,8 @@ export default function MembersPage() {
                       onClick={() => setEditing((p) => ({
                         ...p!,
                         role: r.value,
-                        relationshipToHousehold: r.value === "young-adult" ? "young-adult" : p?.relationshipToHousehold ?? "child",
+                        relationshipToHousehold: relationshipForRole(r.value, p?.relationshipToHousehold),
+                        age: isChildRole(r.value) ? p?.age ?? 8 : p?.age && p.age >= 18 ? p.age : 18,
                       }))}
                       className={`py-2 px-3 rounded-xl font-bold text-sm transition-all border-2 ${
                         editing.role === r.value
@@ -621,7 +646,7 @@ export default function MembersPage() {
                     </button>
                   ))}
                 </div>
-                <p className="mt-2 text-xs font-bold text-slate-400">Adults should be invited as linked parent or grandparent accounts above.</p>
+                <p className="mt-2 text-xs font-bold text-slate-400">Use Mom, Dad, or Parent when you want an adult to appear as an assignable chore target.</p>
               </div>
 
               <div>
@@ -629,12 +654,12 @@ export default function MembersPage() {
                 <Input
                   value={editing.name ?? ""}
                   onChange={(e) => setEditing((p) => ({ ...p!, name: e.target.value }))}
-                  placeholder={editing.role === "young-adult" ? "Young adult's name" : "Child's name"}
+                  placeholder={placeholderForRole(editing.role)}
                   className="rounded-xl mt-1"
                 />
               </div>
 
-              {(editing.role === "child" || editing.role === "young-adult") && (
+              {isChildRole(editing.role) ? (
                 <div className="space-y-3">
                   <div>
                     <Label className="font-bold">Age</Label>
@@ -685,13 +710,25 @@ export default function MembersPage() {
                     </div>
                   </div>
                 </div>
+              ) : (
+                <div>
+                  <Label className="font-bold">Age</Label>
+                  <Input
+                    type="number"
+                    value={editing.age ?? 18}
+                    min={18}
+                    max={120}
+                    onChange={(e) => updateAge(parseInt(e.target.value))}
+                    className="rounded-xl mt-1"
+                  />
+                </div>
               )}
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
                   <Label className="font-bold">Relationship</Label>
                   <select
-                    value={editing.relationshipToHousehold ?? (editing.role === "young-adult" ? "young-adult" : "child")}
+                    value={editing.relationshipToHousehold ?? relationshipForRole(editing.role ?? "child")}
                     onChange={(event) => setEditing((p) => ({ ...p!, relationshipToHousehold: event.target.value }))}
                     className="mt-1 h-10 w-full rounded-xl border border-input bg-transparent px-3 py-2 text-sm font-semibold text-slate-800 outline-none focus:border-violet-300"
                   >
@@ -734,7 +771,7 @@ export default function MembersPage() {
                 />
               </div>
 
-              {!editing.id && (editing.role === "child" || editing.role === "young-adult") && (
+              {!editing.id && isChildRole(editing.role) && (
                 <div className="rounded-2xl bg-violet-50 p-3">
                   <label className="flex items-center gap-2">
                     <input

@@ -11,7 +11,7 @@ type BirthdayInput = {
 
 const ADULT_ROLES = new Set(["mom", "dad", "parent"]);
 const MEMBER_ROLES = new Set(["child", "young-adult", "mom", "dad", "parent"]);
-const RELATIONSHIPS = new Set(["child", "step-child", "adopted-child", "foster-child", "young-adult", "other"]);
+const RELATIONSHIPS = new Set(["child", "step-child", "adopted-child", "foster-child", "young-adult", "mom", "dad", "parent", "other"]);
 const FAMILY_BRANCHES = new Set(["primary", "mom-side", "dad-side", "shared", "blended", "guardian"]);
 
 function cleanRole(value: unknown) {
@@ -54,6 +54,12 @@ function cleanRelationship(value: unknown, fallback = "child") {
 
 function cleanFamilyBranch(value: unknown) {
   return typeof value === "string" && FAMILY_BRANCHES.has(value) ? value : "primary";
+}
+
+function defaultRelationshipForRole(role: string) {
+  if (role === "young-adult") return "young-adult";
+  if (role === "mom" || role === "dad" || role === "parent") return role;
+  return "child";
 }
 
 function validBirthday(month: number | null, day: number | null) {
@@ -167,7 +173,7 @@ export const POST = withErrors(async (req: NextRequest) => {
       ...birthday,
       lastBirthdayAgeUpdateYear: birthdayAgeUpdateYear(birthday.birthdayMonth, birthday.birthdayDay),
       role,
-      relationshipToHousehold: cleanRelationship(body.relationshipToHousehold, role === "young-adult" ? "young-adult" : "child"),
+      relationshipToHousehold: cleanRelationship(body.relationshipToHousehold, defaultRelationshipForRole(role)),
       familyBranch: cleanFamilyBranch(body.familyBranch),
       custodySchedule: cleanOptionalText(body.custodySchedule, 128),
       familyNotes: cleanOptionalText(body.familyNotes, 255),
@@ -205,7 +211,7 @@ export const PUT = withErrors(async (req: NextRequest) => {
       ...(name !== undefined && { name }),
       ...(age !== undefined && { age }),
       ...(role !== undefined && { role }),
-      ...(body.relationshipToHousehold !== undefined && { relationshipToHousehold: cleanRelationship(body.relationshipToHousehold, existing.role === "young-adult" ? "young-adult" : "child") }),
+      ...(body.relationshipToHousehold !== undefined && { relationshipToHousehold: cleanRelationship(body.relationshipToHousehold, defaultRelationshipForRole(role ?? existing.role)) }),
       ...(body.familyBranch !== undefined && { familyBranch: cleanFamilyBranch(body.familyBranch) }),
       ...(body.custodySchedule !== undefined && { custodySchedule: cleanOptionalText(body.custodySchedule, 128) }),
       ...(body.familyNotes !== undefined && { familyNotes: cleanOptionalText(body.familyNotes, 255) }),
