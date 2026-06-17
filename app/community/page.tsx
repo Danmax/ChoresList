@@ -12,20 +12,20 @@ import { Textarea } from "@/components/ui/textarea";
 type CommunityRole = "owner" | "manager" | "member";
 
 type CommunityGroup = {
-  id: number;
+  id: string;
   name: string;
   groupType: string;
   description: string | null;
   location: string | null;
   visibility: string;
-  currentMembership: { id: number; parentId: number; role: CommunityRole } | null;
-  events: { id: number; title: string; date: string; location: string | null }[];
+  currentMembership: { id: string; parentId: string; role: CommunityRole } | null;
+  events: { id: string; title: string; date: string; location: string | null }[];
   _count?: { members: number; events: number };
 };
 
 type CurrentEvent = {
-  id: number;
-  groupId: number;
+  id: string;
+  groupId: string;
   groupName: string;
   title: string;
   date: string;
@@ -102,7 +102,7 @@ export default function CommunityPage() {
   );
 
   const currentEvents = useMemo(() => {
-    const byId = new Map<number, CurrentEvent>();
+    const byId = new Map<string, CurrentEvent>();
     [...groups, ...discoverGroups].forEach((group) => {
       group.events.forEach((event) => {
         byId.set(event.id, {
@@ -143,7 +143,7 @@ export default function CommunityPage() {
     await load();
   }
 
-  async function joinGroup(groupId: number) {
+  async function joinGroup(groupId: string) {
     const res = await fetch("/api/community/members", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

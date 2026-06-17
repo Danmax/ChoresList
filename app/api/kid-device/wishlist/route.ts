@@ -22,8 +22,8 @@ export const POST = withErrors(async (req: NextRequest) => {
   if (!session) return NextResponse.json({ error: "Device access revoked" }, { status: 401 });
 
   const body = await req.json();
-  const memberId = Number(body.memberId);
-  if (!Number.isInteger(memberId) || memberId <= 0) {
+  const memberId = typeof body.memberId === "string" ? body.memberId : "";
+  if (!memberId) {
     return NextResponse.json({ error: "Choose a child" }, { status: 400 });
   }
   if (session.mode === "member" && session.memberId !== memberId) {

@@ -7,7 +7,7 @@ export const GET = withErrors(async (req: NextRequest) => {
   const { searchParams } = new URL(req.url);
   const memberId = searchParams.get("memberId");
   const items = await prisma.wishListItem.findMany({
-    where: { householdId, ...(memberId && { memberId: parseInt(memberId) }) },
+    where: { householdId, ...(memberId && { memberId }) },
     include: { member: { select: { id: true, name: true, avatar: true, color: true } } },
     orderBy: [{ status: "asc" }, { createdAt: "desc" }],
   });
@@ -18,10 +18,10 @@ export const POST = withErrors(async (req: NextRequest) => {
   const { householdId } = requireSession(req);
   const body = await req.json();
   const { memberId, title, category, emoji, note } = body;
-  const cleanMemberId = Number(memberId);
+  const cleanMemberId = typeof memberId === "string" ? memberId : "";
   const cleanTitle = typeof title === "string" ? title.trim().slice(0, 120) : "";
   if (!cleanTitle) return NextResponse.json({ error: "Wish title is required" }, { status: 400 });
-  if (!Number.isInteger(cleanMemberId) || cleanMemberId <= 0) {
+  if (!cleanMemberId) {
     return NextResponse.json({ error: "Member is required" }, { status: 400 });
   }
   const member = await prisma.familyMember.findFirst({ where: { id: cleanMemberId, householdId } });
@@ -61,7 +61,7 @@ export const PUT = withErrors(async (req: NextRequest) => {
 export const DELETE = withErrors(async (req: NextRequest) => {
   const { householdId } = requireSession(req);
   const { searchParams } = new URL(req.url);
-  const id = parseInt(searchParams.get("id") ?? "0");
+  const id = searchParams.get("id") ?? "";
   const item = await prisma.wishListItem.findFirst({ where: { id, householdId }, select: { status: true } });
   if (!item) return NextResponse.json({ error: "Wish not found" }, { status: 404 });
   if (item.status !== "pending") await requireParentSession(req);

@@ -6,21 +6,21 @@ import { ArrowLeft, MonitorSmartphone, Plus, QrCode, RefreshCw, Trash2 } from "l
 import { toast } from "sonner";
 
 type Member = {
-  id: number;
+  id: string;
   name: string;
   avatar: string;
   role: string;
 };
 
 type Device = {
-  id: number;
+  id: string;
   name: string;
   mode: string;
-  memberId: number | null;
+  memberId: string | null;
   createdAt: string;
   lastSeenAt: string | null;
   revokedAt: string | null;
-  member: { id: number; name: string; avatar: string } | null;
+  member: { id: string; name: string; avatar: string } | null;
 };
 
 type Pairing = {
@@ -70,7 +70,7 @@ export default function DevicesPage() {
         body: JSON.stringify({
           deviceName,
           mode,
-          memberId: mode === "member" ? Number(memberId) : null,
+          memberId: mode === "member" ? memberId : null,
         }),
       });
       const data = await res.json();
@@ -85,7 +85,7 @@ export default function DevicesPage() {
     }
   }
 
-  async function revoke(id: number) {
+  async function revoke(id: string) {
     if (!confirm("Revoke this device? It will need a new pairing code to connect again.")) return;
     const res = await fetch(`/api/parent/devices?id=${id}`, { method: "DELETE" });
     if (!res.ok) {

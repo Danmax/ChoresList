@@ -28,6 +28,10 @@ function cleanInt(value: unknown) {
   return Number.isFinite(n) ? Math.round(n) : null;
 }
 
+function cleanId(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
 function cleanBirthday(monthValue: unknown, dayValue: unknown) {
   const birthdayMonth = cleanInt(monthValue);
   const birthdayDay = cleanInt(dayValue);
@@ -40,7 +44,7 @@ function cleanBirthday(monthValue: unknown, dayValue: unknown) {
   return { birthdayMonth, birthdayDay };
 }
 
-async function treePayload(householdId: number) {
+async function treePayload(householdId: string) {
   await syncHouseholdFamilyTree(householdId);
   const [nodes, relationships] = await Promise.all([
     prisma.familyTreeNode.findMany({ where: { householdId }, orderBy: [{ kind: "asc" }, { name: "asc" }] }),
@@ -54,7 +58,7 @@ async function treePayload(householdId: number) {
   };
 }
 
-async function ensureNode(householdId: number, id: number | null) {
+async function ensureNode(householdId: string, id: string | null) {
   if (!id) return null;
   return prisma.familyTreeNode.findFirst({ where: { householdId, id }, select: { id: true } });
 }
@@ -71,8 +75,8 @@ export const POST = withErrors(async (req: NextRequest) => {
   const body = await req.json();
 
   if (body.type === "relationship") {
-    const fromNodeId = cleanInt(body.fromNodeId);
-    const toNodeId = cleanInt(body.toNodeId);
+    const fromNodeId = cleanId(body.fromNodeId);
+    const toNodeId = cleanId(body.toNodeId);
     const relationshipType = RELATIONSHIP_TYPES.has(body.relationshipType) ? body.relationshipType : "other";
     if (!fromNodeId || !toNodeId || fromNodeId === toNodeId) {
       return NextResponse.json({ error: "Choose two different people" }, { status: 400 });
@@ -119,15 +123,15 @@ export const PUT = withErrors(async (req: NextRequest) => {
   const { householdId } = await requireParentSession(req);
   await requirePluginActive(householdId, "family-tree");
   const body = await req.json();
-  const id = cleanInt(body.id);
+  const id = cleanId(body.id);
   if (!id) return NextResponse.json({ error: "ID is required" }, { status: 400 });
 
   if (body.type === "relationship") {
     const existing = await prisma.familyTreeRelationship.findFirst({ where: { id, householdId } });
     if (!existing) return NextResponse.json({ error: "Relationship not found" }, { status: 404 });
 
-    const fromNodeId = body.fromNodeId !== undefined ? cleanInt(body.fromNodeId) : existing.fromNodeId;
-    const toNodeId = body.toNodeId !== undefined ? cleanInt(body.toNodeId) : existing.toNodeId;
+    const fromNodeId = body.fromNodeId !== undefined ? cleanId(body.fromNodeId) : existing.fromNodeId;
+    const toNodeId = body.toNodeId !== undefined ? cleanId(body.toNodeId) : existing.toNodeId;
     if (!fromNodeId || !toNodeId || fromNodeId === toNodeId) {
       return NextResponse.json({ error: "Choose two different people" }, { status: 400 });
     }
@@ -176,7 +180,7 @@ export const DELETE = withErrors(async (req: NextRequest) => {
   const { householdId } = await requireParentSession(req);
   await requirePluginActive(householdId, "family-tree");
   const body = await req.json().catch(() => ({}));
-  const id = cleanInt(body.id);
+  const id = cleanId(body.id);
   if (!id) return NextResponse.json({ error: "ID is required" }, { status: 400 });
 
   if (body.type === "relationship") {

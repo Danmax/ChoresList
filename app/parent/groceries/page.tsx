@@ -21,7 +21,7 @@ type Cadence = "weekly" | "biweekly" | "monthly";
 type Tab = "active" | "recurring" | "history";
 
 type GroceryItem = {
-  id: number;
+  id: string;
   name: string;
   category: string;
   quantity: string | null;
@@ -33,17 +33,17 @@ type GroceryItem = {
 };
 
 type GroceryList = {
-  id: number;
+  id: string;
   title: string;
   status: "active" | "completed" | "archived";
   completedAt: string | null;
   createdAt: string;
   items: GroceryItem[];
-  sourceTemplate: { id: number; title: string; cadence: Cadence } | null;
+  sourceTemplate: { id: string; title: string; cadence: Cadence } | null;
 };
 
 type GroceryTemplate = {
-  id: number;
+  id: string;
   title: string;
   cadence: Cadence;
   isActive: boolean;
@@ -88,8 +88,8 @@ function checkedCount(items: GroceryItem[]) {
 export default function ParentGroceriesPage() {
   const [lists, setLists] = useState<GroceryList[]>([]);
   const [templates, setTemplates] = useState<GroceryTemplate[]>([]);
-  const [selectedListId, setSelectedListId] = useState<number | null>(null);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
+  const [selectedListId, setSelectedListId] = useState<string | null>(null);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("active");
   const [newListTitle, setNewListTitle] = useState("");
   const [newTemplate, setNewTemplate] = useState(BLANK_TEMPLATE);
@@ -166,7 +166,7 @@ export default function ParentGroceriesPage() {
     await load();
   }
 
-  async function deleteList(id: number) {
+  async function deleteList(id: string) {
     if (!confirm("Delete this shopping list?")) return;
     await fetch(`/api/groceries/lists?id=${id}`, { method: "DELETE" });
     toast.success("Shopping list deleted");
@@ -209,7 +209,7 @@ export default function ParentGroceriesPage() {
     await load();
   }
 
-  async function removeItem(scope: "list" | "template", id: number) {
+  async function removeItem(scope: "list" | "template", id: string) {
     await fetch(`/api/groceries/items?scope=${scope}&id=${id}`, { method: "DELETE" });
     await load();
   }
@@ -252,7 +252,7 @@ export default function ParentGroceriesPage() {
     setTab("active");
   }
 
-  async function deleteTemplate(id: number) {
+  async function deleteTemplate(id: string) {
     if (!confirm("Delete this recurring list?")) return;
     await fetch(`/api/groceries/templates?id=${id}`, { method: "DELETE" });
     toast.success("Recurring list deleted");

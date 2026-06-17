@@ -10,13 +10,13 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PROJECT_CATEGORIES, PROJECT_EMOJIS, REWARD_PRESETS } from "@/types";
 
-interface Member { id: number; name: string; avatar: string; color: string; role: string }
+interface Member { id: string; name: string; avatar: string; color: string; role: string }
 interface Project {
-  id: number; title: string; description: string | null; category: string;
+  id: string; title: string; description: string | null; category: string;
   emoji: string; rewardTitle: string; rewardEmoji: string; pointsBonus: number;
-  assignedTo: number | null; status: string; dueDate: string | null;
+  assignedTo: string | null; status: string; dueDate: string | null;
   assignee: Member | null;
-  tickets: { id: number; member: Member; status: string }[];
+  tickets: { id: string; member: Member; status: string }[];
 }
 
 const BLANK = {
@@ -56,7 +56,7 @@ export default function ProjectsPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...form,
-        assignedTo: form.assignedTo ? parseInt(form.assignedTo) : null,
+        assignedTo: form.assignedTo || null,
         dueDate: form.dueDate || null,
         pointsBonus: Number(form.pointsBonus),
       }),
@@ -72,18 +72,18 @@ export default function ProjectsPage() {
     const res = await fetch("/api/projects", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: completingProject.id, status: "completed", completedById: parseInt(completedById) }),
+      body: JSON.stringify({ id: completingProject.id, status: "completed", completedById }),
     });
     if (!res.ok) { toast.error("Could not mark complete"); return; }
     const data = await res.json();
-    const member = members.find((m) => m.id === parseInt(completedById));
+    const member = members.find((m) => m.id === completedById);
     toast.success(`🎫 Reward ticket earned by ${member?.name ?? ""}! Check Reward Tickets to redeem.`);
     setCompletingProject(null);
     setCompletedById("");
     load();
   }
 
-  async function remove(id: number) {
+  async function remove(id: string) {
     if (!confirm("Delete this project?")) return;
     await fetch(`/api/projects?id=${id}`, { method: "DELETE" });
     toast.success("Project removed");

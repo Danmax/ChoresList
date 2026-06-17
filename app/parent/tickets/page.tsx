@@ -6,10 +6,10 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 
-interface Member { id: number; name: string; avatar: string; color: string }
-interface Project { id: number; title: string; emoji: string }
+interface Member { id: string; name: string; avatar: string; color: string }
+interface Project { id: string; title: string; emoji: string }
 interface Ticket {
-  id: number; memberId: number; rewardTitle: string; rewardEmoji: string;
+  id: string; memberId: string; rewardTitle: string; rewardEmoji: string;
   status: string; earnedAt: string; redeemedAt: string | null;
   member: Member; project: Project;
 }
@@ -18,7 +18,7 @@ const CONFETTI = ["⭐","🌟","✨","🎉","🎊","💫","🎈","🎁","🏆","
 
 export default function TicketsPage() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [celebrating, setCelebrating] = useState<number | null>(null);
+  const [celebrating, setCelebrating] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>("");
 
   const load = useCallback(async () => {
@@ -43,7 +43,7 @@ export default function TicketsPage() {
   }
 
   const members = Array.from(new Map(tickets.map((t) => [t.member.id, t.member])).values());
-  const displayed = filter ? tickets.filter((t) => t.memberId === parseInt(filter)) : tickets;
+  const displayed = filter ? tickets.filter((t) => t.memberId === filter) : tickets;
   const pending = displayed.filter((t) => t.status === "pending");
   const redeemed = displayed.filter((t) => t.status === "redeemed");
 

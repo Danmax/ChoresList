@@ -20,7 +20,7 @@ function cleanAccessMode(value: unknown) {
 
 function cleanIds(value: unknown) {
   return Array.isArray(value)
-    ? Array.from(new Set(value.map(Number).filter((id) => Number.isInteger(id) && id > 0)))
+    ? Array.from(new Set(value.filter((id): id is string => typeof id === "string" && id.length > 0)))
     : [];
 }
 

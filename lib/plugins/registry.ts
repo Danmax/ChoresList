@@ -56,7 +56,7 @@ export function pluginByKey(key: unknown) {
   return typeof key === "string" ? PLUGIN_REGISTRY.find((plugin) => plugin.key === key) ?? null : null;
 }
 
-export async function pluginsForHousehold(householdId: number) {
+export async function pluginsForHousehold(householdId: string) {
   const states = await prisma.householdPlugin.findMany({ where: { householdId } });
   const stateByKey = new Map(states.map((state) => [state.pluginKey, state]));
 
@@ -75,7 +75,7 @@ export async function pluginsForHousehold(householdId: number) {
   });
 }
 
-export async function isPluginActive(householdId: number, pluginKey: PluginKey) {
+export async function isPluginActive(householdId: string, pluginKey: PluginKey) {
   const plugin = pluginByKey(pluginKey);
   if (!plugin) return false;
   const state = await prisma.householdPlugin.findUnique({
@@ -85,7 +85,7 @@ export async function isPluginActive(householdId: number, pluginKey: PluginKey) 
   return (state?.status ?? plugin.defaultStatus) === "active";
 }
 
-export async function requirePluginActive(householdId: number, pluginKey: PluginKey) {
+export async function requirePluginActive(householdId: string, pluginKey: PluginKey) {
   if (!(await isPluginActive(householdId, pluginKey))) {
     throw new ForbiddenError("Activate this plugin before using it");
   }

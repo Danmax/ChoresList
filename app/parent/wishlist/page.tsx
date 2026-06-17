@@ -6,11 +6,11 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { WISH_CATEGORIES } from "@/types";
 
-interface Member { id: number; name: string; avatar: string; color: string }
+interface Member { id: string; name: string; avatar: string; color: string }
 
 interface WishItem {
-  id: number;
-  memberId: number;
+  id: string;
+  memberId: string;
   title: string;
   category: string;
   emoji: string;
@@ -40,7 +40,7 @@ export default function ParentWishlistPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  async function grant(id: number) {
+  async function grant(id: string) {
     await fetch("/api/wishlist", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -50,7 +50,7 @@ export default function ParentWishlistPage() {
     load();
   }
 
-  async function ungrant(id: number) {
+  async function ungrant(id: string) {
     await fetch("/api/wishlist", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -59,7 +59,7 @@ export default function ParentWishlistPage() {
     load();
   }
 
-  async function remove(id: number) {
+  async function remove(id: string) {
     if (!confirm("Remove this wish?")) return;
     await fetch(`/api/wishlist?id=${id}`, { method: "DELETE" });
     toast.success("Wish removed");
@@ -67,7 +67,7 @@ export default function ParentWishlistPage() {
   }
 
   const filtered = items.filter((i) => {
-    if (filter && i.memberId !== parseInt(filter)) return false;
+    if (filter && i.memberId !== filter) return false;
     if (catFilter && i.category !== catFilter) return false;
     return true;
   });

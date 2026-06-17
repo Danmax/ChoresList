@@ -28,12 +28,12 @@ function sign(value: string) {
 }
 
 export type ElevationPayload = {
-  parentId: number;
-  householdId: number;
+  parentId: string;
+  householdId: string;
   expiresAt: number;
 };
 
-export function createElevationToken(parent: { id: number; householdId: number }) {
+export function createElevationToken(parent: { id: string; householdId: string }) {
   const expiresAt = Math.floor(Date.now() / 1000) + ELEVATION_TTL_SECONDS;
   const payload = Buffer.from(
     JSON.stringify({ parentId: parent.id, householdId: parent.householdId, expiresAt })
@@ -56,8 +56,8 @@ export function verifyElevationToken(token?: string): ElevationPayload | null {
   try {
     const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as ElevationPayload;
     if (
-      typeof parsed.parentId !== "number" ||
-      typeof parsed.householdId !== "number" ||
+      typeof parsed.parentId !== "string" ||
+      typeof parsed.householdId !== "string" ||
       typeof parsed.expiresAt !== "number" ||
       parsed.expiresAt <= Math.floor(Date.now() / 1000)
     ) {
@@ -80,7 +80,7 @@ export class ElevationRequiredError extends AuthError {
   }
 }
 
-export async function requireElevation(req: NextRequest, parentId: number, householdId: number) {
+export async function requireElevation(req: NextRequest, parentId: string, householdId: string) {
   const parent = await prisma.parentAccount.findFirst({
     where: { id: parentId, householdId },
     select: { pinHash: true },

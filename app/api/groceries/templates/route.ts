@@ -51,8 +51,8 @@ export const POST = withErrors(async (req: NextRequest) => {
 export const PUT = withErrors(async (req: NextRequest) => {
   const { householdId } = await requireParentSession(req);
   const body = await req.json();
-  const id = Number.parseInt(String(body.id ?? ""), 10);
-  if (!Number.isFinite(id) || id <= 0) {
+  const id = typeof body.id === "string" ? body.id : "";
+  if (!id) {
     return NextResponse.json({ error: "Template is required" }, { status: 400 });
   }
 
@@ -81,8 +81,8 @@ export const PUT = withErrors(async (req: NextRequest) => {
 export const DELETE = withErrors(async (req: NextRequest) => {
   const { householdId } = await requireParentSession(req);
   const { searchParams } = new URL(req.url);
-  const id = Number.parseInt(searchParams.get("id") ?? "0", 10);
-  if (!Number.isFinite(id) || id <= 0) {
+  const id = searchParams.get("id") ?? "";
+  if (!id) {
     return NextResponse.json({ error: "Template is required" }, { status: 400 });
   }
 

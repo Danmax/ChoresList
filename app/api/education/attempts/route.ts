@@ -6,7 +6,7 @@ import { normalizeAnswer } from "@/lib/education";
 import { requirePluginActive } from "@/lib/plugins/registry";
 
 type SubmittedAnswer = {
-  materialId: number;
+  materialId: string;
   answer: string;
 };
 
@@ -14,8 +14,8 @@ export const POST = withErrors(async (req: NextRequest) => {
   const { householdId, parentId } = requireSession(req);
   await requirePluginActive(householdId, "education-academy");
   const body = await req.json();
-  const assignmentId = Number(body.assignmentId);
-  const memberId = Number(body.memberId);
+  const assignmentId = typeof body.assignmentId === "string" ? body.assignmentId : "";
+  const memberId = typeof body.memberId === "string" ? body.memberId : "";
   if (!(await canAccessMember(parentId, householdId, memberId))) {
     return NextResponse.json({ error: "You do not have access to this family member" }, { status: 403 });
   }
@@ -28,7 +28,7 @@ export const POST = withErrors(async (req: NextRequest) => {
   if (assignment.set.materials.length === 0) return NextResponse.json({ error: "This assignment has no questions" }, { status: 400 });
 
   const submitted = Array.isArray(body.answers) ? body.answers as SubmittedAnswer[] : [];
-  const answerById = new Map(submitted.map((answer) => [Number(answer.materialId), answer.answer ?? ""]));
+  const answerById = new Map(submitted.map((answer) => [answer.materialId, answer.answer ?? ""]));
   const gradedAnswers = assignment.set.materials.map((material) => {
     const submittedAnswer = answerById.get(material.id) ?? "";
     const correct = normalizeAnswer(submittedAnswer) === normalizeAnswer(material.answer);

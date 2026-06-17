@@ -3,9 +3,9 @@ import { prisma } from "@/lib/prisma";
 const CHILD_RELATIONSHIPS = new Set(["child", "step-child", "adopted-child", "foster-child", "young-adult"]);
 
 type MemberForTree = {
-  id: number;
-  householdId: number;
-  parentAccountId: number | null;
+  id: string;
+  householdId: string;
+  parentAccountId: string | null;
   name: string;
   role: string;
   relationshipToHousehold: string;
@@ -70,7 +70,7 @@ async function ensureMemberNode(member: MemberForTree) {
   });
 }
 
-async function ensureParentNodes(householdId: number) {
+async function ensureParentNodes(householdId: string) {
   const parents = await prisma.parentAccount.findMany({
     where: { householdId },
     select: { id: true, email: true, displayName: true, parentType: true, relationshipLabel: true },
@@ -134,7 +134,7 @@ export async function syncFamilyTreeForMember(member: MemberForTree) {
         householdId: member.householdId,
         fromNodeId: parentNode.id,
         toNodeId: memberNode.id,
-        relationshipType: relationshipTypeFor(parentTypeById.get(parentNode.parentAccountId ?? 0) ?? "parent", member.relationshipToHousehold),
+        relationshipType: relationshipTypeFor(parentNode.parentAccountId ? parentTypeById.get(parentNode.parentAccountId) ?? "parent" : "parent", member.relationshipToHousehold),
       })),
       skipDuplicates: true,
     });
@@ -143,7 +143,7 @@ export async function syncFamilyTreeForMember(member: MemberForTree) {
   return memberNode;
 }
 
-export async function syncHouseholdFamilyTree(householdId: number) {
+export async function syncHouseholdFamilyTree(householdId: string) {
   const members = await prisma.familyMember.findMany({
     where: { householdId },
     select: {

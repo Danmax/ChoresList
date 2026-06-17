@@ -10,8 +10,8 @@ datasource db {
 }
 
 model ParentAccount {
-  id                   Int      @id @default(autoincrement())
-  householdId          Int
+  id                   String   @id @default(uuid()) @db.Char(36)
+  householdId          String   @db.Char(36)
   email                String   @unique @db.VarChar(255)
   passwordHash         String   @db.VarChar(255)
   passwordSalt         String   @db.VarChar(255)
@@ -44,7 +44,7 @@ model ParentAccount {
 }
 
 model Household {
-  id                            Int      @id @default(autoincrement())
+  id                            String   @id @default(uuid()) @db.Char(36)
   name                          String   @db.VarChar(255)
   timeZone                      String   @default("America/New_York") @db.VarChar(64)
   googleCalendarEnabled         Boolean  @default(false)
@@ -89,13 +89,13 @@ model Household {
 }
 
 model HouseholdPlugin {
-  id                  Int       @id @default(autoincrement())
-  householdId         Int
+  id                  String    @id @default(uuid()) @db.Char(36)
+  householdId         String    @db.Char(36)
   pluginKey           String    @db.VarChar(64)
   status              String    @default("inactive") @db.VarChar(32)
   settings            Json?
   activatedAt         DateTime?
-  activatedByParentId Int?
+  activatedByParentId String?   @db.Char(36)
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @default(now()) @updatedAt
 
@@ -107,8 +107,8 @@ model HouseholdPlugin {
 }
 
 model GoogleCalendarConnection {
-  id                 String    @id @default(cuid())
-  householdId        Int       @unique
+  id                 String    @id @default(uuid()) @db.Char(36)
+  householdId        String    @unique @db.Char(36)
   googleAccountEmail String?   @db.VarChar(255)
   calendarId         String    @default("primary") @db.VarChar(255)
   refreshToken       String    @db.Text
@@ -123,8 +123,8 @@ model GoogleCalendarConnection {
 }
 
 model EmailConfirmationToken {
-  id        Int       @id @default(autoincrement())
-  parentId  Int
+  id        String    @id @default(uuid()) @db.Char(36)
+  parentId  String    @db.Char(36)
   tokenHash String    @unique @db.VarChar(255)
   expiresAt DateTime
   usedAt    DateTime?
@@ -134,8 +134,8 @@ model EmailConfirmationToken {
 }
 
 model PasswordResetToken {
-  id        Int       @id @default(autoincrement())
-  parentId  Int
+  id        String    @id @default(uuid()) @db.Char(36)
+  parentId  String    @db.Char(36)
   tokenHash String    @unique @db.VarChar(255)
   expiresAt DateTime
   usedAt    DateTime?
@@ -145,8 +145,8 @@ model PasswordResetToken {
 }
 
 model PinResetToken {
-  id        Int       @id @default(autoincrement())
-  parentId  Int
+  id        String    @id @default(uuid()) @db.Char(36)
+  parentId  String    @db.Char(36)
   tokenHash String    @unique @db.VarChar(255)
   expiresAt DateTime
   usedAt    DateTime?
@@ -156,9 +156,9 @@ model PinResetToken {
 }
 
 model FamilyMember {
-  id                        Int      @id @default(autoincrement())
-  householdId               Int
-  parentAccountId           Int?     @unique
+  id                        String   @id @default(uuid()) @db.Char(36)
+  householdId               String   @db.Char(36)
+  parentAccountId           String?  @unique @db.Char(36)
   name                      String   @db.VarChar(255)
   age                       Int
   birthdayMonth             Int?
@@ -196,8 +196,8 @@ model FamilyMember {
 }
 
 model EducationMaterialSet {
-  id           Int      @id @default(autoincrement())
-  householdId  Int
+  id           String   @id @default(uuid()) @db.Char(36)
+  householdId  String   @db.Char(36)
   title        String   @db.VarChar(255)
   subject      String   @default("vocabulary") @db.VarChar(64)
   mode         String   @default("drill") @db.VarChar(64)
@@ -216,8 +216,8 @@ model EducationMaterialSet {
 }
 
 model EducationMaterial {
-  id          Int      @id @default(autoincrement())
-  setId       Int
+  id          String   @id @default(uuid()) @db.Char(36)
+  setId       String   @db.Char(36)
   prompt      String   @db.Text
   answer      String   @db.Text
   choices     Json?
@@ -229,10 +229,10 @@ model EducationMaterial {
 }
 
 model EducationAssignment {
-  id           Int       @id @default(autoincrement())
-  householdId  Int
-  memberId     Int
-  setId        Int
+  id           String    @id @default(uuid()) @db.Char(36)
+  householdId  String    @db.Char(36)
+  memberId     String    @db.Char(36)
+  setId        String    @db.Char(36)
   title        String    @db.VarChar(255)
   dueDate      DateTime?
   status       String    @default("assigned") @db.VarChar(64)
@@ -251,10 +251,10 @@ model EducationAssignment {
 }
 
 model EducationAttempt {
-  id           Int      @id @default(autoincrement())
-  householdId  Int
-  assignmentId Int
-  memberId     Int
+  id           String   @id @default(uuid()) @db.Char(36)
+  householdId  String   @db.Char(36)
+  assignmentId String   @db.Char(36)
+  memberId     String   @db.Char(36)
   score        Int      @default(0)
   correctCount Int      @default(0)
   totalCount   Int      @default(0)
@@ -270,9 +270,9 @@ model EducationAttempt {
 }
 
 model EducationProject {
-  id           Int       @id @default(autoincrement())
-  householdId  Int
-  memberId     Int?
+  id           String    @id @default(uuid()) @db.Char(36)
+  householdId  String    @db.Char(36)
+  memberId     String?   @db.Char(36)
   title        String    @db.VarChar(255)
   subject      String    @default("project") @db.VarChar(64)
   description  String?   @db.Text
@@ -291,11 +291,11 @@ model EducationProject {
 }
 
 model FamilyTreeNode {
-  id              Int      @id @default(autoincrement())
-  householdId     Int
+  id              String   @id @default(uuid()) @db.Char(36)
+  householdId     String   @db.Char(36)
   kind            String   @default("external") @db.VarChar(32)
-  familyMemberId  Int?
-  parentAccountId Int?
+  familyMemberId  String?  @db.Char(36)
+  parentAccountId String?  @db.Char(36)
   name            String   @db.VarChar(255)
   avatar          String   @default("👤") @db.VarChar(32)
   color           String   @default("#a78bfa") @db.VarChar(32)
@@ -320,10 +320,10 @@ model FamilyTreeNode {
 }
 
 model FamilyTreeRelationship {
-  id               Int      @id @default(autoincrement())
-  householdId      Int
-  fromNodeId       Int
-  toNodeId         Int
+  id               String   @id @default(uuid()) @db.Char(36)
+  householdId      String   @db.Char(36)
+  fromNodeId       String   @db.Char(36)
+  toNodeId         String   @db.Char(36)
   relationshipType String   @db.VarChar(64)
   label            String?  @db.VarChar(128)
   notes            String?  @db.Text
@@ -339,8 +339,8 @@ model FamilyTreeRelationship {
 }
 
 model Chore {
-  id            Int     @id @default(autoincrement())
-  householdId   Int
+  id            String  @id @default(uuid()) @db.Char(36)
+  householdId   String  @db.Char(36)
   name          String  @db.VarChar(255)
   description   String? @db.Text
   icon          String  @default("✅") @db.VarChar(32)
@@ -358,10 +358,10 @@ model Chore {
 }
 
 model ChoreAssignment {
-  id          Int       @id @default(autoincrement())
-  householdId Int
-  memberId    Int
-  choreId     Int
+  id          String    @id @default(uuid()) @db.Char(36)
+  householdId String    @db.Char(36)
+  memberId    String    @db.Char(36)
+  choreId     String    @db.Char(36)
   frequency   String    @default("daily") @db.VarChar(64)
   dueDate     DateTime?
   dayOfWeek   Int?
@@ -375,10 +375,10 @@ model ChoreAssignment {
 }
 
 model TaskCompletion {
-  id               Int      @id @default(autoincrement())
-  householdId      Int
-  assignmentId     Int
-  memberId         Int
+  id               String   @id @default(uuid()) @db.Char(36)
+  householdId      String   @db.Char(36)
+  assignmentId     String   @db.Char(36)
+  memberId         String   @db.Char(36)
   completedAt      DateTime @default(now())
   completionDate   DateTime @default(now())
   photoBeforePath  String?
@@ -396,8 +396,8 @@ model TaskCompletion {
 }
 
 model SkillCategory {
-  id          Int    @id @default(autoincrement())
-  householdId Int
+  id          String @id @default(uuid()) @db.Char(36)
+  householdId String @db.Char(36)
   name        String @db.VarChar(255)
   icon        String @default("⭐") @db.VarChar(32)
 
@@ -407,8 +407,8 @@ model SkillCategory {
 }
 
 model ChoreSkill {
-  choreId Int
-  skillId Int
+  choreId String @db.Char(36)
+  skillId String @db.Char(36)
 
   chore Chore         @relation(fields: [choreId], references: [id], onDelete: Cascade)
   skill SkillCategory @relation(fields: [skillId], references: [id], onDelete: Cascade)
@@ -417,10 +417,10 @@ model ChoreSkill {
 }
 
 model MemberSkill {
-  memberId Int
-  skillId  Int
-  xp       Int @default(0)
-  level    Int @default(1)
+  memberId String @db.Char(36)
+  skillId  String @db.Char(36)
+  xp       Int    @default(0)
+  level    Int    @default(1)
 
   member FamilyMember  @relation(fields: [memberId], references: [id], onDelete: Cascade)
   skill  SkillCategory @relation(fields: [skillId], references: [id], onDelete: Cascade)
@@ -429,9 +429,9 @@ model MemberSkill {
 }
 
 model WeeklyAllowance {
-  id           Int      @id @default(autoincrement())
-  householdId  Int
-  memberId     Int
+  id           String   @id @default(uuid()) @db.Char(36)
+  householdId  String   @db.Char(36)
+  memberId     String   @db.Char(36)
   weekStart    DateTime
   pointsEarned Int      @default(0)
   amountEarned Float    @default(0)
@@ -444,19 +444,19 @@ model WeeklyAllowance {
 }
 
 model AllowanceSettings {
-  id             Int   @id @default(autoincrement())
-  householdId    Int
-  memberId       Int   @unique
-  weeklyBaseRate Float @default(0)
-  pointsToDollar Float @default(0.10)
+  id             String @id @default(uuid()) @db.Char(36)
+  householdId    String @db.Char(36)
+  memberId       String @unique @db.Char(36)
+  weeklyBaseRate Float  @default(0)
+  pointsToDollar Float  @default(0.10)
 
   member    FamilyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
   household Household    @relation(fields: [householdId], references: [id], onDelete: Cascade)
 }
 
 model ChoreInstructions {
-  id          Int      @id @default(autoincrement())
-  choreId     Int      @unique
+  id          String   @id @default(uuid()) @db.Char(36)
+  choreId     String   @unique @db.Char(36)
   steps       String   @db.Text
   tips        String   @db.Text
   safetyNotes String   @db.Text
@@ -467,9 +467,9 @@ model ChoreInstructions {
 }
 
 model WishListItem {
-  id          Int      @id @default(autoincrement())
-  householdId Int
-  memberId    Int
+  id          String   @id @default(uuid()) @db.Char(36)
+  householdId String   @db.Char(36)
+  memberId    String   @db.Char(36)
   title       String   @db.VarChar(255)
   category    String   @default("other") @db.VarChar(64)
   emoji       String   @default("🎁") @db.VarChar(32)
@@ -482,8 +482,8 @@ model WishListItem {
 }
 
 model HouseProject {
-  id          Int       @id @default(autoincrement())
-  householdId Int
+  id          String    @id @default(uuid()) @db.Char(36)
+  householdId String    @db.Char(36)
   title       String    @db.VarChar(255)
   description String?   @db.Text
   category    String    @default("other") @db.VarChar(64)
@@ -491,7 +491,7 @@ model HouseProject {
   rewardTitle String    @db.VarChar(255)
   rewardEmoji String    @default("🎫") @db.VarChar(32)
   pointsBonus Int       @default(50)
-  assignedTo  Int?
+  assignedTo  String?   @db.Char(36)
   status      String    @default("open") @db.VarChar(64)
   dueDate     DateTime?
   createdAt   DateTime  @default(now())
@@ -502,10 +502,10 @@ model HouseProject {
 }
 
 model RewardTicket {
-  id          Int       @id @default(autoincrement())
-  householdId Int
-  projectId   Int
-  memberId    Int
+  id          String    @id @default(uuid()) @db.Char(36)
+  householdId String    @db.Char(36)
+  projectId   String    @db.Char(36)
+  memberId    String    @db.Char(36)
   rewardTitle String    @db.VarChar(255)
   rewardEmoji String    @default("🎫") @db.VarChar(32)
   status      String    @default("pending") @db.VarChar(64)
@@ -518,11 +518,11 @@ model RewardTicket {
 }
 
 model GroceryList {
-  id               Int       @id @default(autoincrement())
-  householdId      Int
+  id               String    @id @default(uuid()) @db.Char(36)
+  householdId      String    @db.Char(36)
   title            String    @db.VarChar(255)
   status           String    @default("active") @db.VarChar(64)
-  sourceTemplateId Int?
+  sourceTemplateId String?   @db.Char(36)
   completedAt      DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @default(now()) @updatedAt
@@ -533,8 +533,8 @@ model GroceryList {
 }
 
 model GroceryListItem {
-  id        Int      @id @default(autoincrement())
-  listId    Int
+  id        String   @id @default(uuid()) @db.Char(36)
+  listId    String   @db.Char(36)
   name      String   @db.VarChar(255)
   category  String   @default("other") @db.VarChar(64)
   quantity  String?  @db.VarChar(64)
@@ -548,8 +548,8 @@ model GroceryListItem {
 }
 
 model GroceryTemplate {
-  id          Int       @id @default(autoincrement())
-  householdId Int
+  id          String    @id @default(uuid()) @db.Char(36)
+  householdId String    @db.Char(36)
   title       String    @db.VarChar(255)
   cadence     String    @default("weekly") @db.VarChar(64)
   isActive    Boolean   @default(true)
@@ -563,8 +563,8 @@ model GroceryTemplate {
 }
 
 model GroceryTemplateItem {
-  id         Int      @id @default(autoincrement())
-  templateId Int
+  id         String   @id @default(uuid()) @db.Char(36)
+  templateId String   @db.Char(36)
   name       String   @db.VarChar(255)
   category   String   @default("other") @db.VarChar(64)
   quantity   String?  @db.VarChar(64)
@@ -577,9 +577,9 @@ model GroceryTemplateItem {
 }
 
 model Recipe {
-  id                Int      @id @default(autoincrement())
-  householdId       Int
-  createdByParentId Int?
+  id                String   @id @default(uuid()) @db.Char(36)
+  householdId       String   @db.Char(36)
+  createdByParentId String?  @db.Char(36)
   title             String   @db.VarChar(255)
   description       String?  @db.Text
   servings          Int      @default(4)
@@ -600,8 +600,8 @@ model Recipe {
 }
 
 model RecipeIngredient {
-  id        Int      @id @default(autoincrement())
-  recipeId  Int
+  id        String   @id @default(uuid()) @db.Char(36)
+  recipeId  String   @db.Char(36)
   name      String   @db.VarChar(255)
   quantity  String?  @db.VarChar(64)
   unit      String?  @db.VarChar(64)
@@ -614,8 +614,8 @@ model RecipeIngredient {
 }
 
 model CommunityGroup {
-  id              Int      @id @default(autoincrement())
-  creatorParentId Int
+  id              String   @id @default(uuid()) @db.Char(36)
+  creatorParentId String   @db.Char(36)
   name            String   @db.VarChar(255)
   groupType       String   @default("other") @db.VarChar(64)
   description     String?  @db.Text
@@ -630,9 +630,9 @@ model CommunityGroup {
 }
 
 model CommunityMember {
-  id       Int      @id @default(autoincrement())
-  groupId  Int
-  parentId Int
+  id       String   @id @default(uuid()) @db.Char(36)
+  groupId  String   @db.Char(36)
+  parentId String   @db.Char(36)
   role     String   @default("member") @db.VarChar(64)
   status   String   @default("active") @db.VarChar(64)
   joinedAt DateTime @default(now())
@@ -644,9 +644,9 @@ model CommunityMember {
 }
 
 model CommunityEvent {
-  id                Int       @id @default(autoincrement())
-  groupId           Int
-  createdByParentId Int?
+  id                String    @id @default(uuid()) @db.Char(36)
+  groupId           String    @db.Char(36)
+  createdByParentId String?   @db.Char(36)
   title             String    @db.VarChar(255)
   eventType         String    @default("other") @db.VarChar(64)
   date              DateTime
@@ -666,9 +666,9 @@ model CommunityEvent {
 }
 
 model CommunityRsvp {
-  id        Int      @id @default(autoincrement())
-  eventId   Int
-  parentId  Int
+  id        String   @id @default(uuid()) @db.Char(36)
+  eventId   String   @db.Char(36)
+  parentId  String   @db.Char(36)
   status    String   @default("going") @db.VarChar(64)
   guests    Int      @default(0)
   note      String?  @db.Text
@@ -682,13 +682,13 @@ model CommunityRsvp {
 }
 
 model CommunityEventItem {
-  id                 Int      @id @default(autoincrement())
-  eventId            Int
+  id                 String   @id @default(uuid()) @db.Char(36)
+  eventId            String   @db.Char(36)
   title              String   @db.VarChar(255)
   quantity           String?  @db.VarChar(64)
   note               String?  @db.Text
-  assignedToParentId Int?
-  claimedByParentId  Int?
+  assignedToParentId String?  @db.Char(36)
+  claimedByParentId  String?  @db.Char(36)
   claimNote          String?  @db.Text
   status             String   @default("open") @db.VarChar(64)
   sortOrder          Int      @default(0)
@@ -701,8 +701,8 @@ model CommunityEventItem {
 }
 
 model FamilyEvent {
-  id                      Int       @id @default(autoincrement())
-  householdId             Int
+  id                      String    @id @default(uuid()) @db.Char(36)
+  householdId             String    @db.Char(36)
   title                   String    @db.VarChar(255)
   eventType               String    @default("other") @db.VarChar(64)
   date                    DateTime
@@ -730,9 +730,9 @@ model FamilyEvent {
 }
 
 model HouseholdDevice {
-  id          Int       @id @default(autoincrement())
-  householdId Int
-  memberId    Int?
+  id          String    @id @default(uuid()) @db.Char(36)
+  householdId String    @db.Char(36)
+  memberId    String?   @db.Char(36)
   name        String    @db.VarChar(255)
   mode        String    @default("household") @db.VarChar(32)
   tokenHash   String    @unique @db.VarChar(255)
@@ -745,9 +745,9 @@ model HouseholdDevice {
 }
 
 model DevicePairingCode {
-  id          Int       @id @default(autoincrement())
-  householdId Int
-  memberId    Int?
+  id          String    @id @default(uuid()) @db.Char(36)
+  householdId String    @db.Char(36)
+  memberId    String?   @db.Char(36)
   codeHash    String    @unique @db.VarChar(255)
   deviceName  String    @db.VarChar(255)
   mode        String    @default("household") @db.VarChar(32)

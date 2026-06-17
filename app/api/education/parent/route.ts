@@ -48,8 +48,8 @@ export const POST = withErrors(async (req: NextRequest) => {
   const action = typeof body.action === "string" ? body.action : "set";
 
   if (action === "assignment") {
-    const memberId = Number(body.memberId);
-    const setId = Number(body.setId);
+    const memberId = typeof body.memberId === "string" ? body.memberId : "";
+    const setId = typeof body.setId === "string" ? body.setId : "";
     if (!(await canAccessMember(parentId, householdId, memberId))) {
       return NextResponse.json({ error: "You do not have access to this family member" }, { status: 403 });
     }
@@ -76,7 +76,7 @@ export const POST = withErrors(async (req: NextRequest) => {
   }
 
   if (action === "project") {
-    const memberId = body.memberId ? Number(body.memberId) : null;
+    const memberId = typeof body.memberId === "string" && body.memberId ? body.memberId : null;
     if (memberId && !(await canAccessMember(parentId, householdId, memberId))) {
       return NextResponse.json({ error: "You do not have access to this family member" }, { status: 403 });
     }
@@ -134,7 +134,7 @@ export const PUT = withErrors(async (req: NextRequest) => {
   const body = await req.json();
 
   if (body.action === "project") {
-    const id = Number(body.id);
+    const id = typeof body.id === "string" ? body.id : "";
     const project = await prisma.educationProject.findFirst({ where: { id, householdId }, select: { memberId: true, pointsReward: true, status: true } });
     if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
     if (project.memberId && !(await canAccessMember(parentId, householdId, project.memberId))) {
@@ -158,7 +158,7 @@ export const PUT = withErrors(async (req: NextRequest) => {
     return NextResponse.json(updated);
   }
 
-  const id = Number(body.id);
+  const id = typeof body.id === "string" ? body.id : "";
   const status = body.status === "completed" ? "completed" : body.status === "archived" ? "archived" : "assigned";
   const assignment = await prisma.educationAssignment.findFirst({ where: { id, householdId }, select: { memberId: true } });
   if (!assignment) return NextResponse.json({ error: "Assignment not found" }, { status: 404 });

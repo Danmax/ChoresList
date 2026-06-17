@@ -35,8 +35,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (!session) return NextResponse.json({ error: "Device access revoked" }, { status: 401 });
 
     const { id } = await params;
-    const completionId = Number.parseInt(id, 10);
-    if (!Number.isFinite(completionId) || completionId <= 0) {
+    const completionId = id;
+    if (!completionId) {
       return NextResponse.json({ error: "Invalid completion" }, { status: 400 });
     }
 

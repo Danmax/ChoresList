@@ -8,7 +8,7 @@ export const GET = withErrors(async (req: NextRequest) => {
   const { searchParams } = new URL(req.url);
   const memberId = searchParams.get("memberId");
   const allowances = await prisma.weeklyAllowance.findMany({
-    where: { householdId, ...(memberId && { memberId: parseInt(memberId) }) },
+    where: { householdId, ...(memberId && { memberId }) },
     include: { member: true },
     orderBy: { weekStart: "desc" },
   });

@@ -59,8 +59,8 @@ const templateChores = CHORE_TEMPLATES_BY_AGE.flatMap((group) =>
   }))
 );
 
-export async function seedHouseholdDefaults(db: Db, householdId: number) {
-  const createdSkills: Record<string, number> = {};
+export async function seedHouseholdDefaults(db: Db, householdId: string) {
+  const createdSkills: Record<string, string> = {};
 
   for (const skill of skills) {
     const created = await db.skillCategory.create({ data: { ...skill, householdId } });

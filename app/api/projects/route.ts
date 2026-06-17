@@ -13,7 +13,7 @@ export const GET = withErrors(async (req: NextRequest) => {
     where: {
       householdId,
       ...(status && { status }),
-      ...(memberId && { OR: [{ assignedTo: parseInt(memberId) }, { assignedTo: null }] }),
+      ...(memberId && { OR: [{ assignedTo: memberId }, { assignedTo: null }] }),
     },
     include: {
       assignee: { select: { id: true, name: true, avatar: true, color: true } },
@@ -56,7 +56,7 @@ export const PUT = withErrors(async (req: NextRequest) => {
 
   const isKidCompletion =
     body?.status === "completed" &&
-    typeof body?.completedById === "number" &&
+    typeof body?.completedById === "string" &&
     Object.keys(body).every((k) => KID_COMPLETE_FIELDS.has(k));
 
   const { householdId } = isKidCompletion
@@ -122,7 +122,7 @@ export const PUT = withErrors(async (req: NextRequest) => {
 export const DELETE = withErrors(async (req: NextRequest) => {
   const { householdId } = await requireParentSession(req);
   const { searchParams } = new URL(req.url);
-  const id = parseInt(searchParams.get("id") ?? "0");
+  const id = searchParams.get("id") ?? "";
   await prisma.houseProject.delete({ where: { id, householdId } });
   return NextResponse.json({ ok: true });
 });

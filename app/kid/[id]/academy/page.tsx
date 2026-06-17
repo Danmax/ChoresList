@@ -7,7 +7,7 @@ import { ArrowLeft, CheckCircle2, GraduationCap, Send, Zap } from "lucide-react"
 import { toast } from "sonner";
 
 type Material = {
-  id: number;
+  id: string;
   prompt: string;
   answer: string;
   choices?: string[] | null;
@@ -15,24 +15,24 @@ type Material = {
 };
 
 type Assignment = {
-  id: number;
+  id: string;
   title: string;
   status: string;
   passingScore: number;
   pointsReward: number;
   dueDate?: string | null;
   set: {
-    id: number;
+    id: string;
     title: string;
     subject: string;
     mode: string;
     materials: Material[];
   };
-  attempts: { id: number; score: number; passed: boolean; completedAt: string }[];
+  attempts: { id: string; score: number; passed: boolean; completedAt: string }[];
 };
 
 type Project = {
-  id: number;
+  id: string;
   title: string;
   subject: string;
   description?: string | null;
@@ -43,7 +43,7 @@ type Project = {
 };
 
 type Member = {
-  id: number;
+  id: string;
   name: string;
   avatar: string;
   color: string;
@@ -58,7 +58,7 @@ type Result = {
   passingScore: number;
   pointsAwarded: number;
   answers: {
-    materialId: number;
+    materialId: string;
     prompt: string;
     answer: string;
     correctAnswer: string;
@@ -71,20 +71,20 @@ function formatDate(value?: string | null) {
   return value ? new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "No due date";
 }
 
-function answerValue(answers: Record<number, string>, materialId: number) {
+function answerValue(answers: Record<string, string>, materialId: string) {
   return answers[materialId] ?? "";
 }
 
 export default function KidAcademyPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const memberId = Number(id);
+  const memberId = id;
   const [member, setMember] = useState<Member | null>(null);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [answers, setAnswers] = useState<Record<number, string>>({});
-  const [flipped, setFlipped] = useState<Record<number, boolean>>({});
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [flipped, setFlipped] = useState<Record<string, boolean>>({});
   const [result, setResult] = useState<Result | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -122,7 +122,7 @@ export default function KidAcademyPage() {
     setResult(null);
   }
 
-  function setAnswer(materialId: number, value: string) {
+  function setAnswer(materialId: string, value: string) {
     setAnswers((previous) => ({ ...previous, [materialId]: value }));
   }
 

@@ -22,7 +22,7 @@ export const GET = withErrors(async (req: NextRequest) => {
     where: {
       isActive: true,
       householdId,
-      ...(memberId && { memberId: parseInt(memberId) }),
+      ...(memberId && { memberId }),
       member: await childAccessWhere(parentId, householdId),
       ...(scope === "all"
         ? {}
@@ -58,7 +58,7 @@ export const GET = withErrors(async (req: NextRequest) => {
 export const POST = withErrors(async (req: NextRequest) => {
   const { householdId, parentId } = await requireParentSession(req);
   const body = await req.json();
-  if (!(await canAccessMember(parentId, householdId, Number(body.memberId)))) {
+  if (!(await canAccessMember(parentId, householdId, String(body.memberId ?? "")))) {
     return NextResponse.json({ error: "You do not have access to this family member" }, { status: 403 });
   }
   const [member, chore] = await Promise.all([
@@ -109,7 +109,7 @@ export const POST = withErrors(async (req: NextRequest) => {
 export const DELETE = withErrors(async (req: NextRequest) => {
   const { householdId, parentId } = await requireParentSession(req);
   const { searchParams } = new URL(req.url);
-  const id = parseInt(searchParams.get("id") ?? "0");
+  const id = searchParams.get("id") ?? "";
   const assignment = await prisma.choreAssignment.findFirst({ where: { id, householdId }, select: { memberId: true } });
   if (!assignment) return NextResponse.json({ error: "Assignment not found" }, { status: 404 });
   if (!(await canAccessMember(parentId, householdId, assignment.memberId))) {

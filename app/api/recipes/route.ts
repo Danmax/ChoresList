@@ -9,7 +9,7 @@ function cleanText(value: unknown, max: number) {
   return typeof value === "string" && value.trim() ? value.trim().slice(0, max) : null;
 }
 
-function cleanPhotoUrl(value: unknown, householdId: number) {
+function cleanPhotoUrl(value: unknown, householdId: string) {
   if (typeof value !== "string" || !value.trim()) return null;
   const clean = value.trim().slice(0, 512);
   if (/^https?:\/\//i.test(clean) || clean.startsWith("/")) return clean;
@@ -58,7 +58,7 @@ const recipeInclude = {
   ingredients: { orderBy: [{ sortOrder: "asc" as const }, { createdAt: "asc" as const }] },
 };
 
-function normalizeRecipePhotoUrl<T extends { householdId: number; photoUrl: string | null }>(recipe: T): T {
+function normalizeRecipePhotoUrl<T extends { householdId: string; photoUrl: string | null }>(recipe: T): T {
   return { ...recipe, photoUrl: cleanPhotoUrl(recipe.photoUrl, recipe.householdId) };
 }
 
@@ -137,8 +137,8 @@ export const PUT = withErrors(async (req: NextRequest) => {
   const { householdId } = await requireParentSession(req);
   await requirePluginActive(householdId, "recipes");
   const body = await req.json();
-  const id = Number.parseInt(String(body.id ?? ""), 10);
-  if (!Number.isFinite(id) || id <= 0) {
+  const id = typeof body.id === "string" ? body.id : "";
+  if (!id) {
     return NextResponse.json({ error: "Recipe is required" }, { status: 400 });
   }
 
@@ -177,8 +177,8 @@ export const DELETE = withErrors(async (req: NextRequest) => {
   const { householdId } = await requireParentSession(req);
   await requirePluginActive(householdId, "recipes");
   const { searchParams } = new URL(req.url);
-  const id = Number.parseInt(searchParams.get("id") ?? "0", 10);
-  if (!Number.isFinite(id) || id <= 0) {
+  const id = searchParams.get("id") ?? "";
+  if (!id) {
     return NextResponse.json({ error: "Recipe is required" }, { status: 400 });
   }
 

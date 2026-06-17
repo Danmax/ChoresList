@@ -12,8 +12,8 @@ export const POST = withErrors(async (req: NextRequest, ctx?: unknown) => {
   const { householdId } = await requireParentSession(req);
   const { params } = ctx as Params;
   const { id } = await params;
-  const templateId = Number.parseInt(id, 10);
-  if (!Number.isFinite(templateId) || templateId <= 0) {
+  const templateId = id;
+  if (!templateId) {
     return NextResponse.json({ error: "Recurring list is required" }, { status: 400 });
   }
 

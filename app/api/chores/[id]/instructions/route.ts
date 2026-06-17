@@ -19,7 +19,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const { householdId } = requireSession(_req);
     const { id } = await params;
     const instructions = await prisma.choreInstructions.findFirst({
-      where: { choreId: parseInt(id), chore: { householdId } },
+      where: { choreId: id, chore: { householdId } },
     });
     return NextResponse.json(instructions ?? null);
   } catch (e) { return err(e); }
@@ -29,7 +29,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
   try {
     const { householdId } = await requireParentSession(_req);
     const { id } = await params;
-    const choreId = parseInt(id);
+    const choreId = id;
     const chore = await prisma.chore.findUnique({ where: { id: choreId, householdId } });
     if (!chore) return NextResponse.json({ error: "Chore not found" }, { status: 404 });
 
@@ -82,7 +82,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
   try {
     const { householdId } = await requireParentSession(req);
     const { id } = await params;
-    const choreId = parseInt(id);
+    const choreId = id;
     const chore = await prisma.chore.findUnique({ where: { id: choreId, householdId } });
     if (!chore) return NextResponse.json({ error: "Chore not found" }, { status: 404 });
     const body = await req.json();
@@ -111,7 +111,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     const { householdId } = await requireParentSession(_req);
     const { id } = await params;
     const instructions = await prisma.choreInstructions.findFirst({
-      where: { choreId: parseInt(id), chore: { householdId } },
+      where: { choreId: id, chore: { householdId } },
     });
     if (instructions) await prisma.choreInstructions.delete({ where: { id: instructions.id } });
     return NextResponse.json({ ok: true });

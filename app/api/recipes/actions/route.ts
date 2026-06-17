@@ -9,6 +9,10 @@ function cleanInt(value: unknown) {
   return Number.isFinite(n) ? Math.round(n) : null;
 }
 
+function cleanId(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
 function recipeNote(recipe: { description: string | null; instructions: string | null; photoUrl: string | null }) {
   const parts = [
     recipe.description ? `Recipe notes: ${recipe.description}` : "",
@@ -18,7 +22,7 @@ function recipeNote(recipe: { description: string | null; instructions: string |
   return parts.join("\n\n").slice(0, 2000) || null;
 }
 
-async function findAccessibleRecipe(recipeId: number, householdId: number) {
+async function findAccessibleRecipe(recipeId: string, householdId: string) {
   return prisma.recipe.findFirst({
     where: {
       id: recipeId,
@@ -33,8 +37,8 @@ export const POST = withErrors(async (req: NextRequest) => {
   await requirePluginActive(householdId, "recipes");
   const body = await req.json();
   const action = typeof body.action === "string" ? body.action : "";
-  const recipeId = cleanInt(body.recipeId);
-  if (!recipeId || recipeId <= 0) return NextResponse.json({ error: "Recipe is required" }, { status: 400 });
+  const recipeId = cleanId(body.recipeId);
+  if (!recipeId) return NextResponse.json({ error: "Recipe is required" }, { status: 400 });
 
   const recipe = await findAccessibleRecipe(recipeId, householdId);
   if (!recipe) return NextResponse.json({ error: "Recipe not found" }, { status: 404 });
@@ -64,8 +68,8 @@ export const POST = withErrors(async (req: NextRequest) => {
   }
 
   if (action === "potluck-item") {
-    const eventId = cleanInt(body.eventId);
-    if (!eventId || eventId <= 0) return NextResponse.json({ error: "Potluck event is required" }, { status: 400 });
+    const eventId = cleanId(body.eventId);
+    if (!eventId) return NextResponse.json({ error: "Potluck event is required" }, { status: 400 });
     const { event } = await requireEventCommunityRole(eventId, parentId, "manager");
     const potluck = await prisma.communityEvent.findUnique({
       where: { id: event.id },

@@ -8,7 +8,7 @@ export const PUT = withErrors(async (req: NextRequest) => {
   const { householdId, parentId } = requireSession(req);
   await requirePluginActive(householdId, "education-academy");
   const body = await req.json();
-  const id = Number(body.id);
+  const id = typeof body.id === "string" ? body.id : "";
   const project = await prisma.educationProject.findFirst({ where: { id, householdId }, select: { memberId: true } });
   if (!project?.memberId) return NextResponse.json({ error: "Project not found" }, { status: 404 });
   if (!(await canAccessMember(parentId, householdId, project.memberId))) {

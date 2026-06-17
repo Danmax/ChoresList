@@ -2,16 +2,16 @@ import { prisma } from "@/lib/prisma";
 
 type ChildAccessWhere =
   | {}
-  | { parentAccountId: number }
-  | { OR: Array<{ id: { in: number[] } } | { parentAccountId: number }> };
+  | { parentAccountId: string }
+  | { OR: Array<{ id: { in: string[] } } | { parentAccountId: string }> };
 
 function idsFromJson(value: unknown) {
   return Array.isArray(value)
-    ? value.map(Number).filter((id) => Number.isInteger(id) && id > 0)
+    ? value.filter((id): id is string => typeof id === "string" && id.length > 0)
     : [];
 }
 
-export async function childAccessWhere(parentId: number, householdId: number): Promise<ChildAccessWhere> {
+export async function childAccessWhere(parentId: string, householdId: string): Promise<ChildAccessWhere> {
   const parent = await prisma.parentAccount.findFirst({
     where: { id: parentId, householdId },
     select: { childAccessMode: true, childAccessMemberIds: true },
@@ -21,10 +21,10 @@ export async function childAccessWhere(parentId: number, householdId: number): P
   if (parent.childAccessMode === "none") return { parentAccountId: parentId };
 
   const ids = idsFromJson(parent.childAccessMemberIds);
-  return { OR: [{ id: { in: ids.length ? ids : [-1] } }, { parentAccountId: parentId }] };
+  return { OR: [{ id: { in: ids.length ? ids : [""] } }, { parentAccountId: parentId }] };
 }
 
-export async function canAccessMember(parentId: number, householdId: number, memberId: number) {
+export async function canAccessMember(parentId: string, householdId: string, memberId: string) {
   const member = await prisma.familyMember.findFirst({
     where: { id: memberId, householdId },
     select: { parentAccountId: true },

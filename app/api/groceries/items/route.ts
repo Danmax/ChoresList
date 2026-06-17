@@ -20,6 +20,10 @@ function cleanScope(value: unknown) {
   return typeof value === "string" && SCOPES.has(value) ? value : null;
 }
 
+function cleanId(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : "";
+}
+
 export const POST = withErrors(async (req: NextRequest) => {
   const { householdId } = await requireParentSession(req);
   const body = await req.json();
@@ -38,8 +42,8 @@ export const POST = withErrors(async (req: NextRequest) => {
   };
 
   if (scope === "list") {
-    const listId = Number.parseInt(String(body.listId ?? ""), 10);
-    if (!Number.isFinite(listId) || listId <= 0) {
+    const listId = cleanId(body.listId);
+    if (!listId) {
       return NextResponse.json({ error: "Shopping list is required" }, { status: 400 });
     }
     const list = await prisma.groceryList.findFirst({ where: { id: listId, householdId }, select: { id: true } });
@@ -50,8 +54,8 @@ export const POST = withErrors(async (req: NextRequest) => {
     return NextResponse.json(item, { status: 201 });
   }
 
-  const templateId = Number.parseInt(String(body.templateId ?? ""), 10);
-  if (!Number.isFinite(templateId) || templateId <= 0) {
+  const templateId = cleanId(body.templateId);
+  if (!templateId) {
     return NextResponse.json({ error: "Recurring list is required" }, { status: 400 });
   }
   const template = await prisma.groceryTemplate.findFirst({ where: { id: templateId, householdId }, select: { id: true } });
@@ -66,10 +70,10 @@ export const PUT = withErrors(async (req: NextRequest) => {
   const { householdId } = await requireParentSession(req);
   const body = await req.json();
   const scope = cleanScope(body.scope);
-  const id = Number.parseInt(String(body.id ?? ""), 10);
+  const id = cleanId(body.id);
 
   if (!scope) return NextResponse.json({ error: "Item scope is required" }, { status: 400 });
-  if (!Number.isFinite(id) || id <= 0) {
+  if (!id) {
     return NextResponse.json({ error: "Item is required" }, { status: 400 });
   }
 
@@ -118,10 +122,10 @@ export const DELETE = withErrors(async (req: NextRequest) => {
   const { householdId } = await requireParentSession(req);
   const { searchParams } = new URL(req.url);
   const scope = cleanScope(searchParams.get("scope"));
-  const id = Number.parseInt(searchParams.get("id") ?? "0", 10);
+  const id = searchParams.get("id") ?? "";
 
   if (!scope) return NextResponse.json({ error: "Item scope is required" }, { status: 400 });
-  if (!Number.isFinite(id) || id <= 0) {
+  if (!id) {
     return NextResponse.json({ error: "Item is required" }, { status: 400 });
   }
 

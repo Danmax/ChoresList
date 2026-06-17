@@ -11,12 +11,12 @@ import { Input } from "@/components/ui/input";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-interface Member { id: number; name: string; avatar: string; color: string; age: number; role: string }
-interface Chore { id: number; name: string; icon: string; ageMin: number; ageMax: number; pointsValue: number }
+interface Member { id: string; name: string; avatar: string; color: string; age: number; role: string }
+interface Chore { id: string; name: string; icon: string; ageMin: number; ageMax: number; pointsValue: number }
 interface Assignment {
-  id: number;
-  choreId: number;
-  memberId: number;
+  id: string;
+  choreId: string;
+  memberId: string;
   frequency: string;
   dueDate: string | null;
   dayOfWeek: number | null;
@@ -64,8 +64,8 @@ export default function AssignPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        memberId: parseInt(form.memberId),
-        choreId: parseInt(form.choreId),
+        memberId: form.memberId,
+        choreId: form.choreId,
         frequency: form.frequency,
         dueDate: form.dueDate || null,
         dayOfWeeks: form.frequency === "weekly" ? form.dayOfWeeks.map(Number) : [],
@@ -81,17 +81,17 @@ export default function AssignPage() {
     load();
   }
 
-  async function unassign(id: number) {
+  async function unassign(id: string) {
     await fetch(`/api/assignments?id=${id}`, { method: "DELETE" });
     toast.success("Assignment removed");
     load();
   }
 
   const filteredAssignments = selectedMember
-    ? assignments.filter((a) => a.memberId === parseInt(selectedMember))
+    ? assignments.filter((a) => a.memberId === selectedMember)
     : assignments;
 
-  const selectedMemberObj = members.find((m) => m.id === parseInt(form.memberId));
+  const selectedMemberObj = members.find((m) => m.id === form.memberId);
   const availableChores = selectedMemberObj
     ? chores.filter((c) => {
         const isParent = selectedMemberObj.role === "parent" || selectedMemberObj.role === "mom" || selectedMemberObj.role === "dad" || selectedMemberObj.role === "grandparent";

@@ -16,8 +16,8 @@ function cleanText(value: unknown, max: number) {
 export const PUT = withErrors(async (req: NextRequest) => {
   const { parentId } = requireSession(req);
   const body = await req.json();
-  const eventId = Number.parseInt(String(body.eventId ?? ""), 10);
-  if (!Number.isFinite(eventId) || eventId <= 0) {
+  const eventId = typeof body.eventId === "string" ? body.eventId : "";
+  if (!eventId) {
     return NextResponse.json({ error: "Event is required" }, { status: 400 });
   }
   await requireEventCommunityRole(eventId, parentId, "member");
@@ -45,8 +45,8 @@ export const PUT = withErrors(async (req: NextRequest) => {
 export const DELETE = withErrors(async (req: NextRequest) => {
   const { parentId } = requireSession(req);
   const { searchParams } = new URL(req.url);
-  const eventId = Number.parseInt(searchParams.get("eventId") ?? "0", 10);
-  if (!Number.isFinite(eventId) || eventId <= 0) {
+  const eventId = searchParams.get("eventId") ?? "";
+  if (!eventId) {
     return NextResponse.json({ error: "Event is required" }, { status: 400 });
   }
   await requireEventCommunityRole(eventId, parentId, "member");

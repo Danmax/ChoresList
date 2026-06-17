@@ -10,18 +10,18 @@ import { Label } from "@/components/ui/label";
 import { COMPLETION_EMOJIS, WISH_CATEGORIES, WISH_EMOJIS } from "@/types";
 
 type Device = {
-  id: number;
+  id: string;
   name: string;
   mode: string;
-  member: { id: number; name: string; avatar: string } | null;
+  member: { id: string; name: string; avatar: string } | null;
 };
 
 type Assignment = {
-  id: number;
+  id: string;
   frequency: string;
   dueDate: string | null;
   member: {
-    id: number;
+    id: string;
     name: string;
     avatar: string;
     color: string;
@@ -29,7 +29,7 @@ type Assignment = {
     level: number;
   };
   chore: {
-    id: number;
+    id: string;
     name: string;
     icon: string;
     color: string;
@@ -41,7 +41,7 @@ type Assignment = {
       safetyNotes: string;
     } | null;
   };
-  completions: { id: number; completedAt: string; reactionEmoji?: string | null }[];
+  completions: { id: string; completedAt: string; reactionEmoji?: string | null }[];
 };
 
 type ChoreGuide = {
@@ -52,9 +52,9 @@ type ChoreGuide = {
   safetyNotes: string[];
 };
 
-type CatalogMember = { id: number; name: string; avatar: string; color: string };
+type CatalogMember = { id: string; name: string; avatar: string; color: string };
 type CatalogChore = {
-  id: number;
+  id: string;
   name: string;
   icon: string;
   color: string;
@@ -76,7 +76,7 @@ export default function TaskScreenPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [filter, setFilter] = useState<Filter>("open");
   const [loading, setLoading] = useState(true);
-  const [completingId, setCompletingId] = useState<number | null>(null);
+  const [completingId, setCompletingId] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showInstallHelp, setShowInstallHelp] = useState(false);
@@ -92,7 +92,7 @@ export default function TaskScreenPage() {
   const [addingTask, setAddingTask] = useState(false);
   const [showPhoto, setShowPhoto] = useState(false);
   const [photoType, setPhotoType] = useState<"before" | "after">("before");
-  const [activeCompletionId, setActiveCompletionId] = useState<number | null>(null);
+  const [activeCompletionId, setActiveCompletionId] = useState<string | null>(null);
   const [activeGuide, setActiveGuide] = useState<ChoreGuide | null>(null);
   const [reactionAssignment, setReactionAssignment] = useState<Assignment | null>(null);
 
@@ -176,7 +176,7 @@ export default function TaskScreenPage() {
     }
   }
 
-  async function uploadPhoto(file: File, completionId: number, type: "before" | "after") {
+  async function uploadPhoto(file: File, completionId: string, type: "before" | "after") {
     const form = new FormData();
     form.append("file", file);
     form.append("type", type);
@@ -251,7 +251,7 @@ export default function TaskScreenPage() {
     const res = await fetch("/api/kid-device/wishlist", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ memberId: Number(wishMemberId), ...wish }),
+      body: JSON.stringify({ memberId: wishMemberId, ...wish }),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -278,7 +278,7 @@ export default function TaskScreenPage() {
       const res = await fetch("/api/kid-device/tasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ memberId: Number(taskMemberId), choreId: Number(taskChoreId) }),
+        body: JSON.stringify({ memberId: taskMemberId, choreId: taskChoreId }),
       });
       const data = await res.json();
       if (!res.ok) {

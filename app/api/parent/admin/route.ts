@@ -7,12 +7,11 @@ import { prisma } from "@/lib/prisma";
 const ACCOUNT_ROLES = new Set(["owner", "parent", "grandparent"]);
 const COMMUNITY_VISIBILITIES = new Set(["private", "public"]);
 
-function cleanInt(value: unknown) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : null;
+function cleanId(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-async function requireManageableCommunity(groupId: number, householdId: number) {
+async function requireManageableCommunity(groupId: string, householdId: string) {
   const group = await prisma.communityGroup.findFirst({
     where: {
       id: groupId,
@@ -127,7 +126,7 @@ export const PUT = withErrors(async (req: NextRequest) => {
   const action = typeof body.action === "string" ? body.action : "";
 
   if (action === "parentRole") {
-    const targetParentId = cleanInt(body.parentId);
+    const targetParentId = cleanId(body.parentId);
     const accountRole = typeof body.accountRole === "string" && ACCOUNT_ROLES.has(body.accountRole)
       ? body.accountRole
       : null;
@@ -157,7 +156,7 @@ export const PUT = withErrors(async (req: NextRequest) => {
   }
 
   if (action === "communityVisibility") {
-    const groupId = cleanInt(body.groupId);
+    const groupId = cleanId(body.groupId);
     const visibility = typeof body.visibility === "string" && COMMUNITY_VISIBILITIES.has(body.visibility)
       ? body.visibility
       : null;
@@ -175,8 +174,8 @@ export const PUT = withErrors(async (req: NextRequest) => {
   }
 
   if (action === "communityMemberRole") {
-    const groupId = cleanInt(body.groupId);
-    const targetParentId = cleanInt(body.parentId);
+    const groupId = cleanId(body.groupId);
+    const targetParentId = cleanId(body.parentId);
     if (!groupId || !targetParentId) {
       return NextResponse.json({ error: "Community and member are required" }, { status: 400 });
     }

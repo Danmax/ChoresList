@@ -99,7 +99,7 @@ async function main() {
   await prisma.chore.deleteMany({ where: { householdId: parent.householdId } });
   await prisma.skillCategory.deleteMany({ where: { householdId: parent.householdId } });
 
-  const createdSkills: Record<string, number> = {};
+  const createdSkills: Record<string, string> = {};
   for (const skill of skills) {
     const s = await prisma.skillCategory.create({ data: { ...skill, householdId: parent.householdId } });
     createdSkills[skill.name] = s.id;

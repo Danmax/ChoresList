@@ -11,7 +11,7 @@ export const GET = withErrors(async (req: NextRequest) => {
   const tickets = await prisma.rewardTicket.findMany({
     where: {
       householdId,
-      ...(memberId && { memberId: parseInt(memberId) }),
+      ...(memberId && { memberId }),
       ...(status && { status }),
     },
     include: {

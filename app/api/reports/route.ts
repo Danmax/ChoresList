@@ -81,7 +81,7 @@ export const GET = withErrors(async (req: NextRequest) => {
     catMap.set(cat, existing);
   }
 
-  const assignCountByMember = new Map<number, number>();
+  const assignCountByMember = new Map<string, number>();
   for (const a of assignments) {
     assignCountByMember.set(a.memberId, (assignCountByMember.get(a.memberId) ?? 0) + 1);
   }

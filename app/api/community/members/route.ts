@@ -7,16 +7,15 @@ function cleanEmail(value: unknown) {
   return typeof value === "string" ? value.trim().toLowerCase().slice(0, 255) : "";
 }
 
-function cleanInt(value: unknown) {
-  const n = Number(value);
-  return Number.isFinite(n) ? Math.round(n) : null;
+function cleanId(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
 export const POST = withErrors(async (req: NextRequest) => {
   const { parentId } = requireSession(req);
   const body = await req.json();
-  const groupId = cleanInt(body.groupId);
-  if (!groupId || groupId <= 0) return NextResponse.json({ error: "Group is required" }, { status: 400 });
+  const groupId = cleanId(body.groupId);
+  if (!groupId) return NextResponse.json({ error: "Group is required" }, { status: 400 });
 
   const email = cleanEmail(body.email);
   const role = cleanCommunityRole(body.role);
@@ -56,8 +55,8 @@ export const POST = withErrors(async (req: NextRequest) => {
 export const PUT = withErrors(async (req: NextRequest) => {
   const { parentId } = requireSession(req);
   const body = await req.json();
-  const groupId = cleanInt(body.groupId);
-  const targetParentId = cleanInt(body.parentId);
+  const groupId = cleanId(body.groupId);
+  const targetParentId = cleanId(body.parentId);
   if (!groupId || !targetParentId) {
     return NextResponse.json({ error: "Group and member are required" }, { status: 400 });
   }
@@ -81,9 +80,9 @@ export const PUT = withErrors(async (req: NextRequest) => {
 export const DELETE = withErrors(async (req: NextRequest) => {
   const { parentId } = requireSession(req);
   const { searchParams } = new URL(req.url);
-  const groupId = Number.parseInt(searchParams.get("groupId") ?? "0", 10);
-  const targetParentId = Number.parseInt(searchParams.get("parentId") ?? "0", 10);
-  if (!Number.isFinite(groupId) || groupId <= 0 || !Number.isFinite(targetParentId) || targetParentId <= 0) {
+  const groupId = searchParams.get("groupId") ?? "";
+  const targetParentId = searchParams.get("parentId") ?? "";
+  if (!groupId || !targetParentId) {
     return NextResponse.json({ error: "Group and member are required" }, { status: 400 });
   }
 

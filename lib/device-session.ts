@@ -11,9 +11,9 @@ const PAIRING_CODE_MAX = 10 ** PAIRING_CODE_DIGITS;
 export type DeviceMode = "household" | "member";
 
 export type DeviceSessionPayload = {
-  deviceId: number;
-  householdId: number;
-  memberId: number | null;
+  deviceId: string;
+  householdId: string;
+  memberId: string | null;
   mode: DeviceMode;
   secret: string;
   expiresAt: number;
@@ -68,9 +68,9 @@ export function normalizePairingCode(code: unknown) {
 export const PAIRING_CODE_LENGTH = PAIRING_CODE_DIGITS;
 
 export function createDeviceSessionToken(device: {
-  id: number;
-  householdId: number;
-  memberId: number | null;
+  id: string;
+  householdId: string;
+  memberId: string | null;
   mode: string;
   secret: string;
 }) {
@@ -104,9 +104,9 @@ export function verifyDeviceSessionToken(token?: string): DeviceSessionPayload |
   try {
     const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as DeviceSessionPayload;
     if (
-      typeof parsed.deviceId !== "number" ||
-      typeof parsed.householdId !== "number" ||
-      !(typeof parsed.memberId === "number" || parsed.memberId === null) ||
+      typeof parsed.deviceId !== "string" ||
+      typeof parsed.householdId !== "string" ||
+      !(typeof parsed.memberId === "string" || parsed.memberId === null) ||
       (parsed.mode !== "household" && parsed.mode !== "member") ||
       typeof parsed.secret !== "string" ||
       typeof parsed.expiresAt !== "number" ||

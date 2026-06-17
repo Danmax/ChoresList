@@ -6,8 +6,8 @@ const INVITE_TTL_SECONDS = 60 * 60 * 24 * 14;
 const COMMUNITY_INVITE_TTL_SECONDS = 60 * 60 * 24 * 14;
 
 export type SessionPayload = {
-  parentId: number;
-  householdId: number;
+  parentId: string;
+  householdId: string;
   email: string;
   expiresAt: number;
 };
@@ -15,19 +15,19 @@ export type SessionPayload = {
 export type HouseholdAccountRole = "owner" | "parent" | "grandparent";
 
 export type HouseholdInvitePayload = {
-  householdId: number;
+  householdId: string;
   accountRole: Exclude<HouseholdAccountRole, "owner">;
   parentType: string;
   relationshipLabel?: string;
   childAccessMode: string;
-  childAccessMemberIds?: number[];
+  childAccessMemberIds?: string[];
   expiresAt: number;
 };
 
 export type CommunityInvitePayload = {
-  groupId: number;
+  groupId: string;
   role: "owner" | "manager" | "member";
-  eventId?: number;
+  eventId?: string;
   expiresAt: number;
 };
 
@@ -52,7 +52,7 @@ function sign(value: string) {
   return createHmac("sha256", secret()).update(value).digest("hex");
 }
 
-export function createSessionToken(parent: { id: number; householdId: number; email: string }) {
+export function createSessionToken(parent: { id: string; householdId: string; email: string }) {
   const expiresAt = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
   const payload = Buffer.from(
     JSON.stringify({
@@ -81,8 +81,8 @@ export function verifySessionToken(token?: string): SessionPayload | null {
   try {
     const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as SessionPayload;
     if (
-      typeof parsed.parentId !== "number" ||
-      typeof parsed.householdId !== "number" ||
+      typeof parsed.parentId !== "string" ||
+      typeof parsed.householdId !== "string" ||
       typeof parsed.email !== "string" ||
       typeof parsed.expiresAt !== "number" ||
       parsed.expiresAt <= Math.floor(Date.now() / 1000)
@@ -114,7 +114,7 @@ function cleanChildAccessMode(value: unknown) {
 
 function cleanChildAccessMemberIds(value: unknown) {
   return Array.isArray(value)
-    ? Array.from(new Set(value.map(Number).filter((id) => Number.isInteger(id) && id > 0)))
+    ? Array.from(new Set(value.filter((id): id is string => typeof id === "string" && id.length > 0)))
     : [];
 }
 
@@ -126,12 +126,12 @@ export function createHouseholdInviteToken({
   childAccessMode,
   childAccessMemberIds,
 }: {
-  householdId: number;
+  householdId: string;
   accountRole?: Exclude<HouseholdAccountRole, "owner">;
   parentType?: string;
   relationshipLabel?: string;
   childAccessMode?: string;
-  childAccessMemberIds?: number[];
+  childAccessMemberIds?: string[];
 }) {
   const expiresAt = Math.floor(Date.now() / 1000) + INVITE_TTL_SECONDS;
   const mode = cleanChildAccessMode(childAccessMode);
@@ -176,7 +176,7 @@ export function verifyHouseholdInviteToken(token?: string): HouseholdInvitePaylo
     };
     if (
       parsed.purpose !== "household-invite" ||
-      typeof parsed.householdId !== "number" ||
+      typeof parsed.householdId !== "string" ||
       typeof parsed.expiresAt !== "number" ||
       parsed.expiresAt <= Math.floor(Date.now() / 1000)
     ) {
@@ -201,9 +201,9 @@ export function createCommunityInviteToken({
   role = "member",
   eventId,
 }: {
-  groupId: number;
+  groupId: string;
   role?: "owner" | "manager" | "member";
-  eventId?: number | null;
+  eventId?: string | null;
 }) {
   const expiresAt = Math.floor(Date.now() / 1000) + COMMUNITY_INVITE_TTL_SECONDS;
   const payload = Buffer.from(
@@ -240,10 +240,10 @@ export function verifyCommunityInviteToken(token?: string): CommunityInvitePaylo
       expiresAt?: unknown;
     };
     const role = parsed.role === "owner" || parsed.role === "manager" || parsed.role === "member" ? parsed.role : null;
-    const eventId = typeof parsed.eventId === "number" ? parsed.eventId : undefined;
+    const eventId = typeof parsed.eventId === "string" ? parsed.eventId : undefined;
     if (
       parsed.purpose !== "community-invite" ||
-      typeof parsed.groupId !== "number" ||
+      typeof parsed.groupId !== "string" ||
       !role ||
       typeof parsed.expiresAt !== "number" ||
       parsed.expiresAt <= Math.floor(Date.now() / 1000)

@@ -8,7 +8,7 @@ export const GET = withErrors(async (req: NextRequest) => {
   const { householdId, parentId } = requireSession(req);
   await requirePluginActive(householdId, "education-academy");
   const { searchParams } = new URL(req.url);
-  const memberId = Number(searchParams.get("memberId"));
+  const memberId = searchParams.get("memberId") ?? "";
   if (!(await canAccessMember(parentId, householdId, memberId))) {
     return NextResponse.json({ error: "You do not have access to this family member" }, { status: 403 });
   }

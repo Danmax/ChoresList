@@ -26,7 +26,7 @@ export const POST = withErrors(async (req: NextRequest) => {
   if (!session) return NextResponse.json({ error: "Device access revoked" }, { status: 401 });
 
   const body = await req.json();
-  const assignmentId = Number(body.assignmentId);
+  const assignmentId = typeof body.assignmentId === "string" ? body.assignmentId : "";
   const reactionEmoji = typeof body.reactionEmoji === "string" && COMPLETION_EMOJIS.includes(body.reactionEmoji)
     ? body.reactionEmoji
     : null;

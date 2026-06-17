@@ -12,8 +12,8 @@ import { WISH_CATEGORIES, WISH_EMOJIS } from "@/types";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface WishItem {
-  id: number;
-  memberId: number;
+  id: string;
+  memberId: string;
   title: string;
   category: string;
   emoji: string;
@@ -23,7 +23,7 @@ interface WishItem {
 }
 
 interface Member {
-  id: number;
+  id: string;
   name: string;
   avatar: string;
   color: string;
@@ -31,7 +31,7 @@ interface Member {
 
 export default function KidWishlistPage() {
   const { id } = useParams<{ id: string }>();
-  const memberId = parseInt(id);
+  const memberId = id;
 
   const [member, setMember] = useState<Member | null>(null);
   const [items, setItems] = useState<WishItem[]>([]);
@@ -77,7 +77,7 @@ export default function KidWishlistPage() {
     load();
   }
 
-  async function remove(itemId: number) {
+  async function remove(itemId: string) {
     await fetch(`/api/wishlist?id=${itemId}`, { method: "DELETE" });
     load();
   }

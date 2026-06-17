@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 type CommunityRole = "owner" | "manager" | "member";
 type RsvpStatus = "going" | "maybe" | "not-going";
 
-type ParentRef = { id: number; email: string };
+type ParentRef = { id: string; email: string };
 type StarterItem = { title: string; quantity: string; note: string };
 type LocationSuggestion = {
   id: string;
@@ -22,9 +22,9 @@ type LocationSuggestion = {
   latitude: number;
   longitude: number;
 };
-type CommunityMember = { id: number; parentId: number; role: CommunityRole; parent: ParentRef };
+type CommunityMember = { id: string; parentId: string; role: CommunityRole; parent: ParentRef };
 type CommunityItem = {
-  id: number;
+  id: string;
   title: string;
   quantity: string | null;
   note: string | null;
@@ -34,15 +34,15 @@ type CommunityItem = {
   claimedBy: ParentRef | null;
 };
 type CommunityRsvp = {
-  id: number;
-  parentId: number;
+  id: string;
+  parentId: string;
   status: RsvpStatus;
   guests: number;
   note: string | null;
   parent: ParentRef;
 };
 type CommunityEvent = {
-  id: number;
+  id: string;
   title: string;
   eventType: string;
   date: string;
@@ -57,14 +57,14 @@ type CommunityEvent = {
   items: CommunityItem[];
 };
 type CommunityGroup = {
-  id: number;
+  id: string;
   name: string;
   groupType: string;
   description: string | null;
   location: string | null;
   visibility: string;
-  currentParentId: number | null;
-  currentMembership: { role: CommunityRole; parentId: number } | null;
+  currentParentId: string | null;
+  currentMembership: { role: CommunityRole; parentId: string } | null;
   members: CommunityMember[];
   events: CommunityEvent[];
 };
@@ -165,17 +165,17 @@ function rsvpCounts(event: CommunityEvent) {
 
 export default function CommunityGroupPage() {
   const params = useParams<{ id: string }>();
-  const groupId = Number.parseInt(params.id, 10);
+  const groupId = params.id;
   const [group, setGroup] = useState<CommunityGroup | null>(null);
   const [eventForm, setEventForm] = useState(BLANK_EVENT);
   const [editEventForm, setEditEventForm] = useState<CommunityEventForm>(BLANK_EVENT);
-  const [editingEventId, setEditingEventId] = useState<number | null>(null);
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [memberForm, setMemberForm] = useState(BLANK_MEMBER);
-  const [eventInviteForms, setEventInviteForms] = useState<Record<number, typeof BLANK_INVITE>>({});
-  const [invitingEventId, setInvitingEventId] = useState<number | null>(null);
+  const [eventInviteForms, setEventInviteForms] = useState<Record<string, typeof BLANK_INVITE>>({});
+  const [invitingEventId, setInvitingEventId] = useState<string | null>(null);
   const [groupForm, setGroupForm] = useState(BLANK_GROUP_FORM);
   const [editingGroup, setEditingGroup] = useState(false);
-  const [itemForms, setItemForms] = useState<Record<number, typeof BLANK_ITEM>>({});
+  const [itemForms, setItemForms] = useState<Record<string, typeof BLANK_ITEM>>({});
   const [eventPrompt, setEventPrompt] = useState("");
   const [draftingEvent, setDraftingEvent] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
@@ -185,7 +185,7 @@ export default function CommunityGroupPage() {
   const [locationStatus, setLocationStatus] = useState<"idle" | "loading" | "error">("idle");
   const [selectedLocation, setSelectedLocation] = useState("");
   const [origin, setOrigin] = useState("");
-  const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -193,7 +193,7 @@ export default function CommunityGroupPage() {
     setLoading(true);
     try {
       const eventId = new URLSearchParams(window.location.search).get("event");
-      const query = new URLSearchParams({ id: String(groupId) });
+      const query = new URLSearchParams({ id: groupId });
       if (eventId) query.set("event", eventId);
       const res = await fetch(`/api/community/groups?${query.toString()}`);
       const data = await res.json().catch(() => null);
@@ -212,8 +212,8 @@ export default function CommunityGroupPage() {
 
   useEffect(() => {
     setOrigin(window.location.origin);
-    const eventId = Number.parseInt(new URLSearchParams(window.location.search).get("event") ?? "0", 10);
-    if (Number.isFinite(eventId) && eventId > 0) setSelectedEventId(eventId);
+    const eventId = new URLSearchParams(window.location.search).get("event");
+    if (eventId) setSelectedEventId(eventId);
   }, []);
 
   useEffect(() => {
@@ -271,16 +271,16 @@ export default function CommunityGroupPage() {
   const canParticipate = Boolean(role);
   const meta = group ? groupMeta(group.groupType) : GROUP_TYPE_META.other;
 
-  function eventSharePath(eventId: number) {
+  function eventSharePath(eventId: string) {
     return `/community/${groupId}?event=${eventId}`;
   }
 
-  function eventShareUrl(eventId: number) {
+  function eventShareUrl(eventId: string) {
     const path = eventSharePath(eventId);
     return origin ? `${origin}${path}` : path;
   }
 
-  function eventQrUrl(eventId: number) {
+  function eventQrUrl(eventId: string) {
     return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(eventShareUrl(eventId))}`;
   }
 
@@ -289,7 +289,7 @@ export default function CommunityGroupPage() {
     [group?.events]
   );
 
-  async function copyEventLink(eventId: number) {
+  async function copyEventLink(eventId: string) {
     await navigator.clipboard.writeText(eventShareUrl(eventId));
     toast.success("Event link copied");
   }
@@ -552,14 +552,14 @@ export default function CommunityGroupPage() {
     await load();
   }
 
-  async function deleteEvent(eventId: number) {
+  async function deleteEvent(eventId: string) {
     if (!confirm("Delete this event?")) return;
     await fetch(`/api/community/events?id=${eventId}`, { method: "DELETE" });
     toast.success("Event deleted");
     await load();
   }
 
-  async function rsvp(eventId: number, status: RsvpStatus) {
+  async function rsvp(eventId: string, status: RsvpStatus) {
     const res = await fetch("/api/community/rsvps", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -573,7 +573,7 @@ export default function CommunityGroupPage() {
     await load();
   }
 
-  async function addItem(eventId: number) {
+  async function addItem(eventId: string) {
     const form = itemForms[eventId] ?? BLANK_ITEM;
     if (!form.title.trim()) {
       toast.error("Item title is required");
@@ -587,7 +587,7 @@ export default function CommunityGroupPage() {
         title: form.title,
         quantity: form.quantity,
         note: form.note,
-        assignedToParentId: form.assignedToParentId ? Number.parseInt(form.assignedToParentId, 10) : null,
+        assignedToParentId: form.assignedToParentId || null,
       }),
     });
     const data = await res.json().catch(() => null);
@@ -599,7 +599,7 @@ export default function CommunityGroupPage() {
     await load();
   }
 
-  async function claimItem(itemId: number) {
+  async function claimItem(itemId: string) {
     const res = await fetch("/api/community/items", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -613,7 +613,7 @@ export default function CommunityGroupPage() {
     await load();
   }
 
-  async function unclaimItem(itemId: number) {
+  async function unclaimItem(itemId: string) {
     const res = await fetch("/api/community/items", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -627,7 +627,7 @@ export default function CommunityGroupPage() {
     await load();
   }
 
-  async function deleteItem(itemId: number) {
+  async function deleteItem(itemId: string) {
     await fetch(`/api/community/items?id=${itemId}`, { method: "DELETE" });
     await load();
   }

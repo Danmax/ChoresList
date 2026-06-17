@@ -90,7 +90,7 @@ function birthdayAgeUpdateYear(birthdayMonth: number | null, birthdayDay: number
   return birthdayHasOccurredThisYear(birthdayMonth, birthdayDay) ? new Date().getFullYear() : null;
 }
 
-async function syncBirthdayAges(householdId: number) {
+async function syncBirthdayAges(householdId: string) {
   const today = new Date();
   const month = today.getMonth() + 1;
   const day = today.getDate();
@@ -233,7 +233,7 @@ export const PUT = withErrors(async (req: NextRequest) => {
 export const DELETE = withErrors(async (req: NextRequest) => {
   const { householdId } = await requireParentSession(req);
   const { searchParams } = new URL(req.url);
-  const id = parseInt(searchParams.get("id") ?? "0");
+  const id = searchParams.get("id") ?? "";
   await prisma.familyMember.delete({ where: { id, householdId } });
   return NextResponse.json({ ok: true });
 });

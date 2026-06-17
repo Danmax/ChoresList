@@ -47,11 +47,11 @@ const groupInclude = {
   },
 } satisfies Prisma.CommunityGroupInclude;
 
-function communityEventPath(groupId: number, eventId: number) {
+function communityEventPath(groupId: string, eventId: string) {
   return `/community/${groupId}?event=${eventId}`;
 }
 
-function publicInviteUrl(req: NextRequest, groupId: number, eventId: number) {
+function publicInviteUrl(req: NextRequest, groupId: string, eventId: string) {
   const token = createCommunityInviteToken({ groupId, role: "member", eventId });
   const inviteUrl = new URL("/parent", getBaseUrl(req));
   inviteUrl.searchParams.set("communityInvite", token);
@@ -63,17 +63,17 @@ export const GET = withErrors(async (req: NextRequest) => {
   const session = optionalSession(req);
   const parentId = session?.parentId ?? null;
   const { searchParams } = new URL(req.url);
-  const id = Number.parseInt(searchParams.get("id") ?? "0", 10);
-  const eventId = Number.parseInt(searchParams.get("event") ?? "0", 10);
+  const id = searchParams.get("id") ?? "";
+  const eventId = searchParams.get("event") ?? "";
   const discover = searchParams.get("discover") === "true";
 
-  if (id > 0) {
+  if (id) {
     const group = await prisma.communityGroup.findFirst({
       where: {
         id,
         OR: [
           { visibility: "public" },
-          eventId > 0
+          eventId
             ? { events: { some: { id: eventId, visibility: "public" } } }
             : { events: { some: { visibility: "public" } } },
           ...(parentId ? [{ members: { some: { parentId, status: "active" } } }] : []),
@@ -86,7 +86,7 @@ export const GET = withErrors(async (req: NextRequest) => {
     const visibleEvents = currentMembership
       ? group.events
       : group.events.filter((event) => event.visibility === "public");
-    if (eventId > 0 && !visibleEvents.some((event) => event.id === eventId)) {
+    if (eventId && !visibleEvents.some((event) => event.id === eventId)) {
       return NextResponse.json({ error: "Community event not found" }, { status: 404 });
     }
     return NextResponse.json({
@@ -168,8 +168,8 @@ export const POST = withErrors(async (req: NextRequest) => {
 export const PUT = withErrors(async (req: NextRequest) => {
   const { parentId } = requireSession(req);
   const body = await req.json();
-  const id = Number.parseInt(String(body.id ?? ""), 10);
-  if (!Number.isFinite(id) || id <= 0) {
+  const id = typeof body.id === "string" ? body.id : "";
+  if (!id) {
     return NextResponse.json({ error: "Group is required" }, { status: 400 });
   }
   await requireCommunityRole(id, parentId, "manager");
@@ -195,8 +195,8 @@ export const PUT = withErrors(async (req: NextRequest) => {
 export const DELETE = withErrors(async (req: NextRequest) => {
   const { parentId } = requireSession(req);
   const { searchParams } = new URL(req.url);
-  const id = Number.parseInt(searchParams.get("id") ?? "0", 10);
-  if (!Number.isFinite(id) || id <= 0) {
+  const id = searchParams.get("id") ?? "";
+  if (!id) {
     return NextResponse.json({ error: "Group is required" }, { status: 400 });
   }
   await requireCommunityRole(id, parentId, "owner");

@@ -13,7 +13,7 @@ import Link from "next/link";
 import { COMPLETION_EMOJIS } from "@/types";
 
 interface Chore {
-  id: number;
+  id: string;
   name: string;
   icon: string;
   color: string;
@@ -27,16 +27,16 @@ interface Chore {
 }
 
 interface Assignment {
-  id: number;
-  choreId: number;
+  id: string;
+  choreId: string;
   frequency: string;
   dueDate: string | null;
   chore: Chore;
-  completions: { id: number; completedAt: string; reactionEmoji?: string | null }[];
+  completions: { id: string; completedAt: string; reactionEmoji?: string | null }[];
 }
 
 interface Member {
-  id: number;
+  id: string;
   name: string;
   avatar: string;
   color: string;
@@ -46,24 +46,24 @@ interface Member {
 }
 
 type EducationAssignment = {
-  id: number;
+  id: string;
   title: string;
   status: string;
   dueDate?: string | null;
   passingScore: number;
   pointsReward: number;
   set: {
-    id: number;
+    id: string;
     title: string;
     subject: string;
     mode: string;
-    materials: { id: number }[];
+    materials: { id: string }[];
   };
-  attempts: { id: number; score: number; passed: boolean; completedAt: string }[];
+  attempts: { id: string; score: number; passed: boolean; completedAt: string }[];
 };
 
 type EducationProject = {
-  id: number;
+  id: string;
   title: string;
   subject: string;
   description?: string | null;
@@ -87,9 +87,9 @@ export default function KidPage() {
   const [showInstructions, setShowInstructions] = useState(false);
   const [showPhoto, setShowPhoto] = useState(false);
   const [photoType, setPhotoType] = useState<"before" | "after">("before");
-  const [activeCompletion, setActiveCompletion] = useState<number | null>(null);
+  const [activeCompletion, setActiveCompletion] = useState<string | null>(null);
   const [celebratePoints, setCelebratePoints] = useState<number | null>(null);
-  const [projects, setProjects] = useState<{id:number;title:string;emoji:string;rewardTitle:string;rewardEmoji:string;pointsBonus:number;status:string}[]>([]);
+  const [projects, setProjects] = useState<{id:string;title:string;emoji:string;rewardTitle:string;rewardEmoji:string;pointsBonus:number;status:string}[]>([]);
   const [earnedTicket, setEarnedTicket] = useState<{rewardTitle:string;rewardEmoji:string;projectTitle:string} | null>(null);
   const [ticketCelebration, setTicketCelebration] = useState(false);
   const [reactionAssignment, setReactionAssignment] = useState<Assignment | null>(null);
@@ -106,7 +106,7 @@ export default function KidPage() {
     ]);
     const membersData = await membersRes.json().catch(() => []);
     const members: Member[] = Array.isArray(membersData) ? membersData : Array.isArray(membersData?.members) ? membersData.members : [];
-    const found = members.find((m) => m.id === parseInt(id));
+    const found = members.find((m) => m.id === id);
     setMember(found ?? null);
     setAssignments(await assignRes.json());
     if (projRes.ok) setProjects(await projRes.json());
@@ -126,7 +126,7 @@ export default function KidPage() {
     const res = await fetch("/api/projects", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: project.id, status: "completed", completedById: parseInt(id) }),
+      body: JSON.stringify({ id: project.id, status: "completed", completedById: id }),
     });
     if (!res.ok) { toast.error("Could not complete project"); return; }
     const data = await res.json();
@@ -144,7 +144,7 @@ export default function KidPage() {
     const res = await fetch("/api/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ assignmentId: assignment.id, memberId: parseInt(id), reactionEmoji }),
+      body: JSON.stringify({ assignmentId: assignment.id, memberId: id, reactionEmoji }),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -163,7 +163,7 @@ export default function KidPage() {
     }
   }
 
-  async function uploadPhoto(file: File, completionId: number, type: "before" | "after") {
+  async function uploadPhoto(file: File, completionId: string, type: "before" | "after") {
     const form = new FormData();
     form.append("file", file);
     form.append("type", type);

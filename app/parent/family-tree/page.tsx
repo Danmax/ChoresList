@@ -6,10 +6,10 @@ import { ArrowLeft, GitBranch, Plus, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 
 type TreeNode = {
-  id: number;
+  id: string;
   kind: "member" | "parent_account" | "external";
-  familyMemberId?: number | null;
-  parentAccountId?: number | null;
+  familyMemberId?: string | null;
+  parentAccountId?: string | null;
   name: string;
   avatar: string;
   color: string;
@@ -22,9 +22,9 @@ type TreeNode = {
 };
 
 type TreeRelationship = {
-  id: number;
-  fromNodeId: number;
-  toNodeId: number;
+  id: string;
+  fromNodeId: string;
+  toNodeId: string;
   relationshipType: string;
   label?: string | null;
   notes?: string | null;
@@ -96,8 +96,8 @@ function nodeSubtitle(node: TreeNode) {
 
 function buildPositions(nodes: TreeNode[], relationships: TreeRelationship[]) {
   const parentLike = new Set(["parent_child", "guardian", "step_parent", "adoptive_parent"]);
-  const parentIds = new Set<number>();
-  const childIds = new Set<number>();
+  const parentIds = new Set<string>();
+  const childIds = new Set<string>();
 
   relationships.forEach((relationship) => {
     if (parentLike.has(relationship.relationshipType)) {
@@ -113,7 +113,7 @@ function buildPositions(nodes: TreeNode[], relationships: TreeRelationship[]) {
   const maxColumns = Math.max(1, ...rows.map((row) => row.length));
   const width = Math.max(760, maxColumns * 230 + 80);
   const height = Math.max(360, rows.length * 180 + 80);
-  const positions = new Map<number, { x: number; y: number }>();
+  const positions = new Map<string, { x: number; y: number }>();
 
   rows.forEach((row, rowIndex) => {
     const rowWidth = row.length * 230;
@@ -213,7 +213,7 @@ export default function FamilyTreePage() {
     if (ok) setRelationshipDraft(DEFAULT_RELATIONSHIP);
   }
 
-  async function remove(type: "node" | "relationship", id: number) {
+  async function remove(type: "node" | "relationship", id: string) {
     setSaving(true);
     try {
       const res = await fetch("/api/family-tree", {

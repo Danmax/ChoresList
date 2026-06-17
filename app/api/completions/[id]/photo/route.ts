@@ -18,8 +18,8 @@ export async function POST(req: NextRequest, { params }: Params) {
   try {
     const { householdId } = requireSession(req);
     const { id } = await params;
-    const completionId = Number.parseInt(id, 10);
-    if (!Number.isFinite(completionId) || completionId <= 0) {
+    const completionId = id;
+    if (!completionId) {
       return NextResponse.json({ error: "Invalid completion" }, { status: 400 });
     }
 

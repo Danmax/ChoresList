@@ -1,8 +1,8 @@
 import { prisma } from "@/lib/prisma";
 
 type ParentForMember = {
-  id: number;
-  householdId: number;
+  id: string;
+  householdId: string;
   email: string;
   displayName: string | null;
   parentType: string;
@@ -31,7 +31,7 @@ function parentDisplayName(parent: ParentForMember) {
   return parent.displayName || parent.relationshipLabel || roleLabel || parent.email.split("@")[0] || "Parent";
 }
 
-async function parentRecord(parentId: number, householdId: number) {
+async function parentRecord(parentId: string, householdId: string) {
   return prisma.parentAccount.findFirst({
     where: { id: parentId, householdId },
     select: {
@@ -45,7 +45,7 @@ async function parentRecord(parentId: number, householdId: number) {
   });
 }
 
-export async function ensureParentFamilyMember(parentId: number, householdId: number) {
+export async function ensureParentFamilyMember(parentId: string, householdId: string) {
   const parent = await parentRecord(parentId, householdId);
   if (!parent) return null;
 

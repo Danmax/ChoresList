@@ -103,7 +103,7 @@ async function markConnectionError(connection: GoogleCalendarConnection, error: 
   }
 }
 
-async function markEventSyncFailure(eventId: number, error: unknown, connection?: GoogleCalendarConnection) {
+async function markEventSyncFailure(eventId: string, error: unknown, connection?: GoogleCalendarConnection) {
   console.error("[Google Calendar] Sync failed", {
     eventId,
     connectionId: connection?.id,
@@ -124,7 +124,7 @@ async function markEventSyncFailure(eventId: number, error: unknown, connection?
   }
 }
 
-async function markEventSynced(eventId: number, googleCalendarEventId: string, connection: GoogleCalendarConnection) {
+async function markEventSynced(eventId: string, googleCalendarEventId: string, connection: GoogleCalendarConnection) {
   const now = new Date();
   await prisma.$transaction([
     prisma.familyEvent.update({
@@ -291,7 +291,7 @@ export async function deleteGoogleCalendarEvent(event: GoogleFamilyEvent) {
   }
 }
 
-export async function fetchFamilyEventForGoogleSync(eventId: number) {
+export async function fetchFamilyEventForGoogleSync(eventId: string) {
   return prisma.familyEvent.findUnique({
     where: { id: eventId },
     include: {

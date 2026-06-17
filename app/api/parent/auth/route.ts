@@ -29,8 +29,8 @@ function cleanAccountRole(value: unknown) {
 }
 
 async function finalizeVerifiedParentAccount(parent: {
-  id: number;
-  householdId: number;
+  id: string;
+  householdId: string;
   email: string;
   accountRole: string;
 }) {

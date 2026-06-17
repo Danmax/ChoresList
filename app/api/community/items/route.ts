@@ -17,10 +17,13 @@ function cleanInt(value: unknown) {
   return Number.isFinite(n) ? Math.round(n) : null;
 }
 
+function cleanId(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
 function cleanOptionalParentId(value: unknown) {
   if (value === null || value === undefined || value === "") return null;
-  const n = cleanInt(value);
-  return n && n > 0 ? n : null;
+  return cleanId(value);
 }
 
 const itemInclude = {
@@ -32,8 +35,8 @@ const itemInclude = {
 export const POST = withErrors(async (req: NextRequest) => {
   const { parentId } = requireSession(req);
   const body = await req.json();
-  const eventId = cleanInt(body.eventId);
-  if (!eventId || eventId <= 0) return NextResponse.json({ error: "Event is required" }, { status: 400 });
+  const eventId = cleanId(body.eventId);
+  if (!eventId) return NextResponse.json({ error: "Event is required" }, { status: 400 });
   const { event } = await requireEventCommunityRole(eventId, parentId, "manager");
 
   const title = cleanRequiredText(body.title, 120);
@@ -70,8 +73,8 @@ export const POST = withErrors(async (req: NextRequest) => {
 export const PUT = withErrors(async (req: NextRequest) => {
   const { parentId } = requireSession(req);
   const body = await req.json();
-  const id = cleanInt(body.id);
-  if (!id || id <= 0) return NextResponse.json({ error: "Item is required" }, { status: 400 });
+  const id = cleanId(body.id);
+  if (!id) return NextResponse.json({ error: "Item is required" }, { status: 400 });
 
   const existing = await prisma.communityEventItem.findUnique({
     where: { id },
@@ -146,8 +149,8 @@ export const PUT = withErrors(async (req: NextRequest) => {
 export const DELETE = withErrors(async (req: NextRequest) => {
   const { parentId } = requireSession(req);
   const { searchParams } = new URL(req.url);
-  const id = Number.parseInt(searchParams.get("id") ?? "0", 10);
-  if (!Number.isFinite(id) || id <= 0) return NextResponse.json({ error: "Item is required" }, { status: 400 });
+  const id = searchParams.get("id") ?? "";
+  if (!id) return NextResponse.json({ error: "Item is required" }, { status: 400 });
 
   const item = await prisma.communityEventItem.findUnique({
     where: { id },

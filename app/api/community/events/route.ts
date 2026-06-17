@@ -60,8 +60,8 @@ const eventInclude = {
 export const GET = withErrors(async (req: NextRequest) => {
   const { parentId } = requireSession(req);
   const { searchParams } = new URL(req.url);
-  const groupId = Number.parseInt(searchParams.get("groupId") ?? "0", 10);
-  if (!Number.isFinite(groupId) || groupId <= 0) {
+  const groupId = searchParams.get("groupId") ?? "";
+  if (!groupId) {
     return NextResponse.json({ error: "Group is required" }, { status: 400 });
   }
 
@@ -77,8 +77,8 @@ export const GET = withErrors(async (req: NextRequest) => {
 export const POST = withErrors(async (req: NextRequest) => {
   const { parentId } = requireSession(req);
   const body = await req.json();
-  const groupId = Number.parseInt(String(body.groupId ?? ""), 10);
-  if (!Number.isFinite(groupId) || groupId <= 0) {
+  const groupId = typeof body.groupId === "string" ? body.groupId : "";
+  if (!groupId) {
     return NextResponse.json({ error: "Group is required" }, { status: 400 });
   }
   await requireCommunityRole(groupId, parentId, "manager");
@@ -114,8 +114,8 @@ export const POST = withErrors(async (req: NextRequest) => {
 export const PUT = withErrors(async (req: NextRequest) => {
   const { parentId } = requireSession(req);
   const body = await req.json();
-  const id = Number.parseInt(String(body.id ?? ""), 10);
-  if (!Number.isFinite(id) || id <= 0) {
+  const id = typeof body.id === "string" ? body.id : "";
+  if (!id) {
     return NextResponse.json({ error: "Event is required" }, { status: 400 });
   }
   await requireEventCommunityRole(id, parentId, "manager");
@@ -147,8 +147,8 @@ export const PUT = withErrors(async (req: NextRequest) => {
 export const DELETE = withErrors(async (req: NextRequest) => {
   const { parentId } = requireSession(req);
   const { searchParams } = new URL(req.url);
-  const id = Number.parseInt(searchParams.get("id") ?? "0", 10);
-  if (!Number.isFinite(id) || id <= 0) {
+  const id = searchParams.get("id") ?? "";
+  if (!id) {
     return NextResponse.json({ error: "Event is required" }, { status: 400 });
   }
   await requireEventCommunityRole(id, parentId, "manager");

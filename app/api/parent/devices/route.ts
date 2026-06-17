@@ -22,11 +22,11 @@ export const POST = withErrors(async (req: NextRequest) => {
   const { householdId } = await requireParentSession(req);
   const body = await req.json();
   const mode = body.mode === "member" ? "member" : "household";
-  const memberId = mode === "member" ? Number(body.memberId) : null;
+  const memberId = mode === "member" && typeof body.memberId === "string" ? body.memberId : null;
   const deviceName = String(body.deviceName ?? "").trim().slice(0, 255) || "Kids task screen";
 
   if (mode === "member") {
-    const member = await prisma.familyMember.findFirst({ where: { id: memberId ?? 0, householdId, role: "child" } });
+    const member = await prisma.familyMember.findFirst({ where: { id: memberId ?? "", householdId, role: "child" } });
     if (!member) return NextResponse.json({ error: "Child not found" }, { status: 404 });
   }
 
@@ -71,7 +71,7 @@ export const POST = withErrors(async (req: NextRequest) => {
 export const DELETE = withErrors(async (req: NextRequest) => {
   const { householdId } = await requireParentSession(req);
   const { searchParams } = new URL(req.url);
-  const id = Number(searchParams.get("id") ?? 0);
+  const id = searchParams.get("id") ?? "";
 
   await prisma.householdDevice.update({
     where: { id, householdId },

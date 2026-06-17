@@ -12,9 +12,8 @@ function cleanEmail(value: unknown) {
   return typeof value === "string" ? value.trim().toLowerCase().slice(0, 255) : "";
 }
 
-function cleanInt(value: unknown) {
-  const n = Number(value);
-  return Number.isFinite(n) ? Math.round(n) : null;
+function cleanId(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
 function cleanRole(value: unknown) {
@@ -23,7 +22,7 @@ function cleanRole(value: unknown) {
 
 const ROLE_RANK = { member: 1, manager: 2, owner: 3 } as const;
 
-function communityPath(groupId: number, eventId?: number | null) {
+function communityPath(groupId: string, eventId?: string | null) {
   const path = `/community/${groupId}`;
   return eventId ? `${path}?event=${eventId}` : path;
 }
@@ -73,12 +72,12 @@ export const GET = withErrors(async (req: NextRequest) => {
 export const POST = withErrors(async (req: NextRequest) => {
   const { parentId, email: inviterEmail } = requireSession(req);
   const body = await req.json();
-  const groupId = cleanInt(body.groupId);
-  const eventId = cleanInt(body.eventId);
+  const groupId = cleanId(body.groupId);
+  const eventId = cleanId(body.eventId);
   const role = cleanRole(body.role);
   const email = cleanEmail(body.email);
 
-  if (!groupId || groupId <= 0) return NextResponse.json({ error: "Group is required" }, { status: 400 });
+  if (!groupId) return NextResponse.json({ error: "Group is required" }, { status: 400 });
   if (!email) return NextResponse.json({ error: "Email is required" }, { status: 400 });
 
   await requireCommunityRole(groupId, parentId, role === "member" ? "manager" : "owner");
@@ -89,13 +88,13 @@ export const POST = withErrors(async (req: NextRequest) => {
   });
   if (!group) return NextResponse.json({ error: "Community group not found" }, { status: 404 });
 
-  const event = eventId && eventId > 0
+  const event = eventId
     ? await prisma.communityEvent.findFirst({
         where: { id: eventId, groupId },
         select: { id: true, title: true },
       })
     : null;
-  if (eventId && eventId > 0 && !event) {
+  if (eventId && !event) {
     return NextResponse.json({ error: "Community event not found" }, { status: 404 });
   }
 

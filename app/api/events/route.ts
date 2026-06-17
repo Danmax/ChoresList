@@ -122,7 +122,7 @@ export const PUT = withErrors(async (req: NextRequest) => {
 export const DELETE = withErrors(async (req: NextRequest) => {
   const { householdId } = await requireParentSession(req);
   const { searchParams } = new URL(req.url);
-  const id = parseInt(searchParams.get("id") ?? "0");
+  const id = searchParams.get("id") ?? "";
 
   const eventForSync = await fetchFamilyEventForGoogleSync(id);
   if (eventForSync && eventForSync.householdId === householdId) {

@@ -89,7 +89,7 @@ export const GET = withErrors(async (req: NextRequest) => {
 
   const completions = await prisma.taskCompletion.findMany({
     where: {
-      ...(memberId && { memberId: parseInt(memberId) }),
+      ...(memberId && { memberId }),
       householdId,
       member: await childAccessWhere(parentId, householdId),
       completedAt: { gte: weekStart, lt: weekEnd },
