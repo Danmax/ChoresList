@@ -8,6 +8,9 @@ export const runtime = "nodejs";
 
 const client = new OpenAI({ apiKey: process.env.CHATGPT_API_KEY ?? "" });
 const CATEGORY_VALUES = ["produce", "dairy", "meat", "pantry", "frozen", "snacks", "drinks", "household", "other"];
+const AMOUNT_PATTERN = String.raw`(?:\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)`;
+const UNIT_PATTERN = String.raw`(?:cups?|c\.?|teaspoons?|tsp\.?|tablespoons?|tbsp\.?|ounces?|oz\.?|pounds?|lbs?\.?|grams?|g|kilograms?|kg|milliliters?|ml|liters?|l|pinch(?:es)?|dash(?:es)?|cloves?|cans?|jars?|packages?|packets?|packs?|slices?|pieces?|sticks?|bunch(?:es)?|sprigs?)`;
+const LEADING_AMOUNT_RE = new RegExp(`^(${AMOUNT_PATTERN})(?:\\s+(${UNIT_PATTERN}))?(?:\\s+(?:of\\s+)?)?(.*)$`, "i");
 
 type IngredientDraft = {
   name: string;
@@ -40,6 +43,28 @@ function parseJson(text: string) {
   }
 }
 
+function splitLeadingAmount(value: string) {
+  const match = value.match(LEADING_AMOUNT_RE);
+  if (!match) return null;
+  return {
+    quantity: cleanString(match[1], "", 64),
+    unit: cleanString(match[2], "", 64),
+    rest: cleanString(match[3], "", 300),
+  };
+}
+
+function readableIngredientLine(quantity: string, unit: string, name: string) {
+  const amount = [quantity, unit].filter(Boolean).join(" ");
+  return [amount, name ? `of ${name}` : ""].filter(Boolean).join(" ");
+}
+
+function noteWithAmount(note: string, quantity: string, unit: string, name: string) {
+  const readableLine = readableIngredientLine(quantity, unit, name);
+  if (!readableLine) return note;
+  if (!note) return readableLine;
+  return note.toLowerCase().includes(quantity.toLowerCase()) ? note : `${readableLine}; ${note}`;
+}
+
 function normalizeIngredients(rawIngredients: unknown) {
   const ingredients = Array.isArray(rawIngredients) ? rawIngredients : [];
   return ingredients
@@ -47,13 +72,46 @@ function normalizeIngredients(rawIngredients: unknown) {
     .map((item): IngredientDraft => {
       const raw = item && typeof item === "object" ? item as Record<string, unknown> : {};
       const category = cleanString(raw.category, "pantry", 64);
+      let name = cleanString(raw.name, "", 120);
+      let quantity = cleanString(raw.quantity, "", 64);
+      let unit = cleanString(raw.unit, "", 64);
+      let note = cleanString(raw.note, "", 300);
+
+      if (!quantity) {
+        const amountFromUnit = splitLeadingAmount(unit);
+        if (amountFromUnit) {
+          quantity = amountFromUnit.quantity;
+          unit = amountFromUnit.unit || amountFromUnit.rest || unit;
+        }
+      }
+
+      if (!quantity) {
+        const amountFromName = splitLeadingAmount(name);
+        if (amountFromName) {
+          quantity = amountFromName.quantity;
+          unit = unit || amountFromName.unit;
+          name = amountFromName.rest || name;
+        }
+      }
+
+      if (!quantity) {
+        const amountFromNote = splitLeadingAmount(note);
+        if (amountFromNote) {
+          quantity = amountFromNote.quantity;
+          unit = unit || amountFromNote.unit;
+        }
+      }
+
+      if (quantity) {
+        note = noteWithAmount(note, quantity, unit, name);
+      }
 
       return {
-        name: cleanString(raw.name, "", 120),
-        quantity: cleanString(raw.quantity, "", 64),
-        unit: cleanString(raw.unit, "", 64),
+        name,
+        quantity,
+        unit,
         category: CATEGORY_VALUES.includes(category) ? category : "pantry",
-        note: cleanString(raw.note, "", 300),
+        note,
       };
     })
     .filter((ingredient) => ingredient.name);
@@ -87,6 +145,11 @@ title, description, servings, prepMinutes, cookMinutes, instructions, ingredient
 
 Rules:
 - ingredients must be an array of objects with name, quantity, unit, category, note.
+- For each ingredient, put the numeric amount or fraction in quantity, for example "1/2", "2", or "1 1/2".
+- Put only the measurement word in unit, for example "cup", "tbsp", "oz", or "clove". Do not put a number in unit.
+- Put only the ingredient name in name, for example "sugar", not "1/2 cup sugar".
+- If an ingredient has a unit, quantity must not be blank unless the amount is truly unknown.
+- When an amount is known, note should include the readable full ingredient phrase, for example "1/2 cup of sugar".
 - ingredient category must be one of: ${CATEGORY_VALUES.join(", ")}
 - servings must be 1 to 200.
 - prepMinutes and cookMinutes must be 0 to 1440.
