@@ -52,6 +52,14 @@ function sign(value: string) {
   return createHmac("sha256", secret()).update(value).digest("hex");
 }
 
+function signatureMatches(payload: string, signature: string, length = 64) {
+  if (signature.length !== length) return false;
+  const expected = sign(payload).slice(0, length);
+  const actualBuffer = Buffer.from(signature, "hex");
+  const expectedBuffer = Buffer.from(expected, "hex");
+  return actualBuffer.length === expectedBuffer.length && timingSafeEqual(actualBuffer, expectedBuffer);
+}
+
 export function createSessionToken(parent: { id: string; householdId: string; email: string }) {
   const expiresAt = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
   const payload = Buffer.from(
@@ -71,10 +79,7 @@ export function verifySessionToken(token?: string): SessionPayload | null {
   const [payload, signature] = token.split(".");
   if (!payload || !signature) return null;
 
-  const expected = sign(payload);
-  const actualBuffer = Buffer.from(signature, "hex");
-  const expectedBuffer = Buffer.from(expected, "hex");
-  if (actualBuffer.length !== expectedBuffer.length || !timingSafeEqual(actualBuffer, expectedBuffer)) {
+  if (!signatureMatches(payload, signature)) {
     return null;
   }
 
@@ -156,10 +161,7 @@ export function verifyHouseholdInviteToken(token?: string): HouseholdInvitePaylo
   const [payload, signature] = token.split(".");
   if (!payload || !signature) return null;
 
-  const expected = sign(payload);
-  const actualBuffer = Buffer.from(signature, "hex");
-  const expectedBuffer = Buffer.from(expected, "hex");
-  if (actualBuffer.length !== expectedBuffer.length || !timingSafeEqual(actualBuffer, expectedBuffer)) {
+  if (!signatureMatches(payload, signature)) {
     return null;
   }
 
@@ -206,16 +208,9 @@ export function createCommunityInviteToken({
   eventId?: string | null;
 }) {
   const expiresAt = Math.floor(Date.now() / 1000) + COMMUNITY_INVITE_TTL_SECONDS;
-  const payload = Buffer.from(
-    JSON.stringify({
-      purpose: "community-invite",
-      groupId,
-      role,
-      ...(eventId ? { eventId } : {}),
-      expiresAt,
-    })
-  ).toString("base64url");
-  return `${payload}.${sign(payload)}`;
+  const roleCode = role === "owner" ? "o" : role === "manager" ? "a" : "m";
+  const payload = Buffer.from(["1", groupId, roleCode, expiresAt, eventId ?? ""].join("|")).toString("base64url");
+  return `${payload}.${sign(payload).slice(0, 32)}`;
 }
 
 export function verifyCommunityInviteToken(token?: string): CommunityInvitePayload | null {
@@ -224,15 +219,23 @@ export function verifyCommunityInviteToken(token?: string): CommunityInvitePaylo
   const [payload, signature] = token.split(".");
   if (!payload || !signature) return null;
 
-  const expected = sign(payload);
-  const actualBuffer = Buffer.from(signature, "hex");
-  const expectedBuffer = Buffer.from(expected, "hex");
-  if (actualBuffer.length !== expectedBuffer.length || !timingSafeEqual(actualBuffer, expectedBuffer)) {
+  if (!signatureMatches(payload, signature, signature.length === 32 ? 32 : 64)) {
     return null;
   }
 
   try {
-    const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
+    const decoded = Buffer.from(payload, "base64url").toString("utf8");
+    if (decoded.startsWith("1|")) {
+      const [, groupId, roleCode, expiresAtValue, eventId] = decoded.split("|");
+      const role = roleCode === "o" ? "owner" : roleCode === "a" ? "manager" : roleCode === "m" ? "member" : null;
+      const expiresAt = Number(expiresAtValue);
+      if (!groupId || !role || !Number.isFinite(expiresAt) || expiresAt <= Math.floor(Date.now() / 1000)) {
+        return null;
+      }
+      return { groupId, role, ...(eventId ? { eventId } : {}), expiresAt };
+    }
+
+    const parsed = JSON.parse(decoded) as {
       purpose?: string;
       groupId?: unknown;
       role?: unknown;

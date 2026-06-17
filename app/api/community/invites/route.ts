@@ -99,10 +99,7 @@ export const POST = withErrors(async (req: NextRequest) => {
   }
 
   const token = createCommunityInviteToken({ groupId, role, eventId: event?.id });
-  const returnPath = communityPath(groupId, event?.id);
-  const inviteUrl = new URL("/parent", getBaseUrl(req));
-  inviteUrl.searchParams.set("communityInvite", token);
-  inviteUrl.searchParams.set("returnTo", returnPath);
+  const inviteUrl = new URL(`/c/${token}`, getBaseUrl(req));
 
   const result = await sendCommunityInviteEmail({
     to: email,

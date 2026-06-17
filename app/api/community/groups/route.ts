@@ -47,17 +47,9 @@ const groupInclude = {
   },
 } satisfies Prisma.CommunityGroupInclude;
 
-function communityPath(groupId: string, eventId?: string | null) {
-  const path = `/community/${groupId}`;
-  return eventId ? `${path}?event=${eventId}` : path;
-}
-
 function publicInviteUrl(req: NextRequest, groupId: string, eventId?: string | null) {
   const token = createCommunityInviteToken({ groupId, role: "member", eventId });
-  const inviteUrl = new URL("/parent", getBaseUrl(req));
-  inviteUrl.searchParams.set("communityInvite", token);
-  inviteUrl.searchParams.set("returnTo", communityPath(groupId, eventId));
-  return inviteUrl.toString();
+  return new URL(`/c/${token}`, getBaseUrl(req)).toString();
 }
 
 export const GET = withErrors(async (req: NextRequest) => {

@@ -276,13 +276,14 @@ export default function CommunityGroupPage() {
     return `/community/${groupId}?event=${eventId}`;
   }
 
-  function eventShareUrl(eventId: string) {
-    const path = eventSharePath(eventId);
+  function eventShareUrl(event: CommunityEvent) {
+    if (event.publicInviteUrl) return event.publicInviteUrl;
+    const path = eventSharePath(event.id);
     return origin ? `${origin}${path}` : path;
   }
 
-  function eventQrUrl(eventId: string) {
-    return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(eventShareUrl(eventId))}`;
+  function eventQrUrl(event: CommunityEvent) {
+    return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(eventShareUrl(event))}`;
   }
 
   function groupQrUrl() {
@@ -295,8 +296,8 @@ export default function CommunityGroupPage() {
     [group?.events]
   );
 
-  async function copyEventLink(eventId: string) {
-    await navigator.clipboard.writeText(eventShareUrl(eventId));
+  async function copyEventLink(event: CommunityEvent) {
+    await navigator.clipboard.writeText(eventShareUrl(event));
     toast.success("Event link copied");
   }
 
@@ -320,7 +321,7 @@ export default function CommunityGroupPage() {
   }
 
   async function shareEvent(event: CommunityEvent) {
-    const url = eventShareUrl(event.id);
+    const url = eventShareUrl(event);
     if (navigator.share) {
       await navigator.share({
         title: event.title,
@@ -329,7 +330,7 @@ export default function CommunityGroupPage() {
       });
       return;
     }
-    await copyEventLink(event.id);
+    await copyEventLink(event);
   }
 
   async function joinGroup() {
@@ -974,7 +975,7 @@ export default function CommunityGroupPage() {
               const eMeta = eventMeta(event.eventType);
               const itemForm = itemForms[event.id] ?? BLANK_ITEM;
               const inviteForm = eventInviteForms[event.id] ?? BLANK_INVITE;
-              const shareUrl = eventShareUrl(event.id);
+              const shareUrl = eventShareUrl(event);
               return (
                 <div
                   key={event.id}
@@ -1017,7 +1018,7 @@ export default function CommunityGroupPage() {
                       <div className="mt-2 flex flex-wrap gap-2">
                         <button
                           type="button"
-                          onClick={() => copyEventLink(event.id)}
+                          onClick={() => copyEventLink(event)}
                           className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50"
                         >
                           <Copy size={14} /> Copy URL
@@ -1055,7 +1056,7 @@ export default function CommunityGroupPage() {
                     </div>
                     <div className="flex items-center gap-3 rounded-2xl bg-white p-3 lg:flex-col">
                       <QrCode size={18} className="text-violet-500 lg:hidden" />
-                      <img src={eventQrUrl(event.id)} alt={`${event.title} QR code`} className="h-28 w-28 rounded-xl bg-white object-contain" />
+                      <img src={eventQrUrl(event)} alt={`${event.title} QR code`} className="h-28 w-28 rounded-xl bg-white object-contain" />
                       <p className="text-xs font-black text-slate-500 lg:text-center">Scan to open</p>
                     </div>
                   </div>
