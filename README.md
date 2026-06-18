@@ -16,6 +16,7 @@ SMTP_SECURE="false"
 SMTP_USER="chores@frowear.com"
 SMTP_PASSWORD="your-gmail-app-password"
 SMTP_FROM="ChoresList <chores@frowear.com>"
+GIPHY_API_KEY=""
 ```
 
 Then create the schema and seed the default chores plus the parent login:
@@ -28,6 +29,8 @@ npm run db:seed
 Parent accounts are household-scoped. New households can sign up from `/parent`; if SMTP is configured the app sends a confirmation email, otherwise it returns a development confirmation link.
 
 For Gmail SMTP, `SMTP_PASSWORD` must be a Google app password for `chores@frowear.com`, not the normal Gmail password. In the Google account, enable 2-Step Verification, then create an app password for Mail and paste that 16-character password into `.env` and the production host environment variables.
+
+`GIPHY_API_KEY` is optional and enables GIF search on event message boards. Members can still paste an HTTPS GIF URL when it is not configured.
 
 First, run the development server:
 

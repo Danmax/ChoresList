@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, CalendarDays, CheckCircle2, Copy, Mail, MapPin, MessageCircle, Pencil, Plus, QrCode, Save, Send, Share2, SmilePlus, Trash2, UserPlus, Users, X, Wand2 } from "lucide-react";
+import { ArrowLeft, CalendarDays, CheckCircle2, Copy, Mail, MapPin, MessageCircle, Pencil, Plus, QrCode, Save, Search, Send, Share2, SmilePlus, Trash2, UserPlus, Users, X, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -56,6 +56,12 @@ type CommunityMessage = {
   gifUrl: string | null;
   createdAt: string;
   parent: ParentRef | null;
+};
+type GifResult = {
+  id: string;
+  title: string;
+  previewUrl: string;
+  gifUrl: string;
 };
 type CommunityEvent = {
   id: string;
@@ -210,6 +216,10 @@ export default function CommunityGroupPage() {
   const [editingGroup, setEditingGroup] = useState(false);
   const [itemForms, setItemForms] = useState<Record<string, typeof BLANK_ITEM>>({});
   const [messageForms, setMessageForms] = useState<Record<string, typeof BLANK_MESSAGE>>({});
+  const [gifQueries, setGifQueries] = useState<Record<string, string>>({});
+  const [gifResults, setGifResults] = useState<Record<string, GifResult[]>>({});
+  const [gifLoadingEventId, setGifLoadingEventId] = useState<string | null>(null);
+  const [gifErrors, setGifErrors] = useState<Record<string, string>>({});
   const [eventPrompt, setEventPrompt] = useState("");
   const [draftingEvent, setDraftingEvent] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
@@ -691,6 +701,30 @@ export default function CommunityGroupPage() {
     await load();
   }
 
+  async function searchGifs(eventId: string) {
+    const query = gifQueries[eventId]?.trim() ?? "";
+    if (query.length < 2) {
+      toast.error("Search for at least 2 characters");
+      return;
+    }
+
+    setGifLoadingEventId(eventId);
+    setGifErrors((current) => ({ ...current, [eventId]: "" }));
+    try {
+      const params = new URLSearchParams({ q: query });
+      const res = await fetch(`/api/gifs?${params.toString()}`);
+      const data = (await res.json().catch(() => null)) as { results?: GifResult[]; error?: string } | null;
+      if (!res.ok) {
+        const message = data?.error ?? "Could not search GIFs";
+        setGifErrors((current) => ({ ...current, [eventId]: message }));
+        return;
+      }
+      setGifResults((current) => ({ ...current, [eventId]: Array.isArray(data?.results) ? data.results : [] }));
+    } finally {
+      setGifLoadingEventId((current) => (current === eventId ? null : current));
+    }
+  }
+
   async function addMessage(eventId: string) {
     const form = messageForms[eventId] ?? BLANK_MESSAGE;
     if (!form.body.trim() && !form.emoji.trim() && !form.gifUrl.trim()) {
@@ -713,6 +747,7 @@ export default function CommunityGroupPage() {
       return;
     }
     setMessageForms((current) => ({ ...current, [eventId]: BLANK_MESSAGE }));
+    setGifResults((current) => ({ ...current, [eventId]: [] }));
     await load();
   }
 
@@ -1044,6 +1079,10 @@ export default function CommunityGroupPage() {
               const itemForm = itemForms[event.id] ?? BLANK_ITEM;
               const inviteForm = eventInviteForms[event.id] ?? BLANK_INVITE;
               const messageForm = messageForms[event.id] ?? BLANK_MESSAGE;
+              const gifQuery = gifQueries[event.id] ?? "";
+              const eventGifResults = gifResults[event.id] ?? [];
+              const gifError = gifErrors[event.id];
+              const isSearchingGifs = gifLoadingEventId === event.id;
               const shareUrl = eventShareUrl(event);
               return (
                 <div
@@ -1348,7 +1387,51 @@ export default function CommunityGroupPage() {
                           ))}
                         </div>
                         <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_auto]">
-                          <div className="relative">
+                          <div className="relative min-w-0">
+                            <Input
+                              value={gifQuery}
+                              onChange={(input) => setGifQueries((current) => ({ ...current, [event.id]: input.target.value }))}
+                              onKeyDown={(input) => {
+                                if (input.key === "Enter") {
+                                  input.preventDefault();
+                                  void searchGifs(event.id);
+                                }
+                              }}
+                              placeholder="Search GIFs"
+                              className="rounded-xl pl-9"
+                            />
+                            <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => searchGifs(event.id)}
+                            disabled={isSearchingGifs}
+                            className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-800 px-4 py-2 text-sm font-black text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                          >
+                            <Search size={15} /> {isSearchingGifs ? "Searching" : "Search"}
+                          </button>
+                        </div>
+                        {gifError && <p className="mt-1 text-xs font-bold text-red-400">{gifError}</p>}
+                        {eventGifResults.length > 0 && (
+                          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                            {eventGifResults.map((gif) => (
+                              <button
+                                key={gif.id}
+                                type="button"
+                                onClick={() => {
+                                  setMessageForms((current) => ({ ...current, [event.id]: { ...messageForm, gifUrl: gif.gifUrl } }));
+                                  setGifResults((current) => ({ ...current, [event.id]: [] }));
+                                }}
+                                className="min-w-0 overflow-hidden rounded-xl border-2 border-transparent bg-slate-50 text-left hover:border-violet-300"
+                                title={gif.title}
+                              >
+                                <img src={gif.previewUrl} alt={gif.title} className="h-28 w-full object-cover" />
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_auto]">
+                          <div className="relative min-w-0">
                             <Input
                               value={messageForm.gifUrl}
                               onChange={(input) => setMessageForms((current) => ({ ...current, [event.id]: { ...messageForm, gifUrl: input.target.value } }))}
@@ -1365,6 +1448,19 @@ export default function CommunityGroupPage() {
                             <Send size={15} /> Post
                           </button>
                         </div>
+                        {messageForm.gifUrl && (
+                          <div className="mt-2 flex min-w-0 items-start gap-2 rounded-xl bg-slate-50 p-2">
+                            <img src={messageForm.gifUrl} alt="" className="max-h-36 min-w-0 max-w-full rounded-lg object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => setMessageForms((current) => ({ ...current, [event.id]: { ...messageForm, gifUrl: "" } }))}
+                              className="shrink-0 rounded-full bg-white p-1 text-slate-400 shadow-sm hover:text-red-500"
+                              aria-label="Remove GIF"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <p className="mt-3 rounded-2xl bg-white p-3 text-sm font-bold text-slate-400">Join the group to post messages.</p>
