@@ -1437,6 +1437,7 @@ export default function CommunityGroupPage() {
               const gifError = gifErrors[event.id];
               const isSearchingGifs = gifLoadingEventId === event.id;
               const shareUrl = eventShareUrl(event);
+              const eventRoster = event.attendance.map((entry) => entry.participant);
               return (
                 <div
                   key={event.id}
@@ -1607,11 +1608,11 @@ export default function CommunityGroupPage() {
                         </div>
                       )}
 
-                      {canManage && group.participants.length > 0 && (
+                      {canManage && eventRoster.length > 0 && (
                         <div className="mt-4">
                           <h4 className="mb-2 flex items-center gap-2 text-sm font-black text-emerald-900"><ClipboardCheck size={15} /> Attendance</h4>
                           <div className="grid gap-2 md:grid-cols-2">
-                            {group.participants.map((participant) => {
+                            {eventRoster.map((participant) => {
                               const attendance = event.attendance.find((entry) => entry.participantId === participant.id);
                               return (
                                 <div key={participant.id} className="rounded-2xl bg-white p-3">
@@ -1688,7 +1689,7 @@ export default function CommunityGroupPage() {
                               </div>
                               {canManage && (
                                 <div className="grid gap-2 md:grid-cols-2">
-                                  {group.participants.map((participant) => {
+                                  {eventRoster.map((participant) => {
                                     const latest = test.attempts.find((attempt) => attempt.participantId === participant.id);
                                     return (
                                       <div key={participant.id} className="flex items-center gap-2 rounded-xl bg-slate-50 p-2">
@@ -2189,7 +2190,7 @@ export default function CommunityGroupPage() {
 
             {canParticipate && (
               <div className="rounded-3xl bg-white p-4 shadow-sm">
-                <h2 className="mb-3 flex items-center gap-2 font-black text-slate-800"><ClipboardCheck size={18} className="text-emerald-500" /> Class Roster</h2>
+                <h2 className="mb-3 flex items-center gap-2 font-black text-slate-800"><ClipboardCheck size={18} className="text-emerald-500" /> Group Participants</h2>
                 <div className="space-y-2">
                   {group.participants.map((participant) => (
                     <div key={participant.id} className="rounded-2xl bg-slate-50 px-3 py-2">
@@ -2198,7 +2199,7 @@ export default function CommunityGroupPage() {
                     </div>
                   ))}
                   {group.participants.length === 0 && (
-                    <p className="rounded-2xl bg-slate-50 p-3 text-sm font-bold text-slate-400">No class participants yet.</p>
+                    <p className="rounded-2xl bg-slate-50 p-3 text-sm font-bold text-slate-400">No group participants yet. Register members inside each class session to build that class roster.</p>
                   )}
                 </div>
                 {familyMembers.length > 0 && (
