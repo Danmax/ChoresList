@@ -29,16 +29,16 @@ type RecurringEndMode = "never" | "date" | "count";
 type ViewMode = "month" | "week" | "day";
 
 interface BirthdayMember {
-  id: number;
+  id: string;
   name: string;
   birthdayMonth?: number | null;
   birthdayDay?: number | null;
 }
 
 interface FamilyEvent {
-  id: number;
+  id: string;
   title: string;
-  eventType: EventType;
+  eventType: string;
   date: string;
   endDate?: string | null;
   allDay: boolean;
@@ -57,7 +57,36 @@ interface FamilyEvent {
   icon: string;
 }
 
-type DisplayEvent = FamilyEvent & { _seriesId: number; _isOccurrence: boolean; _isBirthday?: boolean };
+type CalendarSourceKind = "family" | "birthday" | "community";
+type DisplayEvent = FamilyEvent & {
+  _seriesId: string;
+  _isOccurrence: boolean;
+  _isBirthday?: boolean;
+  _isCommunity?: boolean;
+  _source: CalendarSourceKind;
+  _sourceId: string;
+  _sourceName: string;
+  _sourceHref?: string;
+};
+
+interface CommunityCalendar {
+  id: string;
+  name: string;
+  groupType: string;
+  role: string;
+  events: {
+    id: string;
+    title: string;
+    eventType: string;
+    date: string;
+    endDate?: string | null;
+    allDay: boolean;
+    location?: string | null;
+    imageUrl?: string | null;
+    visibility: string;
+    notes?: string | null;
+  }[];
+}
 
 interface LocationSuggestion {
   id: string;
@@ -83,6 +112,15 @@ const DURATION_PRESETS: { label: string; minutes: number }[] = [
 ];
 
 const MAX_EXPAND = 520;
+const COMMUNITY_EVENT_META: Record<string, { label: string; icon: string; color: string }> = {
+  potluck: { label: "Potluck", icon: "🍲", color: "#f97316" },
+  service: { label: "Service", icon: "🤝", color: "#10b981" },
+  practice: { label: "Practice", icon: "🏃", color: "#0ea5e9" },
+  meeting: { label: "Meeting", icon: "🗓️", color: "#6366f1" },
+  game: { label: "Game", icon: "🏆", color: "#f59e0b" },
+  class: { label: "Class", icon: "📚", color: "#3b82f6" },
+  social: { label: "Social", icon: "🎉", color: "#ec4899" },
+};
 
 function pad(n: number) {
   return String(n).padStart(2, "0");
@@ -153,7 +191,14 @@ function expandOccurrences(events: FamilyEvent[], windowStart: Date, windowEnd: 
     const recurring = (e.recurring ?? "none") as RecurringMode;
 
     if (recurring === "none") {
-      out.push({ ...e, _seriesId: e.id, _isOccurrence: false });
+      out.push({
+        ...e,
+        _seriesId: e.id,
+        _isOccurrence: false,
+        _source: "family",
+        _sourceId: "family",
+        _sourceName: "Family",
+      });
       continue;
     }
 
@@ -178,6 +223,9 @@ function expandOccurrences(events: FamilyEvent[], windowStart: Date, windowEnd: 
         endDate: occEnd ? occEnd.toISOString() : null,
         _seriesId: e.id,
         _isOccurrence: i > 0,
+        _source: "family",
+        _sourceId: "family",
+        _sourceName: "Family",
       });
     }
   }
@@ -186,7 +234,63 @@ function expandOccurrences(events: FamilyEvent[], windowStart: Date, windowEnd: 
 }
 
 function meta(eventType: string) {
-  return EVENT_TYPE_META[eventType as EventType];
+  return EVENT_TYPE_META[eventType as EventType] ?? COMMUNITY_EVENT_META[eventType] ?? EVENT_TYPE_META.other;
+}
+
+function visibleWindowRange(view: ViewMode, anchor: Date) {
+  const year = anchor.getFullYear();
+  const month = anchor.getMonth() + 1;
+  if (view === "month") {
+    return {
+      start: new Date(year, month - 1, 1),
+      end: new Date(year, month, 0, 23, 59, 59),
+    };
+  }
+  if (view === "week") {
+    const s = startOfWeek(anchor);
+    return { start: s, end: addDays(s, 7) };
+  }
+  const d = new Date(anchor);
+  d.setHours(0, 0, 0, 0);
+  return { start: d, end: addDays(d, 1) };
+}
+
+function calendarSourceId(id: string) {
+  return `community:${id}`;
+}
+
+function sourceColor(id: string) {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) % 360;
+  const colors = ["#0ea5e9", "#10b981", "#f97316", "#8b5cf6", "#ec4899", "#f59e0b", "#14b8a6", "#6366f1"];
+  return colors[hash % colors.length];
+}
+
+function communityEvents(calendar: CommunityCalendar): FamilyEvent[] {
+  return calendar.events.map((event) => {
+    const m = meta(event.eventType);
+    return {
+      id: event.id,
+      title: event.title,
+      eventType: event.eventType,
+      date: event.date,
+      endDate: event.endDate ?? null,
+      allDay: event.allDay,
+      recurring: "none",
+      recurringEndDate: null,
+      recurringCount: null,
+      location: event.location ?? null,
+      meetingUrl: null,
+      rsvpUrl: `/community/${calendar.id}?event=${event.id}`,
+      flyerUrl: event.imageUrl ?? null,
+      registrationUrl: null,
+      registrationNotes: null,
+      resources: null,
+      notes: event.notes,
+      color: sourceColor(calendar.id),
+      icon: m.icon,
+    };
+  });
 }
 
 function birthdayEventsForWindow(members: BirthdayMember[], windowStart: Date, windowEnd: Date): FamilyEvent[] {
@@ -205,9 +309,9 @@ function birthdayEventsForWindow(members: BirthdayMember[], windowStart: Date, w
       if (date.getTime() < windowStart.getTime() || date.getTime() > windowEnd.getTime()) return [];
 
       return [{
-        id: -(year * 100000 + member.id),
+        id: `birthday-${year}-${member.id}`,
         title: `${member.name}'s Birthday`,
-        eventType: "other" as EventType,
+        eventType: "other",
         date: date.toISOString(),
         endDate: null,
         allDay: true,
@@ -243,6 +347,8 @@ function CalendarContent() {
   const [anchor, setAnchor] = useState<Date>(today);
   const [events, setEvents] = useState<FamilyEvent[]>([]);
   const [birthdayMembers, setBirthdayMembers] = useState<BirthdayMember[]>([]);
+  const [communityCalendars, setCommunityCalendars] = useState<CommunityCalendar[]>([]);
+  const [hiddenCalendarIds, setHiddenCalendarIds] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [selectedEvent, setSelectedEvent] = useState<DisplayEvent | null>(null);
@@ -278,9 +384,15 @@ function CalendarContent() {
   const month = anchor.getMonth() + 1;
 
   const load = useCallback(async () => {
-    const [eventsRes, membersRes] = await Promise.all([
+    const range = visibleWindowRange(view, anchor);
+    const communityParams = new URLSearchParams({
+      start: range.start.toISOString(),
+      end: range.end.toISOString(),
+    });
+    const [eventsRes, membersRes, communityRes] = await Promise.all([
       fetch(`/api/events?month=${month}&year=${year}`),
       fetch("/api/members"),
+      fetch(`/api/community/calendar?${communityParams.toString()}`),
     ]);
     setEvents(await eventsRes.json());
     if (membersRes.ok) {
@@ -288,7 +400,13 @@ function CalendarContent() {
       const members = Array.isArray(data) ? data : Array.isArray(data?.members) ? data.members : [];
       setBirthdayMembers(members);
     }
-  }, [month, year]);
+    if (communityRes.ok) {
+      const data = await communityRes.json();
+      setCommunityCalendars(Array.isArray(data?.calendars) ? data.calendars : []);
+    } else {
+      setCommunityCalendars([]);
+    }
+  }, [anchor, month, view, year]);
 
   useEffect(() => {
     load();
@@ -325,33 +443,39 @@ function CalendarContent() {
     };
   }, [form.location, open, selectedLocation]);
 
-  const windowRange = useMemo(() => {
-    if (view === "month") {
-      return {
-        start: new Date(year, month - 1, 1),
-        end: new Date(year, month, 0, 23, 59, 59),
-      };
-    }
-    if (view === "week") {
-      const s = startOfWeek(anchor);
-      return { start: s, end: addDays(s, 7) };
-    }
-    const d = new Date(anchor);
-    d.setHours(0, 0, 0, 0);
-    return { start: d, end: addDays(d, 1) };
-  }, [view, anchor, month, year]);
+  const windowRange = useMemo(() => visibleWindowRange(view, anchor), [view, anchor]);
 
   const expanded: DisplayEvent[] = useMemo(() => {
-    const birthdayEvents = birthdayEventsForWindow(birthdayMembers, windowRange.start, windowRange.end);
-    const expandedEvents = expandOccurrences(events, windowRange.start, windowRange.end);
-    const expandedBirthdays = birthdayEvents.map((event) => ({
+    const familyEvents = hiddenCalendarIds.includes("family") ? [] : events;
+    const birthdayEvents = hiddenCalendarIds.includes("birthdays")
+      ? []
+      : birthdayEventsForWindow(birthdayMembers, windowRange.start, windowRange.end);
+    const expandedEvents = expandOccurrences(familyEvents, windowRange.start, windowRange.end);
+    const expandedBirthdays: DisplayEvent[] = birthdayEvents.map((event) => ({
       ...event,
       _seriesId: event.id,
       _isOccurrence: false,
       _isBirthday: true,
+      _source: "birthday",
+      _sourceId: "birthdays",
+      _sourceName: "Birthdays",
     }));
-    return [...expandedEvents, ...expandedBirthdays];
-  }, [events, birthdayMembers, windowRange]);
+    const expandedCommunity: DisplayEvent[] = communityCalendars
+      .filter((calendar) => !hiddenCalendarIds.includes(calendarSourceId(calendar.id)))
+      .flatMap((calendar) =>
+        communityEvents(calendar).map((event) => ({
+          ...event,
+          _seriesId: event.id,
+          _isOccurrence: false,
+          _isCommunity: true,
+          _source: "community",
+          _sourceId: calendarSourceId(calendar.id),
+          _sourceName: calendar.name,
+          _sourceHref: `/community/${calendar.id}?event=${event.id}`,
+        }))
+      );
+    return [...expandedEvents, ...expandedBirthdays, ...expandedCommunity];
+  }, [events, hiddenCalendarIds, birthdayMembers, windowRange, communityCalendars]);
 
   const eventsByDayKey = useMemo(() => {
     const map = new Map<string, DisplayEvent[]>();
@@ -530,6 +654,10 @@ function CalendarContent() {
       toast.info("Birthdays are managed from Family Members");
       return;
     }
+    if (displayEvent._isCommunity) {
+      toast.info("Community events are managed from their community page");
+      return;
+    }
     const targetId = displayEvent._seriesId;
     if (displayEvent._isOccurrence || displayEvent.recurring !== "none") {
       const confirmed = window.confirm("This will delete the entire recurring series. Continue?");
@@ -573,6 +701,12 @@ function CalendarContent() {
 
   const selectedEvents = selectedDate ? eventsByDayKey.get(selectedDate) ?? [] : [];
 
+  function toggleCalendar(id: string) {
+    setHiddenCalendarIds((current) =>
+      current.includes(id) ? current.filter((hiddenId) => hiddenId !== id) : [...current, id]
+    );
+  }
+
   return (
     <div className="min-h-screen p-4 sm:p-6">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -615,6 +749,39 @@ function CalendarContent() {
           <button onClick={() => navigate(1)} className="bg-white rounded-xl p-2 shadow-sm hover:shadow-md">
             <ChevronRight size={20} className="text-slate-600" />
           </button>
+        </div>
+      </div>
+
+      <div className="mb-4 rounded-3xl bg-white/80 p-3 shadow-sm">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="mr-1 text-xs font-black uppercase text-slate-400">Calendars</span>
+          <CalendarToggle
+            label="Family"
+            color="#8b5cf6"
+            checked={!hiddenCalendarIds.includes("family")}
+            onClick={() => toggleCalendar("family")}
+          />
+          <CalendarToggle
+            label="Birthdays"
+            color="#f472b6"
+            checked={!hiddenCalendarIds.includes("birthdays")}
+            onClick={() => toggleCalendar("birthdays")}
+          />
+          {communityCalendars.map((calendar) => {
+            const id = calendarSourceId(calendar.id);
+            return (
+              <CalendarToggle
+                key={calendar.id}
+                label={calendar.name}
+                color={sourceColor(calendar.id)}
+                checked={!hiddenCalendarIds.includes(id)}
+                onClick={() => toggleCalendar(id)}
+              />
+            );
+          })}
+          {communityCalendars.length === 0 && (
+            <span className="text-xs font-bold text-slate-400">No community calendars in this range</span>
+          )}
         </div>
       </div>
 
@@ -1024,6 +1191,36 @@ function CalendarContent() {
   );
 }
 
+function CalendarToggle({
+  label,
+  color,
+  checked,
+  onClick,
+}: {
+  label: string;
+  color: string;
+  checked: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex min-h-9 items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black transition-colors ${
+        checked
+          ? "border-slate-200 bg-white text-slate-700 shadow-sm"
+          : "border-slate-100 bg-slate-50 text-slate-400"
+      }`}
+    >
+      <span
+        className={`h-3 w-3 rounded-full ${checked ? "" : "opacity-40"}`}
+        style={{ backgroundColor: color }}
+      />
+      <span className="max-w-40 truncate">{label}</span>
+    </button>
+  );
+}
+
 function MonthGrid({
   year,
   month,
@@ -1174,15 +1371,17 @@ function WeekGrid({
                         <p className="truncate">{e.title}</p>
                         {time && <p className="text-[10px] font-bold text-slate-500">{time}</p>}
                       </div>
-                      <button
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onDeleteEvent(e);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-opacity"
-                      >
-                        <Trash2 size={12} />
-                      </button>
+                      {!e._isBirthday && !e._isCommunity && (
+                        <button
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onDeleteEvent(e);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-opacity"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      )}
                     </div>
                   );
                 })
@@ -1256,6 +1455,7 @@ function EventRow({ e, onOpen, onDelete }: { e: DisplayEvent; onOpen?: () => voi
         <p className="text-xs font-bold text-slate-500 mt-0.5">
           {time ? `${time} • ` : ""}
           {m?.label}
+          {e._sourceName !== "Family" && ` • ${e._sourceName}`}
           {e.recurring !== "none" && ` • Repeats ${e.recurring}`}
         </p>
         {e.location && (
@@ -1267,7 +1467,7 @@ function EventRow({ e, onOpen, onDelete }: { e: DisplayEvent; onOpen?: () => voi
         {(e.meetingUrl || e.rsvpUrl || e.flyerUrl || e.registrationUrl) && (
           <div className="mt-2 flex flex-wrap gap-2">
             {e.meetingUrl && <EventLink href={e.meetingUrl} label="Meeting" />}
-            {e.rsvpUrl && <EventLink href={e.rsvpUrl} label="RSVP" />}
+            {e.rsvpUrl && <EventLink href={e.rsvpUrl} label={e._isCommunity ? "Community" : "RSVP"} />}
             {e.flyerUrl && <EventLink href={e.flyerUrl} label="Flyer" />}
             {e.registrationUrl && <EventLink href={e.registrationUrl} label="Register" />}
           </div>
@@ -1289,8 +1489,8 @@ function EventRow({ e, onOpen, onDelete }: { e: DisplayEvent; onOpen?: () => voi
           event.stopPropagation();
           onDelete();
         }}
-        className={`p-1 transition-colors ${e._isBirthday ? "invisible" : "text-red-400 hover:text-red-600"}`}
-        disabled={e._isBirthday}
+        className={`p-1 transition-colors ${e._isBirthday || e._isCommunity ? "invisible" : "text-red-400 hover:text-red-600"}`}
+        disabled={e._isBirthday || e._isCommunity}
       >
         <Trash2 size={14} />
       </button>
@@ -1321,6 +1521,7 @@ function EventDetailsDialog({
             <div className="rounded-2xl p-4" style={{ backgroundColor: event.color + "22" }}>
               <p className="text-sm font-black text-slate-700">
                 {m?.label}
+                {event._sourceName !== "Family" ? ` • ${event._sourceName}` : ""}
                 {time ? ` • ${time}` : event.allDay ? " • All day" : ""}
                 {event.recurring !== "none" ? ` • Repeats ${event.recurring}` : ""}
               </p>
@@ -1346,13 +1547,13 @@ function EventDetailsDialog({
             {(event.meetingUrl || event.rsvpUrl || event.flyerUrl || event.registrationUrl) && (
               <div className="flex flex-wrap gap-2">
                 {event.meetingUrl && <EventLink href={event.meetingUrl} label="Meeting link" />}
-                {event.rsvpUrl && <EventLink href={event.rsvpUrl} label="RSVP" />}
+                {event.rsvpUrl && <EventLink href={event.rsvpUrl} label={event._isCommunity ? "Open community event" : "RSVP"} />}
                 {event.flyerUrl && <EventLink href={event.flyerUrl} label="Flyer" />}
                 {event.registrationUrl && <EventLink href={event.registrationUrl} label="Register" />}
               </div>
             )}
 
-            {!event._isBirthday && (
+            {!event._isBirthday && !event._isCommunity && (
               <button
                 type="button"
                 onClick={() => onDelete(event)}
