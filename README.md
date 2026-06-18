@@ -6,7 +6,6 @@ Configure MySQL before running the app:
 
 ```bash
 DATABASE_URL="mysql://u130206374_parent:PASSWORD@srv2104.hstgr.io:3306/u130206374_chores"
-DIRECT_URL="mysql://u130206374_parent:PASSWORD@srv2104.hstgr.io:3306/u130206374_chores"
 PARENT_EMAIL="parent@example.com"
 PARENT_PASSWORD="ChangeMe123!"
 AUTH_SECRET="replace-with-a-long-random-string"
