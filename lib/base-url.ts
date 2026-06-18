@@ -1,10 +1,18 @@
 import { NextRequest } from "next/server";
 
-const LOOPBACK = new Set(["0.0.0.0", "127.0.0.1", "localhost", "::1", "[::1]"]);
+const LOOPBACK = new Set(["0.0.0.0", "127.0.0.1", "localhost", "::1"]);
+
+function hostnameFromHost(host: string) {
+  const trimmed = host.trim().toLowerCase();
+  if (trimmed.startsWith("[")) {
+    const end = trimmed.indexOf("]");
+    return end > 0 ? trimmed.slice(1, end) : trimmed;
+  }
+  return trimmed.split(":")[0] ?? "";
+}
 
 function isInternalHost(host: string) {
-  const bare = host.split(":")[0]!;
-  return LOOPBACK.has(bare);
+  return LOOPBACK.has(hostnameFromHost(host));
 }
 
 function fromForwardedHeaders(req: NextRequest): string | null {
@@ -25,6 +33,16 @@ function fromHostHeader(req: NextRequest): string | null {
   return `${proto}://${host}`;
 }
 
+function fromRequestUrl(req: NextRequest): string | null {
+  const url = new URL(req.url);
+  if (!isInternalHost(url.host)) return url.origin;
+  if (process.env.NODE_ENV === "production") return null;
+
+  url.protocol = "http:";
+  url.hostname = "localhost";
+  return url.origin;
+}
+
 export function getBaseUrl(req: NextRequest): string {
   const fromEnv = process.env.PUBLIC_BASE_URL?.trim();
   if (fromEnv) return fromEnv.replace(/\/$/, "");
@@ -40,5 +58,5 @@ export function getBaseUrl(req: NextRequest): string {
       "PUBLIC_BASE_URL is not set and no usable Host / X-Forwarded-Host header was found"
     );
   }
-  return new URL(req.url).origin;
+  return fromRequestUrl(req) ?? "http://localhost:3000";
 }

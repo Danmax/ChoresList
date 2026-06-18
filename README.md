@@ -10,6 +10,7 @@ DIRECT_URL="mysql://u130206374_parent:PASSWORD@srv2104.hstgr.io:3306/u130206374_
 PARENT_EMAIL="parent@example.com"
 PARENT_PASSWORD="ChangeMe123!"
 AUTH_SECRET="replace-with-a-long-random-string"
+PUBLIC_BASE_URL="https://chores.example.com"
 SMTP_HOST="smtp.gmail.com"
 SMTP_PORT="587"
 SMTP_SECURE="false"

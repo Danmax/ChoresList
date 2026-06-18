@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getBaseUrl } from "@/lib/base-url";
 import { verifyCommunityInviteToken } from "@/lib/session";
 
 function communityPath(groupId: string, eventId?: string | null) {
@@ -13,7 +14,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
     return NextResponse.json({ error: "Community invite is invalid or expired" }, { status: 400 });
   }
 
-  const inviteUrl = new URL("/parent", req.url);
+  const inviteUrl = new URL("/parent", getBaseUrl(req));
   inviteUrl.searchParams.set("communityInvite", token);
   inviteUrl.searchParams.set("returnTo", communityPath(invite.groupId, invite.eventId));
   return NextResponse.redirect(inviteUrl);
