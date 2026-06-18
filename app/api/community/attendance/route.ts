@@ -4,7 +4,7 @@ import { requireSession, withErrors } from "@/lib/api";
 import { requireEventCommunityRole } from "@/lib/community";
 import { awardSkillXp, resolveHouseholdSkillByName } from "@/lib/skills";
 
-const ATTENDANCE_STATUSES = new Set(["present", "late", "excused", "absent"]);
+const ATTENDANCE_STATUSES = new Set(["registered", "present", "late", "excused", "absent"]);
 
 function cleanStatus(value: unknown) {
   return typeof value === "string" && ATTENDANCE_STATUSES.has(value) ? value : "present";

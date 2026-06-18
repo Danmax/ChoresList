@@ -33,6 +33,7 @@ export const POST = withErrors(async (req: NextRequest) => {
   const body = await req.json();
   const groupId = typeof body.groupId === "string" ? body.groupId : "";
   const memberId = typeof body.memberId === "string" ? body.memberId : "";
+  const eventId = typeof body.eventId === "string" && body.eventId ? body.eventId : null;
   if (!groupId || !memberId) return NextResponse.json({ error: "Group and member are required" }, { status: 400 });
 
   await requireCommunityRole(groupId, parentId, "member");
@@ -46,20 +47,41 @@ export const POST = withErrors(async (req: NextRequest) => {
   });
   if (!member) return NextResponse.json({ error: "Family member not found" }, { status: 404 });
 
-  const participant = await prisma.communityParticipant.upsert({
-    where: { groupId_parentId_memberId: { groupId, parentId, memberId } },
-    create: {
-      groupId,
-      parentId,
-      memberId,
-      displayName: cleanText(body.displayName, 255) ?? member.name,
-    },
-    update: {
-      status: "active",
-      displayName: cleanText(body.displayName, 255) ?? member.name,
-    },
-    include: participantInclude,
+  if (eventId) {
+    const event = await prisma.communityEvent.findFirst({
+      where: { id: eventId, groupId, eventType: "class" },
+      select: { id: true },
+    });
+    if (!event) return NextResponse.json({ error: "Class event not found" }, { status: 404 });
+  }
+
+  const participant = await prisma.$transaction(async (tx) => {
+    const created = await tx.communityParticipant.upsert({
+      where: { groupId_parentId_memberId: { groupId, parentId, memberId } },
+      create: {
+        groupId,
+        parentId,
+        memberId,
+        displayName: cleanText(body.displayName, 255) ?? member.name,
+      },
+      update: {
+        status: "active",
+        displayName: cleanText(body.displayName, 255) ?? member.name,
+      },
+      include: participantInclude,
+    });
+
+    if (eventId) {
+      await tx.communityEventAttendance.upsert({
+        where: { eventId_participantId: { eventId, participantId: created.id } },
+        create: { eventId, participantId: created.id, status: "registered" },
+        update: { status: "registered" },
+      });
+    }
+
+    return created;
   });
+
   return NextResponse.json(participant, { status: 201 });
 });
 

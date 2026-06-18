@@ -16,6 +16,14 @@ CREATE TABLE `SkillXpEvent` (
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
+ALTER TABLE `CommunityEvent` ADD COLUMN `recurring` VARCHAR(64) NOT NULL DEFAULT 'none';
+ALTER TABLE `CommunityEvent` ADD COLUMN `recurringEndDate` DATETIME(3) NULL;
+ALTER TABLE `CommunityEvent` ADD COLUMN `recurringCount` INTEGER NULL;
+ALTER TABLE `CommunityEvent` ADD COLUMN `seriesId` CHAR(36) NULL;
+ALTER TABLE `CommunityEvent` ADD COLUMN `sessionNumber` INTEGER NULL;
+ALTER TABLE `CommunityEvent` ADD INDEX `community_event_series_idx`(`seriesId`, `sessionNumber`);
+ALTER TABLE `CommunityEvent` ADD INDEX `community_event_recurring_idx`(`recurring`, `date`);
+
 ALTER TABLE `EducationMaterialSet` ADD COLUMN `skillId` CHAR(36) NULL;
 ALTER TABLE `EducationMaterialSet` ADD INDEX `EducationMaterialSet_skillId_idx`(`skillId`);
 ALTER TABLE `EducationProject` ADD COLUMN `skillId` CHAR(36) NULL;

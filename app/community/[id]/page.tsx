@@ -116,6 +116,11 @@ type CommunityEvent = {
   date: string;
   endDate: string | null;
   allDay: boolean;
+  recurring: string;
+  recurringEndDate: string | null;
+  recurringCount: number | null;
+  seriesId: string | null;
+  sessionNumber: number | null;
   location: string | null;
   imageUrl: string | null;
   visibility: string;
@@ -172,6 +177,9 @@ const BLANK_EVENT = {
   eventType: "potluck",
   date: "",
   endDate: "",
+  recurring: "none",
+  recurringEndDate: "",
+  recurringCount: 1,
   location: "",
   imageUrl: "",
   visibility: "private",
@@ -297,6 +305,7 @@ export default function CommunityGroupPage() {
   const [skills, setSkills] = useState<SkillOption[]>([]);
   const [familyMembers, setFamilyMembers] = useState<FamilyMemberOption[]>([]);
   const [participantMemberId, setParticipantMemberId] = useState("");
+  const [eventRegistrationMemberIds, setEventRegistrationMemberIds] = useState<Record<string, string>>({});
   const [badgeForm, setBadgeForm] = useState(BLANK_BADGE);
   const [classPlanForms, setClassPlanForms] = useState<Record<string, typeof BLANK_CLASS_PLAN>>({});
   const [testForms, setTestForms] = useState<Record<string, typeof BLANK_TEST>>({});
@@ -436,6 +445,11 @@ export default function CommunityGroupPage() {
     [group?.events]
   );
 
+  function familyMemberLabel(memberId: string) {
+    const member = familyMembers.find((item) => item.id === memberId);
+    return member ? `${member.avatar} ${member.name}` : "";
+  }
+
   function classPlanForm(event: CommunityEvent) {
     return classPlanForms[event.id] ?? {
       lessonTitle: event.classPlan?.lessonTitle ?? event.title,
@@ -469,6 +483,32 @@ export default function CommunityGroupPage() {
       }
       setParticipantMemberId("");
       toast.success("Participant added");
+      load();
+    } finally {
+      setSavingCommunityTool(null);
+    }
+  }
+
+  async function registerForClass(event: CommunityEvent) {
+    const memberId = eventRegistrationMemberIds[event.id] ?? "";
+    if (!memberId) {
+      toast.error("Choose a family member");
+      return;
+    }
+    setSavingCommunityTool(`register-${event.id}`);
+    try {
+      const res = await fetch("/api/community/participants", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ groupId, eventId: event.id, memberId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error ?? "Could not register for class");
+        return;
+      }
+      setEventRegistrationMemberIds((current) => ({ ...current, [event.id]: "" }));
+      toast.success("Registered for class");
       load();
     } finally {
       setSavingCommunityTool(null);
@@ -844,7 +884,7 @@ export default function CommunityGroupPage() {
       toast.error(data?.error ?? "Could not create event");
       return;
     }
-    toast.success("Event created");
+    toast.success(Array.isArray(data?.events) ? `${data.events.length} sessions created` : "Event created");
     setEventForm(BLANK_EVENT);
     setEventPrompt("");
     setStarterItems([]);
@@ -861,6 +901,9 @@ export default function CommunityGroupPage() {
       eventType: event.eventType,
       date: toDateTimeLocal(event.date),
       endDate: toDateTimeLocal(event.endDate),
+      recurring: event.recurring ?? "none",
+      recurringEndDate: event.recurringEndDate ? event.recurringEndDate.slice(0, 10) : "",
+      recurringCount: event.recurringCount ?? 1,
       location: event.location ?? "",
       imageUrl: event.imageUrl ?? "",
       visibility: event.visibility,
@@ -1228,6 +1271,43 @@ export default function CommunityGroupPage() {
                     <Input type="datetime-local" value={eventForm.endDate} onChange={(event) => setEventForm((current) => ({ ...current, endDate: event.target.value }))} className="mt-1 rounded-2xl" />
                   </div>
                   <div>
+                    <Label className="text-sm font-bold">Repeats</Label>
+                    <Select value={eventForm.recurring} onValueChange={(value) => setEventForm((current) => ({ ...current, recurring: value ?? "none" }))}>
+                      <SelectTrigger className="mt-1 rounded-2xl"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Does not repeat</SelectItem>
+                        <SelectItem value="daily">Daily</SelectItem>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="biweekly">Every 2 weeks</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {eventForm.recurring !== "none" && (
+                    <>
+                      <div>
+                        <Label className="text-sm font-bold">Sessions</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={104}
+                          value={eventForm.recurringCount}
+                          onChange={(event) => setEventForm((current) => ({ ...current, recurringCount: Math.max(1, Math.min(104, Number(event.target.value) || 1)) }))}
+                          className="mt-1 rounded-2xl"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-sm font-bold">Repeat until optional</Label>
+                        <Input
+                          type="date"
+                          value={eventForm.recurringEndDate}
+                          onChange={(event) => setEventForm((current) => ({ ...current, recurringEndDate: event.target.value }))}
+                          className="mt-1 rounded-2xl"
+                        />
+                      </div>
+                    </>
+                  )}
+                  <div>
                     <Label className="text-sm font-bold">Visibility</Label>
                     <Select value={eventForm.visibility} onValueChange={(value) => setEventForm((current) => ({ ...current, visibility: value ?? "private" }))}>
                       <SelectTrigger className="mt-1 rounded-2xl"><SelectValue /></SelectTrigger>
@@ -1369,7 +1449,10 @@ export default function CommunityGroupPage() {
                         <span className="text-3xl">{eMeta.icon}</span>
                         <div>
                           <h2 className="text-xl font-black text-slate-800">{event.title}</h2>
-                          <p className="text-sm font-bold text-slate-400">{formatDate(event.date)}</p>
+                          <p className="text-sm font-bold text-slate-400">
+                            {formatDate(event.date)}
+                            {event.sessionNumber ? ` · Session ${event.sessionNumber}` : ""}
+                          </p>
                         </div>
                       </div>
                       {event.location && <p className="mt-2 flex items-center gap-1 text-sm font-bold text-slate-500"><MapPin size={15} /> {event.location}</p>}
@@ -1476,6 +1559,52 @@ export default function CommunityGroupPage() {
                         </div>
                       ) : (
                         <p className="text-sm font-bold text-emerald-700">No lesson plan has been posted yet.</p>
+                      )}
+
+                      {canParticipate && familyMembers.length > 0 && (
+                        <div className="mt-4 rounded-2xl bg-white p-3">
+                          <h4 className="mb-2 flex items-center gap-2 text-sm font-black text-slate-800"><UserPlus size={15} /> Register for this class</h4>
+                          <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                            <Select
+                              value={eventRegistrationMemberIds[event.id] || "none"}
+                              onValueChange={(value) => {
+                                const next = value ?? "none";
+                                setEventRegistrationMemberIds((current) => ({ ...current, [event.id]: next === "none" ? "" : next }));
+                              }}
+                            >
+                              <SelectTrigger className="rounded-2xl">
+                                <span className="min-w-0 truncate text-left">
+                                  {familyMemberLabel(eventRegistrationMemberIds[event.id] ?? "") || "Choose family member"}
+                                </span>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">Choose family member</SelectItem>
+                                {familyMembers.map((member) => <SelectItem key={member.id} value={member.id}>{member.avatar} {member.name}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                            <button
+                              type="button"
+                              onClick={() => registerForClass(event)}
+                              disabled={savingCommunityTool === `register-${event.id}` || !(eventRegistrationMemberIds[event.id] ?? "")}
+                              className="rounded-2xl bg-emerald-500 px-4 py-2.5 font-black text-white hover:bg-emerald-600 disabled:opacity-50"
+                            >
+                              Register
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {event.attendance.length > 0 && (
+                        <div className="mt-4">
+                          <h4 className="mb-2 text-sm font-black text-emerald-900">Registered roster</h4>
+                          <div className="flex flex-wrap gap-2">
+                            {event.attendance.map((entry) => (
+                              <span key={entry.id} className="rounded-full bg-white px-3 py-1 text-xs font-black text-emerald-700">
+                                {entry.participant.member.avatar} {entry.participant.displayName ?? entry.participant.member.name} · {entry.status}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
                       )}
 
                       {canManage && group.participants.length > 0 && (
@@ -1693,6 +1822,46 @@ export default function CommunityGroupPage() {
                             className="mt-1 rounded-2xl bg-white"
                           />
                         </div>
+                        <div>
+                          <Label className="text-sm font-bold">Repeats</Label>
+                          <Select
+                            value={editEventForm.recurring}
+                            onValueChange={(value) => setEditEventForm((current) => ({ ...current, recurring: value ?? "none" }))}
+                          >
+                            <SelectTrigger className="mt-1 rounded-2xl bg-white"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">Does not repeat</SelectItem>
+                              <SelectItem value="daily">Daily</SelectItem>
+                              <SelectItem value="weekly">Weekly</SelectItem>
+                              <SelectItem value="biweekly">Every 2 weeks</SelectItem>
+                              <SelectItem value="monthly">Monthly</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {editEventForm.recurring !== "none" && (
+                          <>
+                            <div>
+                              <Label className="text-sm font-bold">Sessions</Label>
+                              <Input
+                                type="number"
+                                min={1}
+                                max={104}
+                                value={editEventForm.recurringCount}
+                                onChange={(input) => setEditEventForm((current) => ({ ...current, recurringCount: Math.max(1, Math.min(104, Number(input.target.value) || 1)) }))}
+                                className="mt-1 rounded-2xl bg-white"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-sm font-bold">Repeat until optional</Label>
+                              <Input
+                                type="date"
+                                value={editEventForm.recurringEndDate}
+                                onChange={(input) => setEditEventForm((current) => ({ ...current, recurringEndDate: input.target.value }))}
+                                className="mt-1 rounded-2xl bg-white"
+                              />
+                            </div>
+                          </>
+                        )}
                         <div>
                           <Label className="text-sm font-bold">Visibility</Label>
                           <Select
@@ -2038,7 +2207,11 @@ export default function CommunityGroupPage() {
                       const next = value ?? "none";
                       setParticipantMemberId(next === "none" ? "" : next);
                     }}>
-                      <SelectTrigger className="rounded-2xl"><SelectValue placeholder="Choose family member" /></SelectTrigger>
+                      <SelectTrigger className="rounded-2xl">
+                        <span className="min-w-0 truncate text-left">
+                          {familyMemberLabel(participantMemberId) || "Choose family member"}
+                        </span>
+                      </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">Choose family member</SelectItem>
                         {familyMembers.map((member) => <SelectItem key={member.id} value={member.id}>{member.avatar} {member.name}</SelectItem>)}

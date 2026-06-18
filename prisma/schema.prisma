@@ -753,6 +753,11 @@ model CommunityEvent {
   date              DateTime
   endDate           DateTime?
   allDay            Boolean   @default(false)
+  recurring         String    @default("none") @db.VarChar(64)
+  recurringEndDate  DateTime?
+  recurringCount    Int?
+  seriesId          String?   @db.Char(36)
+  sessionNumber     Int?
   location          String?   @db.VarChar(255)
   imageUrl          String?   @db.VarChar(512)
   visibility        String    @default("private") @db.VarChar(64)
@@ -768,6 +773,9 @@ model CommunityEvent {
   classPlan  CommunityClassPlan?
   attendance CommunityEventAttendance[]
   skillTests SkillTest[]
+
+  @@index([seriesId, sessionNumber], map: "community_event_series_idx")
+  @@index([recurring, date], map: "community_event_recurring_idx")
 }
 
 model CommunityParticipant {
