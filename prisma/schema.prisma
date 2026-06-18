@@ -26,21 +26,26 @@ model ParentAccount {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @default(now()) @updatedAt
 
-  household              Household                @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  confirmationTokens     EmailConfirmationToken[]
-  passwordResetTokens    PasswordResetToken[]
-  pinResetTokens         PinResetToken[]
-  createdCommunities     CommunityGroup[]         @relation("CommunityCreator")
-  communityMemberships   CommunityMember[]
-  createdCommunityEvents CommunityEvent[]         @relation("CommunityEventCreator")
-  communityRsvps         CommunityRsvp[]
-  assignedCommunityItems CommunityEventItem[]     @relation("CommunityItemAssignee")
-  claimedCommunityItems  CommunityEventItem[]     @relation("CommunityItemClaimer")
-  communityMessages      CommunityEventMessage[]
-  activatedPlugins       HouseholdPlugin[]        @relation("PluginActivator")
-  familyTreeNodes        FamilyTreeNode[]
-  createdRecipes         Recipe[]                 @relation("RecipeCreator")
-  familyMemberProfile    FamilyMember?            @relation("ParentFamilyMember")
+  household                  Household                  @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  confirmationTokens         EmailConfirmationToken[]
+  passwordResetTokens        PasswordResetToken[]
+  pinResetTokens             PinResetToken[]
+  createdCommunities         CommunityGroup[]           @relation("CommunityCreator")
+  communityMemberships       CommunityMember[]
+  createdCommunityEvents     CommunityEvent[]           @relation("CommunityEventCreator")
+  communityRsvps             CommunityRsvp[]
+  assignedCommunityItems     CommunityEventItem[]       @relation("CommunityItemAssignee")
+  claimedCommunityItems      CommunityEventItem[]       @relation("CommunityItemClaimer")
+  communityMessages          CommunityEventMessage[]
+  communityParticipants      CommunityParticipant[]
+  checkedCommunityAttendance CommunityEventAttendance[] @relation("CommunityAttendanceChecker")
+  reviewedSkillTests         SkillTestAttempt[]         @relation("SkillTestReviewer")
+  awardedSkillXpEvents       SkillXpEvent[]             @relation("SkillXpAwarder")
+  awardedBadges              MemberBadge[]              @relation("BadgeAwarder")
+  activatedPlugins           HouseholdPlugin[]          @relation("PluginActivator")
+  familyTreeNodes            FamilyTreeNode[]
+  createdRecipes             Recipe[]                   @relation("RecipeCreator")
+  familyMemberProfile        FamilyMember?              @relation("ParentFamilyMember")
 }
 
 model Household {
@@ -86,6 +91,9 @@ model Household {
   educationAttempts        EducationAttempt[]
   educationProjects        EducationProject[]
   recipes                  Recipe[]
+  skillXpEvents            SkillXpEvent[]
+  meritBadges              MeritBadge[]
+  memberBadges             MemberBadge[]
 }
 
 model HouseholdPlugin {
@@ -175,22 +183,26 @@ model FamilyMember {
   level                     Int      @default(1)
   createdAt                 DateTime @default(now())
 
-  assignments          ChoreAssignment[]
-  completions          TaskCompletion[]
-  allowances           WeeklyAllowance[]
-  skills               MemberSkill[]
-  allowanceSetting     AllowanceSettings?
-  wishList             WishListItem[]
-  houseProjects        HouseProject[]        @relation("ProjectAssignee")
-  rewardTickets        RewardTicket[]
-  devices              HouseholdDevice[]
-  pairingCodes         DevicePairingCode[]
-  household            Household             @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  parentAccount        ParentAccount?        @relation("ParentFamilyMember", fields: [parentAccountId], references: [id], onDelete: SetNull)
-  familyTreeNodes      FamilyTreeNode[]
-  educationAssignments EducationAssignment[]
-  educationAttempts    EducationAttempt[]
-  educationProjects    EducationProject[]
+  assignments           ChoreAssignment[]
+  completions           TaskCompletion[]
+  allowances            WeeklyAllowance[]
+  skills                MemberSkill[]
+  skillXpEvents         SkillXpEvent[]
+  badges                MemberBadge[]
+  communityParticipants CommunityParticipant[]
+  skillTestAttempts     SkillTestAttempt[]
+  allowanceSetting      AllowanceSettings?
+  wishList              WishListItem[]
+  houseProjects         HouseProject[]         @relation("ProjectAssignee")
+  rewardTickets         RewardTicket[]
+  devices               HouseholdDevice[]
+  pairingCodes          DevicePairingCode[]
+  household             Household              @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  parentAccount         ParentAccount?         @relation("ParentFamilyMember", fields: [parentAccountId], references: [id], onDelete: SetNull)
+  familyTreeNodes       FamilyTreeNode[]
+  educationAssignments  EducationAssignment[]
+  educationAttempts     EducationAttempt[]
+  educationProjects     EducationProject[]
 
   @@index([householdId, role])
 }
@@ -198,6 +210,7 @@ model FamilyMember {
 model EducationMaterialSet {
   id           String   @id @default(uuid()) @db.Char(36)
   householdId  String   @db.Char(36)
+  skillId      String?  @db.Char(36)
   title        String   @db.VarChar(255)
   subject      String   @default("vocabulary") @db.VarChar(64)
   mode         String   @default("drill") @db.VarChar(64)
@@ -209,10 +222,12 @@ model EducationMaterialSet {
   updatedAt    DateTime @default(now()) @updatedAt
 
   household   Household             @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  skill       SkillCategory?        @relation(fields: [skillId], references: [id], onDelete: SetNull)
   materials   EducationMaterial[]
   assignments EducationAssignment[]
 
   @@index([householdId, subject])
+  @@index([skillId])
 }
 
 model EducationMaterial {
@@ -273,6 +288,7 @@ model EducationProject {
   id           String    @id @default(uuid()) @db.Char(36)
   householdId  String    @db.Char(36)
   memberId     String?   @db.Char(36)
+  skillId      String?   @db.Char(36)
   title        String    @db.VarChar(255)
   subject      String    @default("project") @db.VarChar(64)
   description  String?   @db.Text
@@ -284,10 +300,12 @@ model EducationProject {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @default(now()) @updatedAt
 
-  household Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  member    FamilyMember? @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  household Household      @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  member    FamilyMember?  @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  skill     SkillCategory? @relation(fields: [skillId], references: [id], onDelete: SetNull)
 
   @@index([householdId, status])
+  @@index([skillId])
 }
 
 model FamilyTreeNode {
@@ -401,9 +419,15 @@ model SkillCategory {
   name        String @db.VarChar(255)
   icon        String @default("⭐") @db.VarChar(32)
 
-  chores    ChoreSkill[]
-  members   MemberSkill[]
-  household Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  chores            ChoreSkill[]
+  members           MemberSkill[]
+  xpEvents          SkillXpEvent[]
+  meritBadges       MeritBadge[]
+  classPlans        CommunityClassPlan[]
+  skillTests        SkillTest[]
+  educationSets     EducationMaterialSet[]
+  educationProjects EducationProject[]
+  household         Household              @relation(fields: [householdId], references: [id], onDelete: Cascade)
 }
 
 model ChoreSkill {
@@ -426,6 +450,79 @@ model MemberSkill {
   skill  SkillCategory @relation(fields: [skillId], references: [id], onDelete: Cascade)
 
   @@id([memberId, skillId])
+}
+
+model SkillXpEvent {
+  id                String   @id @default(uuid()) @db.Char(36)
+  householdId       String   @db.Char(36)
+  memberId          String   @db.Char(36)
+  skillId           String   @db.Char(36)
+  sourceType        String   @db.VarChar(64)
+  sourceId          String?  @db.Char(36)
+  xp                Int
+  note              String?  @db.Text
+  awardedByParentId String?  @db.Char(36)
+  createdAt         DateTime @default(now())
+
+  household Household      @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  member    FamilyMember   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  skill     SkillCategory  @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  awardedBy ParentAccount? @relation("SkillXpAwarder", fields: [awardedByParentId], references: [id], onDelete: SetNull)
+
+  @@unique([householdId, memberId, skillId, sourceType, sourceId])
+  @@index([householdId, memberId, createdAt])
+  @@index([skillId])
+}
+
+model MeritBadge {
+  id                      String   @id @default(uuid()) @db.Char(36)
+  householdId             String?  @db.Char(36)
+  communityGroupId        String?  @db.Char(36)
+  skillId                 String?  @db.Char(36)
+  title                   String   @db.VarChar(255)
+  icon                    String   @default("🏅") @db.VarChar(32)
+  description             String?  @db.Text
+  requirements            Json?
+  xpReward                Int      @default(25)
+  requiresTest            Boolean  @default(true)
+  requiresAttendance      Boolean  @default(false)
+  requiresManagerApproval Boolean  @default(true)
+  isActive                Boolean  @default(true)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @default(now()) @updatedAt
+
+  household  Household?           @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  group      CommunityGroup?      @relation(fields: [communityGroupId], references: [id], onDelete: Cascade)
+  skill      SkillCategory?       @relation(fields: [skillId], references: [id], onDelete: SetNull)
+  awards     MemberBadge[]
+  classPlans CommunityClassPlan[]
+  skillTests SkillTest[]
+
+  @@index([householdId])
+  @@index([communityGroupId])
+  @@index([skillId])
+}
+
+model MemberBadge {
+  id                String   @id @default(uuid()) @db.Char(36)
+  householdId       String   @db.Char(36)
+  memberId          String   @db.Char(36)
+  badgeId           String   @db.Char(36)
+  communityGroupId  String?  @db.Char(36)
+  awardedByParentId String?  @db.Char(36)
+  evidence          Json?
+  note              String?  @db.Text
+  awardedAt         DateTime @default(now())
+
+  household Household       @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  member    FamilyMember    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  badge     MeritBadge      @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+  group     CommunityGroup? @relation(fields: [communityGroupId], references: [id], onDelete: SetNull)
+  awardedBy ParentAccount?  @relation("BadgeAwarder", fields: [awardedByParentId], references: [id], onDelete: SetNull)
+
+  @@unique([memberId, badgeId, communityGroupId])
+  @@index([householdId, memberId])
+  @@index([badgeId])
 }
 
 model WeeklyAllowance {
@@ -624,9 +721,13 @@ model CommunityGroup {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @default(now()) @updatedAt
 
-  creator ParentAccount     @relation("CommunityCreator", fields: [creatorParentId], references: [id], onDelete: Cascade)
-  members CommunityMember[]
-  events  CommunityEvent[]
+  creator      ParentAccount          @relation("CommunityCreator", fields: [creatorParentId], references: [id], onDelete: Cascade)
+  members      CommunityMember[]
+  participants CommunityParticipant[]
+  events       CommunityEvent[]
+  meritBadges  MeritBadge[]
+  memberBadges MemberBadge[]
+  skillTests   SkillTest[]
 }
 
 model CommunityMember {
@@ -659,11 +760,124 @@ model CommunityEvent {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @default(now()) @updatedAt
 
-  group     CommunityGroup       @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  createdBy ParentAccount?       @relation("CommunityEventCreator", fields: [createdByParentId], references: [id], onDelete: SetNull)
-  rsvps     CommunityRsvp[]
-  items     CommunityEventItem[]
-  messages  CommunityEventMessage[]
+  group      CommunityGroup             @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdBy  ParentAccount?             @relation("CommunityEventCreator", fields: [createdByParentId], references: [id], onDelete: SetNull)
+  rsvps      CommunityRsvp[]
+  items      CommunityEventItem[]
+  messages   CommunityEventMessage[]
+  classPlan  CommunityClassPlan?
+  attendance CommunityEventAttendance[]
+  skillTests SkillTest[]
+}
+
+model CommunityParticipant {
+  id          String   @id @default(uuid()) @db.Char(36)
+  groupId     String   @db.Char(36)
+  parentId    String   @db.Char(36)
+  memberId    String   @db.Char(36)
+  displayName String?  @db.VarChar(255)
+  status      String   @default("active") @db.VarChar(64)
+  joinedAt    DateTime @default(now())
+
+  group        CommunityGroup             @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  parent       ParentAccount              @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  member       FamilyMember               @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  attendance   CommunityEventAttendance[]
+  testAttempts SkillTestAttempt[]
+
+  @@unique([groupId, parentId, memberId])
+  @@index([groupId, status])
+  @@index([memberId])
+}
+
+model CommunityClassPlan {
+  id               String   @id @default(uuid()) @db.Char(36)
+  eventId          String   @unique @db.Char(36)
+  skillId          String?  @db.Char(36)
+  badgeId          String?  @db.Char(36)
+  lessonTitle      String   @db.VarChar(255)
+  objectives       String?  @db.Text
+  materials        String?  @db.Text
+  agenda           String?  @db.Text
+  homework         String?  @db.Text
+  testInstructions String?  @db.Text
+  attendanceXp     Int      @default(5)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @default(now()) @updatedAt
+
+  event CommunityEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  skill SkillCategory? @relation(fields: [skillId], references: [id], onDelete: SetNull)
+  badge MeritBadge?    @relation(fields: [badgeId], references: [id], onDelete: SetNull)
+
+  @@index([skillId])
+  @@index([badgeId])
+}
+
+model CommunityEventAttendance {
+  id                  String    @id @default(uuid()) @db.Char(36)
+  eventId             String    @db.Char(36)
+  participantId       String    @db.Char(36)
+  status              String    @default("present") @db.VarChar(64)
+  checkedInAt         DateTime?
+  checkedInByParentId String?   @db.Char(36)
+  notes               String?   @db.Text
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @default(now()) @updatedAt
+
+  event       CommunityEvent       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  participant CommunityParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  checkedInBy ParentAccount?       @relation("CommunityAttendanceChecker", fields: [checkedInByParentId], references: [id], onDelete: SetNull)
+
+  @@unique([eventId, participantId])
+  @@index([participantId])
+}
+
+model SkillTest {
+  id               String   @id @default(uuid()) @db.Char(36)
+  communityGroupId String?  @db.Char(36)
+  eventId          String?  @db.Char(36)
+  badgeId          String?  @db.Char(36)
+  skillId          String?  @db.Char(36)
+  title            String   @db.VarChar(255)
+  instructions     String?  @db.Text
+  passingScore     Int      @default(85)
+  xpReward         Int      @default(25)
+  status           String   @default("active") @db.VarChar(64)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @default(now()) @updatedAt
+
+  group    CommunityGroup?    @relation(fields: [communityGroupId], references: [id], onDelete: Cascade)
+  event    CommunityEvent?    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  badge    MeritBadge?        @relation(fields: [badgeId], references: [id], onDelete: SetNull)
+  skill    SkillCategory?     @relation(fields: [skillId], references: [id], onDelete: SetNull)
+  attempts SkillTestAttempt[]
+
+  @@index([communityGroupId])
+  @@index([eventId])
+  @@index([badgeId])
+  @@index([skillId])
+}
+
+model SkillTestAttempt {
+  id                 String    @id @default(uuid()) @db.Char(36)
+  testId             String    @db.Char(36)
+  participantId      String    @db.Char(36)
+  memberId           String    @db.Char(36)
+  score              Int       @default(0)
+  passed             Boolean   @default(false)
+  evidence           Json?
+  notes              String?   @db.Text
+  reviewedByParentId String?   @db.Char(36)
+  reviewedAt         DateTime?
+  createdAt          DateTime  @default(now())
+
+  test        SkillTest            @relation(fields: [testId], references: [id], onDelete: Cascade)
+  participant CommunityParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  member      FamilyMember         @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  reviewedBy  ParentAccount?       @relation("SkillTestReviewer", fields: [reviewedByParentId], references: [id], onDelete: SetNull)
+
+  @@index([testId, participantId])
+  @@index([memberId])
 }
 
 model CommunityRsvp {

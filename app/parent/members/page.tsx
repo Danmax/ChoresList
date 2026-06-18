@@ -52,7 +52,7 @@ const FAMILY_BRANCH_OPTIONS = [
 ];
 
 interface Member {
-  id: number;
+  id: string;
   name: string;
   age: number;
   birthdayMonth?: number | null;
@@ -66,17 +66,28 @@ interface Member {
   color: string;
   totalPoints: number;
   level: number;
+  skills?: {
+    xp: number;
+    level: number;
+    skill: { id: string; name: string; icon: string };
+  }[];
+  badges?: {
+    id: string;
+    awardedAt: string;
+    badge: { id: string; title: string; icon: string; skill?: { name: string } | null };
+    group?: { id: string; name: string } | null;
+  }[];
 }
 
 type ParentProfile = {
-  id: number;
+  id: string;
   email: string;
   accountRole?: string;
   displayName?: string | null;
   parentType?: string;
   relationshipLabel?: string | null;
   childAccessMode?: string;
-  childAccessMemberIds?: number[] | null;
+  childAccessMemberIds?: string[] | null;
 };
 
 type MembersResponse = Member[] | { members?: Member[]; currentParent?: ParentProfile };
@@ -95,7 +106,7 @@ function currentParentFromResponse(data: unknown) {
   return currentParent && typeof currentParent.email === "string" ? currentParent as ParentProfile : null;
 }
 
-type SavedMember = Member & { id: number };
+type SavedMember = Member & { id: string };
 
 const MONTH_OPTIONS = [
   { value: 1, label: "January" },
@@ -173,7 +184,7 @@ export default function MembersPage() {
     parentType: "parent",
     relationshipLabel: "",
     childAccessMode: "all",
-    childAccessMemberIds: [] as number[],
+    childAccessMemberIds: [] as string[],
   });
   const [inviteUrl, setInviteUrl] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
@@ -257,7 +268,7 @@ export default function MembersPage() {
     const existing = await res.json().catch(() => []);
     if (Array.isArray(existing)) {
       const match = existing.find((chore) => chore.name?.toLowerCase() === template.name.toLowerCase());
-      if (match?.id) return match.id as number;
+      if (match?.id) return match.id as string;
     }
 
     const createRes = await fetch("/api/chores", {
@@ -277,7 +288,7 @@ export default function MembersPage() {
     });
     const created = await createRes.json();
     if (!createRes.ok) throw new Error(created.error ?? `Could not create ${template.name}`);
-    return created.id as number;
+    return created.id as string;
   }
 
   async function assignStarterTasks(member: SavedMember) {
@@ -346,7 +357,7 @@ export default function MembersPage() {
     load();
   }
 
-  async function remove(id: number) {
+  async function remove(id: string) {
     if (!confirm("Remove this family member and all their chore data?")) return;
     await fetch(`/api/members?id=${id}`, { method: "DELETE" });
     toast.success("Member removed");
@@ -394,7 +405,7 @@ export default function MembersPage() {
     }
   }
 
-  function toggleInviteChild(id: number) {
+  function toggleInviteChild(id: string) {
     setInviteDraft((previous) => ({
       ...previous,
       childAccessMemberIds: previous.childAccessMemberIds.includes(id)
@@ -588,6 +599,28 @@ export default function MembersPage() {
                 <p className="text-slate-400 text-xs font-bold">🎂 {birthdayLabel(m)}</p>
               )}
               <p className="text-slate-500 text-sm font-semibold">⭐ {m.totalPoints} pts • Lv.{m.level}</p>
+              {m.skills && m.skills.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {m.skills
+                    .slice()
+                    .sort((a, b) => b.level - a.level || b.xp - a.xp)
+                    .slice(0, 3)
+                    .map((entry) => (
+                      <span key={entry.skill.id} className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-black text-emerald-700">
+                        {entry.skill.icon} {entry.skill.name} L{entry.level}
+                      </span>
+                    ))}
+                </div>
+              )}
+              {m.badges && m.badges.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {m.badges.slice(0, 3).map((entry) => (
+                    <span key={entry.id} className="rounded-full bg-amber-50 px-2 py-1 text-xs font-black text-amber-700">
+                      {entry.badge.icon} {entry.badge.title}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="flex flex-col gap-1.5 items-end shrink-0">
               <Link

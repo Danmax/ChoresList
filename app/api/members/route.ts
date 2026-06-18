@@ -148,6 +148,7 @@ export const GET = withErrors(async (req: NextRequest) => {
     include: {
       assignments: { where: { isActive: true }, include: { chore: true, completions: true } },
       skills: { include: { skill: true } },
+      badges: { include: { badge: { include: { skill: true } }, group: { select: { id: true, name: true } } }, orderBy: { awardedAt: "desc" } },
       allowanceSetting: true,
     },
     orderBy: { name: "asc" },

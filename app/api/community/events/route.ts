@@ -47,6 +47,36 @@ function cleanStarterItems(value: unknown) {
 
 const eventInclude = {
   group: { select: { id: true, name: true } },
+  classPlan: {
+    include: {
+      skill: { select: { id: true, name: true, icon: true } },
+      badge: { select: { id: true, title: true, icon: true } },
+    },
+  },
+  attendance: {
+    include: {
+      participant: {
+        include: {
+          member: { select: { id: true, name: true, avatar: true, color: true } },
+          parent: { select: { id: true, email: true, displayName: true, relationshipLabel: true } },
+        },
+      },
+    },
+  },
+  skillTests: {
+    where: { status: "active" },
+    include: {
+      skill: { select: { id: true, name: true, icon: true } },
+      badge: { select: { id: true, title: true, icon: true } },
+      attempts: {
+        orderBy: { createdAt: "desc" },
+        take: 10,
+        include: {
+          participant: { include: { member: { select: { id: true, name: true, avatar: true, color: true } } } },
+        },
+      },
+    },
+  },
   rsvps: { include: { parent: { select: { id: true, email: true, displayName: true, relationshipLabel: true } } } },
   items: {
     orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
@@ -88,6 +118,13 @@ function publicEvent(event: Prisma.CommunityEventGetPayload<{ include: typeof ev
       ...item,
       assignedTo: publicParent(item.assignedTo, showEmail),
       claimedBy: publicParent(item.claimedBy, showEmail),
+    })),
+    attendance: event.attendance.map((attendance) => ({
+      ...attendance,
+      participant: {
+        ...attendance.participant,
+        parent: publicParent(attendance.participant.parent, showEmail),
+      },
     })),
     messages: event.messages.map((message) => ({ ...message, parent: publicParent(message.parent, showEmail) })),
   };

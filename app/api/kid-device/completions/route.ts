@@ -5,6 +5,7 @@ import { withErrors } from "@/lib/api";
 import { getWeekStart } from "@/lib/allowance";
 import { calcPointsEarned, getLevelFromPoints } from "@/lib/points";
 import { hashDeviceSecret, requireDeviceSession } from "@/lib/device-session";
+import { awardChoreSkillXp } from "@/lib/skills";
 import { COMPLETION_EMOJIS } from "@/types";
 
 async function verifyDevice(req: NextRequest) {
@@ -93,6 +94,14 @@ export const POST = withErrors(async (req: NextRequest) => {
           update: { pointsEarned: { increment: pointsEarned } },
         });
       }
+
+      await awardChoreSkillXp(tx, {
+        householdId: session.householdId,
+        memberId: assignment.memberId,
+        choreId: assignment.choreId,
+        completionId: created.id,
+        xp: pointsEarned,
+      });
 
       await tx.householdDevice.update({
         where: { id: session.deviceId },

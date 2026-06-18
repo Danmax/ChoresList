@@ -33,9 +33,52 @@ const groupInclude = {
     include: { parent: { select: { id: true, email: true, displayName: true, relationshipLabel: true } } },
     orderBy: [{ role: "asc" }, { joinedAt: "asc" }],
   },
+  participants: {
+    where: { status: "active" },
+    include: {
+      member: { select: { id: true, name: true, avatar: true, color: true, role: true } },
+      parent: { select: { id: true, email: true, displayName: true, relationshipLabel: true } },
+    },
+    orderBy: [{ displayName: "asc" }, { joinedAt: "asc" }],
+  },
+  meritBadges: {
+    where: { isActive: true },
+    include: { skill: { select: { id: true, name: true, icon: true } }, _count: { select: { awards: true } } },
+    orderBy: { createdAt: "desc" },
+  },
   events: {
     orderBy: { date: "asc" },
     include: {
+      classPlan: {
+        include: {
+          skill: { select: { id: true, name: true, icon: true } },
+          badge: { select: { id: true, title: true, icon: true } },
+        },
+      },
+      attendance: {
+        include: {
+          participant: {
+            include: {
+              member: { select: { id: true, name: true, avatar: true, color: true } },
+              parent: { select: { id: true, email: true, displayName: true, relationshipLabel: true } },
+            },
+          },
+        },
+      },
+      skillTests: {
+        where: { status: "active" },
+        include: {
+          skill: { select: { id: true, name: true, icon: true } },
+          badge: { select: { id: true, title: true, icon: true } },
+          attempts: {
+            orderBy: { createdAt: "desc" },
+            take: 10,
+            include: {
+              participant: { include: { member: { select: { id: true, name: true, avatar: true, color: true } } } },
+            },
+          },
+        },
+      },
       rsvps: { include: { parent: { select: { id: true, email: true, displayName: true, relationshipLabel: true } } } },
       items: {
         orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
@@ -92,11 +135,22 @@ function publicMembership(member: Prisma.CommunityMemberGetPayload<{ include: ty
   };
 }
 
+function publicParticipant(
+  participant: Prisma.CommunityParticipantGetPayload<{ include: typeof groupInclude.participants.include }>,
+  showEmail: boolean
+) {
+  return {
+    ...participant,
+    parent: publicParent(participant.parent, showEmail),
+  };
+}
+
 function publicEvent(
   req: NextRequest,
   groupId: string,
   event: Prisma.CommunityEventGetPayload<{ include: typeof groupInclude.events.include }>,
-  showEmail: boolean
+  showEmail: boolean,
+  showRoster: boolean
 ) {
   return {
     ...event,
@@ -110,6 +164,18 @@ function publicEvent(
       assignedTo: publicParent(item.assignedTo, showEmail),
       claimedBy: publicParent(item.claimedBy, showEmail),
     })),
+    attendance: showRoster
+      ? event.attendance.map((attendance) => ({
+          ...attendance,
+          participant: {
+            ...attendance.participant,
+            parent: publicParent(attendance.participant.parent, showEmail),
+          },
+        }))
+      : [],
+    skillTests: showRoster
+      ? event.skillTests
+      : event.skillTests.map((test) => ({ ...test, attempts: [] })),
     messages: event.messages.map((message) => ({
       ...message,
       parent: publicParent(message.parent, showEmail),
@@ -152,7 +218,9 @@ export const GET = withErrors(async (req: NextRequest) => {
       ...group,
       creator: publicParent(group.creator, showEmails),
       members: currentMembership ? group.members.map((member) => publicMembership(member, showEmails)) : [],
-      events: visibleEvents.map((event) => publicEvent(req, group.id, event, showEmails)),
+      participants: currentMembership ? group.participants.map((participant) => publicParticipant(participant, showEmails)) : [],
+      events: visibleEvents.map((event) => publicEvent(req, group.id, event, showEmails, Boolean(currentMembership))),
+      meritBadges: currentMembership ? group.meritBadges : [],
       groupInviteUrl: currentMembership && ["owner", "manager"].includes(currentMembership.role)
         ? publicInviteUrl(req, group.id)
         : null,

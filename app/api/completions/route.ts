@@ -5,6 +5,7 @@ import { calcPointsEarned, getLevelFromPoints } from "@/lib/points";
 import { getWeekStart } from "@/lib/allowance";
 import { requireParentSession, requireSession, withErrors } from "@/lib/api";
 import { canAccessMember, childAccessWhere } from "@/lib/child-access";
+import { awardChoreSkillXp } from "@/lib/skills";
 import { COMPLETION_EMOJIS } from "@/types";
 
 export const POST = withErrors(async (req: NextRequest) => {
@@ -65,6 +66,14 @@ export const POST = withErrors(async (req: NextRequest) => {
           update: { pointsEarned: { increment: pts } },
         });
       }
+
+      await awardChoreSkillXp(tx, {
+        householdId,
+        memberId,
+        choreId: assignment.choreId,
+        completionId: created.id,
+        xp: pts,
+      });
 
       return created;
     });

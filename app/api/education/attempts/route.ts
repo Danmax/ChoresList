@@ -4,6 +4,7 @@ import { requireSession, withErrors } from "@/lib/api";
 import { canAccessMember } from "@/lib/child-access";
 import { normalizeAnswer } from "@/lib/education";
 import { requirePluginActive } from "@/lib/plugins/registry";
+import { awardSkillXp, resolveSkillId } from "@/lib/skills";
 
 type SubmittedAnswer = {
   materialId: string;
@@ -68,6 +69,22 @@ export const POST = withErrors(async (req: NextRequest) => {
       });
       if (!alreadyPassed && assignment.pointsReward > 0) {
         await tx.familyMember.update({ where: { id: memberId }, data: { totalPoints: { increment: assignment.pointsReward } } });
+        const skillId = await resolveSkillId(tx, {
+          householdId,
+          skillId: assignment.set.skillId,
+          subject: assignment.set.subject,
+        });
+        if (skillId) {
+          await awardSkillXp(tx, {
+            householdId,
+            memberId,
+            skillId,
+            xp: assignment.pointsReward,
+            sourceType: "education_attempt",
+            sourceId: created.id,
+            note: "Education assignment passed",
+          });
+        }
       }
     }
 

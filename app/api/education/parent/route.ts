@@ -4,6 +4,7 @@ import { requireParentSession, requireSession, withErrors } from "@/lib/api";
 import { canAccessMember, childAccessWhere } from "@/lib/child-access";
 import { requirePluginActive } from "@/lib/plugins/registry";
 import { cleanInt, cleanOptionalText, cleanText, dateFromInput, EDUCATION_MODES, EDUCATION_SUBJECTS, parseMaterialLines } from "@/lib/education";
+import { awardSkillXp, resolveSkillId } from "@/lib/skills";
 
 export const GET = withErrors(async (req: NextRequest) => {
   const { householdId, parentId } = requireSession(req);
@@ -86,6 +87,7 @@ export const POST = withErrors(async (req: NextRequest) => {
       data: {
         householdId,
         memberId,
+        skillId: await resolveSkillId(prisma, { householdId, skillId: body.skillId, subject: body.subject }),
         title,
         subject: EDUCATION_SUBJECTS.has(body.subject) ? body.subject : "project",
         description: cleanOptionalText(body.description, 2000),
@@ -108,6 +110,7 @@ export const POST = withErrors(async (req: NextRequest) => {
     data: {
       householdId,
       title,
+      skillId: await resolveSkillId(prisma, { householdId, skillId: body.skillId, subject: body.subject }),
       subject: EDUCATION_SUBJECTS.has(body.subject) ? body.subject : "vocabulary",
       mode: EDUCATION_MODES.has(body.mode) ? body.mode : "drill",
       description: cleanOptionalText(body.description, 2000),
@@ -135,7 +138,7 @@ export const PUT = withErrors(async (req: NextRequest) => {
 
   if (body.action === "project") {
     const id = typeof body.id === "string" ? body.id : "";
-    const project = await prisma.educationProject.findFirst({ where: { id, householdId }, select: { memberId: true, pointsReward: true, status: true } });
+    const project = await prisma.educationProject.findFirst({ where: { id, householdId }, select: { memberId: true, skillId: true, subject: true, pointsReward: true, status: true } });
     if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
     if (project.memberId && !(await canAccessMember(parentId, householdId, project.memberId))) {
       return NextResponse.json({ error: "You do not have access to this family member" }, { status: 403 });
@@ -151,6 +154,19 @@ export const PUT = withErrors(async (req: NextRequest) => {
       });
       if (completedNow && project.memberId && project.pointsReward > 0) {
         await tx.familyMember.update({ where: { id: project.memberId }, data: { totalPoints: { increment: project.pointsReward } } });
+        const skillId = await resolveSkillId(tx, { householdId, skillId: project.skillId, subject: project.subject });
+        if (skillId) {
+          await awardSkillXp(tx, {
+            householdId,
+            memberId: project.memberId,
+            skillId,
+            xp: project.pointsReward,
+            sourceType: "education_project",
+            sourceId: id,
+            note: "Education project completed",
+            awardedByParentId: parentId,
+          });
+        }
       }
       return nextProject;
     });

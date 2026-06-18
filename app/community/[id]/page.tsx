@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, CalendarDays, CheckCircle2, Copy, Mail, MapPin, MessageCircle, Pencil, Plus, QrCode, Save, Search, Send, Share2, SmilePlus, Trash2, UserPlus, Users, X, Wand2 } from "lucide-react";
+import { ArrowLeft, Award, BookOpen, CalendarDays, CheckCircle2, ClipboardCheck, Copy, Mail, MapPin, MessageCircle, Pencil, Plus, QrCode, Save, Search, Send, Share2, SmilePlus, Trash2, UserPlus, Users, X, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -57,6 +57,52 @@ type CommunityMessage = {
   createdAt: string;
   parent: ParentRef | null;
 };
+type SkillOption = { id: string; name: string; icon: string };
+type FamilyMemberOption = { id: string; name: string; avatar: string; color: string; role: string };
+type CommunityParticipant = {
+  id: string;
+  parentId: string;
+  memberId: string;
+  displayName: string | null;
+  parent: ParentRef | null;
+  member: FamilyMemberOption;
+};
+type MeritBadge = {
+  id: string;
+  title: string;
+  icon: string;
+  description: string | null;
+  xpReward: number;
+  skill: SkillOption | null;
+  _count?: { awards: number };
+};
+type CommunityClassPlan = {
+  id: string;
+  lessonTitle: string;
+  objectives: string | null;
+  materials: string | null;
+  agenda: string | null;
+  homework: string | null;
+  testInstructions: string | null;
+  attendanceXp: number;
+  skill: SkillOption | null;
+  badge: Pick<MeritBadge, "id" | "title" | "icon"> | null;
+};
+type CommunityAttendance = {
+  id: string;
+  participantId: string;
+  status: string;
+  participant: CommunityParticipant;
+};
+type SkillTest = {
+  id: string;
+  title: string;
+  passingScore: number;
+  xpReward: number;
+  skill: SkillOption | null;
+  badge: Pick<MeritBadge, "id" | "title" | "icon"> | null;
+  attempts: { id: string; participantId: string; score: number; passed: boolean; participant: CommunityParticipant }[];
+};
 type GifResult = {
   id: string;
   title: string;
@@ -78,6 +124,9 @@ type CommunityEvent = {
   rsvps: CommunityRsvp[];
   items: CommunityItem[];
   messages: CommunityMessage[];
+  classPlan: CommunityClassPlan | null;
+  attendance: CommunityAttendance[];
+  skillTests: SkillTest[];
 };
 type CommunityGroup = {
   id: string;
@@ -90,6 +139,8 @@ type CommunityGroup = {
   currentParentId: string | null;
   currentMembership: { role: CommunityRole; parentId: string } | null;
   members: CommunityMember[];
+  participants: CommunityParticipant[];
+  meritBadges: MeritBadge[];
   events: CommunityEvent[];
 };
 
@@ -140,6 +191,19 @@ const BLANK_GROUP_FORM = {
   location: "",
   visibility: "private",
 };
+const BLANK_BADGE = { title: "", icon: "🏅", description: "", skillId: "", xpReward: 25, requirements: "" };
+const BLANK_CLASS_PLAN = {
+  lessonTitle: "",
+  skillId: "",
+  badgeId: "",
+  objectives: "",
+  materials: "",
+  agenda: "",
+  homework: "",
+  testInstructions: "",
+  attendanceXp: 5,
+};
+const BLANK_TEST = { title: "", skillId: "", badgeId: "", instructions: "", passingScore: 85, xpReward: 25 };
 const COMMON_POTLUCK_ITEMS: StarterItem[] = [
   { title: "Main dish", quantity: "2 trays", note: "Enough to share" },
   { title: "Side dish", quantity: "2 bowls", note: "" },
@@ -230,6 +294,14 @@ export default function CommunityGroupPage() {
   const [selectedLocation, setSelectedLocation] = useState("");
   const [origin, setOrigin] = useState("");
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [skills, setSkills] = useState<SkillOption[]>([]);
+  const [familyMembers, setFamilyMembers] = useState<FamilyMemberOption[]>([]);
+  const [participantMemberId, setParticipantMemberId] = useState("");
+  const [badgeForm, setBadgeForm] = useState(BLANK_BADGE);
+  const [classPlanForms, setClassPlanForms] = useState<Record<string, typeof BLANK_CLASS_PLAN>>({});
+  const [testForms, setTestForms] = useState<Record<string, typeof BLANK_TEST>>({});
+  const [testScores, setTestScores] = useState<Record<string, Record<string, number>>>({});
+  const [savingCommunityTool, setSavingCommunityTool] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -253,6 +325,31 @@ export default function CommunityGroupPage() {
   }, [groupId]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    async function loadSupportData() {
+      const [skillsRes, membersRes] = await Promise.all([
+        fetch("/api/skills"),
+        fetch("/api/members"),
+      ]);
+      if (skillsRes.ok) {
+        const data = await skillsRes.json().catch(() => []);
+        setSkills(Array.isArray(data) ? data : []);
+      }
+      if (membersRes.ok) {
+        const data = await membersRes.json().catch(() => null);
+        const members = Array.isArray(data) ? data : Array.isArray(data?.members) ? data.members : [];
+        setFamilyMembers(members.map((member: FamilyMemberOption) => ({
+          id: member.id,
+          name: member.name,
+          avatar: member.avatar,
+          color: member.color,
+          role: member.role,
+        })));
+      }
+    }
+    loadSupportData();
+  }, []);
 
   useEffect(() => {
     setOrigin(window.location.origin);
@@ -338,6 +435,182 @@ export default function CommunityGroupPage() {
     () => [...(group?.events ?? [])].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
     [group?.events]
   );
+
+  function classPlanForm(event: CommunityEvent) {
+    return classPlanForms[event.id] ?? {
+      lessonTitle: event.classPlan?.lessonTitle ?? event.title,
+      skillId: event.classPlan?.skill?.id ?? "",
+      badgeId: event.classPlan?.badge?.id ?? "",
+      objectives: event.classPlan?.objectives ?? "",
+      materials: event.classPlan?.materials ?? "",
+      agenda: event.classPlan?.agenda ?? "",
+      homework: event.classPlan?.homework ?? "",
+      testInstructions: event.classPlan?.testInstructions ?? "",
+      attendanceXp: event.classPlan?.attendanceXp ?? 5,
+    };
+  }
+
+  async function addParticipant() {
+    if (!participantMemberId) {
+      toast.error("Choose a family member");
+      return;
+    }
+    setSavingCommunityTool("participant");
+    try {
+      const res = await fetch("/api/community/participants", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ groupId, memberId: participantMemberId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error ?? "Could not add participant");
+        return;
+      }
+      setParticipantMemberId("");
+      toast.success("Participant added");
+      load();
+    } finally {
+      setSavingCommunityTool(null);
+    }
+  }
+
+  async function createBadge() {
+    if (!badgeForm.title.trim()) {
+      toast.error("Badge title is required");
+      return;
+    }
+    setSavingCommunityTool("badge");
+    try {
+      const res = await fetch("/api/community/badges", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ groupId, ...badgeForm }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error ?? "Could not create badge");
+        return;
+      }
+      setBadgeForm(BLANK_BADGE);
+      toast.success("Badge created");
+      load();
+    } finally {
+      setSavingCommunityTool(null);
+    }
+  }
+
+  async function awardBadge(participantId: string, badgeId: string) {
+    if (!badgeId) {
+      toast.error("Choose a badge");
+      return;
+    }
+    setSavingCommunityTool(`badge-${participantId}`);
+    try {
+      const res = await fetch("/api/community/badges", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "award", participantId, badgeId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error ?? "Could not award badge");
+        return;
+      }
+      toast.success("Badge awarded");
+      load();
+    } finally {
+      setSavingCommunityTool(null);
+    }
+  }
+
+  async function saveClassPlan(event: CommunityEvent) {
+    const draft = classPlanForm(event);
+    setSavingCommunityTool(`plan-${event.id}`);
+    try {
+      const res = await fetch("/api/community/class-plans", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId: event.id, ...draft }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error ?? "Could not save lesson plan");
+        return;
+      }
+      toast.success("Lesson plan saved");
+      load();
+    } finally {
+      setSavingCommunityTool(null);
+    }
+  }
+
+  async function markAttendance(event: CommunityEvent, participantId: string, status: string) {
+    setSavingCommunityTool(`attendance-${event.id}-${participantId}`);
+    try {
+      const res = await fetch("/api/community/attendance", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId: event.id, attendance: [{ participantId, status }] }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error ?? "Could not update attendance");
+        return;
+      }
+      toast.success("Attendance saved");
+      load();
+    } finally {
+      setSavingCommunityTool(null);
+    }
+  }
+
+  async function createSkillTest(event: CommunityEvent) {
+    const draft = testForms[event.id] ?? BLANK_TEST;
+    if (!draft.title.trim()) {
+      toast.error("Test title is required");
+      return;
+    }
+    setSavingCommunityTool(`test-${event.id}`);
+    try {
+      const res = await fetch("/api/community/skill-tests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ groupId, eventId: event.id, ...draft }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error ?? "Could not create skill test");
+        return;
+      }
+      setTestForms((current) => ({ ...current, [event.id]: BLANK_TEST }));
+      toast.success("Skill test created");
+      load();
+    } finally {
+      setSavingCommunityTool(null);
+    }
+  }
+
+  async function recordSkillTest(test: SkillTest, participantId: string) {
+    const score = testScores[test.id]?.[participantId] ?? test.passingScore;
+    setSavingCommunityTool(`test-attempt-${test.id}-${participantId}`);
+    try {
+      const res = await fetch("/api/community/skill-tests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "attempt", testId: test.id, participantId, score }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error ?? "Could not record test");
+        return;
+      }
+      toast.success(score >= test.passingScore ? "Skill proven" : "Test recorded");
+      load();
+    } finally {
+      setSavingCommunityTool(null);
+    }
+  }
 
   async function copyEventLink(event: CommunityEvent) {
     await navigator.clipboard.writeText(eventShareUrl(event));
@@ -1119,6 +1392,201 @@ export default function CommunityGroupPage() {
                     )}
                   </div>
 
+                  {event.eventType === "class" && (
+                    <div className="mb-4 rounded-2xl border border-emerald-100 bg-emerald-50 p-3">
+                      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                        <h3 className="flex items-center gap-2 font-black text-emerald-900"><BookOpen size={17} /> Class plan</h3>
+                        {event.classPlan?.skill && (
+                          <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-emerald-700">
+                            {event.classPlan.skill.icon} {event.classPlan.skill.name} +{event.classPlan.attendanceXp} XP attendance
+                          </span>
+                        )}
+                      </div>
+                      {canManage ? (() => {
+                        const draft = classPlanForm(event);
+                        return (
+                          <div className="grid gap-3 md:grid-cols-2">
+                            <div>
+                              <Label className="text-sm font-bold">Lesson title</Label>
+                              <Input
+                                value={draft.lessonTitle}
+                                onChange={(input) => setClassPlanForms((current) => ({ ...current, [event.id]: { ...draft, lessonTitle: input.target.value } }))}
+                                className="mt-1 rounded-2xl bg-white"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-sm font-bold">Skill</Label>
+                              <Select value={draft.skillId || "none"} onValueChange={(value) => {
+                                const next = value ?? "none";
+                                setClassPlanForms((current) => ({ ...current, [event.id]: { ...draft, skillId: next === "none" ? "" : next } }));
+                              }}>
+                                <SelectTrigger className="mt-1 rounded-2xl bg-white"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">No skill</SelectItem>
+                                  {skills.map((skill) => <SelectItem key={skill.id} value={skill.id}>{skill.icon} {skill.name}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label className="text-sm font-bold">Badge</Label>
+                              <Select value={draft.badgeId || "none"} onValueChange={(value) => {
+                                const next = value ?? "none";
+                                setClassPlanForms((current) => ({ ...current, [event.id]: { ...draft, badgeId: next === "none" ? "" : next } }));
+                              }}>
+                                <SelectTrigger className="mt-1 rounded-2xl bg-white"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">No badge</SelectItem>
+                                  {(group?.meritBadges ?? []).map((badge) => <SelectItem key={badge.id} value={badge.id}>{badge.icon} {badge.title}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label className="text-sm font-bold">Attendance XP</Label>
+                              <Input
+                                type="number"
+                                min={0}
+                                max={100}
+                                value={draft.attendanceXp}
+                                onChange={(input) => setClassPlanForms((current) => ({ ...current, [event.id]: { ...draft, attendanceXp: Number(input.target.value) || 0 } }))}
+                                className="mt-1 rounded-2xl bg-white"
+                              />
+                            </div>
+                            <div className="md:col-span-2">
+                              <Label className="text-sm font-bold">Objectives</Label>
+                              <Textarea value={draft.objectives} onChange={(input) => setClassPlanForms((current) => ({ ...current, [event.id]: { ...draft, objectives: input.target.value } }))} className="mt-1 rounded-2xl bg-white" />
+                            </div>
+                            <div className="md:col-span-2">
+                              <Label className="text-sm font-bold">Agenda</Label>
+                              <Textarea value={draft.agenda} onChange={(input) => setClassPlanForms((current) => ({ ...current, [event.id]: { ...draft, agenda: input.target.value } }))} className="mt-1 rounded-2xl bg-white" />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => saveClassPlan(event)}
+                              disabled={savingCommunityTool === `plan-${event.id}`}
+                              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 py-2.5 font-black text-white hover:bg-emerald-600 disabled:opacity-50"
+                            >
+                              <Save size={16} /> Save Plan
+                            </button>
+                          </div>
+                        );
+                      })() : event.classPlan ? (
+                        <div className="space-y-2 text-sm font-semibold text-slate-600">
+                          {event.classPlan.objectives && <p>{event.classPlan.objectives}</p>}
+                          {event.classPlan.agenda && <p>{event.classPlan.agenda}</p>}
+                        </div>
+                      ) : (
+                        <p className="text-sm font-bold text-emerald-700">No lesson plan has been posted yet.</p>
+                      )}
+
+                      {canManage && group.participants.length > 0 && (
+                        <div className="mt-4">
+                          <h4 className="mb-2 flex items-center gap-2 text-sm font-black text-emerald-900"><ClipboardCheck size={15} /> Attendance</h4>
+                          <div className="grid gap-2 md:grid-cols-2">
+                            {group.participants.map((participant) => {
+                              const attendance = event.attendance.find((entry) => entry.participantId === participant.id);
+                              return (
+                                <div key={participant.id} className="rounded-2xl bg-white p-3">
+                                  <p className="font-black text-slate-800">{participant.member.avatar} {participant.displayName ?? participant.member.name}</p>
+                                  <p className="mb-2 text-xs font-bold text-slate-400">{attendance?.status ?? "not marked"}</p>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {["present", "late", "excused", "absent"].map((status) => (
+                                      <button
+                                        key={status}
+                                        type="button"
+                                        onClick={() => markAttendance(event, participant.id, status)}
+                                        disabled={savingCommunityTool === `attendance-${event.id}-${participant.id}`}
+                                        className={`rounded-xl px-2.5 py-1.5 text-xs font-black ${attendance?.status === status ? "bg-emerald-500 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+                                      >
+                                        {status}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {canManage && (
+                        <div className="mt-4 rounded-2xl bg-white p-3">
+                          <h4 className="mb-2 flex items-center gap-2 text-sm font-black text-slate-800"><Award size={15} /> Skill test</h4>
+                          {(() => {
+                            const draft = testForms[event.id] ?? BLANK_TEST;
+                            return (
+                              <div className="grid gap-2 md:grid-cols-2">
+                                <Input value={draft.title} onChange={(input) => setTestForms((current) => ({ ...current, [event.id]: { ...draft, title: input.target.value } }))} placeholder="Test title" className="rounded-2xl" />
+                                <Select value={draft.skillId || "none"} onValueChange={(value) => {
+                                  const next = value ?? "none";
+                                  setTestForms((current) => ({ ...current, [event.id]: { ...draft, skillId: next === "none" ? "" : next } }));
+                                }}>
+                                  <SelectTrigger className="rounded-2xl"><SelectValue placeholder="Skill" /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">No skill</SelectItem>
+                                    {skills.map((skill) => <SelectItem key={skill.id} value={skill.id}>{skill.icon} {skill.name}</SelectItem>)}
+                                  </SelectContent>
+                                </Select>
+                                <Select value={draft.badgeId || "none"} onValueChange={(value) => {
+                                  const next = value ?? "none";
+                                  setTestForms((current) => ({ ...current, [event.id]: { ...draft, badgeId: next === "none" ? "" : next } }));
+                                }}>
+                                  <SelectTrigger className="rounded-2xl"><SelectValue placeholder="Badge" /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">No badge</SelectItem>
+                                    {(group?.meritBadges ?? []).map((badge) => <SelectItem key={badge.id} value={badge.id}>{badge.icon} {badge.title}</SelectItem>)}
+                                  </SelectContent>
+                                </Select>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <Input type="number" min={1} max={100} value={draft.passingScore} onChange={(input) => setTestForms((current) => ({ ...current, [event.id]: { ...draft, passingScore: Number(input.target.value) || 85 } }))} className="rounded-2xl" />
+                                  <Input type="number" min={0} max={500} value={draft.xpReward} onChange={(input) => setTestForms((current) => ({ ...current, [event.id]: { ...draft, xpReward: Number(input.target.value) || 0 } }))} className="rounded-2xl" />
+                                </div>
+                                <button type="button" onClick={() => createSkillTest(event)} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-800 px-4 py-2.5 font-black text-white hover:bg-slate-700">
+                                  <Plus size={16} /> Create Test
+                                </button>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      )}
+
+                      {event.skillTests.length > 0 && (
+                        <div className="mt-4 space-y-2">
+                          {event.skillTests.map((test) => (
+                            <div key={test.id} className="rounded-2xl bg-white p-3">
+                              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                                <p className="font-black text-slate-800">{test.title}</p>
+                                <span className="text-xs font-black text-slate-400">Pass {test.passingScore}% · +{test.xpReward} XP</span>
+                              </div>
+                              {canManage && (
+                                <div className="grid gap-2 md:grid-cols-2">
+                                  {group.participants.map((participant) => {
+                                    const latest = test.attempts.find((attempt) => attempt.participantId === participant.id);
+                                    return (
+                                      <div key={participant.id} className="flex items-center gap-2 rounded-xl bg-slate-50 p-2">
+                                        <span className="min-w-0 flex-1 truncate text-sm font-bold text-slate-700">{participant.member.avatar} {participant.displayName ?? participant.member.name}</span>
+                                        <Input
+                                          type="number"
+                                          min={0}
+                                          max={100}
+                                          value={testScores[test.id]?.[participant.id] ?? latest?.score ?? test.passingScore}
+                                          onChange={(input) => setTestScores((current) => ({ ...current, [test.id]: { ...(current[test.id] ?? {}), [participant.id]: Number(input.target.value) || 0 } }))}
+                                          className="h-9 w-20 rounded-xl bg-white"
+                                        />
+                                        <button type="button" onClick={() => recordSkillTest(test, participant.id)} className="rounded-xl bg-emerald-500 px-3 py-2 text-xs font-black text-white hover:bg-emerald-600">
+                                          Record
+                                        </button>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="mb-4 grid min-w-0 gap-3 rounded-2xl bg-violet-50 p-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,150px)]">
                     <div className="min-w-0">
                       <p className="mb-1 flex items-center gap-2 text-sm font-black text-violet-900"><Share2 size={15} /> Share event</p>
@@ -1549,6 +2017,107 @@ export default function CommunityGroupPage() {
                 ))}
               </div>
             </div>
+
+            {canParticipate && (
+              <div className="rounded-3xl bg-white p-4 shadow-sm">
+                <h2 className="mb-3 flex items-center gap-2 font-black text-slate-800"><ClipboardCheck size={18} className="text-emerald-500" /> Class Roster</h2>
+                <div className="space-y-2">
+                  {group.participants.map((participant) => (
+                    <div key={participant.id} className="rounded-2xl bg-slate-50 px-3 py-2">
+                      <p className="truncate text-sm font-black text-slate-700">{participant.member.avatar} {participant.displayName ?? participant.member.name}</p>
+                      <p className="truncate text-xs font-bold text-slate-400">{parentLabel(participant.parent)}</p>
+                    </div>
+                  ))}
+                  {group.participants.length === 0 && (
+                    <p className="rounded-2xl bg-slate-50 p-3 text-sm font-bold text-slate-400">No class participants yet.</p>
+                  )}
+                </div>
+                {familyMembers.length > 0 && (
+                  <div className="mt-3 grid gap-2">
+                    <Select value={participantMemberId || "none"} onValueChange={(value) => {
+                      const next = value ?? "none";
+                      setParticipantMemberId(next === "none" ? "" : next);
+                    }}>
+                      <SelectTrigger className="rounded-2xl"><SelectValue placeholder="Choose family member" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Choose family member</SelectItem>
+                        {familyMembers.map((member) => <SelectItem key={member.id} value={member.id}>{member.avatar} {member.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <button
+                      type="button"
+                      onClick={addParticipant}
+                      disabled={savingCommunityTool === "participant" || !participantMemberId}
+                      className="rounded-2xl bg-emerald-500 py-2.5 font-black text-white hover:bg-emerald-600 disabled:opacity-50"
+                    >
+                      Add Participant
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {canParticipate && (
+              <div className="rounded-3xl bg-white p-4 shadow-sm">
+                <h2 className="mb-3 flex items-center gap-2 font-black text-slate-800"><Award size={18} className="text-amber-500" /> Merit Badges</h2>
+                <div className="space-y-2">
+                  {group.meritBadges.map((badge) => (
+                    <div key={badge.id} className="rounded-2xl bg-amber-50 px-3 py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="truncate text-sm font-black text-amber-900">{badge.icon} {badge.title}</p>
+                        <span className="rounded-full bg-white px-2 py-0.5 text-xs font-black text-amber-700">{badge._count?.awards ?? 0}</span>
+                      </div>
+                      <p className="truncate text-xs font-bold text-amber-700">{badge.skill ? `${badge.skill.icon} ${badge.skill.name}` : "General"} · +{badge.xpReward} XP</p>
+                      {canManage && group.participants.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {group.participants.slice(0, 4).map((participant) => (
+                            <button
+                              key={participant.id}
+                              type="button"
+                              onClick={() => awardBadge(participant.id, badge.id)}
+                              disabled={savingCommunityTool === `badge-${participant.id}`}
+                              className="rounded-xl bg-white px-2 py-1 text-xs font-black text-amber-700 hover:bg-amber-100 disabled:opacity-50"
+                            >
+                              {participant.member.avatar} Award
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {group.meritBadges.length === 0 && (
+                    <p className="rounded-2xl bg-slate-50 p-3 text-sm font-bold text-slate-400">No badges yet.</p>
+                  )}
+                </div>
+                {canManage && (
+                  <div className="mt-3 grid gap-2">
+                    <Input value={badgeForm.title} onChange={(event) => setBadgeForm((current) => ({ ...current, title: event.target.value }))} placeholder="Badge title" className="rounded-2xl" />
+                    <div className="grid grid-cols-[72px_1fr] gap-2">
+                      <Input value={badgeForm.icon} onChange={(event) => setBadgeForm((current) => ({ ...current, icon: event.target.value }))} className="rounded-2xl" />
+                      <Select value={badgeForm.skillId || "none"} onValueChange={(value) => {
+                        const next = value ?? "none";
+                        setBadgeForm((current) => ({ ...current, skillId: next === "none" ? "" : next }));
+                      }}>
+                        <SelectTrigger className="rounded-2xl"><SelectValue placeholder="Skill" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No skill</SelectItem>
+                          {skills.map((skill) => <SelectItem key={skill.id} value={skill.id}>{skill.icon} {skill.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Textarea value={badgeForm.requirements} onChange={(event) => setBadgeForm((current) => ({ ...current, requirements: event.target.value }))} placeholder="Requirements" className="rounded-2xl" />
+                    <button
+                      type="button"
+                      onClick={createBadge}
+                      disabled={savingCommunityTool === "badge" || !badgeForm.title.trim()}
+                      className="rounded-2xl bg-amber-500 py-2.5 font-black text-white hover:bg-amber-600 disabled:opacity-50"
+                    >
+                      Create Badge
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
             {canManage && group.groupInviteUrl && (
               <div className="min-w-0 rounded-3xl bg-white p-4 shadow-sm">
