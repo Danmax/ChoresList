@@ -333,8 +333,8 @@ export function ParentPinGate({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="relative">
-      <div className="fixed bottom-4 right-4 z-40 flex gap-2">
+    <div className="relative pb-[calc(6rem+env(safe-area-inset-bottom))] sm:pb-0">
+      <div className="fixed right-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-40 flex gap-2">
         <button
           type="button"
           onClick={lock}

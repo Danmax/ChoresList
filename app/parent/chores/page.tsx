@@ -9,8 +9,16 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+
+const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const FREQUENCY_LABELS: Record<string, string> = {
+  daily: "📋 Daily",
+  weekly: "📅 Weekly",
+  monthly: "🗓️ Monthly",
+  "one-time": "⭐ Special / One-time",
+};
 
 interface Instructions {
   steps: string[];
@@ -18,8 +26,16 @@ interface Instructions {
   safetyNotes: string[];
 }
 
+interface Member {
+  id: string;
+  name: string;
+  avatar: string;
+  age: number;
+  role: string;
+}
+
 interface Chore {
-  id: number;
+  id: string;
   name: string;
   icon: string;
   color: string;
@@ -33,6 +49,7 @@ interface Chore {
 
 export default function ChoresPage() {
   const [chores, setChores] = useState<Chore[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
   const [filterCat, setFilterCat] = useState("all");
   const [editingInstructions, setEditingInstructions] = useState<Chore | null>(null);
   const [instructions, setInstructions] = useState<Instructions>({ steps: [], tips: [], safetyNotes: [] });
@@ -44,10 +61,25 @@ export default function ChoresPage() {
   const [showEmojiPicker, setShowEmojiPicker] = useState<"new" | "edit" | null>(null);
   const [chorePrompt, setChorePrompt] = useState("");
   const [draftingChore, setDraftingChore] = useState(false);
+  const [assignOnCreate, setAssignOnCreate] = useState(false);
+  const [newAssignment, setNewAssignment] = useState({
+    memberId: "",
+    frequency: "daily",
+    dueDate: "",
+    dayOfWeeks: ["1"],
+  });
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/chores");
-    setChores(await res.json());
+    const [choresRes, membersRes] = await Promise.all([
+      fetch("/api/chores"),
+      fetch("/api/members"),
+    ]);
+    const [choresData, membersData] = await Promise.all([
+      choresRes.json().catch(() => []),
+      membersRes.json().catch(() => []),
+    ]);
+    setChores(Array.isArray(choresData) ? choresData : []);
+    setMembers(Array.isArray(membersData) ? membersData : Array.isArray(membersData?.members) ? membersData.members : []);
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -124,15 +156,53 @@ export default function ChoresPage() {
 
   async function addChore() {
     if (!newChore.name) { toast.error("Name required"); return; }
-    await fetch("/api/chores", {
+    if (assignOnCreate && !newAssignment.memberId) {
+      toast.error("Select a family member to assign this chore");
+      return;
+    }
+    if (assignOnCreate && newAssignment.frequency === "weekly" && newAssignment.dayOfWeeks.length === 0) {
+      toast.error("Choose at least one weekday");
+      return;
+    }
+    if (assignOnCreate && (newAssignment.frequency === "monthly" || newAssignment.frequency === "one-time") && !newAssignment.dueDate) {
+      toast.error("Choose a date for this assignment");
+      return;
+    }
+
+    const choreRes = await fetch("/api/chores", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newChore),
     });
-    toast.success("Chore added!");
-    setShowNewChore(false);
-    setNewChore({ name: "", description: "", icon: "✅", color: "#e0e7ff", ageMin: 6, ageMax: 18, pointsValue: 10, category: "other", requiresPhoto: false });
-    setChorePrompt("");
+    const chore = await choreRes.json();
+    if (!choreRes.ok) {
+      toast.error(chore.error ?? "Could not add chore");
+      return;
+    }
+
+    if (assignOnCreate) {
+      const assignRes = await fetch("/api/assignments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          memberId: newAssignment.memberId,
+          choreId: chore.id,
+          frequency: newAssignment.frequency,
+          dueDate: newAssignment.dueDate || null,
+          dayOfWeeks: newAssignment.frequency === "weekly" ? newAssignment.dayOfWeeks.map(Number) : [],
+        }),
+      });
+      const assignData = await assignRes.json().catch(() => null);
+      if (!assignRes.ok) {
+        toast.error(assignData?.error ?? "Chore added, but it could not be assigned");
+        resetNewChoreForm();
+        load();
+        return;
+      }
+    }
+
+    toast.success(assignOnCreate ? "Chore added and assigned!" : "Chore added!");
+    resetNewChoreForm();
     load();
   }
 
@@ -188,7 +258,7 @@ export default function ChoresPage() {
     load();
   }
 
-  async function deleteChore(id: number) {
+  async function deleteChore(id: string) {
     if (!confirm("Delete this chore?")) return;
     await fetch(`/api/chores?id=${id}`, { method: "DELETE" });
     toast.success("Chore deleted");
@@ -207,6 +277,26 @@ export default function ChoresPage() {
   }
 
   const filtered = filterCat === "all" ? chores : chores.filter((c) => c.category === filterCat);
+  const selectedNewMember = members.find((member) => member.id === newAssignment.memberId);
+  const selectedNewCategory = CHORE_CATEGORIES.find((category) => category.value === newChore.category);
+  const selectedEditCategory = editingChore ? CHORE_CATEGORIES.find((category) => category.value === editingChore.category) : null;
+
+  function toggleNewAssignmentDay(day: string) {
+    setNewAssignment((previous) => {
+      const selected = previous.dayOfWeeks.includes(day)
+        ? previous.dayOfWeeks.filter((value) => value !== day)
+        : [...previous.dayOfWeeks, day].sort((a, b) => Number(a) - Number(b));
+      return { ...previous, dayOfWeeks: selected };
+    });
+  }
+
+  function resetNewChoreForm() {
+    setShowNewChore(false);
+    setNewChore({ name: "", description: "", icon: "✅", color: "#e0e7ff", ageMin: 6, ageMax: 18, pointsValue: 10, category: "other", requiresPhoto: false });
+    setAssignOnCreate(false);
+    setNewAssignment({ memberId: "", frequency: "daily", dueDate: "", dayOfWeeks: ["1"] });
+    setChorePrompt("");
+  }
 
   return (
     <div className="min-h-screen p-4 sm:p-6">
@@ -537,8 +627,10 @@ export default function ChoresPage() {
             <div>
               <Label className="font-bold">Category</Label>
               <Select value={newChore.category} onValueChange={(v) => setNewChore((p) => ({ ...p, category: v ?? "other" }))}>
-                <SelectTrigger className="rounded-xl mt-1">
-                  <SelectValue />
+                <SelectTrigger className="mt-1 w-full rounded-xl">
+                  <span className="flex flex-1 items-center gap-1.5 truncate text-left">
+                    {selectedNewCategory ? `${selectedNewCategory.icon} ${selectedNewCategory.label}` : "Select a category"}
+                  </span>
                 </SelectTrigger>
                 <SelectContent>
                   {CHORE_CATEGORIES.map((c) => (
@@ -547,11 +639,102 @@ export default function ChoresPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-3">
+              <label className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={assignOnCreate}
+                  onChange={(e) => setAssignOnCreate(e.target.checked)}
+                  className="h-5 w-5 rounded"
+                />
+                <span className="font-black text-emerald-800">Assign after creating</span>
+              </label>
+              {assignOnCreate && (
+                <div className="mt-3 space-y-3">
+                  <div>
+                    <Label className="font-bold">Family Member</Label>
+                    <Select
+                      value={newAssignment.memberId}
+                      onValueChange={(v) => setNewAssignment((p) => ({ ...p, memberId: v ?? "" }))}
+                    >
+                      <SelectTrigger className="mt-1 w-full rounded-xl bg-white">
+                        <span className={`flex flex-1 items-center gap-1.5 truncate text-left ${selectedNewMember ? "" : "text-slate-400"}`}>
+                          {selectedNewMember ? `${selectedNewMember.avatar} ${selectedNewMember.name}` : "Select a family member"}
+                        </span>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {members.map((member) => (
+                          <SelectItem key={member.id} value={member.id}>
+                            {member.avatar} {member.name}
+                            {member.role === "child" ? ` (age ${member.age})` : ` - ${member.role}`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="font-bold">Frequency</Label>
+                    <Select
+                      value={newAssignment.frequency}
+                      onValueChange={(v) => setNewAssignment((p) => ({ ...p, frequency: v ?? "daily" }))}
+                    >
+                      <SelectTrigger className="mt-1 w-full rounded-xl bg-white">
+                        <span className="flex flex-1 items-center gap-1.5 truncate text-left">
+                          {FREQUENCY_LABELS[newAssignment.frequency] ?? newAssignment.frequency}
+                        </span>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="daily">📋 Daily</SelectItem>
+                        <SelectItem value="weekly">📅 Weekly</SelectItem>
+                        <SelectItem value="monthly">🗓️ Monthly</SelectItem>
+                        <SelectItem value="one-time">⭐ Special / One-time</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {newAssignment.frequency === "weekly" && (
+                    <div>
+                      <Label className="font-bold">Days of Week</Label>
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        {DAYS.map((day, index) => {
+                          const value = String(index);
+                          const selected = newAssignment.dayOfWeeks.includes(value);
+                          return (
+                            <button
+                              key={day}
+                              type="button"
+                              onClick={() => toggleNewAssignmentDay(value)}
+                              className={`rounded-xl border-2 px-3 py-2 text-sm font-black transition-colors ${
+                                selected
+                                  ? "border-emerald-400 bg-white text-emerald-700"
+                                  : "border-emerald-100 bg-white/70 text-slate-500 hover:bg-white"
+                              }`}
+                            >
+                              {day}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  {(newAssignment.frequency === "monthly" || newAssignment.frequency === "one-time") && (
+                    <div>
+                      <Label className="font-bold">{newAssignment.frequency === "monthly" ? "Monthly Date" : "Due Date"}</Label>
+                      <Input
+                        type="date"
+                        value={newAssignment.dueDate}
+                        onChange={(e) => setNewAssignment((p) => ({ ...p, dueDate: e.target.value }))}
+                        className="mt-1 rounded-xl bg-white"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
             <button
               onClick={addChore}
               className="w-full bg-blue-500 text-white rounded-xl py-3 font-black hover:bg-blue-600 transition-colors"
             >
-              Add Chore
+              {assignOnCreate ? "Add and Assign Chore" : "Add Chore"}
             </button>
           </div>
         </DialogContent>
@@ -671,7 +854,11 @@ export default function ChoresPage() {
                   value={editingChore.category}
                   onValueChange={(v) => setEditingChore((p) => p && ({ ...p, category: v ?? "other" }))}
                 >
-                  <SelectTrigger className="rounded-xl mt-1"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="mt-1 w-full rounded-xl">
+                    <span className="flex flex-1 items-center gap-1.5 truncate text-left">
+                      {selectedEditCategory ? `${selectedEditCategory.icon} ${selectedEditCategory.label}` : "Select a category"}
+                    </span>
+                  </SelectTrigger>
                   <SelectContent>
                     {CHORE_CATEGORIES.map((c) => (
                       <SelectItem key={c.value} value={c.value}>{c.icon} {c.label}</SelectItem>

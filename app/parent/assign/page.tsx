@@ -6,10 +6,16 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const FREQUENCY_LABELS: Record<string, string> = {
+  daily: "📋 Daily",
+  weekly: "📅 Weekly",
+  monthly: "🗓️ Monthly",
+  "one-time": "⭐ Special / One-time",
+};
 
 interface Member { id: string; name: string; avatar: string; color: string; age: number; role: string }
 interface Chore { id: string; name: string; icon: string; ageMin: number; ageMax: number; pointsValue: number }
@@ -92,6 +98,7 @@ export default function AssignPage() {
     : assignments;
 
   const selectedMemberObj = members.find((m) => m.id === form.memberId);
+  const selectedChoreObj = chores.find((c) => c.id === form.choreId);
   const availableChores = selectedMemberObj
     ? chores.filter((c) => {
         const isParent = selectedMemberObj.role === "parent" || selectedMemberObj.role === "mom" || selectedMemberObj.role === "dad" || selectedMemberObj.role === "grandparent";
@@ -199,8 +206,10 @@ export default function AssignPage() {
             <div>
               <Label className="font-bold">Family Member</Label>
               <Select value={form.memberId} onValueChange={(v) => setForm((p) => ({ ...p, memberId: v ?? "", choreId: "" }))}>
-                <SelectTrigger className="rounded-xl mt-1">
-                  <SelectValue placeholder="Select a family member" />
+                <SelectTrigger className="mt-1 w-full rounded-xl">
+                  <span className={`flex flex-1 items-center gap-1.5 truncate text-left ${selectedMemberObj ? "" : "text-slate-400"}`}>
+                    {selectedMemberObj ? `${selectedMemberObj.avatar} ${selectedMemberObj.name}` : "Select a family member"}
+                  </span>
                 </SelectTrigger>
                 <SelectContent>
                   {members.map((m) => (
@@ -215,8 +224,10 @@ export default function AssignPage() {
             <div>
               <Label className="font-bold">Chore</Label>
               <Select value={form.choreId} onValueChange={(v) => setForm((p) => ({ ...p, choreId: v ?? "" }))}>
-                <SelectTrigger className="rounded-xl mt-1">
-                  <SelectValue placeholder="Select a chore" />
+                <SelectTrigger className="mt-1 w-full rounded-xl">
+                  <span className={`flex flex-1 items-center gap-1.5 truncate text-left ${selectedChoreObj ? "" : "text-slate-400"}`}>
+                    {selectedChoreObj ? `${selectedChoreObj.icon} ${selectedChoreObj.name}` : "Select a chore"}
+                  </span>
                 </SelectTrigger>
                 <SelectContent>
                   {availableChores.map((c) => (
@@ -228,8 +239,10 @@ export default function AssignPage() {
             <div>
               <Label className="font-bold">Frequency</Label>
               <Select value={form.frequency} onValueChange={(v) => setForm((p) => ({ ...p, frequency: v ?? "daily" }))}>
-                <SelectTrigger className="rounded-xl mt-1">
-                  <SelectValue />
+                <SelectTrigger className="mt-1 w-full rounded-xl">
+                  <span className="flex flex-1 items-center gap-1.5 truncate text-left">
+                    {FREQUENCY_LABELS[form.frequency] ?? form.frequency}
+                  </span>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="daily">📋 Daily</SelectItem>
