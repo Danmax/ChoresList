@@ -37,6 +37,7 @@ model ParentAccount {
   communityRsvps         CommunityRsvp[]
   assignedCommunityItems CommunityEventItem[]     @relation("CommunityItemAssignee")
   claimedCommunityItems  CommunityEventItem[]     @relation("CommunityItemClaimer")
+  communityMessages      CommunityEventMessage[]
   activatedPlugins       HouseholdPlugin[]        @relation("PluginActivator")
   familyTreeNodes        FamilyTreeNode[]
   createdRecipes         Recipe[]                 @relation("RecipeCreator")
@@ -663,6 +664,7 @@ model CommunityEvent {
   createdBy ParentAccount?       @relation("CommunityEventCreator", fields: [createdByParentId], references: [id], onDelete: SetNull)
   rsvps     CommunityRsvp[]
   items     CommunityEventItem[]
+  messages  CommunityEventMessage[]
 }
 
 model CommunityRsvp {
@@ -698,6 +700,23 @@ model CommunityEventItem {
   event      CommunityEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
   assignedTo ParentAccount? @relation("CommunityItemAssignee", fields: [assignedToParentId], references: [id], onDelete: SetNull)
   claimedBy  ParentAccount? @relation("CommunityItemClaimer", fields: [claimedByParentId], references: [id], onDelete: SetNull)
+}
+
+model CommunityEventMessage {
+  id        String   @id @default(uuid()) @db.Char(36)
+  eventId   String   @db.Char(36)
+  parentId  String   @db.Char(36)
+  body      String?  @db.Text
+  emoji     String?  @db.VarChar(32)
+  gifUrl    String?  @db.VarChar(512)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  event  CommunityEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  parent ParentAccount  @relation(fields: [parentId], references: [id], onDelete: Cascade)
+
+  @@index([eventId, createdAt])
+  @@index([parentId])
 }
 
 model FamilyEvent {

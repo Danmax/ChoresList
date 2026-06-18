@@ -27,17 +27,44 @@ function cleanOptionalParentId(value: unknown) {
 }
 
 const itemInclude = {
-  assignedTo: { select: { id: true, email: true } },
-  claimedBy: { select: { id: true, email: true } },
+  assignedTo: { select: { id: true, email: true, displayName: true, relationshipLabel: true } },
+  claimedBy: { select: { id: true, email: true, displayName: true, relationshipLabel: true } },
   event: { select: { id: true, groupId: true } },
 } satisfies Prisma.CommunityEventItemInclude;
+
+function displayLabel(parent: { email?: string | null; displayName?: string | null; relationshipLabel?: string | null } | null) {
+  if (!parent) return "Member";
+  return parent.displayName || parent.relationshipLabel || parent.email?.split("@")[0] || "Member";
+}
+
+function publicParent<T extends { id: string; email?: string | null; displayName?: string | null; relationshipLabel?: string | null }>(
+  parent: T | null,
+  showEmail: boolean
+) {
+  if (!parent) return null;
+  return {
+    id: parent.id,
+    label: displayLabel(parent),
+    displayName: parent.displayName ?? null,
+    relationshipLabel: parent.relationshipLabel ?? null,
+    ...(showEmail ? { email: parent.email ?? null } : {}),
+  };
+}
+
+function publicItem(item: Prisma.CommunityEventItemGetPayload<{ include: typeof itemInclude }>, showEmail: boolean) {
+  return {
+    ...item,
+    assignedTo: publicParent(item.assignedTo, showEmail),
+    claimedBy: publicParent(item.claimedBy, showEmail),
+  };
+}
 
 export const POST = withErrors(async (req: NextRequest) => {
   const { parentId } = requireSession(req);
   const body = await req.json();
   const eventId = cleanId(body.eventId);
   if (!eventId) return NextResponse.json({ error: "Event is required" }, { status: 400 });
-  const { event } = await requireEventCommunityRole(eventId, parentId, "manager");
+  const { event, membership } = await requireEventCommunityRole(eventId, parentId, "manager");
 
   const title = cleanRequiredText(body.title, 120);
   if (!title) return NextResponse.json({ error: "Item title is required" }, { status: 400 });
@@ -67,7 +94,7 @@ export const POST = withErrors(async (req: NextRequest) => {
     include: itemInclude,
   });
 
-  return NextResponse.json(item, { status: 201 });
+  return NextResponse.json(publicItem(item, membership.role === "owner" || membership.role === "manager"), { status: 201 });
 });
 
 export const PUT = withErrors(async (req: NextRequest) => {
@@ -83,7 +110,7 @@ export const PUT = withErrors(async (req: NextRequest) => {
   if (!existing) return NextResponse.json({ error: "Item not found" }, { status: 404 });
 
   if (body.action === "claim") {
-    await requireCommunityRole(existing.event.groupId, parentId, "member");
+    const membership = await requireCommunityRole(existing.event.groupId, parentId, "member");
     const item = await prisma.communityEventItem.update({
       where: { id },
       data: {
@@ -93,7 +120,7 @@ export const PUT = withErrors(async (req: NextRequest) => {
       },
       include: itemInclude,
     });
-    return NextResponse.json(item);
+    return NextResponse.json(publicItem(item, membership.role === "owner" || membership.role === "manager"));
   }
 
   if (body.action === "unclaim") {
@@ -110,10 +137,10 @@ export const PUT = withErrors(async (req: NextRequest) => {
       },
       include: itemInclude,
     });
-    return NextResponse.json(item);
+    return NextResponse.json(publicItem(item, membership.role === "owner" || membership.role === "manager"));
   }
 
-  await requireEventCommunityRole(existing.eventId, parentId, "manager");
+  const { membership } = await requireEventCommunityRole(existing.eventId, parentId, "manager");
   const title = body.title !== undefined ? cleanRequiredText(body.title, 120) : undefined;
   if (title !== undefined && !title) return NextResponse.json({ error: "Item title is required" }, { status: 400 });
 
@@ -143,7 +170,7 @@ export const PUT = withErrors(async (req: NextRequest) => {
     include: itemInclude,
   });
 
-  return NextResponse.json(item);
+  return NextResponse.json(publicItem(item, membership.role === "owner" || membership.role === "manager"));
 });
 
 export const DELETE = withErrors(async (req: NextRequest) => {

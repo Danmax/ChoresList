@@ -47,15 +47,51 @@ function cleanStarterItems(value: unknown) {
 
 const eventInclude = {
   group: { select: { id: true, name: true } },
-  rsvps: { include: { parent: { select: { id: true, email: true } } } },
+  rsvps: { include: { parent: { select: { id: true, email: true, displayName: true, relationshipLabel: true } } } },
   items: {
     orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     include: {
-      assignedTo: { select: { id: true, email: true } },
-      claimedBy: { select: { id: true, email: true } },
+      assignedTo: { select: { id: true, email: true, displayName: true, relationshipLabel: true } },
+      claimedBy: { select: { id: true, email: true, displayName: true, relationshipLabel: true } },
     },
   },
+  messages: {
+    orderBy: { createdAt: "asc" },
+    include: { parent: { select: { id: true, email: true, displayName: true, relationshipLabel: true } } },
+  },
 } satisfies Prisma.CommunityEventInclude;
+
+function displayLabel(parent: { email?: string | null; displayName?: string | null; relationshipLabel?: string | null } | null) {
+  if (!parent) return "Member";
+  return parent.displayName || parent.relationshipLabel || parent.email?.split("@")[0] || "Member";
+}
+
+function publicParent<T extends { id: string; email?: string | null; displayName?: string | null; relationshipLabel?: string | null }>(
+  parent: T | null,
+  showEmail: boolean
+) {
+  if (!parent) return null;
+  return {
+    id: parent.id,
+    label: displayLabel(parent),
+    displayName: parent.displayName ?? null,
+    relationshipLabel: parent.relationshipLabel ?? null,
+    ...(showEmail ? { email: parent.email ?? null } : {}),
+  };
+}
+
+function publicEvent(event: Prisma.CommunityEventGetPayload<{ include: typeof eventInclude }>, showEmail: boolean) {
+  return {
+    ...event,
+    rsvps: event.rsvps.map((rsvp) => ({ ...rsvp, parent: publicParent(rsvp.parent, showEmail) })),
+    items: event.items.map((item) => ({
+      ...item,
+      assignedTo: publicParent(item.assignedTo, showEmail),
+      claimedBy: publicParent(item.claimedBy, showEmail),
+    })),
+    messages: event.messages.map((message) => ({ ...message, parent: publicParent(message.parent, showEmail) })),
+  };
+}
 
 export const GET = withErrors(async (req: NextRequest) => {
   const { parentId } = requireSession(req);
@@ -65,13 +101,13 @@ export const GET = withErrors(async (req: NextRequest) => {
     return NextResponse.json({ error: "Group is required" }, { status: 400 });
   }
 
-  await requireCommunityRole(groupId, parentId, "member");
+  const membership = await requireCommunityRole(groupId, parentId, "member");
   const events = await prisma.communityEvent.findMany({
     where: { groupId },
     include: eventInclude,
     orderBy: { date: "asc" },
   });
-  return NextResponse.json(events);
+  return NextResponse.json(events.map((event) => publicEvent(event, membership.role === "owner" || membership.role === "manager")));
 });
 
 export const POST = withErrors(async (req: NextRequest) => {
@@ -81,7 +117,7 @@ export const POST = withErrors(async (req: NextRequest) => {
   if (!groupId) {
     return NextResponse.json({ error: "Group is required" }, { status: 400 });
   }
-  await requireCommunityRole(groupId, parentId, "manager");
+  const membership = await requireCommunityRole(groupId, parentId, "manager");
 
   const title = cleanRequiredText(body.title, 120);
   const date = cleanDate(body.date);
@@ -108,7 +144,7 @@ export const POST = withErrors(async (req: NextRequest) => {
     include: eventInclude,
   });
 
-  return NextResponse.json(event, { status: 201 });
+  return NextResponse.json(publicEvent(event, membership.role === "owner" || membership.role === "manager"), { status: 201 });
 });
 
 export const PUT = withErrors(async (req: NextRequest) => {
@@ -118,7 +154,7 @@ export const PUT = withErrors(async (req: NextRequest) => {
   if (!id) {
     return NextResponse.json({ error: "Event is required" }, { status: 400 });
   }
-  await requireEventCommunityRole(id, parentId, "manager");
+  const { membership } = await requireEventCommunityRole(id, parentId, "manager");
 
   const title = body.title !== undefined ? cleanRequiredText(body.title, 120) : undefined;
   if (title !== undefined && !title) return NextResponse.json({ error: "Event title is required" }, { status: 400 });
@@ -141,7 +177,7 @@ export const PUT = withErrors(async (req: NextRequest) => {
     include: eventInclude,
   });
 
-  return NextResponse.json(event);
+  return NextResponse.json(publicEvent(event, membership.role === "owner" || membership.role === "manager"));
 });
 
 export const DELETE = withErrors(async (req: NextRequest) => {

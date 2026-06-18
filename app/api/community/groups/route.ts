@@ -8,6 +8,7 @@ import { createCommunityInviteToken } from "@/lib/session";
 
 const GROUP_TYPES = new Set(["church", "nonprofit", "sports", "school", "hobby", "neighborhood", "other"]);
 const VISIBILITIES = new Set(["private", "public"]);
+const MANAGER_ROLES = new Set(["owner", "manager"]);
 
 function cleanText(value: unknown, max: number) {
   return typeof value === "string" && value.trim() ? value.trim().slice(0, max) : null;
@@ -26,22 +27,26 @@ function cleanVisibility(value: unknown) {
 }
 
 const groupInclude = {
-  creator: { select: { id: true, email: true } },
+  creator: { select: { id: true, email: true, displayName: true, relationshipLabel: true } },
   members: {
     where: { status: "active" },
-    include: { parent: { select: { id: true, email: true } } },
+    include: { parent: { select: { id: true, email: true, displayName: true, relationshipLabel: true } } },
     orderBy: [{ role: "asc" }, { joinedAt: "asc" }],
   },
   events: {
     orderBy: { date: "asc" },
     include: {
-      rsvps: { include: { parent: { select: { id: true, email: true } } } },
+      rsvps: { include: { parent: { select: { id: true, email: true, displayName: true, relationshipLabel: true } } } },
       items: {
         orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
         include: {
-          assignedTo: { select: { id: true, email: true } },
-          claimedBy: { select: { id: true, email: true } },
+          assignedTo: { select: { id: true, email: true, displayName: true, relationshipLabel: true } },
+          claimedBy: { select: { id: true, email: true, displayName: true, relationshipLabel: true } },
         },
+      },
+      messages: {
+        orderBy: { createdAt: "asc" },
+        include: { parent: { select: { id: true, email: true, displayName: true, relationshipLabel: true } } },
       },
     },
   },
@@ -50,6 +55,66 @@ const groupInclude = {
 function publicInviteUrl(req: NextRequest, groupId: string, eventId?: string | null) {
   const token = createCommunityInviteToken({ groupId, role: "member", eventId });
   return new URL(`/c/${token}`, getBaseUrl(req)).toString();
+}
+
+function canViewEmails(role?: string | null) {
+  return role ? MANAGER_ROLES.has(role) : false;
+}
+
+function displayLabel(parent: { email?: string | null; displayName?: string | null; relationshipLabel?: string | null } | null) {
+  if (!parent) return "Member";
+  return parent.displayName || parent.relationshipLabel || parent.email?.split("@")[0] || "Member";
+}
+
+function publicParent<T extends { id: string; email?: string | null; displayName?: string | null; relationshipLabel?: string | null }>(
+  parent: T | null,
+  showEmail: boolean
+) {
+  if (!parent) return null;
+  return {
+    id: parent.id,
+    label: displayLabel(parent),
+    displayName: parent.displayName ?? null,
+    relationshipLabel: parent.relationshipLabel ?? null,
+    ...(showEmail ? { email: parent.email ?? null } : {}),
+  };
+}
+
+function publicMembership(member: Prisma.CommunityMemberGetPayload<{ include: typeof groupInclude.members.include }>, showEmail: boolean) {
+  return {
+    id: member.id,
+    groupId: member.groupId,
+    parentId: member.parentId,
+    role: member.role,
+    status: member.status,
+    joinedAt: member.joinedAt,
+    parent: publicParent(member.parent, showEmail),
+  };
+}
+
+function publicEvent(
+  req: NextRequest,
+  groupId: string,
+  event: Prisma.CommunityEventGetPayload<{ include: typeof groupInclude.events.include }>,
+  showEmail: boolean
+) {
+  return {
+    ...event,
+    publicInviteUrl: event.visibility === "public" ? publicInviteUrl(req, groupId, event.id) : null,
+    rsvps: event.rsvps.map((rsvp) => ({
+      ...rsvp,
+      parent: publicParent(rsvp.parent, showEmail),
+    })),
+    items: event.items.map((item) => ({
+      ...item,
+      assignedTo: publicParent(item.assignedTo, showEmail),
+      claimedBy: publicParent(item.claimedBy, showEmail),
+    })),
+    messages: event.messages.map((message) => ({
+      ...message,
+      parent: publicParent(message.parent, showEmail),
+    })),
+  };
 }
 
 export const GET = withErrors(async (req: NextRequest) => {
@@ -76,6 +141,7 @@ export const GET = withErrors(async (req: NextRequest) => {
     });
     if (!group) return NextResponse.json({ error: "Community group not found" }, { status: 404 });
     const currentMembership = parentId ? group.members.find((member) => member.parentId === parentId) ?? null : null;
+    const showEmails = canViewEmails(currentMembership?.role);
     const visibleEvents = currentMembership
       ? group.events
       : group.events.filter((event) => event.visibility === "public");
@@ -84,15 +150,22 @@ export const GET = withErrors(async (req: NextRequest) => {
     }
     return NextResponse.json({
       ...group,
-      members: currentMembership ? group.members : [],
-      events: visibleEvents.map((event) => ({
-        ...event,
-        publicInviteUrl: event.visibility === "public" ? publicInviteUrl(req, group.id, event.id) : null,
-      })),
+      creator: publicParent(group.creator, showEmails),
+      members: currentMembership ? group.members.map((member) => publicMembership(member, showEmails)) : [],
+      events: visibleEvents.map((event) => publicEvent(req, group.id, event, showEmails)),
       groupInviteUrl: currentMembership && ["owner", "manager"].includes(currentMembership.role)
         ? publicInviteUrl(req, group.id)
         : null,
-      currentMembership,
+      currentMembership: currentMembership
+        ? {
+            id: currentMembership.id,
+            groupId: currentMembership.groupId,
+            parentId: currentMembership.parentId,
+            role: currentMembership.role,
+            status: currentMembership.status,
+            joinedAt: currentMembership.joinedAt,
+          }
+        : null,
       currentParentId: parentId,
     });
   }
@@ -110,7 +183,7 @@ export const GET = withErrors(async (req: NextRequest) => {
         }
       : { members: { some: { parentId: parentId!, status: "active" } } },
     include: {
-      creator: { select: { id: true, email: true } },
+      creator: { select: { id: true, email: true, displayName: true, relationshipLabel: true } },
       members: { where: { status: "active" }, select: { id: true, parentId: true, role: true } },
       events: {
         where: {
@@ -125,10 +198,14 @@ export const GET = withErrors(async (req: NextRequest) => {
     orderBy: { updatedAt: "desc" },
   });
 
-  return NextResponse.json(groups.map((group) => ({
-    ...group,
-    currentMembership: parentId ? group.members.find((member) => member.parentId === parentId) ?? null : null,
-  })));
+  return NextResponse.json(groups.map((group) => {
+    const currentMembership = parentId ? group.members.find((member) => member.parentId === parentId) ?? null : null;
+    return {
+      ...group,
+      creator: publicParent(group.creator, canViewEmails(currentMembership?.role)),
+      currentMembership,
+    };
+  }));
 });
 
 export const POST = withErrors(async (req: NextRequest) => {

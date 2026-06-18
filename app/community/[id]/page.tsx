@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, CalendarDays, CheckCircle2, Copy, Mail, MapPin, Pencil, Plus, QrCode, Save, Share2, Trash2, UserPlus, Users, X, Wand2 } from "lucide-react";
+import { ArrowLeft, CalendarDays, CheckCircle2, Copy, Mail, MapPin, MessageCircle, Pencil, Plus, QrCode, Save, Send, Share2, SmilePlus, Trash2, UserPlus, Users, X, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,7 +13,13 @@ import { Textarea } from "@/components/ui/textarea";
 type CommunityRole = "owner" | "manager" | "member";
 type RsvpStatus = "going" | "maybe" | "not-going";
 
-type ParentRef = { id: string; email: string };
+type ParentRef = {
+  id: string;
+  label: string;
+  email?: string | null;
+  displayName?: string | null;
+  relationshipLabel?: string | null;
+};
 type StarterItem = { title: string; quantity: string; note: string };
 type LocationSuggestion = {
   id: string;
@@ -41,6 +47,16 @@ type CommunityRsvp = {
   note: string | null;
   parent: ParentRef;
 };
+type CommunityMessage = {
+  id: string;
+  eventId: string;
+  parentId: string;
+  body: string | null;
+  emoji: string | null;
+  gifUrl: string | null;
+  createdAt: string;
+  parent: ParentRef | null;
+};
 type CommunityEvent = {
   id: string;
   title: string;
@@ -55,6 +71,7 @@ type CommunityEvent = {
   publicInviteUrl: string | null;
   rsvps: CommunityRsvp[];
   items: CommunityItem[];
+  messages: CommunityMessage[];
 };
 type CommunityGroup = {
   id: string;
@@ -109,6 +126,7 @@ type CommunityEventForm = typeof BLANK_EVENT;
 const BLANK_MEMBER = { email: "", role: "member" as CommunityRole };
 const BLANK_INVITE = { email: "" };
 const BLANK_ITEM = { title: "", quantity: "", note: "", assignedToParentId: "" };
+const BLANK_MESSAGE = { body: "", emoji: "", gifUrl: "" };
 const BLANK_GROUP_FORM = {
   name: "",
   groupType: "other",
@@ -125,6 +143,7 @@ const COMMON_POTLUCK_ITEMS: StarterItem[] = [
   { title: "Napkins", quantity: "1 pack", note: "" },
   { title: "Utensils", quantity: "1 pack", note: "" },
 ];
+const MESSAGE_EMOJIS = ["👍", "❤️", "😂", "🎉", "🙏", "🔥", "👏", "🙌"];
 
 function eventMeta(type: string) {
   return EVENT_TYPES.find((eventType) => eventType.value === type) ?? EVENT_TYPES[EVENT_TYPES.length - 1];
@@ -156,6 +175,19 @@ function emailName(email?: string | null) {
   return email ? email.split("@")[0] : "Someone";
 }
 
+function parentLabel(parent?: ParentRef | null) {
+  return parent?.label || parent?.displayName || parent?.relationshipLabel || emailName(parent?.email) || "Member";
+}
+
+function messageTime(value: string) {
+  return new Date(value).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 function rsvpCounts(event: CommunityEvent) {
   return {
     going: event.rsvps.filter((rsvp) => rsvp.status === "going").length,
@@ -177,6 +209,7 @@ export default function CommunityGroupPage() {
   const [groupForm, setGroupForm] = useState(BLANK_GROUP_FORM);
   const [editingGroup, setEditingGroup] = useState(false);
   const [itemForms, setItemForms] = useState<Record<string, typeof BLANK_ITEM>>({});
+  const [messageForms, setMessageForms] = useState<Record<string, typeof BLANK_MESSAGE>>({});
   const [eventPrompt, setEventPrompt] = useState("");
   const [draftingEvent, setDraftingEvent] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
@@ -658,6 +691,41 @@ export default function CommunityGroupPage() {
     await load();
   }
 
+  async function addMessage(eventId: string) {
+    const form = messageForms[eventId] ?? BLANK_MESSAGE;
+    if (!form.body.trim() && !form.emoji.trim() && !form.gifUrl.trim()) {
+      toast.error("Add a message, emoji, or GIF");
+      return;
+    }
+    const res = await fetch("/api/community/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        eventId,
+        body: form.body,
+        emoji: form.emoji,
+        gifUrl: form.gifUrl,
+      }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      toast.error(data?.error ?? "Could not post message");
+      return;
+    }
+    setMessageForms((current) => ({ ...current, [eventId]: BLANK_MESSAGE }));
+    await load();
+  }
+
+  async function deleteMessage(messageId: string) {
+    const res = await fetch(`/api/community/messages?id=${messageId}`, { method: "DELETE" });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      toast.error(data?.error ?? "Could not delete message");
+      return;
+    }
+    await load();
+  }
+
   if (!group && !loading) {
     return (
       <div className="min-h-screen p-6">
@@ -673,14 +741,14 @@ export default function CommunityGroupPage() {
   }
 
   return (
-    <div className="min-h-screen p-4 sm:p-6">
+    <div className="min-h-screen overflow-x-hidden p-3 sm:p-6">
       <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-start">
         <Link href="/community" className="self-start rounded-2xl bg-white p-2 shadow-sm transition-shadow hover:shadow-md">
           <ArrowLeft size={20} className="text-slate-600" />
         </Link>
         {group && (
           <>
-            <div className="flex min-w-0 flex-1 gap-4 rounded-3xl p-5 shadow-sm" style={{ backgroundColor: meta.bg, border: `2px solid ${meta.color}44` }}>
+            <div className="flex min-w-0 flex-1 flex-col gap-3 rounded-3xl p-4 shadow-sm sm:flex-row sm:gap-4 sm:p-5" style={{ backgroundColor: meta.bg, border: `2px solid ${meta.color}44` }}>
               <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-3xl" style={{ backgroundColor: `${meta.color}22` }}>
                 {meta.icon}
               </div>
@@ -718,8 +786,8 @@ export default function CommunityGroupPage() {
       </div>
 
       {group && (
-        <div className="grid gap-5 xl:grid-cols-[1fr_360px]">
-          <div className="space-y-5">
+        <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
+          <div className="min-w-0 space-y-5">
             {canManage && editingGroup && (
               <div className="rounded-3xl bg-white p-4 shadow-sm sm:p-5">
                 <div className="mb-4 flex items-center justify-between gap-3">
@@ -975,15 +1043,16 @@ export default function CommunityGroupPage() {
               const eMeta = eventMeta(event.eventType);
               const itemForm = itemForms[event.id] ?? BLANK_ITEM;
               const inviteForm = eventInviteForms[event.id] ?? BLANK_INVITE;
+              const messageForm = messageForms[event.id] ?? BLANK_MESSAGE;
               const shareUrl = eventShareUrl(event);
               return (
                 <div
                   key={event.id}
                   id={`event-${event.id}`}
-                  className={`scroll-mt-5 rounded-3xl bg-white p-4 shadow-sm sm:p-5 ${selectedEventId === event.id ? "ring-2 ring-violet-200" : ""}`}
+                  className={`min-w-0 scroll-mt-5 rounded-3xl bg-white p-4 shadow-sm sm:p-5 ${selectedEventId === event.id ? "ring-2 ring-violet-200" : ""}`}
                 >
                   <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-start">
-                    <div className="flex-1">
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="text-3xl">{eMeta.icon}</span>
                         <div>
@@ -1011,7 +1080,7 @@ export default function CommunityGroupPage() {
                     )}
                   </div>
 
-                  <div className="mb-4 grid gap-3 rounded-2xl bg-violet-50 p-3 lg:grid-cols-[1fr_150px]">
+                  <div className="mb-4 grid min-w-0 gap-3 rounded-2xl bg-violet-50 p-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,150px)]">
                     <div className="min-w-0">
                       <p className="mb-1 flex items-center gap-2 text-sm font-black text-violet-900"><Share2 size={15} /> Share event</p>
                       <p className="truncate rounded-xl bg-white px-3 py-2 text-xs font-bold text-slate-500">{shareUrl}</p>
@@ -1054,9 +1123,9 @@ export default function CommunityGroupPage() {
                         </div>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 rounded-2xl bg-white p-3 lg:flex-col">
+                    <div className="flex min-w-0 items-center justify-center gap-3 rounded-2xl bg-white p-3 lg:flex-col">
                       <QrCode size={18} className="text-violet-500 lg:hidden" />
-                      <img src={eventQrUrl(event)} alt={`${event.title} QR code`} className="h-28 w-28 rounded-xl bg-white object-contain" />
+                      <img src={eventQrUrl(event)} alt={`${event.title} QR code`} className="h-28 w-28 max-w-full rounded-xl bg-white object-contain" />
                       <p className="text-xs font-black text-slate-500 lg:text-center">Scan to open</p>
                     </div>
                   </div>
@@ -1211,6 +1280,97 @@ export default function CommunityGroupPage() {
                     )}
                   </div>
 
+                  <div className="mb-4 rounded-2xl bg-slate-50 p-3">
+                    <h3 className="mb-3 flex items-center gap-2 font-black text-slate-800">
+                      <MessageCircle size={17} className="text-violet-500" /> Event Message Board
+                    </h3>
+                    <div className="space-y-2">
+                      {event.messages.map((message) => {
+                        const canDeleteMessage = canManage || message.parentId === group.currentParentId;
+                        return (
+                          <div key={message.id} className="min-w-0 rounded-2xl bg-white p-3 shadow-sm">
+                            <div className="mb-1 flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-black text-slate-700">{parentLabel(message.parent)}</p>
+                                <p className="text-xs font-bold text-slate-400">{messageTime(message.createdAt)}</p>
+                              </div>
+                              {canDeleteMessage && (
+                                <button
+                                  type="button"
+                                  onClick={() => deleteMessage(message.id)}
+                                  className="shrink-0 text-red-300 hover:text-red-500"
+                                  aria-label="Delete message"
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                              )}
+                            </div>
+                            {(message.body || message.emoji) && (
+                              <p className="whitespace-pre-wrap break-words text-sm font-semibold text-slate-600">
+                                {message.emoji && <span className="mr-2 text-lg">{message.emoji}</span>}
+                                {message.body}
+                              </p>
+                            )}
+                            {message.gifUrl && (
+                              <img
+                                src={message.gifUrl}
+                                alt=""
+                                className="mt-2 max-h-56 w-full max-w-full rounded-2xl object-cover sm:w-auto sm:max-w-sm"
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
+                      {event.messages.length === 0 && (
+                        <p className="rounded-2xl bg-white p-4 text-center text-sm font-bold text-slate-400">
+                          No messages yet.
+                        </p>
+                      )}
+                    </div>
+                    {canParticipate ? (
+                      <div className="mt-3 rounded-2xl bg-white p-3">
+                        <Textarea
+                          value={messageForm.body}
+                          onChange={(input) => setMessageForms((current) => ({ ...current, [event.id]: { ...messageForm, body: input.target.value } }))}
+                          placeholder="Share an update, question, or encouragement..."
+                          className="min-h-20 resize-none rounded-xl"
+                        />
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {MESSAGE_EMOJIS.map((emoji) => (
+                            <button
+                              key={emoji}
+                              type="button"
+                              onClick={() => setMessageForms((current) => ({ ...current, [event.id]: { ...messageForm, emoji: messageForm.emoji === emoji ? "" : emoji } }))}
+                              className={`rounded-xl px-2.5 py-1.5 text-xl transition-colors ${messageForm.emoji === emoji ? "bg-violet-100 ring-2 ring-violet-300" : "bg-slate-50 hover:bg-violet-50"}`}
+                            >
+                              {emoji}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_auto]">
+                          <div className="relative">
+                            <Input
+                              value={messageForm.gifUrl}
+                              onChange={(input) => setMessageForms((current) => ({ ...current, [event.id]: { ...messageForm, gifUrl: input.target.value } }))}
+                              placeholder="Paste an HTTPS GIF URL"
+                              className="rounded-xl pl-9"
+                            />
+                            <SmilePlus size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => addMessage(event.id)}
+                            className="inline-flex items-center justify-center gap-2 rounded-xl bg-violet-500 px-4 py-2 text-sm font-black text-white hover:bg-violet-600"
+                          >
+                            <Send size={15} /> Post
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="mt-3 rounded-2xl bg-white p-3 text-sm font-bold text-slate-400">Join the group to post messages.</p>
+                    )}
+                  </div>
+
                   <div>
                     <h3 className="mb-2 font-black text-slate-800">Items to bring</h3>
                     {canManage && (
@@ -1222,7 +1382,7 @@ export default function CommunityGroupPage() {
                           <SelectTrigger className="rounded-xl bg-white"><SelectValue placeholder="Assign" /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="none">Anyone</SelectItem>
-                            {group.members.map((member) => <SelectItem key={member.parentId} value={String(member.parentId)}>{emailName(member.parent.email)}</SelectItem>)}
+                            {group.members.map((member) => <SelectItem key={member.parentId} value={String(member.parentId)}>{parentLabel(member.parent)}</SelectItem>)}
                           </SelectContent>
                         </Select>
                         <button type="button" onClick={() => addItem(event.id)} className="rounded-xl bg-slate-800 px-3 py-2 text-sm font-black text-white hover:bg-slate-700">Add</button>
@@ -1237,11 +1397,11 @@ export default function CommunityGroupPage() {
                             <div className="min-w-0 flex-1">
                               <p className="font-black text-slate-800">{item.title}</p>
                               <p className="text-xs font-bold text-slate-400">
-                                {[item.quantity, item.note, item.assignedTo ? `Assigned to ${emailName(item.assignedTo.email)}` : null].filter(Boolean).join(" · ")}
+                                {[item.quantity, item.note, item.assignedTo ? `Assigned to ${parentLabel(item.assignedTo)}` : null].filter(Boolean).join(" · ")}
                               </p>
                               {item.claimedBy && (
                                 <p className="mt-1 text-xs font-black text-emerald-700">
-                                  <CheckCircle2 size={13} className="mr-1 inline" /> Claimed by {emailName(item.claimedBy.email)}
+                                  <CheckCircle2 size={13} className="mr-1 inline" /> Claimed by {parentLabel(item.claimedBy)}
                                 </p>
                               )}
                             </div>
@@ -1278,15 +1438,15 @@ export default function CommunityGroupPage() {
             )}
           </div>
 
-          <aside className="space-y-5">
+          <aside className="min-w-0 space-y-5">
             <div className="rounded-3xl bg-white p-4 shadow-sm">
               <h2 className="mb-3 flex items-center gap-2 font-black text-slate-800"><Users size={18} className="text-violet-500" /> Members</h2>
               <div className="space-y-2">
                 {group.members.map((member) => (
                   <div key={member.id} className="flex items-center justify-between rounded-2xl bg-slate-50 px-3 py-2">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-black text-slate-700">{emailName(member.parent.email)}</p>
-                      <p className="truncate text-xs font-bold text-slate-400">{member.parent.email}</p>
+                      <p className="truncate text-sm font-black text-slate-700">{parentLabel(member.parent)}</p>
+                      {member.parent?.email && <p className="truncate text-xs font-bold text-slate-400">{member.parent.email}</p>}
                     </div>
                     <span className="rounded-full bg-white px-2 py-0.5 text-xs font-black text-slate-500">{member.role}</span>
                   </div>
@@ -1295,10 +1455,10 @@ export default function CommunityGroupPage() {
             </div>
 
             {canManage && group.groupInviteUrl && (
-              <div className="rounded-3xl bg-white p-4 shadow-sm">
+              <div className="min-w-0 rounded-3xl bg-white p-4 shadow-sm">
                 <h2 className="mb-3 flex items-center gap-2 font-black text-slate-800"><QrCode size={18} className="text-violet-500" /> Group Join QR</h2>
-                <div className="rounded-2xl bg-violet-50 p-3">
-                  <img src={groupQrUrl()} alt={`${group.name} join QR code`} className="mx-auto h-52 w-52 rounded-xl bg-white p-2 object-contain" />
+                <div className="flex justify-center rounded-2xl bg-violet-50 p-3">
+                  <img src={groupQrUrl()} alt={`${group.name} join QR code`} className="h-auto w-full max-w-52 rounded-xl bg-white p-2 object-contain" />
                 </div>
                 <p className="mt-3 text-sm font-semibold leading-6 text-slate-500">
                   Scan to create a parent account or sign in, then join this group as a member.

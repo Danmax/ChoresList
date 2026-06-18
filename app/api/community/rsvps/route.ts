@@ -13,6 +13,25 @@ function cleanText(value: unknown, max: number) {
   return typeof value === "string" && value.trim() ? value.trim().slice(0, max) : null;
 }
 
+function displayLabel(parent: { email?: string | null; displayName?: string | null; relationshipLabel?: string | null } | null) {
+  if (!parent) return "Member";
+  return parent.displayName || parent.relationshipLabel || parent.email?.split("@")[0] || "Member";
+}
+
+function publicParent<T extends { id: string; email?: string | null; displayName?: string | null; relationshipLabel?: string | null }>(
+  parent: T | null,
+  showEmail: boolean
+) {
+  if (!parent) return null;
+  return {
+    id: parent.id,
+    label: displayLabel(parent),
+    displayName: parent.displayName ?? null,
+    relationshipLabel: parent.relationshipLabel ?? null,
+    ...(showEmail ? { email: parent.email ?? null } : {}),
+  };
+}
+
 export const PUT = withErrors(async (req: NextRequest) => {
   const { parentId } = requireSession(req);
   const body = await req.json();
@@ -20,7 +39,7 @@ export const PUT = withErrors(async (req: NextRequest) => {
   if (!eventId) {
     return NextResponse.json({ error: "Event is required" }, { status: 400 });
   }
-  await requireEventCommunityRole(eventId, parentId, "member");
+  const { membership } = await requireEventCommunityRole(eventId, parentId, "member");
 
   const rsvp = await prisma.communityRsvp.upsert({
     where: { eventId_parentId: { eventId, parentId } },
@@ -36,10 +55,13 @@ export const PUT = withErrors(async (req: NextRequest) => {
       guests: Math.max(0, Math.min(20, Math.round(Number(body.guests) || 0))),
       note: cleanText(body.note, 500),
     },
-    include: { parent: { select: { id: true, email: true } } },
+    include: { parent: { select: { id: true, email: true, displayName: true, relationshipLabel: true } } },
   });
 
-  return NextResponse.json(rsvp);
+  return NextResponse.json({
+    ...rsvp,
+    parent: publicParent(rsvp.parent, membership.role === "owner" || membership.role === "manager"),
+  });
 });
 
 export const DELETE = withErrors(async (req: NextRequest) => {
