@@ -419,13 +419,13 @@ export default function KidPage() {
                       opacity: done ? 0.75 : 1,
                     }}
                   >
-                    <div className="flex items-center gap-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
                       <div className="text-4xl">{assignment.chore.icon}</div>
-                      <div className="flex-1">
+                      <div className="min-w-0 flex-1">
                         <h3 className={`font-black text-slate-800 text-lg ${done ? "line-through text-slate-400" : ""}`}>
                           {assignment.chore.name}
                         </h3>
-                        <div className="flex items-center gap-2 mt-1">
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
                           <span className="text-xs font-bold text-slate-500">⭐ {assignment.chore.pointsValue} pts</span>
                           {assignment.chore.requiresPhoto && (
                             <span className="text-xs font-bold text-blue-500 flex items-center gap-1">
@@ -440,7 +440,7 @@ export default function KidPage() {
                         </div>
                       </div>
 
-                      <div className="flex gap-2">
+                      <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:shrink-0">
                         {hasInstructions && !done && (
                           <button
                             onClick={() => openInstructions(assignment)}
@@ -453,12 +453,12 @@ export default function KidPage() {
                         {!done ? (
                           <button
                             onClick={() => setReactionAssignment(assignment)}
-                            className="bg-emerald-400 hover:bg-emerald-500 text-white rounded-xl px-4 py-2 font-bold text-sm transition-colors flex items-center gap-1"
+                            className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-emerald-400 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-emerald-500 sm:flex-none"
                           >
                             <CheckCircle2 size={16} /> Done!
                           </button>
                         ) : (
-                          <div className="bg-emerald-100 text-emerald-600 rounded-xl px-4 py-2 font-bold text-sm flex items-center gap-1">
+                          <div className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-emerald-100 px-4 py-2 text-sm font-bold text-emerald-600 sm:flex-none">
                             {reactionEmoji ? <span>{reactionEmoji}</span> : <CheckCircle2 size={16} />} Done ✓
                           </div>
                         )}
@@ -627,9 +627,9 @@ export default function KidPage() {
           <div className="space-y-3">
             {projects.map((p) => (
               <div key={p.id} className="bg-white rounded-3xl p-4 shadow-sm border-2 border-orange-100">
-                <div className="flex items-center gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                   <span className="text-4xl">{p.emoji}</span>
-                  <div className="flex-1">
+                  <div className="min-w-0 flex-1">
                     <p className="font-black text-slate-800">{p.title}</p>
                     <div className="flex items-center gap-2 mt-1 bg-amber-50 border border-amber-200 rounded-xl px-2 py-1 w-fit">
                       <span className="text-base">{p.rewardEmoji}</span>
@@ -639,7 +639,7 @@ export default function KidPage() {
                   </div>
                   <button
                     onClick={() => completeProject(p)}
-                    className="bg-orange-500 text-white rounded-2xl px-4 py-2.5 font-black text-sm hover:bg-orange-600 transition-colors"
+                    className="w-full rounded-2xl bg-orange-500 px-4 py-2.5 text-sm font-black text-white transition-colors hover:bg-orange-600 sm:w-auto"
                   >
                     Done! ✅
                   </button>

@@ -218,7 +218,39 @@ export default function DevicesPage() {
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-slate-100">
+          <div className="space-y-3 md:hidden">
+            {devices.map((device) => (
+              <div key={device.id} className="rounded-2xl border border-slate-100 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate font-black text-slate-800">{device.name}</p>
+                    <p className="text-xs font-bold text-slate-400">
+                      {device.mode === "member" && device.member
+                        ? `${device.member.avatar} ${device.member.name}`
+                        : "All kids"}
+                    </p>
+                  </div>
+                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${device.revokedAt ? "bg-red-50 text-red-500" : "bg-emerald-50 text-emerald-600"}`}>
+                    {device.revokedAt ? "Revoked" : "Active"}
+                  </span>
+                </div>
+                <p className="mt-2 text-xs font-bold text-slate-500">
+                  Last seen: {device.lastSeenAt ? new Date(device.lastSeenAt).toLocaleString() : "Never"}
+                </p>
+                {!device.revokedAt && (
+                  <button
+                    type="button"
+                    onClick={() => revoke(device.id)}
+                    className="mt-3 inline-flex w-full items-center justify-center gap-1 rounded-xl bg-red-50 px-3 py-2 text-xs font-black text-red-500 transition-colors hover:bg-red-100"
+                  >
+                    <Trash2 size={14} /> Revoke
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="hidden overflow-x-auto rounded-2xl border border-slate-100 md:block">
             <table className="w-full min-w-[680px] text-left text-sm">
               <thead className="bg-slate-50 text-xs font-black uppercase text-slate-400">
                 <tr>

@@ -106,7 +106,7 @@ export default function ReportsPage() {
       ) : !data ? null : (
         <div className="space-y-8">
           {/* Stat cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard
               icon={<CheckCircle2 size={22} className="text-emerald-500" />}
               bg="bg-emerald-50"
@@ -221,17 +221,19 @@ export default function ReportsPage() {
             {data.byCategory.length > 0 && (
               <div className="bg-white rounded-3xl p-6 shadow-sm">
                 <h2 className="text-lg font-black text-slate-800 mb-4">By Category</h2>
-                <div className="flex gap-4">
-                  <ResponsiveContainer width="50%" height={180}>
-                    <PieChart>
-                      <Pie data={data.byCategory} dataKey="count" nameKey="category" cx="50%" cy="50%" outerRadius={70} innerRadius={35}>
-                        {data.byCategory.map((entry) => (
-                          <Cell key={entry.category} fill={CATEGORY_COLORS[entry.category] ?? "#94a3b8"} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(val, name) => [val, name]} contentStyle={{ borderRadius: 12, border: "none" }} />
-                    </PieChart>
-                  </ResponsiveContainer>
+                <div className="flex flex-col gap-4 sm:flex-row">
+                  <div className="h-[180px] w-full sm:w-1/2">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie data={data.byCategory} dataKey="count" nameKey="category" cx="50%" cy="50%" outerRadius={70} innerRadius={35}>
+                          {data.byCategory.map((entry) => (
+                            <Cell key={entry.category} fill={CATEGORY_COLORS[entry.category] ?? "#94a3b8"} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(val, name) => [val, name]} contentStyle={{ borderRadius: 12, border: "none" }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
                   <div className="flex-1 space-y-2 self-center">
                     {data.byCategory.map((c) => {
                       const meta = CHORE_CATEGORIES.find((cat) => cat.value === c.category);
@@ -254,7 +256,7 @@ export default function ReportsPage() {
             <div className="bg-white rounded-3xl p-6 shadow-sm">
               <h2 className="text-lg font-black text-slate-800 mb-4">Member Summary</h2>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full min-w-[620px] text-sm">
                   <thead>
                     <tr className="text-left text-slate-400 font-bold border-b border-slate-100">
                       <th className="pb-3 pr-4">Member</th>

@@ -274,7 +274,7 @@ export default function ParentGroceriesPage() {
           <h1 className="text-2xl sm:text-3xl font-black text-slate-800">🛒 Grocery Shopping</h1>
           <p className="text-sm font-semibold text-slate-500">Build shopping lists and reuse weekly, biweekly, or monthly staples.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
           <Input
             value={newListTitle}
             onChange={(event) => setNewListTitle(event.target.value)}
@@ -284,7 +284,7 @@ export default function ParentGroceriesPage() {
           <button
             type="button"
             onClick={() => createList()}
-            className="shrink-0 flex items-center gap-1.5 bg-emerald-500 text-white rounded-2xl px-4 py-2.5 font-bold hover:bg-emerald-600 transition-colors"
+            className="flex shrink-0 items-center justify-center gap-1.5 rounded-2xl bg-emerald-500 px-4 py-2.5 font-bold text-white transition-colors hover:bg-emerald-600"
           >
             <Plus size={18} /> New List
           </button>
@@ -361,7 +361,7 @@ export default function ParentGroceriesPage() {
                       {checkedCount(selectedList.items)} of {selectedList.items.length} items checked
                     </p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
                       onClick={() => completeList(selectedList)}
@@ -554,7 +554,7 @@ export default function ParentGroceriesPage() {
                       {CADENCE_META[selectedTemplate.cadence]?.label ?? selectedTemplate.cadence} recurring list · {selectedTemplate.items.length} items
                     </p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
                       onClick={() => generateTemplate(selectedTemplate)}

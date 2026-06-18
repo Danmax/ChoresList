@@ -404,7 +404,67 @@ export default function TaskScreenPage() {
         </header>
 
         <div className="overflow-hidden rounded-3xl bg-white shadow-sm">
-          <div className="overflow-x-auto">
+          <div className="divide-y divide-slate-100 md:hidden">
+            {visibleAssignments.map((assignment) => {
+              const done = assignment.completions.length > 0;
+              const reactionEmoji = assignment.completions[0]?.reactionEmoji;
+              return (
+                <div key={assignment.id} className={`p-4 ${done ? "bg-emerald-50/50 text-slate-400" : "text-slate-800"}`}>
+                  {device?.mode !== "member" && (
+                    <div className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-500">
+                      <span className="text-2xl">{assignment.member.avatar}</span>
+                      <span>{assignment.member.name}</span>
+                      <span className="inline-flex items-center gap-1 text-xs text-slate-400">
+                        <Star size={12} className="fill-yellow-400 text-yellow-400" /> {assignment.member.totalPoints} pts
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex gap-3">
+                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-3xl" style={{ backgroundColor: done ? "#dcfce7" : assignment.chore.color }}>
+                      {assignment.chore.icon}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className={`text-lg font-black ${done ? "line-through" : ""}`}>{assignment.chore.name}</p>
+                      <div className="mt-2 flex flex-wrap gap-2 text-xs font-black">
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 capitalize text-slate-600">{assignment.frequency}</span>
+                        <span className="rounded-full bg-amber-100 px-2.5 py-1 text-amber-700">+{assignment.chore.pointsValue} pts</span>
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ${done ? "bg-emerald-100 text-emerald-600" : "bg-orange-100 text-orange-700"}`}>
+                          {done && (reactionEmoji ? <span>{reactionEmoji}</span> : <CheckCircle2 size={14} />)} {done ? "Done" : "Open"}
+                        </span>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {assignment.chore.requiresPhoto && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-black text-blue-500">
+                            <Camera size={12} /> Photos
+                          </span>
+                        )}
+                        {assignment.chore.instructions && (
+                          <button
+                            type="button"
+                            onClick={() => openGuide(assignment)}
+                            className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-black text-indigo-600 hover:bg-indigo-100"
+                          >
+                            <BookOpen size={12} /> Guide
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={done || completingId === assignment.id}
+                    onClick={() => setReactionAssignment(assignment)}
+                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-5 py-3 text-base font-black text-white transition-colors hover:bg-emerald-600 disabled:bg-slate-200 disabled:text-slate-400"
+                  >
+                    <CheckCircle2 size={19} />
+                    {done ? "Done" : completingId === assignment.id ? "Saving" : "Mark Done"}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full min-w-[760px] text-left">
               <thead className="bg-slate-100 text-xs font-black uppercase text-slate-500">
                 <tr>
