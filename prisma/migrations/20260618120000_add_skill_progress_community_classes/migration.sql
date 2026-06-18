@@ -10,9 +10,9 @@ CREATE TABLE `SkillXpEvent` (
     `awardedByParentId` CHAR(36) NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
-    UNIQUE INDEX `SkillXpEvent_householdId_memberId_skillId_sourceType_sourceId_key`(`householdId`, `memberId`, `skillId`, `sourceType`, `sourceId`),
-    INDEX `SkillXpEvent_householdId_memberId_createdAt_idx`(`householdId`, `memberId`, `createdAt`),
-    INDEX `SkillXpEvent_skillId_idx`(`skillId`),
+    UNIQUE INDEX `skill_xp_event_source_uq`(`householdId`, `memberId`, `skillId`, `sourceType`, `sourceId`),
+    INDEX `skill_xp_member_created_idx`(`householdId`, `memberId`, `createdAt`),
+    INDEX `skill_xp_skill_idx`(`skillId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -38,9 +38,9 @@ CREATE TABLE `MeritBadge` (
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
-    INDEX `MeritBadge_householdId_idx`(`householdId`),
-    INDEX `MeritBadge_communityGroupId_idx`(`communityGroupId`),
-    INDEX `MeritBadge_skillId_idx`(`skillId`),
+    INDEX `merit_badge_household_idx`(`householdId`),
+    INDEX `merit_badge_group_idx`(`communityGroupId`),
+    INDEX `merit_badge_skill_idx`(`skillId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -55,9 +55,9 @@ CREATE TABLE `MemberBadge` (
     `note` TEXT NULL,
     `awardedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
-    UNIQUE INDEX `MemberBadge_memberId_badgeId_communityGroupId_key`(`memberId`, `badgeId`, `communityGroupId`),
-    INDEX `MemberBadge_householdId_memberId_idx`(`householdId`, `memberId`),
-    INDEX `MemberBadge_badgeId_idx`(`badgeId`),
+    UNIQUE INDEX `member_badge_award_uq`(`memberId`, `badgeId`, `communityGroupId`),
+    INDEX `member_badge_member_idx`(`householdId`, `memberId`),
+    INDEX `member_badge_badge_idx`(`badgeId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -70,9 +70,9 @@ CREATE TABLE `CommunityParticipant` (
     `status` VARCHAR(64) NOT NULL DEFAULT 'active',
     `joinedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
-    UNIQUE INDEX `CommunityParticipant_groupId_parentId_memberId_key`(`groupId`, `parentId`, `memberId`),
-    INDEX `CommunityParticipant_groupId_status_idx`(`groupId`, `status`),
-    INDEX `CommunityParticipant_memberId_idx`(`memberId`),
+    UNIQUE INDEX `community_participant_uq`(`groupId`, `parentId`, `memberId`),
+    INDEX `community_participant_group_idx`(`groupId`, `status`),
+    INDEX `community_participant_member_idx`(`memberId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -92,8 +92,8 @@ CREATE TABLE `CommunityClassPlan` (
     `updatedAt` DATETIME(3) NOT NULL,
 
     UNIQUE INDEX `CommunityClassPlan_eventId_key`(`eventId`),
-    INDEX `CommunityClassPlan_skillId_idx`(`skillId`),
-    INDEX `CommunityClassPlan_badgeId_idx`(`badgeId`),
+    INDEX `community_class_plan_skill_idx`(`skillId`),
+    INDEX `community_class_plan_badge_idx`(`badgeId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -108,8 +108,8 @@ CREATE TABLE `CommunityEventAttendance` (
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
-    UNIQUE INDEX `CommunityEventAttendance_eventId_participantId_key`(`eventId`, `participantId`),
-    INDEX `CommunityEventAttendance_participantId_idx`(`participantId`),
+    UNIQUE INDEX `community_attendance_uq`(`eventId`, `participantId`),
+    INDEX `community_attendance_participant_idx`(`participantId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -127,10 +127,10 @@ CREATE TABLE `SkillTest` (
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
-    INDEX `SkillTest_communityGroupId_idx`(`communityGroupId`),
-    INDEX `SkillTest_eventId_idx`(`eventId`),
-    INDEX `SkillTest_badgeId_idx`(`badgeId`),
-    INDEX `SkillTest_skillId_idx`(`skillId`),
+    INDEX `skill_test_group_idx`(`communityGroupId`),
+    INDEX `skill_test_event_idx`(`eventId`),
+    INDEX `skill_test_badge_idx`(`badgeId`),
+    INDEX `skill_test_skill_idx`(`skillId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -147,8 +147,8 @@ CREATE TABLE `SkillTestAttempt` (
     `reviewedAt` DATETIME(3) NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
-    INDEX `SkillTestAttempt_testId_participantId_idx`(`testId`, `participantId`),
-    INDEX `SkillTestAttempt_memberId_idx`(`memberId`),
+    INDEX `skill_test_attempt_test_idx`(`testId`, `participantId`),
+    INDEX `skill_test_attempt_member_idx`(`memberId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 

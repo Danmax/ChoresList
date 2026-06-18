@@ -469,9 +469,9 @@ model SkillXpEvent {
   skill     SkillCategory  @relation(fields: [skillId], references: [id], onDelete: Cascade)
   awardedBy ParentAccount? @relation("SkillXpAwarder", fields: [awardedByParentId], references: [id], onDelete: SetNull)
 
-  @@unique([householdId, memberId, skillId, sourceType, sourceId])
-  @@index([householdId, memberId, createdAt])
-  @@index([skillId])
+  @@unique([householdId, memberId, skillId, sourceType, sourceId], map: "skill_xp_event_source_uq")
+  @@index([householdId, memberId, createdAt], map: "skill_xp_member_created_idx")
+  @@index([skillId], map: "skill_xp_skill_idx")
 }
 
 model MeritBadge {
@@ -498,9 +498,9 @@ model MeritBadge {
   classPlans CommunityClassPlan[]
   skillTests SkillTest[]
 
-  @@index([householdId])
-  @@index([communityGroupId])
-  @@index([skillId])
+  @@index([householdId], map: "merit_badge_household_idx")
+  @@index([communityGroupId], map: "merit_badge_group_idx")
+  @@index([skillId], map: "merit_badge_skill_idx")
 }
 
 model MemberBadge {
@@ -520,9 +520,9 @@ model MemberBadge {
   group     CommunityGroup? @relation(fields: [communityGroupId], references: [id], onDelete: SetNull)
   awardedBy ParentAccount?  @relation("BadgeAwarder", fields: [awardedByParentId], references: [id], onDelete: SetNull)
 
-  @@unique([memberId, badgeId, communityGroupId])
-  @@index([householdId, memberId])
-  @@index([badgeId])
+  @@unique([memberId, badgeId, communityGroupId], map: "member_badge_award_uq")
+  @@index([householdId, memberId], map: "member_badge_member_idx")
+  @@index([badgeId], map: "member_badge_badge_idx")
 }
 
 model WeeklyAllowance {
@@ -785,9 +785,9 @@ model CommunityParticipant {
   attendance   CommunityEventAttendance[]
   testAttempts SkillTestAttempt[]
 
-  @@unique([groupId, parentId, memberId])
-  @@index([groupId, status])
-  @@index([memberId])
+  @@unique([groupId, parentId, memberId], map: "community_participant_uq")
+  @@index([groupId, status], map: "community_participant_group_idx")
+  @@index([memberId], map: "community_participant_member_idx")
 }
 
 model CommunityClassPlan {
@@ -809,8 +809,8 @@ model CommunityClassPlan {
   skill SkillCategory? @relation(fields: [skillId], references: [id], onDelete: SetNull)
   badge MeritBadge?    @relation(fields: [badgeId], references: [id], onDelete: SetNull)
 
-  @@index([skillId])
-  @@index([badgeId])
+  @@index([skillId], map: "community_class_plan_skill_idx")
+  @@index([badgeId], map: "community_class_plan_badge_idx")
 }
 
 model CommunityEventAttendance {
@@ -828,8 +828,8 @@ model CommunityEventAttendance {
   participant CommunityParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
   checkedInBy ParentAccount?       @relation("CommunityAttendanceChecker", fields: [checkedInByParentId], references: [id], onDelete: SetNull)
 
-  @@unique([eventId, participantId])
-  @@index([participantId])
+  @@unique([eventId, participantId], map: "community_attendance_uq")
+  @@index([participantId], map: "community_attendance_participant_idx")
 }
 
 model SkillTest {
@@ -852,10 +852,10 @@ model SkillTest {
   skill    SkillCategory?     @relation(fields: [skillId], references: [id], onDelete: SetNull)
   attempts SkillTestAttempt[]
 
-  @@index([communityGroupId])
-  @@index([eventId])
-  @@index([badgeId])
-  @@index([skillId])
+  @@index([communityGroupId], map: "skill_test_group_idx")
+  @@index([eventId], map: "skill_test_event_idx")
+  @@index([badgeId], map: "skill_test_badge_idx")
+  @@index([skillId], map: "skill_test_skill_idx")
 }
 
 model SkillTestAttempt {
@@ -876,8 +876,8 @@ model SkillTestAttempt {
   member      FamilyMember         @relation(fields: [memberId], references: [id], onDelete: Cascade)
   reviewedBy  ParentAccount?       @relation("SkillTestReviewer", fields: [reviewedByParentId], references: [id], onDelete: SetNull)
 
-  @@index([testId, participantId])
-  @@index([memberId])
+  @@index([testId, participantId], map: "skill_test_attempt_test_idx")
+  @@index([memberId], map: "skill_test_attempt_member_idx")
 }
 
 model CommunityRsvp {
