@@ -136,8 +136,8 @@ export const PUT = withErrors(async (req: NextRequest) => {
     const survey = await prisma.communitySurvey.update({ where: { id: surveyId }, data: { status: "published", closedAt: null }, include: surveyGraph() });
     return NextResponse.json(survey);
   }
-  if (existing.status !== "draft" || existing._count.submissions > 0) {
-    return NextResponse.json({ error: "Published surveys cannot be structurally edited" }, { status: 400 });
+  if (existing._count.submissions > 0) {
+    return NextResponse.json({ error: "Surveys with recorded responses cannot be edited" }, { status: 400 });
   }
 
   const draft = normalizeSurveyDraft(body);

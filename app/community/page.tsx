@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, CalendarDays, Compass, MapPin, Plus, Users } from "lucide-react";
+import { ArrowLeft, CalendarDays, ClipboardList, Compass, MapPin, Plus, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,6 +30,17 @@ type CurrentEvent = {
   title: string;
   date: string;
   location: string | null;
+};
+
+type OpenSurvey = {
+  id: string;
+  groupId: string;
+  groupName: string;
+  title: string;
+  description: string | null;
+  surveyType: string;
+  closesAt: string | null;
+  _count: { questions: number; submissions: number };
 };
 
 const GROUP_TYPES = [
@@ -66,6 +77,7 @@ function formatDate(value: string) {
 export default function CommunityPage() {
   const [groups, setGroups] = useState<CommunityGroup[]>([]);
   const [discoverGroups, setDiscoverGroups] = useState<CommunityGroup[]>([]);
+  const [openSurveys, setOpenSurveys] = useState<OpenSurvey[]>([]);
   const [form, setForm] = useState(BLANK_GROUP);
   const [showCreate, setShowCreate] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -87,8 +99,23 @@ export default function CommunityPage() {
         return;
       }
       setError("");
-      setGroups(Array.isArray(joinedData) ? joinedData : []);
+      const joinedGroups = Array.isArray(joinedData) ? joinedData as CommunityGroup[] : [];
+      setGroups(joinedGroups);
       setDiscoverGroups(Array.isArray(discoverData) ? discoverData : []);
+      const surveyResults = await Promise.all(joinedGroups.map(async (group) => {
+        const response = await fetch(`/api/community/surveys?groupId=${encodeURIComponent(group.id)}`);
+        const data = await response.json().catch(() => null);
+        return response.ok && Array.isArray(data?.surveys)
+          ? data.surveys.map((survey: Omit<OpenSurvey, "groupId" | "groupName"> & { status: string; opensAt: string | null; hasSubmitted: boolean }) => ({ ...survey, groupId: group.id, groupName: group.name }))
+          : [];
+      }));
+      const now = Date.now();
+      setOpenSurveys(surveyResults.flat().filter((survey) =>
+        survey.status === "published"
+        && !survey.hasSubmitted
+        && (!survey.opensAt || new Date(survey.opensAt).getTime() <= now)
+        && (!survey.closesAt || new Date(survey.closesAt).getTime() > now)
+      ));
     } finally {
       setLoading(false);
     }
@@ -245,6 +272,29 @@ export default function CommunityPage() {
           </button>
         </div>
       )}
+
+      <div className="mb-8">
+        <div className="mb-3 flex items-center gap-2">
+          <ClipboardList size={18} className="text-violet-500" />
+          <h2 className="font-black text-slate-800">Open Surveys</h2>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {openSurveys.map((survey) => (
+            <Link key={survey.id} href={`/community/${survey.groupId}/surveys/${survey.id}`} className="rounded-3xl bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
+              <p className="text-xs font-black uppercase tracking-wide text-violet-500">{survey.groupName} · {survey.surveyType}</p>
+              <p className="mt-1 font-black text-slate-800">{survey.title}</p>
+              {survey.description && <p className="mt-1 line-clamp-2 text-sm font-semibold text-slate-500">{survey.description}</p>}
+              <div className="mt-3 flex items-center justify-between text-xs font-bold text-slate-400">
+                <span>{survey._count.questions} questions</span>
+                <span>{survey.closesAt ? `Closes ${formatDate(survey.closesAt)}` : "Open now"}</span>
+              </div>
+            </Link>
+          ))}
+          {openSurveys.length === 0 && !loading && (
+            <div className="rounded-3xl bg-white p-6 text-center text-sm font-bold text-slate-400 md:col-span-2 xl:col-span-3">No open surveys to take.</div>
+          )}
+        </div>
+      </div>
 
       <div className="mb-8">
         <div className="mb-3 flex items-center gap-2">

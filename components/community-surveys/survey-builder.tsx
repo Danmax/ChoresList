@@ -72,7 +72,7 @@ export function SurveyBuilder({ groupId, surveyId }: { groupId: string; surveyId
     fetch(`/api/community/surveys?surveyId=${encodeURIComponent(surveyId)}`)
       .then(async (res) => ({ ok: res.ok, data: await res.json() }))
       .then(({ ok, data }) => {
-        if (!ok || !data.canManage || data.survey.status !== "draft") throw new Error(data.error ?? "This survey cannot be edited");
+        if (!ok || !data.canManage || data.survey._count.submissions > 0) throw new Error(data.error ?? "This survey cannot be edited after responses are recorded");
         setDraft(fromStored(data.survey));
       })
       .catch((error) => toast.error(error.message))
@@ -123,7 +123,7 @@ export function SurveyBuilder({ groupId, surveyId }: { groupId: string; surveyId
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Could not save survey");
-      toast.success("Survey draft saved");
+      toast.success(surveyId ? "Survey updated" : "Survey draft saved");
       router.push(`/community/${groupId}/surveys/${data.id}`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not save survey");
@@ -139,7 +139,7 @@ export function SurveyBuilder({ groupId, surveyId }: { groupId: string; surveyId
       <div className="mx-auto max-w-5xl">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <Link href={`/community/${groupId}/surveys`} className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2 font-bold text-slate-600 shadow-sm"><ArrowLeft size={17} /> Surveys</Link>
-          <button onClick={save} disabled={saving} className="inline-flex items-center gap-2 rounded-2xl bg-violet-500 px-5 py-2.5 font-black text-white hover:bg-violet-600 disabled:opacity-50"><Save size={17} /> {saving ? "Saving..." : "Save Draft"}</button>
+          <button onClick={save} disabled={saving} className="inline-flex items-center gap-2 rounded-2xl bg-violet-500 px-5 py-2.5 font-black text-white hover:bg-violet-600 disabled:opacity-50"><Save size={17} /> {saving ? "Saving..." : surveyId ? "Save Changes" : "Save Draft"}</button>
         </div>
 
         <section className="mb-5 rounded-3xl bg-violet-50 p-5 ring-1 ring-violet-100">

@@ -2,10 +2,9 @@
 
 import { type FormEvent, useState, useEffect } from "react";
 import Link from "next/link";
-import { Users, ListChecks, CalendarDays, DollarSign, Home, BarChart2, Gift, Wrench, Ticket, Mail, LockKeyhole, MonitorSmartphone, LogOut, Settings, UserPlus, Copy, Share2, CheckCircle2, ShoppingCart, Network, GraduationCap, ChefHat, HeartHandshake, ChevronDown } from "lucide-react";
+import { Users, ListChecks, CalendarDays, DollarSign, Home, BarChart2, Gift, Wrench, Ticket, Mail, LockKeyhole, MonitorSmartphone, LogOut, Settings, CheckCircle2, ShoppingCart, Network, GraduationCap, ChefHat, HeartHandshake } from "lucide-react";
 
 type AccountRole = "owner" | "parent" | "grandparent";
-type InviteRole = "parent" | "grandparent";
 
 type Plugin = {
   key: string;
@@ -56,10 +55,6 @@ export default function ParentPanel() {
   const [canResendConfirmation, setCanResendConfirmation] = useState(false);
   const [checking, setChecking] = useState(false);
   const [inviteToken, setInviteToken] = useState("");
-  const [inviteUrl, setInviteUrl] = useState("");
-  const [inviteRole, setInviteRole] = useState<InviteRole>("parent");
-  const [inviteLoading, setInviteLoading] = useState(false);
-  const [inviteMenuOpen, setInviteMenuOpen] = useState(false);
   const [communityInviteToken, setCommunityInviteToken] = useState("");
   const [communityReturnTo, setCommunityReturnTo] = useState("");
   const [communityInvitePreview, setCommunityInvitePreview] = useState<CommunityInvitePreview | null>(null);
@@ -302,51 +297,6 @@ export default function ParentPanel() {
     fetch("/api/parent/auth", { method: "DELETE" }).catch(() => {});
     setUnlocked(false);
     setPassword("");
-  }
-
-  async function loadInvite(role: InviteRole = "parent") {
-    setInviteLoading(true);
-    setInviteRole(role);
-    try {
-      const res = await fetch(`/api/parent/invite?role=${role}`);
-      const data = await res.json();
-      if (data.ok && data.inviteUrl) {
-        setInviteUrl(data.inviteUrl);
-        setNotice("");
-        setError("");
-      } else {
-        setError(
-          data.needsPin
-            ? "Unlock the parent PIN in a parent section, then come back to create an invite."
-            : data.error ?? "Could not create invite link."
-        );
-      }
-    } catch {
-      setError("Could not create invite link.");
-    } finally {
-      setInviteLoading(false);
-    }
-  }
-
-  async function copyInvite() {
-    if (!inviteUrl) return;
-    await navigator.clipboard.writeText(inviteUrl);
-    setNotice("Invite link copied.");
-  }
-
-  async function shareInvite() {
-    if (!inviteUrl) return;
-    if (navigator.share) {
-      await navigator.share({
-        title: inviteRole === "grandparent" ? "Join my ChoresList family as a grandparent" : "Join my ChoresList household",
-        text: inviteRole === "grandparent"
-          ? "Create a grandparent account to stay connected with our family chore app."
-          : "Create a parent account to join our family chore app.",
-        url: inviteUrl,
-      });
-      return;
-    }
-    await copyInvite();
   }
 
   function communityEventDate() {
@@ -605,42 +555,6 @@ export default function ParentPanel() {
           <p className="mt-1 text-xs font-black uppercase tracking-wide text-violet-500">{roleLabel}</p>
         </div>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:flex">
-          {accountRole === "owner" && (
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setInviteMenuOpen((open) => !open)}
-                disabled={inviteLoading}
-                aria-expanded={inviteMenuOpen}
-                aria-haspopup="menu"
-                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-violet-500 px-4 py-2.5 font-bold text-white shadow-sm transition-colors hover:bg-violet-600 disabled:opacity-60"
-              >
-                <UserPlus size={18} /> {inviteLoading ? "Loading..." : "Invite Parent / Grandparent"}
-                {!inviteLoading && <ChevronDown size={16} />}
-              </button>
-              {inviteMenuOpen && (
-                <div
-                  role="menu"
-                  className="absolute right-0 z-20 mt-2 w-full min-w-56 overflow-hidden rounded-2xl bg-white p-1.5 shadow-lg ring-1 ring-slate-200"
-                >
-                  {(["parent", "grandparent"] as const).map((role) => (
-                    <button
-                      key={role}
-                      type="button"
-                      role="menuitem"
-                      onClick={() => {
-                        setInviteMenuOpen(false);
-                        void loadInvite(role);
-                      }}
-                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-bold text-slate-700 hover:bg-violet-50 hover:text-violet-700"
-                    >
-                      <UserPlus size={16} /> Invite {role === "parent" ? "Parent" : "Grandparent"}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
           <Link
             href="/dashboard"
             className="flex items-center justify-center gap-2 bg-white rounded-2xl px-4 py-2.5 shadow-sm font-bold text-slate-600 hover:shadow-md transition-shadow"
@@ -656,36 +570,6 @@ export default function ParentPanel() {
           </button>
         </div>
       </div>
-
-      {inviteUrl && (
-        <div className="mb-6 rounded-3xl bg-white p-4 shadow-sm">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center">
-            <div className="min-w-0 flex-1">
-              <p className="font-black text-slate-800">Share parent access</p>
-              <p className="text-xs font-black uppercase tracking-wide text-violet-500">
-                {inviteRole === "grandparent" ? "Grandparent invite" : "Parent invite"}
-              </p>
-              <p className="truncate text-sm font-semibold text-slate-500">{inviteUrl}</p>
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={copyInvite}
-                className="inline-flex items-center gap-2 rounded-2xl bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200"
-              >
-                <Copy size={16} /> Copy
-              </button>
-              <button
-                type="button"
-                onClick={shareInvite}
-                className="inline-flex items-center gap-2 rounded-2xl bg-violet-100 px-4 py-2 text-sm font-bold text-violet-700 hover:bg-violet-200"
-              >
-                <Share2 size={16} /> Share
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         {visibleSections.map((s) => (

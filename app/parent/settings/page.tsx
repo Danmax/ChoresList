@@ -3,7 +3,7 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Building2, CalendarDays, ExternalLink, LockKeyhole, Mail, Puzzle, RefreshCw, Save, Shield, ShieldCheck, Trash2, UserCog, Users } from "lucide-react";
+import { ArrowLeft, Building2, CalendarDays, Copy, ExternalLink, LockKeyhole, Mail, Puzzle, RefreshCw, Save, Share2, Shield, ShieldCheck, Trash2, UserCog, UserPlus, Users } from "lucide-react";
 import { toast } from "sonner";
 
 const TIME_ZONES = [
@@ -56,6 +56,7 @@ type Plugin = {
 };
 
 type SettingsTab = "household" | "admin";
+type InviteRole = "parent" | "grandparent";
 
 type ParentUser = {
   id: number;
@@ -174,6 +175,9 @@ export default function ParentSettingsPage() {
   const [pinResetUrl, setPinResetUrl] = useState("");
   const [plugins, setPlugins] = useState<Plugin[]>([]);
   const [savingPlugin, setSavingPlugin] = useState("");
+  const [inviteUrl, setInviteUrl] = useState("");
+  const [inviteRole, setInviteRole] = useState<InviteRole>("parent");
+  const [inviteLoading, setInviteLoading] = useState(false);
   const canManage = settings.canManageHousehold;
   const calendarSyncActive = plugins.some((plugin) => plugin.key === "calendar-sync" && plugin.active);
   const notificationsActive = plugins.some((plugin) => plugin.key === "notifications" && plugin.active);
@@ -219,6 +223,42 @@ export default function ParentSettingsPage() {
 
   function update<K extends keyof Settings>(key: K, value: Settings[K]) {
     setSettings((previous) => ({ ...previous, [key]: value }));
+  }
+
+  async function createInvite(role: InviteRole) {
+    setInviteLoading(true);
+    setInviteRole(role);
+    try {
+      const res = await fetch(`/api/parent/invite?role=${role}`);
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.inviteUrl) {
+        toast.error(data?.needsPin ? "Unlock the parent PIN before creating an invite." : data?.error ?? "Could not create invite link");
+        return;
+      }
+      setInviteUrl(data.inviteUrl);
+      toast.success(`${role === "grandparent" ? "Grandparent" : "Parent"} invite created`);
+    } finally {
+      setInviteLoading(false);
+    }
+  }
+
+  async function copyInvite() {
+    if (!inviteUrl) return;
+    await navigator.clipboard.writeText(inviteUrl);
+    toast.success("Invite link copied");
+  }
+
+  async function shareInvite() {
+    if (!inviteUrl) return;
+    if (navigator.share) {
+      await navigator.share({
+        title: inviteRole === "grandparent" ? "Join my ChoresList family as a grandparent" : "Join my ChoresList household",
+        text: `Create a ${inviteRole} account to join our family in ChoresList.`,
+        url: inviteUrl,
+      });
+      return;
+    }
+    await copyInvite();
   }
 
   async function save() {
@@ -468,6 +508,32 @@ export default function ParentSettingsPage() {
             </label>
           </div>
         </section>
+
+        {settings.accountRole === "owner" && (
+          <section className="rounded-3xl bg-white p-5 shadow-sm">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="rounded-2xl bg-violet-100 p-3 text-violet-600"><UserPlus size={22} /></div>
+              <div>
+                <h2 className="font-black text-slate-800">Household Access</h2>
+                <p className="text-sm font-semibold text-slate-500">Invite another parent or grandparent to this household.</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => createInvite("parent")} disabled={inviteLoading} className="rounded-2xl bg-violet-500 px-4 py-2.5 font-black text-white hover:bg-violet-600 disabled:opacity-50">Invite Parent</button>
+              <button type="button" onClick={() => createInvite("grandparent")} disabled={inviteLoading} className="rounded-2xl bg-violet-100 px-4 py-2.5 font-black text-violet-700 hover:bg-violet-200 disabled:opacity-50">Invite Grandparent</button>
+            </div>
+            {inviteUrl && (
+              <div className="mt-4 rounded-2xl bg-slate-50 p-4">
+                <p className="text-xs font-black uppercase tracking-wide text-violet-500">{inviteRole} invite</p>
+                <p className="mt-1 truncate text-sm font-semibold text-slate-500">{inviteUrl}</p>
+                <div className="mt-3 flex gap-2">
+                  <button type="button" onClick={copyInvite} className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-black text-slate-700 shadow-sm"><Copy size={15} /> Copy</button>
+                  <button type="button" onClick={shareInvite} className="inline-flex items-center gap-2 rounded-xl bg-violet-100 px-3 py-2 text-sm font-black text-violet-700"><Share2 size={15} /> Share</button>
+                </div>
+              </div>
+            )}
+          </section>
+        )}
 
         <section className="rounded-3xl bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center gap-3">

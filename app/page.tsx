@@ -54,6 +54,11 @@ const features = [
     description: "Manage groups, calendars, advanced recurring meetings, RSVPs, registrations, potlucks, and online links.",
   },
   {
+    icon: "📝",
+    title: "Community Surveys",
+    description: "Publish polls, feedback forms, and personality surveys, then surface open surveys where members can find them.",
+  },
+  {
     icon: "🔔",
     title: "Event Notifications",
     description: "Send assignment and registration emails, event reminders, and weekly manager summaries.",
@@ -62,6 +67,16 @@ const features = [
     icon: "📊",
     title: "Reports",
     description: "Review chore completion feedback, completion rates, points history, and skill growth over time.",
+  },
+  {
+    icon: "💗",
+    title: "Private Wellbeing Check-ins",
+    description: "Give family members a private way to share how they are doing without points, rankings, or public comparisons.",
+  },
+  {
+    icon: "🌳",
+    title: "Family Tree",
+    description: "Map parents, grandparents, guardians, partners, and family branches in one visual family view.",
   },
 ];
 
@@ -95,7 +110,7 @@ export default function LandingPage() {
             Make chores fun for the whole family
           </p>
           <p className="text-slate-400 text-base sm:text-lg mb-10 max-w-xl mx-auto">
-            Assign chores, coordinate schedules, plan shopping, manage community events, and activate only the family tools you need.
+            Assign chores, coordinate schedules, plan shopping, run community surveys, support family wellbeing, and activate only the tools you need.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">

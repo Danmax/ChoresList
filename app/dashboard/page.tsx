@@ -94,6 +94,16 @@ type DashboardEventItem = CommunityEventItem & {
   groupName: string;
 };
 
+type DashboardSurvey = {
+  id: string;
+  groupId: number;
+  groupName: string;
+  title: string;
+  surveyType: string;
+  closesAt: string | null;
+  _count: { questions: number; submissions: number };
+};
+
 type EducationAssignment = {
   id: number;
   status: string;
@@ -152,6 +162,7 @@ export default function FamilyDashboard() {
   const [communityGroups, setCommunityGroups] = useState<CommunityGroup[]>([]);
   const [discoverGroups, setDiscoverGroups] = useState<CommunityGroup[]>([]);
   const [eventItems, setEventItems] = useState<DashboardEventItem[]>([]);
+  const [openSurveys, setOpenSurveys] = useState<DashboardSurvey[]>([]);
   const [educationAssignments, setEducationAssignments] = useState<EducationAssignment[]>([]);
   const [educationProjects, setEducationProjects] = useState<EducationProject[]>([]);
   const [educationSetCount, setEducationSetCount] = useState(0);
@@ -180,6 +191,7 @@ export default function FamilyDashboard() {
         setCommunityGroups([]);
         setDiscoverGroups([]);
         setEventItems([]);
+        setOpenSurveys([]);
         setEducationAssignments([]);
         setEducationProjects([]);
         setEducationSetCount(0);
@@ -255,6 +267,20 @@ export default function FamilyDashboard() {
         })
         .slice(0, 6);
       setEventItems(nextEventItems);
+      const surveyResults = await Promise.all(nextGroups.map(async (group) => {
+        const response = await fetch(`/api/community/surveys?groupId=${encodeURIComponent(group.id)}`);
+        const data = await response.json().catch(() => null);
+        return response.ok && Array.isArray(data?.surveys)
+          ? data.surveys.map((survey: DashboardSurvey & { status: string; opensAt: string | null; hasSubmitted: boolean }) => ({ ...survey, groupId: group.id, groupName: group.name }))
+          : [];
+      }));
+      const surveyNow = Date.now();
+      setOpenSurveys(surveyResults.flat().filter((survey) =>
+        survey.status === "published"
+        && !survey.hasSubmitted
+        && (!survey.opensAt || new Date(survey.opensAt).getTime() <= surveyNow)
+        && (!survey.closesAt || new Date(survey.closesAt).getTime() > surveyNow)
+      ).slice(0, 6));
       setLoading(false);
     } catch (e) {
       setAuthRequired(false);
@@ -264,6 +290,7 @@ export default function FamilyDashboard() {
       setCommunityGroups([]);
       setDiscoverGroups([]);
       setEventItems([]);
+      setOpenSurveys([]);
       setEducationAssignments([]);
       setEducationProjects([]);
       setEducationSetCount(0);
@@ -512,6 +539,37 @@ export default function FamilyDashboard() {
                 <Link href="/parent/groceries" className="block rounded-2xl border border-dashed border-slate-200 p-5 text-center font-bold text-slate-400 hover:bg-white/70">
                   No active shopping lists. Create one in Groceries.
                 </Link>
+              )}
+            </div>
+          </section>}
+
+          {communityEnabled && <section className="rounded-3xl bg-white/80 p-5 shadow-sm">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="flex items-center gap-2 font-black text-slate-800">
+                  <ClipboardList size={18} className="text-violet-500" /> Open Surveys
+                </h2>
+                <p className="text-xs font-bold text-slate-400">Community surveys waiting for your response</p>
+              </div>
+              <Link href="/community" className="inline-flex items-center gap-1 text-sm font-black text-violet-500 hover:text-violet-700">
+                View all <ArrowRight size={14} />
+              </Link>
+            </div>
+            <div className="space-y-3">
+              {openSurveys.map((survey) => (
+                <Link key={survey.id} href={`/community/${survey.groupId}/surveys/${survey.id}`} className="block rounded-2xl border border-violet-100 bg-violet-50/60 p-3 transition-colors hover:bg-violet-50">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-black text-slate-800">{survey.title}</p>
+                      <p className="truncate text-xs font-bold text-violet-500">{survey.groupName} · {survey._count.questions} questions</p>
+                    </div>
+                    <Badge className="bg-white text-violet-700">Take survey</Badge>
+                  </div>
+                  {survey.closesAt && <p className="mt-2 text-xs font-bold text-slate-400">Closes {formatShortDate(survey.closesAt)}</p>}
+                </Link>
+              ))}
+              {openSurveys.length === 0 && (
+                <Link href="/community" className="block rounded-2xl border border-dashed border-slate-200 p-5 text-center font-bold text-slate-400 hover:bg-white/70">No open community surveys.</Link>
               )}
             </div>
           </section>}
