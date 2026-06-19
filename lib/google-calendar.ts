@@ -1,6 +1,7 @@
 import { google, calendar_v3 } from "googleapis";
 import { GaxiosError } from "gaxios";
 import { prisma } from "@/lib/prisma";
+import { isPluginActive } from "@/lib/plugins/registry";
 import type { FamilyEvent, GoogleCalendarConnection, Household } from "@prisma/client";
 
 type GoogleFamilyEvent = FamilyEvent & {
@@ -204,6 +205,7 @@ export function mapFamilyEventToGoogleEvent(event: GoogleFamilyEvent): calendar_
 }
 
 async function getSyncContext(event: GoogleFamilyEvent): Promise<SyncContext | null> {
+  if (!(await isPluginActive(event.householdId, "calendar-sync"))) return null;
   if (!event.household.googleCalendarEnabled || !event.household.googleCalendarSyncEvents) return null;
 
   const connection = await prisma.googleCalendarConnection.findUnique({

@@ -50,6 +50,9 @@ type Plugin = {
   route: string;
   active: boolean;
   status: "active" | "inactive";
+  dependencies: string[];
+  backgroundJobs: string[];
+  dataRetention: "preserve-on-deactivate";
 };
 
 type SettingsTab = "household" | "admin";
@@ -171,6 +174,8 @@ export default function ParentSettingsPage() {
   const [plugins, setPlugins] = useState<Plugin[]>([]);
   const [savingPlugin, setSavingPlugin] = useState("");
   const canManage = settings.canManageHousehold;
+  const calendarSyncActive = plugins.some((plugin) => plugin.key === "calendar-sync" && plugin.active);
+  const notificationsActive = plugins.some((plugin) => plugin.key === "notifications" && plugin.active);
   const connection = settings.googleCalendarConnection;
   const calendarStatus = connection?.syncStatus ?? "not connected";
   const lastSync = connection?.lastSyncAt
@@ -463,6 +468,9 @@ export default function ParentSettingsPage() {
                   <div>
                     <h3 className="font-black text-slate-800">{plugin.label}</h3>
                     <p className="mt-1 text-sm font-semibold text-slate-500">{plugin.description}</p>
+                    {plugin.dependencies.length > 0 && <p className="mt-2 text-xs font-bold text-slate-400">Requires: {plugin.dependencies.join(", ")}</p>}
+                    {plugin.backgroundJobs.length > 0 && <p className="mt-1 text-xs font-bold text-slate-400">Scheduled work: {plugin.backgroundJobs.join(", ")}</p>}
+                    <p className="mt-1 text-xs font-bold text-slate-400">Data is preserved when deactivated.</p>
                   </div>
                   <span className={`rounded-full px-2.5 py-1 text-xs font-black uppercase ${plugin.active ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500"}`}>
                     {plugin.active ? "Active" : "Off"}
@@ -546,7 +554,7 @@ export default function ParentSettingsPage() {
           )}
         </section>
 
-        <section className="rounded-3xl bg-white p-5 shadow-sm">
+        {calendarSyncActive && <section className="rounded-3xl bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center gap-3">
             <div className="rounded-2xl bg-orange-100 p-3 text-orange-600">
               <CalendarDays size={22} />
@@ -593,9 +601,9 @@ export default function ParentSettingsPage() {
             )}
             {lastSync && <span className="text-sm font-bold text-slate-500">Last sync: {lastSync}</span>}
           </div>
-        </section>
+        </section>}
 
-        <section className="rounded-3xl bg-white p-5 shadow-sm">
+        {notificationsActive && <section className="rounded-3xl bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center gap-3">
             <div className="rounded-2xl bg-blue-100 p-3 text-blue-600">
               <Mail size={22} />
@@ -607,7 +615,7 @@ export default function ParentSettingsPage() {
             <Toggle label="Daily summary" checked={settings.emailDailySummary} disabled={!canManage} onChange={(value) => update("emailDailySummary", value)} />
             <Toggle label="Weekly report" checked={settings.emailWeeklyReport} disabled={!canManage} onChange={(value) => update("emailWeeklyReport", value)} />
           </div>
-        </section>
+        </section>}
 
         <section className="rounded-3xl bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center gap-3">

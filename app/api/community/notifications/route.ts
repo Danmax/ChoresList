@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSession, withErrors } from "@/lib/api";
+import { requirePluginAccess } from "@/lib/plugins/registry";
 
 const FIELDS = new Set([
   "emailNotificationsEnabled",
@@ -11,7 +12,9 @@ const FIELDS = new Set([
 ]);
 
 export const PUT = withErrors(async (req: NextRequest) => {
-  const { parentId } = requireSession(req);
+  const { householdId, parentId } = requireSession(req);
+  await requirePluginAccess(householdId, parentId, "community-events");
+  await requirePluginAccess(householdId, parentId, "notifications");
   const body = await req.json();
   const groupId = typeof body.groupId === "string" ? body.groupId : "";
   const field = typeof body.field === "string" ? body.field : "";

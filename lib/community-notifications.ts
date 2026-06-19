@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sendNotificationEmail } from "@/lib/email";
+import { isPluginActive } from "@/lib/plugins/registry";
 
 type Payload = Record<string, unknown>;
 
@@ -62,10 +63,16 @@ export async function enqueueNotification(input: {
 }
 
 async function eligibleMembership(groupId: string, parentId: string) {
-  return prisma.communityMember.findFirst({
+  const membership = await prisma.communityMember.findFirst({
     where: { groupId, parentId, status: "active", emailNotificationsEnabled: true },
-    include: { parent: { select: { id: true, email: true, emailVerified: true, displayName: true } } },
+    include: { parent: { select: { id: true, householdId: true, email: true, emailVerified: true, displayName: true } } },
   });
+  if (!membership) return null;
+  const [communityActive, notificationsActive] = await Promise.all([
+    isPluginActive(membership.parent.householdId, "community-events"),
+    isPluginActive(membership.parent.householdId, "notifications"),
+  ]);
+  return communityActive && notificationsActive ? membership : null;
 }
 
 export async function syncOneTimeEventReminders(eventId: string, parentId?: string) {
@@ -198,9 +205,15 @@ export async function notificationIsEnabled(notification: { type: string; groupI
       emailEventReminders: true,
       emailRegistrationUpdates: true,
       emailManagerWeeklySummary: true,
+      parent: { select: { householdId: true } },
     },
   });
   if (!membership || membership.status !== "active" || !membership.emailNotificationsEnabled) return false;
+  const [communityActive, notificationsActive] = await Promise.all([
+    isPluginActive(membership.parent.householdId, "community-events"),
+    isPluginActive(membership.parent.householdId, "notifications"),
+  ]);
+  if (!communityActive || !notificationsActive) return false;
   if (notification.type.startsWith("event-reminder-")) return membership.emailEventReminders;
   if (notification.type === "item-assigned") return membership.emailItemAssignments;
   if (["rsvp-confirmation", "registration-confirmation"].includes(notification.type)) return membership.emailRegistrationUpdates;
@@ -216,6 +229,11 @@ export async function enqueueWeeklyManagerSummaries(now = new Date()) {
     include: { parent: { include: { household: { select: { timeZone: true } } } }, group: { select: { id: true, name: true } } },
   });
   for (const manager of managers) {
+    const [communityActive, notificationsActive] = await Promise.all([
+      isPluginActive(manager.parent.householdId, "community-events"),
+      isPluginActive(manager.parent.householdId, "notifications"),
+    ]);
+    if (!communityActive || !notificationsActive) continue;
     const timeZone = manager.parent.household.timeZone || "UTC";
     const localText = new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" }).formatToParts(now);
     const parts = Object.fromEntries(localText.filter((p) => p.type !== "literal").map((p) => [p.type, p.value]));

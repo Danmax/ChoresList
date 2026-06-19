@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { authErrorResponse, requireParentSession, requireSession } from "@/lib/api";
 import { optimizeToWebp } from "@/lib/image";
+import { requirePluginAccess } from "@/lib/plugins/registry";
 
 export const runtime = "nodejs";
 
@@ -21,7 +22,8 @@ function receiptFilePath(receiptPath: string) {
 
 export async function GET(req: NextRequest, { params }: Params) {
   try {
-    const { householdId } = requireSession(req);
+    const { householdId, parentId } = requireSession(req);
+    await requirePluginAccess(householdId, parentId, "grocery-pantry");
     const { id } = await params;
     const list = await prisma.groceryList.findFirst({
       where: { id, householdId },
@@ -53,7 +55,8 @@ export async function GET(req: NextRequest, { params }: Params) {
 
 export async function POST(req: NextRequest, { params }: Params) {
   try {
-    const { householdId } = await requireParentSession(req);
+    const { householdId, parentId } = await requireParentSession(req);
+    await requirePluginAccess(householdId, parentId, "grocery-pantry");
     const { id } = await params;
     const list = await prisma.groceryList.findFirst({
       where: { id, householdId },

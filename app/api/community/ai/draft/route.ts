@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession, withErrors } from "@/lib/api";
+import { requirePluginAccess } from "@/lib/plugins/registry";
 import { rateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -128,7 +129,8 @@ Rules:
 }
 
 export const POST = withErrors(async (req: NextRequest) => {
-  requireSession(req);
+  const { householdId, parentId } = requireSession(req);
+  await requirePluginAccess(householdId, parentId, "community-events");
 
   const limited = rateLimit(req, { key: "community-ai-draft", limit: 20, windowMs: 60_000 });
   if (limited) return limited;

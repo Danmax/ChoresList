@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSession, withErrors } from "@/lib/api";
 import { cleanCommunityRole, requireCommunityRole } from "@/lib/community";
+import { requirePluginAccess } from "@/lib/plugins/registry";
 
 function cleanEmail(value: unknown) {
   return typeof value === "string" ? value.trim().toLowerCase().slice(0, 255) : "";
@@ -12,7 +13,8 @@ function cleanId(value: unknown) {
 }
 
 export const POST = withErrors(async (req: NextRequest) => {
-  const { parentId } = requireSession(req);
+  const { householdId, parentId } = requireSession(req);
+  await requirePluginAccess(householdId, parentId, "community-events");
   const body = await req.json();
   const groupId = cleanId(body.groupId);
   if (!groupId) return NextResponse.json({ error: "Group is required" }, { status: 400 });
@@ -53,7 +55,8 @@ export const POST = withErrors(async (req: NextRequest) => {
 });
 
 export const PUT = withErrors(async (req: NextRequest) => {
-  const { parentId } = requireSession(req);
+  const { householdId, parentId } = requireSession(req);
+  await requirePluginAccess(householdId, parentId, "community-events");
   const body = await req.json();
   const groupId = cleanId(body.groupId);
   const targetParentId = cleanId(body.parentId);
@@ -78,7 +81,8 @@ export const PUT = withErrors(async (req: NextRequest) => {
 });
 
 export const DELETE = withErrors(async (req: NextRequest) => {
-  const { parentId } = requireSession(req);
+  const { householdId, parentId } = requireSession(req);
+  await requirePluginAccess(householdId, parentId, "community-events");
   const { searchParams } = new URL(req.url);
   const groupId = searchParams.get("groupId") ?? "";
   const targetParentId = searchParams.get("parentId") ?? "";

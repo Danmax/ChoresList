@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireParentSession, requireSession, withErrors } from "@/lib/api";
+import { requirePluginAccess } from "@/lib/plugins/registry";
 
 const CADENCES = new Set(["weekly", "biweekly", "monthly"]);
 
@@ -13,7 +14,8 @@ function cleanCadence(value: unknown) {
 }
 
 export const GET = withErrors(async (req: NextRequest) => {
-  const { householdId } = requireSession(req);
+  const { householdId, parentId } = requireSession(req);
+  await requirePluginAccess(householdId, parentId, "grocery-pantry");
   const { searchParams } = new URL(req.url);
   const activeOnly = searchParams.get("active") === "true";
 
@@ -30,7 +32,8 @@ export const GET = withErrors(async (req: NextRequest) => {
 });
 
 export const POST = withErrors(async (req: NextRequest) => {
-  const { householdId } = await requireParentSession(req);
+  const { householdId, parentId } = await requireParentSession(req);
+  await requirePluginAccess(householdId, parentId, "grocery-pantry");
   const body = await req.json();
   const title = cleanText(body.title, 120);
 
@@ -49,7 +52,8 @@ export const POST = withErrors(async (req: NextRequest) => {
 });
 
 export const PUT = withErrors(async (req: NextRequest) => {
-  const { householdId } = await requireParentSession(req);
+  const { householdId, parentId } = await requireParentSession(req);
+  await requirePluginAccess(householdId, parentId, "grocery-pantry");
   const body = await req.json();
   const id = typeof body.id === "string" ? body.id : "";
   if (!id) {
@@ -79,7 +83,8 @@ export const PUT = withErrors(async (req: NextRequest) => {
 });
 
 export const DELETE = withErrors(async (req: NextRequest) => {
-  const { householdId } = await requireParentSession(req);
+  const { householdId, parentId } = await requireParentSession(req);
+  await requirePluginAccess(householdId, parentId, "grocery-pantry");
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id") ?? "";
   if (!id) {

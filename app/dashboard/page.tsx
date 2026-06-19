@@ -127,8 +127,8 @@ const GROUP_META: Record<string, { label: string; icon: string; color: string; b
   other: { label: "Community", icon: "👥", color: "#64748b", bg: "#f1f5f9" },
 };
 
-async function readJsonArray<T>(res: Response) {
-  if (!res.ok) return [];
+async function readJsonArray<T>(res: Response | null) {
+  if (!res?.ok) return [];
   const data = await res.json().catch(() => []);
   return Array.isArray(data) ? data as T[] : [];
 }
@@ -156,6 +156,9 @@ export default function FamilyDashboard() {
   const [educationProjects, setEducationProjects] = useState<EducationProject[]>([]);
   const [educationSetCount, setEducationSetCount] = useState(0);
   const [educationEnabled, setEducationEnabled] = useState(false);
+  const [groceryEnabled, setGroceryEnabled] = useState(false);
+  const [communityEnabled, setCommunityEnabled] = useState(false);
+  const [calendarEnabled, setCalendarEnabled] = useState(false);
   const [tvMode, setTvMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -188,22 +191,36 @@ export default function FamilyDashboard() {
       setApiError(null);
       setMembers(nextMembers);
 
+      const pluginsRes = await fetch("/api/plugins");
+      const pluginsData = pluginsRes.ok ? await pluginsRes.json().catch(() => null) : null;
+      const activePluginKeys = new Set<string>(
+        Array.isArray(pluginsData?.plugins)
+          ? pluginsData.plugins.filter((plugin: { active?: boolean }) => plugin.active).map((plugin: { key: string }) => plugin.key)
+          : []
+      );
+      const nextGroceryEnabled = activePluginKeys.has("grocery-pantry");
+      const nextCommunityEnabled = activePluginKeys.has("community-events");
+      const nextEducationEnabled = activePluginKeys.has("education-academy");
+      setGroceryEnabled(nextGroceryEnabled);
+      setCommunityEnabled(nextCommunityEnabled);
+      setCalendarEnabled(activePluginKeys.has("family-calendar"));
+
       const [listsRes, groupsRes, discoverRes, educationRes] = await Promise.all([
-        fetch("/api/groceries/lists?status=active"),
-        fetch("/api/community/groups"),
-        fetch("/api/community/groups?discover=true"),
-        fetch("/api/education/parent"),
+        nextGroceryEnabled ? fetch("/api/groceries/lists?status=active") : Promise.resolve(null),
+        nextCommunityEnabled ? fetch("/api/community/groups") : Promise.resolve(null),
+        nextCommunityEnabled ? fetch("/api/community/groups?discover=true") : Promise.resolve(null),
+        nextEducationEnabled ? fetch("/api/education/parent") : Promise.resolve(null),
       ]);
       const [nextLists, nextGroups, nextDiscoverGroups] = await Promise.all([
         readJsonArray<GroceryList>(listsRes),
         readJsonArray<CommunityGroup>(groupsRes),
         readJsonArray<CommunityGroup>(discoverRes),
       ]);
-      const educationData = educationRes.ok ? await educationRes.json().catch(() => null) : null;
+      const educationData = educationRes?.ok ? await educationRes.json().catch(() => null) : null;
       setGroceryLists(nextLists);
       setCommunityGroups(nextGroups);
       setDiscoverGroups(nextDiscoverGroups);
-      setEducationEnabled(Boolean(educationData));
+      setEducationEnabled(nextEducationEnabled && Boolean(educationData));
       setEducationAssignments(Array.isArray(educationData?.assignments) ? educationData.assignments : []);
       setEducationProjects(Array.isArray(educationData?.projects) ? educationData.projects : []);
       setEducationSetCount(Array.isArray(educationData?.sets) ? educationData.sets.length : 0);
@@ -314,18 +331,18 @@ export default function FamilyDashboard() {
         {!tvMode && (
           <div className="flex flex-wrap justify-end gap-2 sm:gap-3">
             <TinyWeather />
-            <Link
+            {calendarEnabled && <Link
               href="/calendar"
               className="flex items-center gap-1.5 bg-white rounded-2xl px-3 sm:px-4 py-2.5 shadow-sm font-bold text-slate-600 hover:shadow-md transition-shadow text-sm sm:text-base"
             >
               <Calendar size={16} /> <span className="hidden sm:inline">Calendar</span>
-            </Link>
-            <Link
+            </Link>}
+            {communityEnabled && <Link
               href="/community"
               className="flex items-center gap-1.5 bg-white rounded-2xl px-3 sm:px-4 py-2.5 shadow-sm font-bold text-slate-600 hover:shadow-md transition-shadow text-sm sm:text-base"
             >
               <Users size={16} /> <span className="hidden sm:inline">Community</span>
-            </Link>
+            </Link>}
             <Link
               href="/parent"
               className="flex items-center gap-1.5 bg-white rounded-2xl px-3 sm:px-4 py-2.5 shadow-sm font-bold text-slate-600 hover:shadow-md transition-shadow text-sm sm:text-base"
@@ -433,7 +450,7 @@ export default function FamilyDashboard() {
               </Link>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
-              {PARENT_ITEMS.map((item) => (
+              {PARENT_ITEMS.filter((item) => item.href !== "/parent/academy" || educationEnabled).map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
@@ -451,7 +468,7 @@ export default function FamilyDashboard() {
             </div>
           </section>
 
-          <section className="rounded-3xl bg-white/80 p-5 shadow-sm">
+          {groceryEnabled && <section className="rounded-3xl bg-white/80 p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
                 <h2 className="flex items-center gap-2 font-black text-slate-800">
@@ -495,9 +512,9 @@ export default function FamilyDashboard() {
                 </Link>
               )}
             </div>
-          </section>
+          </section>}
 
-          <section className="rounded-3xl bg-white/80 p-5 shadow-sm">
+          {communityEnabled && <section className="rounded-3xl bg-white/80 p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
                 <h2 className="flex items-center gap-2 font-black text-slate-800">
@@ -538,9 +555,9 @@ export default function FamilyDashboard() {
                 </Link>
               )}
             </div>
-          </section>
+          </section>}
 
-          <section className="rounded-3xl bg-white/80 p-5 shadow-sm">
+          {communityEnabled && <section className="rounded-3xl bg-white/80 p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
                 <h2 className="flex items-center gap-2 font-black text-slate-800">
@@ -582,7 +599,7 @@ export default function FamilyDashboard() {
                 </Link>
               )}
             </div>
-          </section>
+          </section>}
         </div>
       )}
 

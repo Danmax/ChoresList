@@ -38,6 +38,18 @@ Community email notifications use a database-backed outbox. Run the processor on
 
 The processor sends one-time event reminders at 8:00 AM in the event time zone 10 days before, 3 days before, and on the event date. It also sends item assignments, RSVP/registration confirmations, and Monday manager summaries. `PUBLIC_BASE_URL` and SMTP settings are required for delivery.
 
+## Feature plugins
+
+Household owners can activate or deactivate optional features under Parent Settings. Deactivation hides navigation, blocks protected pages and APIs, and stops plugin-owned scheduled work while preserving existing data. Grocery & Pantry, Community Events, Reports & Coaching, Family Calendar, Calendar Sync, and Notifications default to active to preserve existing household behavior.
+
+Emotional Wellbeing is opt-in and stores private qualitative check-ins. Check-ins do not affect points, badges, reports, or leaderboards, and access follows household child-access rules.
+
+After pulling schema changes, apply migrations before starting the app:
+
+```bash
+npm run db:deploy
+```
+
 `GIPHY_API_KEY` is optional and enables GIF search on event message boards. Members can still paste an HTTPS GIF URL when it is not configured.
 
 First, run the development server:

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireParentSession, withErrors } from "@/lib/api";
+import { requirePluginAccess } from "@/lib/plugins/registry";
 
 const SCOPES = new Set(["list", "template"]);
 
@@ -25,7 +26,8 @@ function cleanId(value: unknown) {
 }
 
 export const POST = withErrors(async (req: NextRequest) => {
-  const { householdId } = await requireParentSession(req);
+  const { householdId, parentId } = await requireParentSession(req);
+  await requirePluginAccess(householdId, parentId, "grocery-pantry");
   const body = await req.json();
   const scope = cleanScope(body.scope);
   const name = cleanRequiredText(body.name, 120);
@@ -67,7 +69,8 @@ export const POST = withErrors(async (req: NextRequest) => {
 });
 
 export const PUT = withErrors(async (req: NextRequest) => {
-  const { householdId } = await requireParentSession(req);
+  const { householdId, parentId } = await requireParentSession(req);
+  await requirePluginAccess(householdId, parentId, "grocery-pantry");
   const body = await req.json();
   const scope = cleanScope(body.scope);
   const id = cleanId(body.id);
@@ -124,7 +127,8 @@ export const PUT = withErrors(async (req: NextRequest) => {
 });
 
 export const DELETE = withErrors(async (req: NextRequest) => {
-  const { householdId } = await requireParentSession(req);
+  const { householdId, parentId } = await requireParentSession(req);
+  await requirePluginAccess(householdId, parentId, "grocery-pantry");
   const { searchParams } = new URL(req.url);
   const scope = cleanScope(searchParams.get("scope"));
   const id = searchParams.get("id") ?? "";

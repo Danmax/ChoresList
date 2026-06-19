@@ -46,6 +46,7 @@ model ParentAccount {
   familyTreeNodes            FamilyTreeNode[]
   createdRecipes             Recipe[]                   @relation("RecipeCreator")
   familyMemberProfile        FamilyMember?              @relation("ParentFamilyMember")
+  wellbeingCheckIns         WellbeingCheckIn[]          @relation("WellbeingRecorder")
 }
 
 model Household {
@@ -94,6 +95,7 @@ model Household {
   skillXpEvents            SkillXpEvent[]
   meritBadges              MeritBadge[]
   memberBadges             MemberBadge[]
+  wellbeingCheckIns        WellbeingCheckIn[]
 }
 
 model HouseholdPlugin {
@@ -188,6 +190,7 @@ model FamilyMember {
   allowances            WeeklyAllowance[]
   skills                MemberSkill[]
   skillXpEvents         SkillXpEvent[]
+  wellbeingCheckIns     WellbeingCheckIn[]
   badges                MemberBadge[]
   communityParticipants CommunityParticipant[]
   skillTestAttempts     SkillTestAttempt[]
@@ -205,6 +208,24 @@ model FamilyMember {
   educationProjects     EducationProject[]
 
   @@index([householdId, role])
+}
+
+model WellbeingCheckIn {
+  id                 String   @id @default(uuid()) @db.Char(36)
+  householdId        String   @db.Char(36)
+  memberId           String   @db.Char(36)
+  recordedByParentId String   @db.Char(36)
+  mood               String   @db.VarChar(32)
+  note               String?  @db.Text
+  supportRequested   Boolean  @default(false)
+  createdAt          DateTime @default(now())
+
+  household Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  member    FamilyMember  @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  recordedBy ParentAccount @relation("WellbeingRecorder", fields: [recordedByParentId], references: [id], onDelete: Cascade)
+
+  @@index([householdId, createdAt])
+  @@index([memberId, createdAt])
 }
 
 model EducationMaterialSet {

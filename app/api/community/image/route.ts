@@ -4,6 +4,7 @@ import path from "path";
 import { NextRequest, NextResponse } from "next/server";
 import { authErrorResponse, requireSession } from "@/lib/api";
 import { optimizeToWebp } from "@/lib/image";
+import { requirePluginAccess } from "@/lib/plugins/registry";
 
 export const runtime = "nodejs";
 
@@ -13,7 +14,8 @@ const UPLOADS_ROOT = path.resolve(process.cwd(), "public", "uploads");
 
 export async function POST(req: NextRequest) {
   try {
-    const { parentId } = requireSession(req);
+    const { householdId, parentId } = requireSession(req);
+    await requirePluginAccess(householdId, parentId, "community-events");
     const formData = await req.formData();
     const file = formData.get("file");
 

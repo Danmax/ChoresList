@@ -5,6 +5,7 @@ import { requireCommunityRole } from "@/lib/community";
 import { sendCommunityInviteEmail } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
 import { createCommunityInviteToken, verifyCommunityInviteToken } from "@/lib/session";
+import { requirePluginAccess } from "@/lib/plugins/registry";
 
 export const runtime = "nodejs";
 
@@ -72,7 +73,8 @@ export const GET = withErrors(async (req: NextRequest) => {
 });
 
 export const POST = withErrors(async (req: NextRequest) => {
-  const { parentId, email: inviterEmail } = requireSession(req);
+  const { householdId, parentId, email: inviterEmail } = requireSession(req);
+  await requirePluginAccess(householdId, parentId, "community-events");
   const body = await req.json();
   const groupId = cleanId(body.groupId);
   const eventId = cleanId(body.eventId);
@@ -119,7 +121,8 @@ export const POST = withErrors(async (req: NextRequest) => {
 });
 
 export const PUT = withErrors(async (req: NextRequest) => {
-  const { parentId } = requireSession(req);
+  const { householdId, parentId } = requireSession(req);
+  await requirePluginAccess(householdId, parentId, "community-events");
   const body = await req.json();
   const invite = verifyCommunityInviteToken(typeof body.token === "string" ? body.token : undefined);
   if (!invite) return NextResponse.json({ error: "Community invite is invalid or expired" }, { status: 400 });

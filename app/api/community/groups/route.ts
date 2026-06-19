@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { optionalSession, requireSession, withErrors } from "@/lib/api";
 import { getBaseUrl } from "@/lib/base-url";
 import { requireCommunityRole } from "@/lib/community";
+import { requirePluginAccess } from "@/lib/plugins/registry";
 import { createCommunityInviteToken } from "@/lib/session";
 
 const GROUP_TYPES = new Set(["church", "nonprofit", "sports", "school", "hobby", "neighborhood", "other"]);
@@ -187,6 +188,7 @@ function publicEvent(
 
 export const GET = withErrors(async (req: NextRequest) => {
   const session = optionalSession(req);
+  if (session) await requirePluginAccess(session.householdId, session.parentId, "community-events");
   const parentId = session?.parentId ?? null;
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id") ?? "";
@@ -284,7 +286,8 @@ export const GET = withErrors(async (req: NextRequest) => {
 });
 
 export const POST = withErrors(async (req: NextRequest) => {
-  const { parentId } = requireSession(req);
+  const { householdId, parentId } = requireSession(req);
+  await requirePluginAccess(householdId, parentId, "community-events");
   const body = await req.json();
   const name = cleanRequiredText(body.name, 120);
   if (!name) return NextResponse.json({ error: "Group name is required" }, { status: 400 });

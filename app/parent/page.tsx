@@ -2,7 +2,7 @@
 
 import { type FormEvent, useState, useEffect } from "react";
 import Link from "next/link";
-import { Users, ListChecks, CalendarDays, DollarSign, BookOpen, Home, BarChart2, Gift, Wrench, Ticket, Mail, LockKeyhole, MonitorSmartphone, LogOut, Settings, UserPlus, Copy, Share2, CheckCircle2, ShoppingCart, Network, GraduationCap, ChefHat } from "lucide-react";
+import { Users, ListChecks, CalendarDays, DollarSign, Home, BarChart2, Gift, Wrench, Ticket, Mail, LockKeyhole, MonitorSmartphone, LogOut, Settings, UserPlus, Copy, Share2, CheckCircle2, ShoppingCart, Network, GraduationCap, ChefHat, HeartHandshake } from "lucide-react";
 
 type AccountRole = "owner" | "parent" | "grandparent";
 type InviteRole = "parent" | "grandparent";
@@ -16,6 +16,7 @@ type Plugin = {
   bg?: string;
   active: boolean;
   roles: string[];
+  showInNavigation?: boolean;
 };
 
 type CommunityInvitePreview = {
@@ -556,10 +557,17 @@ export default function ParentPanel() {
   }
 
   const pluginSections = plugins
-    .filter((plugin) => plugin.active)
+    .filter((plugin) => plugin.active && plugin.showInNavigation !== false)
     .map((plugin) => ({
       href: plugin.route,
-      icon: plugin.key === "education-academy" ? GraduationCap : plugin.key === "recipes" ? ChefHat : Network,
+      icon: plugin.key === "education-academy" ? GraduationCap
+        : plugin.key === "recipes" ? ChefHat
+        : plugin.key === "family-tree" ? Network
+        : plugin.key === "grocery-pantry" ? ShoppingCart
+        : plugin.key === "community-events" ? Users
+        : plugin.key === "reports-coaching" ? BarChart2
+        : plugin.key === "emotional-wellbeing" ? HeartHandshake
+        : CalendarDays,
       label: plugin.label,
       desc: plugin.description,
       color: plugin.color ?? "#14b8a6",
@@ -575,13 +583,9 @@ export default function ParentPanel() {
     { href: "/parent/tasks", icon: CheckCircle2, label: "Parent Tasks", desc: "Complete chores assigned to parents", color: "#14b8a6", bg: "#ccfbf1", roles: ["owner", "parent"] },
     { href: "/parent/allowance", icon: DollarSign, label: "Allowance", desc: "Review points, pay out credits", color: "#fbbf24", bg: "#fef3c7", roles: ["owner", "parent"] },
     { href: "/parent/projects", icon: Wrench, label: "House Projects", desc: "Fix-it tasks with reward tickets", color: "#f97316", bg: "#ffedd5", roles: ["owner", "parent"] },
-    { href: "/parent/groceries", icon: ShoppingCart, label: "Grocery Lists", desc: "Plan shopping & recurring staples", color: "#22c55e", bg: "#dcfce7", roles: ["owner", "parent"] },
     { href: "/parent/tickets", icon: Ticket, label: "Reward Tickets", desc: "Cash in earned rewards", color: "#eab308", bg: "#fefce8", roles: ["owner", "parent", "grandparent"] },
-    { href: "/parent/reports", icon: BarChart2, label: "Reports", desc: "Charts, completions & points trends", color: "#10b981", bg: "#d1fae5", roles: ["owner", "parent", "grandparent"] },
     { href: "/parent/devices", icon: MonitorSmartphone, label: "Device Screens", desc: "Pair QR task boards for kids", color: "#6366f1", bg: "#e0e7ff", roles: ["owner", "parent"] },
     { href: "/parent/wishlist", icon: Gift, label: "Wish Lists", desc: "View kids' wishes & requests", color: "#f472b6", bg: "#fce7f3", roles: ["owner", "parent", "grandparent"] },
-    { href: "/calendar", icon: BookOpen, label: "Family Calendar", desc: "See family events & activities", color: "#f97316", bg: "#ffedd5", roles: ["owner", "parent", "grandparent"] },
-    { href: "/community", icon: Users, label: "Community", desc: "Groups, events, RSVP & potlucks", color: "#8b5cf6", bg: "#ede9fe", roles: ["owner", "parent", "grandparent"] },
     { href: "/parent/settings", icon: Settings, label: "Household Settings", desc: "Account, PIN, email & privacy", color: "#64748b", bg: "#f1f5f9", roles: ["owner", "parent", "grandparent"] },
   ];
   const visibleSections = sections.filter((section) => section.roles.includes(accountRole));

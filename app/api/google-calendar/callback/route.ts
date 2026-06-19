@@ -3,6 +3,7 @@ import { requireSession, withErrors } from "@/lib/api";
 import { exchangeGoogleAuthorizationCode } from "@/lib/google-calendar";
 import { prisma } from "@/lib/prisma";
 import { getBaseUrl } from "@/lib/base-url";
+import { requirePluginAccess } from "@/lib/plugins/registry";
 
 const STATE_COOKIE = "google-calendar-oauth-state";
 
@@ -16,6 +17,7 @@ function redirectToSettings(req: NextRequest, params?: Record<string, string>) {
 
 export const GET = withErrors(async (req: NextRequest) => {
   const session = requireSession(req);
+  await requirePluginAccess(session.householdId, session.parentId, "calendar-sync");
   const { searchParams } = new URL(req.url);
   const error = searchParams.get("error");
   if (error) return redirectToSettings(req, { googleCalendar: "denied" });

@@ -1,5 +1,6 @@
 import { ForbiddenError } from "@/lib/auth-error";
 import { prisma } from "@/lib/prisma";
+import { requirePluginAccess } from "@/lib/plugins/registry";
 
 export type CommunityRole = "owner" | "manager" | "member";
 
@@ -21,6 +22,9 @@ export async function getCommunityMembership(groupId: string, parentId: string) 
 }
 
 export async function requireCommunityRole(groupId: string, parentId: string, minimum: CommunityRole) {
+  const parent = await prisma.parentAccount.findUnique({ where: { id: parentId }, select: { householdId: true } });
+  if (!parent) throw new ForbiddenError("Parent account not found");
+  await requirePluginAccess(parent.householdId, parentId, "community-events");
   const membership = await getCommunityMembership(groupId, parentId);
   if (!membership) throw new ForbiddenError("Join this community group before doing that");
 

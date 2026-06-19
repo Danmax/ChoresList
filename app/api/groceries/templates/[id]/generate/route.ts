@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireParentSession, withErrors } from "@/lib/api";
+import { requirePluginAccess } from "@/lib/plugins/registry";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -9,7 +10,8 @@ function cleanText(value: unknown, max: number) {
 }
 
 export const POST = withErrors(async (req: NextRequest, ctx?: unknown) => {
-  const { householdId } = await requireParentSession(req);
+  const { householdId, parentId } = await requireParentSession(req);
+  await requirePluginAccess(householdId, parentId, "grocery-pantry");
   const { params } = ctx as Params;
   const { id } = await params;
   const templateId = id;

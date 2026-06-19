@@ -3,6 +3,7 @@ import { unlink } from "fs/promises";
 import path from "path";
 import { prisma } from "@/lib/prisma";
 import { requireParentSession, requireSession, withErrors } from "@/lib/api";
+import { requirePluginAccess } from "@/lib/plugins/registry";
 
 const LIST_STATUSES = new Set(["active", "completed", "archived"]);
 const RECEIPTS_ROOT = path.resolve(process.cwd(), "storage", "grocery-receipts");
@@ -17,7 +18,8 @@ function cleanText(value: unknown, max: number) {
 }
 
 export const GET = withErrors(async (req: NextRequest) => {
-  const { householdId } = requireSession(req);
+  const { householdId, parentId } = requireSession(req);
+  await requirePluginAccess(householdId, parentId, "grocery-pantry");
   const { searchParams } = new URL(req.url);
   const status = searchParams.get("status");
 
@@ -37,7 +39,8 @@ export const GET = withErrors(async (req: NextRequest) => {
 });
 
 export const POST = withErrors(async (req: NextRequest) => {
-  const { householdId } = await requireParentSession(req);
+  const { householdId, parentId } = await requireParentSession(req);
+  await requirePluginAccess(householdId, parentId, "grocery-pantry");
   const body = await req.json();
   const title = cleanText(body.title, 120);
 
@@ -52,7 +55,8 @@ export const POST = withErrors(async (req: NextRequest) => {
 });
 
 export const PUT = withErrors(async (req: NextRequest) => {
-  const { householdId } = await requireParentSession(req);
+  const { householdId, parentId } = await requireParentSession(req);
+  await requirePluginAccess(householdId, parentId, "grocery-pantry");
   const body = await req.json();
   const id = typeof body.id === "string" ? body.id : "";
   if (!id) {
@@ -89,7 +93,8 @@ export const PUT = withErrors(async (req: NextRequest) => {
 });
 
 export const DELETE = withErrors(async (req: NextRequest) => {
-  const { householdId } = await requireParentSession(req);
+  const { householdId, parentId } = await requireParentSession(req);
+  await requirePluginAccess(householdId, parentId, "grocery-pantry");
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id") ?? "";
   if (!id) {

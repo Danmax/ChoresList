@@ -14,7 +14,8 @@
     "db:resolve:init": "prisma migrate resolve --applied 20260524054410_init",
     "db:seed": "npx tsx prisma/seed.ts",
     "db:studio": "prisma studio",
-    "notifications:run": "tsx scripts/process-notifications.ts"
+    "notifications:run": "tsx scripts/process-notifications.ts",
+    "test:plugins": "node --import tsx --test tests/plugins-registry.test.ts"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"

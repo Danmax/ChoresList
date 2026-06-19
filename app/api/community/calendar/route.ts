@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSession, withErrors } from "@/lib/api";
+import { requirePluginAccess } from "@/lib/plugins/registry";
 
 function parseDate(value: string | null) {
   if (!value) return null;
@@ -9,7 +10,8 @@ function parseDate(value: string | null) {
 }
 
 export const GET = withErrors(async (req: NextRequest) => {
-  const { parentId } = requireSession(req);
+  const { householdId, parentId } = requireSession(req);
+  await requirePluginAccess(householdId, parentId, "community-events");
   const { searchParams } = new URL(req.url);
   const start = parseDate(searchParams.get("start"));
   const end = parseDate(searchParams.get("end"));

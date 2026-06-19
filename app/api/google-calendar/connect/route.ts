@@ -1,13 +1,15 @@
 import { randomBytes } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { requireParentSession, withErrors } from "@/lib/api";
+import { requireOwnerSession, withErrors } from "@/lib/api";
 import { createGoogleAuthorizationUrl } from "@/lib/google-calendar";
+import { requirePluginAccess } from "@/lib/plugins/registry";
 
 const STATE_COOKIE = "google-calendar-oauth-state";
 const STATE_TTL_SECONDS = 10 * 60;
 
 export const GET = withErrors(async (req: NextRequest) => {
-  await requireParentSession(req);
+  const { householdId, parentId } = await requireOwnerSession(req);
+  await requirePluginAccess(householdId, parentId, "calendar-sync");
 
   const state = randomBytes(32).toString("base64url");
   const res = NextResponse.redirect(createGoogleAuthorizationUrl(state));

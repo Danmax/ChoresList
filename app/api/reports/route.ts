@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSession, withErrors } from "@/lib/api";
+import { requirePluginAccess } from "@/lib/plugins/registry";
 import { childAccessWhere } from "@/lib/child-access";
 
 function weekStart(date: Date): Date {
@@ -17,6 +18,7 @@ function weekLabel(date: Date): string {
 
 export const GET = withErrors(async (req: NextRequest) => {
   const { householdId, parentId } = requireSession(req);
+  await requirePluginAccess(householdId, parentId, "reports-coaching");
   const { searchParams } = new URL(req.url);
   const range = searchParams.get("range") ?? "month";
 

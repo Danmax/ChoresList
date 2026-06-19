@@ -477,6 +477,7 @@ export default function CommunityGroupPage() {
   const [testForms, setTestForms] = useState<Record<string, typeof BLANK_TEST>>({});
   const [testScores, setTestScores] = useState<Record<string, Record<string, number>>>({});
   const [savingCommunityTool, setSavingCommunityTool] = useState<string | null>(null);
+  const [notificationsPluginActive, setNotificationsPluginActive] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -503,9 +504,10 @@ export default function CommunityGroupPage() {
 
   useEffect(() => {
     async function loadSupportData() {
-      const [skillsRes, membersRes] = await Promise.all([
+      const [skillsRes, membersRes, pluginsRes] = await Promise.all([
         fetch("/api/skills"),
         fetch("/api/members"),
+        fetch("/api/plugins"),
       ]);
       if (skillsRes.ok) {
         const data = await skillsRes.json().catch(() => []);
@@ -521,6 +523,10 @@ export default function CommunityGroupPage() {
           color: member.color,
           role: member.role,
         })));
+      }
+      if (pluginsRes.ok) {
+        const data = await pluginsRes.json().catch(() => null);
+        setNotificationsPluginActive(Array.isArray(data?.plugins) && data.plugins.some((plugin: { key: string; active: boolean }) => plugin.key === "notifications" && plugin.active));
       }
     }
     loadSupportData();
@@ -2435,7 +2441,7 @@ export default function CommunityGroupPage() {
               </div>
             </div>
 
-            {group.currentMembership && (
+            {group.currentMembership && notificationsPluginActive && (
               <div className="rounded-3xl bg-white p-4 shadow-sm">
                 <h2 className="mb-3 flex items-center gap-2 font-black text-slate-800"><Mail size={18} className="text-blue-500" /> Email Notifications</h2>
                 <div className="space-y-3">
