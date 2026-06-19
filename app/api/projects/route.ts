@@ -184,6 +184,33 @@ export const PUT = withErrors(async (req: NextRequest) => {
     return NextResponse.json({ ...result, ticket: result.tickets[0] ?? null });
   }
 
+  if (body.action === "assign") {
+    const project = await prisma.houseProject.findFirst({ where: { id: body.id, householdId }, include: { participants: true } });
+    if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    if (project.status !== "open" || project.participants.some((participant) => participant.completedAt)) {
+      return NextResponse.json({ error: "Completed projects cannot be reassigned" }, { status: 409 });
+    }
+    const assignedMemberIds = memberIds(body.assignedMemberIds);
+    for (const memberId of assignedMemberIds) {
+      const member = await prisma.familyMember.findFirst({ where: { id: memberId, householdId }, select: { id: true } });
+      if (!member || !(await canAccessMember(parentId, householdId, memberId))) {
+        return NextResponse.json({ error: "You do not have access to one or more selected members" }, { status: 403 });
+      }
+    }
+    const updated = await prisma.$transaction(async (tx) => {
+      await tx.houseProjectParticipant.deleteMany({ where: { projectId: project.id } });
+      return tx.houseProject.update({
+        where: { id: project.id },
+        data: {
+          assignedTo: assignedMemberIds[0] ?? null,
+          participants: assignedMemberIds.length ? { create: assignedMemberIds.map((memberId) => ({ householdId, memberId })) } : undefined,
+        },
+        include: { assignee: true, participants: { include: { member: true } }, tickets: { include: { member: true } } },
+      });
+    });
+    return NextResponse.json(updated);
+  }
+
   if (body.assignedTo) {
     if (!(await canAccessMember(parentId, householdId, body.assignedTo))) {
       return NextResponse.json({ error: "You do not have access to this family member" }, { status: 403 });

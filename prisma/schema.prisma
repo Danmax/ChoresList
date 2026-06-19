@@ -762,15 +762,16 @@ model RecipeIngredient {
 }
 
 model CommunityGroup {
-  id              String   @id @default(uuid()) @db.Char(36)
-  creatorParentId String   @db.Char(36)
-  name            String   @db.VarChar(255)
-  groupType       String   @default("other") @db.VarChar(64)
-  description     String?  @db.Text
-  location        String?  @db.VarChar(255)
-  visibility      String   @default("private") @db.VarChar(64)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @default(now()) @updatedAt
+  id               String   @id @default(uuid()) @db.Char(36)
+  creatorParentId  String   @db.Char(36)
+  name             String   @db.VarChar(255)
+  groupType        String   @default("other") @db.VarChar(64)
+  description      String?  @db.Text
+  location         String?  @db.VarChar(255)
+  visibility       String   @default("private") @db.VarChar(64)
+  googleCalendarId String?  @db.VarChar(255)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @default(now()) @updatedAt
 
   creator      ParentAccount          @relation("CommunityCreator", fields: [creatorParentId], references: [id], onDelete: Cascade)
   members      CommunityMember[]
@@ -824,28 +825,31 @@ model EmailNotification {
 }
 
 model CommunityEvent {
-  id                String    @id @default(uuid()) @db.Char(36)
-  groupId           String    @db.Char(36)
-  createdByParentId String?   @db.Char(36)
-  title             String    @db.VarChar(255)
-  eventType         String    @default("other") @db.VarChar(64)
-  date              DateTime
-  endDate           DateTime?
-  allDay            Boolean   @default(false)
-  recurring         String    @default("none") @db.VarChar(64)
-  recurringEndDate  DateTime?
-  recurringCount    Int?
-  seriesId          String?   @db.Char(36)
-  sessionNumber     Int?
-  location          String?   @db.VarChar(255)
-  meetingUrl        String?   @db.VarChar(1024)
-  registrationUrl   String?   @db.VarChar(1024)
-  timeZone          String    @default("UTC") @db.VarChar(64)
-  imageUrl          String?   @db.VarChar(512)
-  visibility        String    @default("private") @db.VarChar(64)
-  notes             String?   @db.Text
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @default(now()) @updatedAt
+  id                      String    @id @default(uuid()) @db.Char(36)
+  groupId                 String    @db.Char(36)
+  createdByParentId       String?   @db.Char(36)
+  title                   String    @db.VarChar(255)
+  eventType               String    @default("other") @db.VarChar(64)
+  date                    DateTime
+  endDate                 DateTime?
+  allDay                  Boolean   @default(false)
+  recurring               String    @default("none") @db.VarChar(64)
+  recurringEndDate        DateTime?
+  recurringCount          Int?
+  seriesId                String?   @db.Char(36)
+  sessionNumber           Int?
+  location                String?   @db.VarChar(255)
+  meetingUrl              String?   @db.VarChar(1024)
+  registrationUrl         String?   @db.VarChar(1024)
+  timeZone                String    @default("UTC") @db.VarChar(64)
+  imageUrl                String?   @db.VarChar(512)
+  visibility              String    @default("private") @db.VarChar(64)
+  notes                   String?   @db.Text
+  googleCalendarEventId   String?   @db.VarChar(255)
+  googleCalendarSyncedAt  DateTime?
+  googleCalendarSyncError String?   @db.Text
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @default(now()) @updatedAt
 
   group      CommunityGroup             @relation(fields: [groupId], references: [id], onDelete: Cascade)
   createdBy  ParentAccount?             @relation("CommunityEventCreator", fields: [createdByParentId], references: [id], onDelete: SetNull)

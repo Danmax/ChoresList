@@ -37,6 +37,8 @@ export default function ProjectsPage() {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showRewardPicker, setShowRewardPicker] = useState(false);
   const [filterStatus, setFilterStatus] = useState("open");
+  const [assigningProject, setAssigningProject] = useState<Project | null>(null);
+  const [assignmentIds, setAssignmentIds] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     const [pRes, mRes] = await Promise.all([fetch("/api/projects"), fetch("/api/members")]);
@@ -54,7 +56,7 @@ export default function ProjectsPage() {
       toast.error("Title and reward are required");
       return;
     }
-    await fetch("/api/projects", {
+    const res = await fetch("/api/projects", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -63,10 +65,26 @@ export default function ProjectsPage() {
         pointsBonus: Number(form.pointsBonus),
       }),
     });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) return toast.error(data?.error ?? "Could not create project");
     toast.success("Project created!");
     setOpen(false);
     setForm(BLANK);
     load();
+  }
+
+  async function saveAssignment() {
+    if (!assigningProject) return;
+    const res = await fetch("/api/projects", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "assign", id: assigningProject.id, assignedMemberIds: assignmentIds }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) return toast.error(data?.error ?? "Could not assign project");
+    toast.success(assignmentIds.length ? "Project assigned" : "Project assignment cleared");
+    setAssigningProject(null);
+    await load();
   }
 
   async function completeProject() {
@@ -188,17 +206,20 @@ export default function ProjectsPage() {
               </div>
               <div className="flex flex-col gap-2 shrink-0">
                 {p.status === "open" && (
-                  <button
-                    onClick={() => {
-                      setCompletingProject(p);
-                      setCompletedByIds(p.participants.filter((participant) => !participant.completedAt).map((participant) => participant.member.id));
-                      setCompletionReaction("");
-                      setCompletionNote("");
-                    }}
-                    className="flex items-center gap-1 bg-emerald-500 text-white rounded-xl px-3 py-1.5 text-xs font-black hover:bg-emerald-600 transition-colors"
-                  >
-                    <CheckCircle2 size={13} /> Done
-                  </button>
+                  <>
+                    <button onClick={() => { setAssigningProject(p); setAssignmentIds(p.participants.length ? p.participants.map((participant) => participant.member.id) : p.assignee ? [p.assignee.id] : []); }} className="rounded-xl bg-orange-50 px-3 py-1.5 text-xs font-black text-orange-700">Assign</button>
+                    <button
+                      onClick={() => {
+                        setCompletingProject(p);
+                        setCompletedByIds(p.participants.filter((participant) => !participant.completedAt).map((participant) => participant.member.id));
+                        setCompletionReaction("");
+                        setCompletionNote("");
+                      }}
+                      className="flex items-center gap-1 bg-emerald-500 text-white rounded-xl px-3 py-1.5 text-xs font-black hover:bg-emerald-600 transition-colors"
+                    >
+                      <CheckCircle2 size={13} /> Done
+                    </button>
+                  </>
                 )}
                 <button onClick={() => remove(p.id)} className="text-red-300 hover:text-red-500 transition-colors self-end">
                   <Trash2 size={16} />
@@ -214,6 +235,17 @@ export default function ProjectsPage() {
           </div>
         )}
       </div>
+
+      {/* Mark Complete Dialog */}
+      <Dialog open={!!assigningProject} onOpenChange={(open) => !open && setAssigningProject(null)}>
+        <DialogContent className="max-w-md rounded-3xl">
+          <DialogHeader><DialogTitle className="font-black">Assign {assigningProject?.title}</DialogTitle></DialogHeader>
+          <div className="grid grid-cols-2 gap-2">
+            {members.map((member) => <button key={member.id} type="button" onClick={() => setAssignmentIds((current) => current.includes(member.id) ? current.filter((id) => id !== member.id) : [...current, member.id])} className={`flex items-center gap-2 rounded-xl border-2 p-3 font-bold ${assignmentIds.includes(member.id) ? "border-orange-400 bg-orange-50 text-orange-800" : "border-transparent bg-slate-50 text-slate-600"}`}><span className="text-2xl">{member.avatar}</span>{member.name}</button>)}
+          </div>
+          <button type="button" onClick={saveAssignment} className="w-full rounded-xl bg-orange-500 py-3 font-black text-white">Save Assignment</button>
+        </DialogContent>
+      </Dialog>
 
       {/* Mark Complete Dialog */}
       <Dialog open={!!completingProject} onOpenChange={(o) => !o && setCompletingProject(null)}>

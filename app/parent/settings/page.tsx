@@ -595,7 +595,7 @@ export default function ParentSettingsPage() {
             </label>
           </div>
           <p className="mt-3 text-sm font-semibold text-slate-500">
-            Family events created in ChoresList are sent to Google Calendar. Events already in Google Calendar are not imported.
+            Family events are sent to your selected Google calendar. Each community group you own gets a separate Google calendar. Reconnect once to grant calendar-creation access.
           </p>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             {canManage && (

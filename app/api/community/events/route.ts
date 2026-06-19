@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireSession, withErrors } from "@/lib/api";
 import { requireCommunityRole, requireEventCommunityRole } from "@/lib/community";
 import { syncOneTimeEventReminders } from "@/lib/community-notifications";
+import { createGoogleCommunityEvent, deleteGoogleCommunityEvent, fetchCommunityEventForGoogleSync, updateGoogleCommunityEvent } from "@/lib/google-calendar";
 
 const EVENT_TYPES = new Set(["potluck", "service", "practice", "meeting", "appointment", "conference", "worship", "workshop", "fundraiser", "game", "class", "social", "other"]);
 const VISIBILITIES = new Set(["private", "public"]);
@@ -346,6 +347,11 @@ export const POST = withErrors(async (req: NextRequest) => {
     return created;
   });
 
+  for (const event of events) {
+    const eventForSync = await fetchCommunityEventForGoogleSync(event.id);
+    if (eventForSync) await createGoogleCommunityEvent(eventForSync);
+  }
+
   const publicEvents = events.map((event) => publicEvent(event, membership.role === "owner" || membership.role === "manager"));
   if (publicEvents.length === 1) {
     return NextResponse.json(publicEvents[0], { status: 201 });
@@ -399,12 +405,14 @@ export const PUT = withErrors(async (req: NextRequest) => {
   };
 
   const updateFutureSeries = body.scope === "future" && currentEvent.seriesId;
+  let syncEventIds = [id];
   if (updateFutureSeries) {
     const futureEvents = await prisma.communityEvent.findMany({
       where: { groupId: currentEvent.groupId, seriesId: currentEvent.seriesId, date: { gte: currentEvent.date } },
       select: { id: true, date: true, endDate: true },
       orderBy: { date: "asc" },
     });
+    syncEventIds = futureEvents.map((event) => event.id);
     const nextStart = date ?? currentEvent.date;
     const startDelta = nextStart.getTime() - currentEvent.date.getTime();
     const requestedEnd = body.endDate !== undefined ? cleanDate(body.endDate) : undefined;
@@ -447,6 +455,10 @@ export const PUT = withErrors(async (req: NextRequest) => {
   }
 
   const event = await prisma.communityEvent.findUniqueOrThrow({ where: { id }, include: eventInclude });
+  for (const eventId of syncEventIds) {
+    const eventForSync = await fetchCommunityEventForGoogleSync(eventId);
+    if (eventForSync) await updateGoogleCommunityEvent(eventForSync);
+  }
   await syncOneTimeEventReminders(event.id).catch((error) => console.error("[notifications event update]", error));
 
   return NextResponse.json(publicEvent(event, membership.role === "owner" || membership.role === "manager"));
@@ -460,6 +472,8 @@ export const DELETE = withErrors(async (req: NextRequest) => {
     return NextResponse.json({ error: "Event is required" }, { status: 400 });
   }
   await requireEventCommunityRole(id, parentId, "manager");
+  const eventForSync = await fetchCommunityEventForGoogleSync(id);
+  if (eventForSync) await deleteGoogleCommunityEvent(eventForSync);
   await prisma.emailNotification.updateMany({
     where: { eventId: id, status: { in: ["pending", "failed"] } },
     data: { status: "cancelled" },

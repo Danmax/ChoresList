@@ -2,7 +2,7 @@ import { google, calendar_v3 } from "googleapis";
 import { GaxiosError } from "gaxios";
 import { prisma } from "@/lib/prisma";
 import { isPluginActive } from "@/lib/plugins/registry";
-import type { FamilyEvent, GoogleCalendarConnection, Household } from "@prisma/client";
+import type { CommunityEvent, CommunityGroup, FamilyEvent, GoogleCalendarConnection, Household } from "@prisma/client";
 
 type GoogleFamilyEvent = FamilyEvent & {
   household: Pick<
@@ -18,9 +18,15 @@ type SyncContext = {
 
 const DEFAULT_TIME_ZONE = "America/New_York";
 export const GOOGLE_CALENDAR_SCOPES = [
-  "https://www.googleapis.com/auth/calendar.events",
+  "https://www.googleapis.com/auth/calendar",
   "https://www.googleapis.com/auth/userinfo.email",
 ];
+
+type GoogleCommunityEvent = CommunityEvent & {
+  group: CommunityGroup & {
+    creator: { household: Pick<Household, "id" | "timeZone" | "googleCalendarEnabled"> };
+  };
+};
 
 function requiredEnv(name: string) {
   const value = process.env[name]?.trim();
@@ -205,6 +211,104 @@ export function mapFamilyEventToGoogleEvent(event: GoogleFamilyEvent): calendar_
   return requestBody;
 }
 
+function mapCommunityEventToGoogleEvent(event: GoogleCommunityEvent): calendar_v3.Schema$Event {
+  const timeZone = event.timeZone || event.group.creator.household.timeZone || DEFAULT_TIME_ZONE;
+  const description = [event.notes, event.meetingUrl ? `Meeting: ${event.meetingUrl}` : null, event.registrationUrl ? `Registration: ${event.registrationUrl}` : null, `Community: ${event.group.name}`].filter(Boolean).join("\n\n");
+  const requestBody: calendar_v3.Schema$Event = {
+    summary: event.title,
+    description,
+    location: event.location ?? undefined,
+    extendedProperties: { private: { choresListCommunityEventId: event.id, choresListCommunityGroupId: event.groupId } },
+  };
+  if (event.allDay) {
+    requestBody.start = { date: dateOnly(event.date) };
+    requestBody.end = { date: dateOnly(addDays(event.endDate ?? event.date, 1)) };
+  } else {
+    requestBody.start = { dateTime: event.date.toISOString(), timeZone };
+    requestBody.end = { dateTime: (event.endDate ?? new Date(event.date.getTime() + 60 * 60 * 1000)).toISOString(), timeZone };
+  }
+  return requestBody;
+}
+
+async function communitySyncContext(event: GoogleCommunityEvent): Promise<SyncContext | null> {
+  const household = event.group.creator.household;
+  if (!household.googleCalendarEnabled || !(await isPluginActive(household.id, "calendar-sync"))) return null;
+  const connection = await prisma.googleCalendarConnection.findUnique({ where: { householdId: household.id } });
+  if (!connection) return null;
+  let calendarId = event.group.googleCalendarId;
+  if (!calendarId) {
+    const calendar = getCalendarClient(connection);
+    const created = await calendar.calendars.insert({ requestBody: { summary: event.group.name, description: `Community events for ${event.group.name} from ChoresList`, timeZone: household.timeZone || DEFAULT_TIME_ZONE } });
+    if (!created.data.id) throw new Error("Google Calendar did not return a community calendar id");
+    calendarId = created.data.id;
+    await prisma.communityGroup.update({ where: { id: event.groupId }, data: { googleCalendarId: calendarId } });
+  }
+  return { connection, calendarId };
+}
+
+async function markCommunityEventFailure(eventId: string, error: unknown, connection?: GoogleCalendarConnection) {
+  if (connection) await markConnectionError(connection, error);
+  await prisma.communityEvent.update({ where: { id: eventId }, data: { googleCalendarSyncError: googleErrorMessage(error).slice(0, 4000) } }).catch(() => undefined);
+}
+
+async function markCommunityEventSynced(eventId: string, googleCalendarEventId: string, connection: GoogleCalendarConnection) {
+  const now = new Date();
+  await prisma.$transaction([
+    prisma.communityEvent.update({ where: { id: eventId }, data: { googleCalendarEventId, googleCalendarSyncedAt: now, googleCalendarSyncError: null } }),
+    prisma.googleCalendarConnection.update({ where: { id: connection.id }, data: { syncStatus: "synced", lastSyncAt: now } }),
+  ]);
+}
+
+export async function fetchCommunityEventForGoogleSync(eventId: string) {
+  return prisma.communityEvent.findUnique({
+    where: { id: eventId },
+    include: { group: { include: { creator: { include: { household: { select: { id: true, timeZone: true, googleCalendarEnabled: true } } } } } } },
+  });
+}
+
+export async function createGoogleCommunityEvent(event: GoogleCommunityEvent) {
+  let context: SyncContext | null = null;
+  try {
+    context = await communitySyncContext(event);
+    if (!context) return null;
+    const response = await getCalendarClient(context.connection).events.insert({ calendarId: context.calendarId, requestBody: mapCommunityEventToGoogleEvent(event) });
+    if (!response.data.id) throw new Error("Google Calendar did not return an event id");
+    await markCommunityEventSynced(event.id, response.data.id, context.connection);
+    return response.data;
+  } catch (error) {
+    await markCommunityEventFailure(event.id, error, context?.connection);
+    return null;
+  }
+}
+
+export async function updateGoogleCommunityEvent(event: GoogleCommunityEvent) {
+  let context: SyncContext | null = null;
+  try {
+    context = await communitySyncContext(event);
+    if (!context) return null;
+    if (!event.googleCalendarEventId) return createGoogleCommunityEvent(event);
+    const response = await getCalendarClient(context.connection).events.update({ calendarId: context.calendarId, eventId: event.googleCalendarEventId, requestBody: mapCommunityEventToGoogleEvent(event) });
+    if (!response.data.id) throw new Error("Google Calendar did not return an event id");
+    await markCommunityEventSynced(event.id, response.data.id, context.connection);
+    return response.data;
+  } catch (error) {
+    if (googleStatus(error) === 404) return createGoogleCommunityEvent({ ...event, googleCalendarEventId: null });
+    await markCommunityEventFailure(event.id, error, context?.connection);
+    return null;
+  }
+}
+
+export async function deleteGoogleCommunityEvent(event: GoogleCommunityEvent) {
+  let context: SyncContext | null = null;
+  try {
+    context = await communitySyncContext(event);
+    if (!context || !event.googleCalendarEventId) return;
+    await getCalendarClient(context.connection).events.delete({ calendarId: context.calendarId, eventId: event.googleCalendarEventId });
+  } catch (error) {
+    if (googleStatus(error) !== 404) await markCommunityEventFailure(event.id, error, context?.connection);
+  }
+}
+
 async function getSyncContext(event: GoogleFamilyEvent): Promise<SyncContext | null> {
   if (!(await isPluginActive(event.householdId, "calendar-sync"))) return null;
   if (!event.household.googleCalendarEnabled || !event.household.googleCalendarSyncEvents) return null;
@@ -347,6 +451,41 @@ export async function syncAllFamilyEventsToGoogle(householdId: string) {
   }
 
   return { synced, failed, skipped: null };
+}
+
+export async function syncAllCommunityEventsToGoogle(householdId: string) {
+  if (!(await isPluginActive(householdId, "calendar-sync"))) return { synced: 0, failed: 0, skipped: "Calendar Sync is inactive" };
+  const household = await prisma.household.findUnique({ where: { id: householdId }, include: { googleCalendarConnection: true } });
+  if (!household?.googleCalendarEnabled) return { synced: 0, failed: 0, skipped: "Google Calendar integration is disabled" };
+  if (!household.googleCalendarConnection) return { synced: 0, failed: 0, skipped: "Google Calendar is not connected" };
+  const eventIds = await prisma.communityEvent.findMany({
+    where: { group: { creator: { householdId } } },
+    select: { id: true },
+    orderBy: { date: "asc" },
+  });
+  let synced = 0;
+  let failed = 0;
+  for (const { id } of eventIds) {
+    const event = await fetchCommunityEventForGoogleSync(id);
+    const result = event ? await updateGoogleCommunityEvent(event) : null;
+    if (result) synced += 1;
+    else failed += 1;
+  }
+  return { synced, failed, skipped: null };
+}
+
+export async function syncAllGoogleCalendars(householdId: string) {
+  const [family, community] = await Promise.all([
+    syncAllFamilyEventsToGoogle(householdId),
+    syncAllCommunityEventsToGoogle(householdId),
+  ]);
+  return {
+    synced: family.synced + community.synced,
+    failed: family.failed + community.failed,
+    skipped: family.skipped && community.skipped ? `${family.skipped}; ${community.skipped}` : null,
+    family,
+    community,
+  };
 }
 
 export function createGoogleAuthorizationUrl(state: string) {
