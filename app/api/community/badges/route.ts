@@ -112,9 +112,15 @@ export const PUT = withErrors(async (req: NextRequest) => {
       ...(body.title !== undefined && { title: cleanRequiredText(body.title, 255) || "Badge" }),
       ...(body.icon !== undefined && { icon: cleanText(body.icon, 32) ?? "🏅" }),
       ...(body.description !== undefined && { description: cleanText(body.description, 2000) }),
+      ...(body.requirements !== undefined && {
+        requirements: cleanText(body.requirements, 3000) ? { text: cleanText(body.requirements, 3000)! } : Prisma.JsonNull,
+      }),
       ...(body.skillId !== undefined && { skillId: typeof body.skillId === "string" && body.skillId ? body.skillId : null }),
       ...(body.xpReward !== undefined && { xpReward: cleanInt(body.xpReward, 25, 0, 500) }),
       ...(body.isActive !== undefined && { isActive: Boolean(body.isActive) }),
+      ...(body.requiresTest !== undefined && { requiresTest: Boolean(body.requiresTest) }),
+      ...(body.requiresAttendance !== undefined && { requiresAttendance: Boolean(body.requiresAttendance) }),
+      ...(body.requiresManagerApproval !== undefined && { requiresManagerApproval: Boolean(body.requiresManagerApproval) }),
     },
     include: badgeInclude,
   });

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Award, BookOpen, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCheck, Copy, ExternalLink, List, Mail, MapPin, MessageCircle, Pencil, Plus, QrCode, Save, Search, Send, Share2, SmilePlus, Trash2, UserPlus, Users, Video, X, Wand2 } from "lucide-react";
+import { ArrowLeft, Award, BookOpen, CalendarDays, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ClipboardCheck, Copy, ExternalLink, List, Mail, MapPin, MessageCircle, Pencil, Plus, QrCode, Save, Search, Send, Share2, SmilePlus, Trash2, UserPlus, Users, Video, X, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -83,6 +83,7 @@ type MeritBadge = {
   xpReward: number;
   skill: SkillOption | null;
   _count?: { awards: number };
+  requirements?: { text?: string } | null;
 };
 type CommunityClassPlan = {
   id: string;
@@ -472,6 +473,8 @@ export default function CommunityGroupPage() {
   const [participantMemberId, setParticipantMemberId] = useState("");
   const [eventRegistrationMemberIds, setEventRegistrationMemberIds] = useState<Record<string, string>>({});
   const [badgeForm, setBadgeForm] = useState(BLANK_BADGE);
+  const [editingBadgeId, setEditingBadgeId] = useState<string | null>(null);
+  const [expandedEventSections, setExpandedEventSections] = useState<Record<string, boolean>>({});
   const [classPlanForms, setClassPlanForms] = useState<Record<string, typeof BLANK_CLASS_PLAN>>({});
   const [testForms, setTestForms] = useState<Record<string, typeof BLANK_TEST>>({});
   const [testScores, setTestScores] = useState<Record<string, Record<string, number>>>({});
@@ -602,6 +605,30 @@ export default function CommunityGroupPage() {
     return origin ? `${origin}${path}` : path;
   }
 
+  function mapsUrl(location: string) {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
+  }
+
+  function sectionExpanded(eventId: string, section: "share" | "items") {
+    return Boolean(expandedEventSections[`${eventId}:${section}`]);
+  }
+
+  function toggleEventSection(eventId: string, section: "share" | "items") {
+    const key = `${eventId}:${section}`;
+    setExpandedEventSections((current) => ({ ...current, [key]: !current[key] }));
+  }
+
+  function toggleCreateEvent() {
+    setShowCreateEvent((current) => {
+      const opening = !current;
+      if (opening && group?.location) {
+        setEventForm((form) => ({ ...form, location: form.location || group.location || "" }));
+        setSelectedLocation(group.location);
+      }
+      return opening;
+    });
+  }
+
   const upcomingEvents = useMemo(
     () => [...(group?.events ?? [])].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
     [group?.events]
@@ -690,9 +717,9 @@ export default function CommunityGroupPage() {
     setSavingCommunityTool("badge");
     try {
       const res = await fetch("/api/community/badges", {
-        method: "POST",
+        method: editingBadgeId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ groupId, ...badgeForm }),
+        body: JSON.stringify(editingBadgeId ? { id: editingBadgeId, ...badgeForm } : { groupId, ...badgeForm }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -700,11 +727,26 @@ export default function CommunityGroupPage() {
         return;
       }
       setBadgeForm(BLANK_BADGE);
-      toast.success("Badge created");
+      setEditingBadgeId(null);
+      toast.success(editingBadgeId ? "Badge updated" : "Badge created");
       load();
     } finally {
       setSavingCommunityTool(null);
     }
+  }
+
+  function editBadge(badge: MeritBadge) {
+    setEditingBadgeId(badge.id);
+    setBadgeForm({ title: badge.title, icon: badge.icon, description: badge.description ?? "", skillId: badge.skill?.id ?? "", xpReward: badge.xpReward, requirements: badge.requirements?.text ?? "" });
+  }
+
+  async function archiveBadge(badge: MeritBadge) {
+    if (!window.confirm(`Archive ${badge.title}? Existing awards will be preserved.`)) return;
+    const res = await fetch("/api/community/badges", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: badge.id, isActive: false }) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return toast.error(data.error ?? "Could not archive badge");
+    toast.success("Badge archived");
+    load();
   }
 
   async function awardBadge(participantId: string, badgeId: string) {
@@ -1088,7 +1130,8 @@ export default function CommunityGroupPage() {
       return;
     }
     toast.success(Array.isArray(data?.events) ? `${data.events.length} sessions created` : "Event created");
-    setEventForm(BLANK_EVENT);
+    setEventForm({ ...BLANK_EVENT, location: group?.location ?? "" });
+    setSelectedLocation(group?.location ?? "");
     setEventPrompt("");
     setStarterItems([]);
     setSelectedLocation("");
@@ -1323,7 +1366,7 @@ export default function CommunityGroupPage() {
                   {role && <span className="rounded-full bg-white/70 px-2 py-1 text-slate-500">{role}</span>}
                 </div>
                 {group.description && <p className="mt-3 text-sm font-semibold text-slate-600">{group.description}</p>}
-                {group.location && <p className="mt-2 flex items-center gap-1 text-sm font-bold text-slate-500"><MapPin size={15} /> {group.location}</p>}
+                {group.location && <a href={mapsUrl(group.location)} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 text-sm font-bold text-slate-500 hover:text-violet-600"><MapPin size={15} /> {group.location} <ExternalLink size={12} /></a>}
               </div>
             </div>
             {!role && group.visibility === "public" && (
@@ -1442,7 +1485,7 @@ export default function CommunityGroupPage() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => setShowCreateEvent((current) => !current)}
+                      onClick={toggleCreateEvent}
                       className="inline-flex items-center gap-2 rounded-2xl bg-violet-500 px-4 py-2.5 font-black text-white hover:bg-violet-600"
                     >
                       {showCreateEvent ? <X size={17} /> : <Plus size={17} />}
@@ -1714,7 +1757,7 @@ export default function CommunityGroupPage() {
                           </p>
                         </div>
                       </div>
-                      {event.location && <p className="mt-2 flex items-center gap-1 text-sm font-bold text-slate-500"><MapPin size={15} /> {event.location}</p>}
+                      {event.location && <a href={mapsUrl(event.location)} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 text-sm font-bold text-slate-500 hover:text-violet-600"><MapPin size={15} /> {event.location} <ExternalLink size={12} /></a>}
                       {(event.meetingUrl || event.registrationUrl) && (
                         <div className="mt-3 flex flex-wrap gap-2">
                           {event.meetingUrl && (
@@ -1996,7 +2039,11 @@ export default function CommunityGroupPage() {
                     </div>
                   )}
 
-                  <div className="mb-4 grid min-w-0 gap-3 rounded-2xl bg-violet-50 p-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,150px)]">
+                  <button type="button" onClick={() => toggleEventSection(event.id, "share")} className="mb-2 flex w-full items-center justify-between rounded-2xl bg-violet-50 px-4 py-3 font-black text-violet-900">
+                    <span className="flex items-center gap-2"><Share2 size={16} /> Share event</span>
+                    <ChevronDown size={18} className={`transition-transform ${sectionExpanded(event.id, "share") ? "rotate-180" : ""}`} />
+                  </button>
+                  {sectionExpanded(event.id, "share") && <div className="mb-4 grid min-w-0 gap-3 rounded-2xl bg-violet-50 p-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,150px)]">
                     <div className="min-w-0">
                       <p className="mb-1 flex items-center gap-2 text-sm font-black text-violet-900"><Share2 size={15} /> Share event</p>
                       <p className="truncate rounded-xl bg-white px-3 py-2 text-xs font-bold text-slate-500">{shareUrl}</p>
@@ -2044,7 +2091,7 @@ export default function CommunityGroupPage() {
                       <LocalQrCode value={eventShareUrl(event)} alt={`${event.title} QR code`} size={112} className="h-28 w-28 max-w-full rounded-xl bg-white object-contain" />
                       <p className="text-xs font-black text-slate-500 lg:text-center">Scan to open</p>
                     </div>
-                  </div>
+                  </div>}
 
                   {canManage && editingEventId === event.id && (
                     <div className="mb-4 rounded-2xl border border-violet-100 bg-violet-50 p-3">
@@ -2358,7 +2405,11 @@ export default function CommunityGroupPage() {
                   </div>
 
                   <div>
-                    <h3 className="mb-2 font-black text-slate-800">Items to bring</h3>
+                    <button type="button" onClick={() => toggleEventSection(event.id, "items")} className="mb-2 flex w-full items-center justify-between rounded-2xl bg-slate-50 px-4 py-3 font-black text-slate-800">
+                      <span className="flex items-center gap-2"><List size={16} /> Items to bring <span className="rounded-full bg-white px-2 py-0.5 text-xs text-slate-500">{event.items.length}</span></span>
+                      <ChevronDown size={18} className={`transition-transform ${sectionExpanded(event.id, "items") ? "rotate-180" : ""}`} />
+                    </button>
+                    {sectionExpanded(event.id, "items") && <div>
                     {canManage && (
                       <div className="mb-3 grid gap-2 rounded-2xl bg-slate-50 p-3 md:grid-cols-[1fr_100px_1fr_160px_auto]">
                         <Input value={itemForm.title} onChange={(input) => setItemForms((current) => ({ ...current, [event.id]: { ...itemForm, title: input.target.value } }))} placeholder="Mac and cheese" className="rounded-xl bg-white" />
@@ -2411,6 +2462,7 @@ export default function CommunityGroupPage() {
                         </div>
                       )}
                     </div>
+                    </div>}
                   </div>
                 </div>
               );
@@ -2527,6 +2579,13 @@ export default function CommunityGroupPage() {
                         <span className="rounded-full bg-white px-2 py-0.5 text-xs font-black text-amber-700">{badge._count?.awards ?? 0}</span>
                       </div>
                       <p className="truncate text-xs font-bold text-amber-700">{badge.skill ? `${badge.skill.icon} ${badge.skill.name}` : "General"} · +{badge.xpReward} XP</p>
+                      {badge.description && <p className="mt-1 text-xs font-semibold text-amber-800">{badge.description}</p>}
+                      {canManage && (
+                        <div className="mt-2 flex gap-2">
+                          <button type="button" onClick={() => editBadge(badge)} className="inline-flex items-center gap-1 rounded-xl bg-white px-2 py-1 text-xs font-black text-amber-700"><Pencil size={12} /> Edit</button>
+                          <button type="button" onClick={() => archiveBadge(badge)} className="inline-flex items-center gap-1 rounded-xl bg-white px-2 py-1 text-xs font-black text-red-500"><Trash2 size={12} /> Archive</button>
+                        </div>
+                      )}
                       {canManage && group.participants.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-1.5">
                           {group.participants.slice(0, 4).map((participant) => (
@@ -2550,6 +2609,10 @@ export default function CommunityGroupPage() {
                 </div>
                 {canManage && (
                   <div className="mt-3 grid gap-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-black text-slate-700">{editingBadgeId ? "Edit merit badge" : "Create merit badge"}</p>
+                      {editingBadgeId && <button type="button" onClick={() => { setEditingBadgeId(null); setBadgeForm(BLANK_BADGE); }} className="text-slate-400"><X size={15} /></button>}
+                    </div>
                     <Input value={badgeForm.title} onChange={(event) => setBadgeForm((current) => ({ ...current, title: event.target.value }))} placeholder="Badge title" className="rounded-2xl" />
                     <div className="grid grid-cols-[72px_1fr] gap-2">
                       <Input value={badgeForm.icon} onChange={(event) => setBadgeForm((current) => ({ ...current, icon: event.target.value }))} className="rounded-2xl" />
@@ -2564,6 +2627,8 @@ export default function CommunityGroupPage() {
                         </SelectContent>
                       </Select>
                     </div>
+                    <Textarea value={badgeForm.description} onChange={(event) => setBadgeForm((current) => ({ ...current, description: event.target.value }))} placeholder="Badge description" className="rounded-2xl" />
+                    <Input type="number" min={0} max={500} value={badgeForm.xpReward} onChange={(event) => setBadgeForm((current) => ({ ...current, xpReward: Number(event.target.value) || 0 }))} placeholder="XP reward" className="rounded-2xl" />
                     <Textarea value={badgeForm.requirements} onChange={(event) => setBadgeForm((current) => ({ ...current, requirements: event.target.value }))} placeholder="Requirements" className="rounded-2xl" />
                     <button
                       type="button"
@@ -2571,7 +2636,7 @@ export default function CommunityGroupPage() {
                       disabled={savingCommunityTool === "badge" || !badgeForm.title.trim()}
                       className="rounded-2xl bg-amber-500 py-2.5 font-black text-white hover:bg-amber-600 disabled:opacity-50"
                     >
-                      Create Badge
+                      {editingBadgeId ? "Save Badge" : "Create Badge"}
                     </button>
                   </div>
                 )}
