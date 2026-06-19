@@ -6,7 +6,7 @@ import { ArrowLeft, BookOpenCheck, ClipboardList, GraduationCap, Plus, Trophy, W
 import { toast } from "sonner";
 
 type Member = {
-  id: number;
+  id: string;
   name: string;
   avatar: string;
   color: string;
@@ -14,14 +14,14 @@ type Member = {
 };
 
 type Material = {
-  id: number;
+  id: string;
   prompt: string;
   answer: string;
   choices?: string[] | null;
 };
 
 type MaterialSet = {
-  id: number;
+  id: string;
   title: string;
   subject: string;
   mode: string;
@@ -32,7 +32,7 @@ type MaterialSet = {
 };
 
 type Assignment = {
-  id: number;
+  id: string;
   title: string;
   status: string;
   passingScore: number;
@@ -40,11 +40,11 @@ type Assignment = {
   dueDate?: string | null;
   member: Pick<Member, "id" | "name" | "avatar" | "color">;
   set: Pick<MaterialSet, "id" | "title" | "subject" | "mode">;
-  attempts: { id: number; score: number; passed: boolean; completedAt: string }[];
+  attempts: { id: string; score: number; passed: boolean; completedAt: string }[];
 };
 
 type Project = {
-  id: number;
+  id: string;
   title: string;
   subject: string;
   status: string;
@@ -271,7 +271,7 @@ export default function ParentAcademyPage() {
             <h1 className="flex items-center gap-2 text-2xl font-black text-slate-800 sm:text-3xl">
               <GraduationCap className="text-blue-600" /> Merit Education Academy
             </h1>
-            <p className="text-sm font-semibold text-slate-500">Daily mastery drills, exams, flashcards, real-life exercises, and projects.</p>
+            <p className="text-sm font-semibold text-slate-500">Assign drills, exams, flashcards, real-life exercises, and projects to any family member.</p>
           </div>
         </div>
         <div className="grid grid-cols-3 gap-2 text-center">
@@ -401,7 +401,7 @@ export default function ParentAcademyPage() {
         </main>
 
         <aside className="space-y-5">
-          <section className="rounded-3xl bg-white p-5 shadow-sm">
+          <section id="lesson-builder" className="scroll-mt-6 rounded-3xl bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center gap-2">
               <Wand2 size={18} className="text-blue-600" />
               <h2 className="font-black text-slate-800">Build Lesson with AI</h2>
@@ -467,12 +467,13 @@ export default function ParentAcademyPage() {
             </form>
           </section>
 
-          <section className="rounded-3xl bg-white p-5 shadow-sm">
-            <h2 className="mb-4 font-black text-slate-800">Assign Drill</h2>
+          <section id="assign-academy" className="scroll-mt-6 rounded-3xl bg-white p-5 shadow-sm">
+            <h2 className="mb-1 font-black text-slate-800">Assign Academy Work</h2>
+            <p className="mb-4 text-xs font-bold text-slate-400">Assign a drill, flashcard set, exam, or exercise to any family member.</p>
             <form onSubmit={createAssignment} className="space-y-3">
               <select value={assignmentDraft.memberId} onChange={(e) => setAssignmentDraft((d) => ({ ...d, memberId: e.target.value }))} className="w-full rounded-2xl border-2 border-slate-100 bg-slate-50 px-3 py-2 font-semibold outline-none focus:border-blue-300">
-                <option value="">Choose child</option>
-                {members.map((member) => <option key={member.id} value={member.id}>{member.avatar} {member.name}</option>)}
+                <option value="">Choose family member</option>
+                {members.map((member) => <option key={member.id} value={member.id}>{member.avatar} {member.name} · {member.role}</option>)}
               </select>
               <select value={assignmentDraft.setId} onChange={(e) => setAssignmentDraft((d) => ({ ...d, setId: e.target.value }))} className="w-full rounded-2xl border-2 border-slate-100 bg-slate-50 px-3 py-2 font-semibold outline-none focus:border-blue-300">
                 <option value="">Choose material set</option>
@@ -490,8 +491,8 @@ export default function ParentAcademyPage() {
             <h2 className="mb-4 font-black text-slate-800">Create Project</h2>
             <form onSubmit={createProject} className="space-y-3">
               <select value={projectDraft.memberId} onChange={(e) => setProjectDraft((d) => ({ ...d, memberId: e.target.value }))} className="w-full rounded-2xl border-2 border-slate-100 bg-slate-50 px-3 py-2 font-semibold outline-none focus:border-blue-300">
-                <option value="">Choose child</option>
-                {members.map((member) => <option key={member.id} value={member.id}>{member.avatar} {member.name}</option>)}
+                <option value="">Choose family member</option>
+                {members.map((member) => <option key={member.id} value={member.id}>{member.avatar} {member.name} · {member.role}</option>)}
               </select>
               <input value={projectDraft.title} onChange={(e) => setProjectDraft((d) => ({ ...d, title: e.target.value }))} placeholder="Project title" className="w-full rounded-2xl border-2 border-slate-100 bg-slate-50 px-3 py-2 font-semibold outline-none focus:border-blue-300" />
               <textarea value={projectDraft.description} onChange={(e) => setProjectDraft((d) => ({ ...d, description: e.target.value }))} placeholder="Real-life exercise or project directions" rows={3} className="w-full rounded-2xl border-2 border-slate-100 bg-slate-50 px-3 py-2 font-semibold outline-none focus:border-blue-300" />

@@ -296,7 +296,7 @@ export default function FamilyDashboard() {
   const openEducationAssignments = educationAssignments.filter((assignment) => assignment.status !== "completed" && assignment.status !== "archived");
   const openEducationProjects = educationProjects.filter((project) => project.status === "open");
   const academyByMember = new Map<number, { assignments: number; projects: number; completed: number }>();
-  kids.forEach((member) => academyByMember.set(member.id, { assignments: 0, projects: 0, completed: 0 }));
+  members.forEach((member) => academyByMember.set(member.id, { assignments: 0, projects: 0, completed: 0 }));
   educationAssignments.forEach((assignment) => {
     const summary = academyByMember.get(assignment.member.id);
     if (!summary) return;
@@ -401,7 +401,7 @@ export default function FamilyDashboard() {
         <div className="mb-8 grid gap-5 xl:grid-cols-2">
           {educationEnabled && (
             <section className="rounded-3xl bg-white/80 p-5 shadow-sm xl:col-span-2">
-              <div className="mb-4 flex items-center justify-between gap-3">
+              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="flex items-center gap-2 font-black text-slate-800">
                     <GraduationCap size={18} className="text-blue-600" /> Education Academy
@@ -410,12 +410,14 @@ export default function FamilyDashboard() {
                     {openEducationAssignments.length} open assignments · {openEducationProjects.length} open projects · {educationSetCount} lesson sets
                   </p>
                 </div>
-                <Link href="/parent/academy" className="inline-flex items-center gap-1 text-sm font-black text-blue-600 hover:text-blue-800">
-                  Manage <ArrowRight size={14} />
-                </Link>
+                <div className="flex flex-wrap gap-2">
+                  <Link href="/parent/academy#lesson-builder" className="rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-black text-white hover:bg-blue-700">Create study set</Link>
+                  <Link href="/parent/academy#assign-academy" className="rounded-xl bg-blue-100 px-3 py-1.5 text-xs font-black text-blue-700 hover:bg-blue-200">Assign work</Link>
+                  <Link href="/parent/academy" className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-black text-blue-600 hover:text-blue-800">Manage <ArrowRight size={14} /></Link>
+                </div>
               </div>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {kids.map((member) => {
+                {members.map((member) => {
                   const academy = academyByMember.get(member.id) ?? { assignments: 0, projects: 0, completed: 0 };
                   return (
                     <Link

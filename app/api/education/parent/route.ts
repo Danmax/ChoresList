@@ -2,17 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireParentSession, requireSession, withErrors } from "@/lib/api";
 import { canAccessMember, childAccessWhere } from "@/lib/child-access";
-import { requirePluginActive } from "@/lib/plugins/registry";
+import { requirePluginAccess } from "@/lib/plugins/registry";
 import { cleanInt, cleanOptionalText, cleanText, dateFromInput, EDUCATION_MODES, EDUCATION_SUBJECTS, parseMaterialLines } from "@/lib/education";
 import { awardSkillXp, resolveSkillId } from "@/lib/skills";
 
 export const GET = withErrors(async (req: NextRequest) => {
   const { householdId, parentId } = requireSession(req);
-  await requirePluginActive(householdId, "education-academy");
+  await requirePluginAccess(householdId, parentId, "education-academy");
+  const memberAccess = await childAccessWhere(parentId, householdId);
 
   const [members, sets, assignments, projects] = await Promise.all([
     prisma.familyMember.findMany({
-      where: { householdId, ...(await childAccessWhere(parentId, householdId)) },
+      where: { householdId, ...memberAccess },
       orderBy: { name: "asc" },
       select: { id: true, name: true, avatar: true, color: true, role: true },
     }),
@@ -22,7 +23,7 @@ export const GET = withErrors(async (req: NextRequest) => {
       orderBy: { createdAt: "desc" },
     }),
     prisma.educationAssignment.findMany({
-      where: { householdId },
+      where: { householdId, member: memberAccess },
       include: {
         member: { select: { id: true, name: true, avatar: true, color: true } },
         set: { select: { id: true, title: true, subject: true, mode: true } },
@@ -32,7 +33,7 @@ export const GET = withErrors(async (req: NextRequest) => {
       take: 80,
     }),
     prisma.educationProject.findMany({
-      where: { householdId },
+      where: { householdId, OR: [{ memberId: null }, { member: memberAccess }] },
       include: { member: { select: { id: true, name: true, avatar: true, color: true } } },
       orderBy: { createdAt: "desc" },
       take: 40,
@@ -44,7 +45,7 @@ export const GET = withErrors(async (req: NextRequest) => {
 
 export const POST = withErrors(async (req: NextRequest) => {
   const { householdId, parentId } = await requireParentSession(req);
-  await requirePluginActive(householdId, "education-academy");
+  await requirePluginAccess(householdId, parentId, "education-academy");
   const body = await req.json();
   const action = typeof body.action === "string" ? body.action : "set";
 
@@ -133,7 +134,7 @@ export const POST = withErrors(async (req: NextRequest) => {
 
 export const PUT = withErrors(async (req: NextRequest) => {
   const { householdId, parentId } = await requireParentSession(req);
-  await requirePluginActive(householdId, "education-academy");
+  await requirePluginAccess(householdId, parentId, "education-academy");
   const body = await req.json();
 
   if (body.action === "project") {
