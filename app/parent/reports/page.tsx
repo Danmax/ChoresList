@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { ArrowLeft, TrendingUp, CheckCircle2, Star, Users } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Camera, TrendingUp, CheckCircle2, MessageCircle, Star, Users } from "lucide-react";
 import Link from "next/link";
 import {
   ResponsiveContainer,
@@ -39,6 +39,21 @@ interface ReportData {
   byCategory: { category: string; count: number; points: number }[];
   totalCompletions: number;
   totalPoints: number;
+  feedback: {
+    reactions: { emoji: string; count: number }[];
+    verifiedCount: number;
+    photoCount: number;
+    recent: {
+      id: string;
+      completedAt: string;
+      member: { id: string; name: string; color: string; avatar: string };
+      chore: { name: string; icon: string; category: string };
+      reactionEmoji: string | null;
+      verifiedByParent: boolean;
+      hasPhoto: boolean;
+      pointsEarned: number;
+    }[];
+  };
 }
 
 const RANGE_OPTIONS = [
@@ -248,6 +263,52 @@ export default function ReportsPage() {
                   </div>
                 </div>
               </div>
+            )}
+          </div>
+
+          <div className="rounded-3xl bg-white p-6 shadow-sm">
+            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="flex items-center gap-2 text-lg font-black text-slate-800"><MessageCircle size={20} className="text-violet-500" /> Chore Completion Feedback</h2>
+                <p className="text-sm font-semibold text-slate-400">Reactions, parent verification, and photo proof for this period.</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-black text-emerald-700"><BadgeCheck size={14} /> {data.feedback.verifiedCount} verified</span>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-black text-blue-700"><Camera size={14} /> {data.feedback.photoCount} with photos</span>
+              </div>
+            </div>
+
+            {data.feedback.reactions.length > 0 && (
+              <div className="mb-5 flex flex-wrap gap-2">
+                {data.feedback.reactions.map((reaction) => (
+                  <span key={reaction.emoji} className="rounded-2xl bg-slate-50 px-3 py-2 text-sm font-black text-slate-700">
+                    <span className="mr-1.5 text-lg">{reaction.emoji}</span>{reaction.count}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {data.feedback.recent.length > 0 ? (
+              <div className="divide-y divide-slate-100">
+                {data.feedback.recent.map((feedback) => (
+                  <div key={feedback.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center">
+                    <div className="flex min-w-0 flex-1 items-center gap-3">
+                      <span className="text-2xl">{feedback.reactionEmoji ?? feedback.chore.icon}</span>
+                      <div className="min-w-0">
+                        <p className="truncate font-black text-slate-800">{feedback.member.avatar} {feedback.member.name} · {feedback.chore.name}</p>
+                        <p className="text-xs font-bold text-slate-400">{new Date(feedback.completedAt).toLocaleString()}</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 pl-9 sm:pl-0">
+                      {feedback.verifiedByParent && <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-black text-emerald-700">Verified</span>}
+                      {feedback.hasPhoto && <span className="rounded-full bg-blue-50 px-2 py-1 text-xs font-black text-blue-700">Photo</span>}
+                      <span className="rounded-full bg-amber-50 px-2 py-1 text-xs font-black text-amber-700">+{feedback.pointsEarned} pts</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="rounded-2xl bg-slate-50 p-5 text-center text-sm font-bold text-slate-400">Completion feedback will appear after chores are finished.</p>
             )}
           </div>
 

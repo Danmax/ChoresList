@@ -1897,9 +1897,16 @@ export default function CommunityGroupPage() {
                                     {(group?.meritBadges ?? []).map((badge) => <SelectItem key={badge.id} value={badge.id}>{badge.icon} {badge.title}</SelectItem>)}
                                   </SelectContent>
                                 </Select>
-                                <div className="grid grid-cols-2 gap-2">
-                                  <Input type="number" min={1} max={100} value={draft.passingScore} onChange={(input) => setTestForms((current) => ({ ...current, [event.id]: { ...draft, passingScore: Number(input.target.value) || 85 } }))} className="rounded-2xl" />
-                                  <Input type="number" min={0} max={500} value={draft.xpReward} onChange={(input) => setTestForms((current) => ({ ...current, [event.id]: { ...draft, xpReward: Number(input.target.value) || 0 } }))} className="rounded-2xl" />
+                                <div className="grid grid-cols-2 gap-2 md:col-span-2">
+                                  <div>
+                                    <Label className="text-xs font-bold text-slate-600">Passing score (%)</Label>
+                                    <Input type="number" min={1} max={100} value={draft.passingScore} onChange={(input) => setTestForms((current) => ({ ...current, [event.id]: { ...draft, passingScore: Number(input.target.value) || 85 } }))} className="mt-1 rounded-2xl" />
+                                  </div>
+                                  <div>
+                                    <Label className="text-xs font-bold text-slate-600">XP reward</Label>
+                                    <Input type="number" min={0} max={500} value={draft.xpReward} onChange={(input) => setTestForms((current) => ({ ...current, [event.id]: { ...draft, xpReward: Number(input.target.value) || 0 } }))} className="mt-1 rounded-2xl" />
+                                  </div>
+                                  <p className="col-span-2 text-xs font-black text-slate-500">Pass {draft.passingScore}% · +{draft.xpReward} XP</p>
                                 </div>
                                 <button type="button" onClick={() => createSkillTest(event)} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-800 px-4 py-2.5 font-black text-white hover:bg-slate-700">
                                   <Plus size={16} /> Create Test

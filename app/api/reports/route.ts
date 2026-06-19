@@ -102,6 +102,24 @@ export const GET = withErrors(async (req: NextRequest) => {
     };
   });
 
+  const reactionMap = new Map<string, number>();
+  for (const completion of completions) {
+    if (completion.reactionEmoji) {
+      reactionMap.set(completion.reactionEmoji, (reactionMap.get(completion.reactionEmoji) ?? 0) + 1);
+    }
+  }
+
+  const recentFeedback = [...completions].reverse().slice(0, 12).map((completion) => ({
+    id: completion.id,
+    completedAt: completion.completedAt,
+    member: completion.member,
+    chore: completion.assignment.chore,
+    reactionEmoji: completion.reactionEmoji,
+    verifiedByParent: completion.verifiedByParent,
+    hasPhoto: Boolean(completion.photoBeforePath || completion.photoAfterPath),
+    pointsEarned: completion.pointsEarned,
+  }));
+
   return NextResponse.json({
     members: memberStats,
     weekly: Array.from(weekMap.values()),
@@ -110,5 +128,11 @@ export const GET = withErrors(async (req: NextRequest) => {
     byCategory: Array.from(catMap.values()).sort((a, b) => b.count - a.count),
     totalCompletions: completions.length,
     totalPoints: completions.reduce((sum, c) => sum + c.pointsEarned, 0),
+    feedback: {
+      reactions: Array.from(reactionMap, ([emoji, count]) => ({ emoji, count })).sort((a, b) => b.count - a.count),
+      verifiedCount: completions.filter((completion) => completion.verifiedByParent).length,
+      photoCount: completions.filter((completion) => completion.photoBeforePath || completion.photoAfterPath).length,
+      recent: recentFeedback,
+    },
   });
 });

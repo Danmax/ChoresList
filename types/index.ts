@@ -15,6 +15,15 @@ export type EventType =
   | "playdate"
   | "beach"
   | "sick-day"
+  | "doctors-appointment"
+  | "vacation"
+  | "bible-study"
+  | "work"
+  | "yard-work"
+  | "sports"
+  | "date"
+  | "rehearsal"
+  | "training"
   | "other";
 
 export const EVENT_TYPE_META: Record<
@@ -33,6 +42,15 @@ export const EVENT_TYPE_META: Record<
   playdate: { label: "Play Date", icon: "🧸", color: "#ec4899" },
   beach: { label: "Beach Day", icon: "🏖️", color: "#06b6d4" },
   "sick-day": { label: "Sick Day", icon: "🤒", color: "#94a3b8" },
+  "doctors-appointment": { label: "Doctor's Appointment", icon: "🩺", color: "#06b6d4" },
+  vacation: { label: "Vacation", icon: "✈️", color: "#0ea5e9" },
+  "bible-study": { label: "Bible Study", icon: "📖", color: "#8b5cf6" },
+  work: { label: "Work", icon: "💼", color: "#475569" },
+  "yard-work": { label: "Yard Work", icon: "🌿", color: "#16a34a" },
+  sports: { label: "Sports", icon: "⚽", color: "#f97316" },
+  date: { label: "Date", icon: "❤️", color: "#ec4899" },
+  rehearsal: { label: "Rehearsal", icon: "🎭", color: "#d946ef" },
+  training: { label: "Training", icon: "🏋️", color: "#eab308" },
   other: { label: "Other", icon: "📅", color: "#a78bfa" },
 };
 
