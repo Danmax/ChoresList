@@ -82,6 +82,8 @@ interface CommunityCalendar {
     endDate?: string | null;
     allDay: boolean;
     location?: string | null;
+    meetingUrl?: string | null;
+    registrationUrl?: string | null;
     imageUrl?: string | null;
     visibility: string;
     notes?: string | null;
@@ -117,6 +119,12 @@ const COMMUNITY_EVENT_META: Record<string, { label: string; icon: string; color:
   service: { label: "Service", icon: "🤝", color: "#10b981" },
   practice: { label: "Practice", icon: "🏃", color: "#0ea5e9" },
   meeting: { label: "Meeting", icon: "🗓️", color: "#6366f1" },
+  appointment: { label: "Appointment", icon: "📆", color: "#8b5cf6" },
+  doctor: { label: "Doctor's Appointment", icon: "🩺", color: "#06b6d4" },
+  conference: { label: "Conference", icon: "🎤", color: "#7c3aed" },
+  worship: { label: "Worship Night", icon: "🙏", color: "#d946ef" },
+  workshop: { label: "Workshop", icon: "🛠️", color: "#ea580c" },
+  fundraiser: { label: "Fundraiser", icon: "💝", color: "#e11d48" },
   game: { label: "Game", icon: "🏆", color: "#f59e0b" },
   class: { label: "Class", icon: "📚", color: "#3b82f6" },
   social: { label: "Social", icon: "🎉", color: "#ec4899" },
@@ -280,10 +288,10 @@ function communityEvents(calendar: CommunityCalendar): FamilyEvent[] {
       recurringEndDate: null,
       recurringCount: null,
       location: event.location ?? null,
-      meetingUrl: null,
+      meetingUrl: event.meetingUrl ?? null,
       rsvpUrl: `/community/${calendar.id}?event=${event.id}`,
       flyerUrl: event.imageUrl ?? null,
-      registrationUrl: null,
+      registrationUrl: event.registrationUrl ?? null,
       registrationNotes: null,
       resources: null,
       notes: event.notes,

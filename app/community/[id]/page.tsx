@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Award, BookOpen, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCheck, Copy, List, Mail, MapPin, MessageCircle, Pencil, Plus, QrCode, Save, Search, Send, Share2, SmilePlus, Trash2, UserPlus, Users, X, Wand2 } from "lucide-react";
+import { ArrowLeft, Award, BookOpen, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCheck, Copy, ExternalLink, List, Mail, MapPin, MessageCircle, Pencil, Plus, QrCode, Save, Search, Send, Share2, SmilePlus, Trash2, UserPlus, Users, Video, X, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -123,6 +123,9 @@ type CommunityEvent = {
   seriesId: string | null;
   sessionNumber: number | null;
   location: string | null;
+  meetingUrl: string | null;
+  registrationUrl: string | null;
+  timeZone: string;
   imageUrl: string | null;
   visibility: string;
   notes: string | null;
@@ -167,6 +170,12 @@ const EVENT_TYPES = [
   { value: "service", label: "Service", icon: "🤝" },
   { value: "practice", label: "Practice", icon: "🏃" },
   { value: "meeting", label: "Meeting", icon: "🗣️" },
+  { value: "appointment", label: "Appointment", icon: "📆" },
+  { value: "doctor", label: "Doctor's Appointment", icon: "🩺" },
+  { value: "conference", label: "Conference", icon: "🎤" },
+  { value: "worship", label: "Worship Night", icon: "🙏" },
+  { value: "workshop", label: "Workshop", icon: "🛠️" },
+  { value: "fundraiser", label: "Fundraiser", icon: "💝" },
   { value: "game", label: "Game", icon: "🏆" },
   { value: "class", label: "Class", icon: "📚" },
   { value: "social", label: "Social", icon: "🎉" },
@@ -182,6 +191,8 @@ const BLANK_EVENT = {
   recurringEndDate: "",
   recurringCount: 1,
   location: "",
+  meetingUrl: "",
+  registrationUrl: "",
   imageUrl: "",
   visibility: "private",
   notes: "",
@@ -226,6 +237,45 @@ const MESSAGE_EMOJIS = ["👍", "❤️", "😂", "🎉", "🙏", "🔥", "👏"
 
 function eventMeta(type: string) {
   return EVENT_TYPES.find((eventType) => eventType.value === type) ?? EVENT_TYPES[EVENT_TYPES.length - 1];
+}
+
+function ordinal(value: number) {
+  if (value === 1) return "1st";
+  if (value === 2) return "2nd";
+  if (value === 3) return "3rd";
+  return `${value}th`;
+}
+
+function monthlyPatternLabels(value: string) {
+  const date = new Date(value);
+  if (!value || Number.isNaN(date.getTime())) {
+    return {
+      date: "Monthly on the same date",
+      weekday: "Monthly on the same weekday occurrence",
+      lastWeekday: "Monthly on the last matching weekday",
+    };
+  }
+  const weekday = date.toLocaleDateString("en-US", { weekday: "long" });
+  return {
+    date: `Monthly on day ${date.getDate()}`,
+    weekday: `Monthly on the ${ordinal(Math.ceil(date.getDate() / 7))} ${weekday}`,
+    lastWeekday: `Monthly on the last ${weekday}`,
+  };
+}
+
+function recurringLabel(recurring: string, date: string) {
+  const labels = monthlyPatternLabels(date);
+  const values: Record<string, string> = {
+    none: "Does not repeat",
+    daily: "Daily",
+    weekly: "Weekly",
+    biweekly: "Every 2 weeks",
+    monthly: "Monthly",
+    "monthly-date": labels.date,
+    "monthly-weekday": labels.weekday,
+    "monthly-last-weekday": labels.lastWeekday,
+  };
+  return values[recurring] ?? recurring;
 }
 
 function groupMeta(type: string) {
@@ -926,6 +976,8 @@ export default function CommunityGroupPage() {
         date: draft.date || current.date,
         endDate: draft.endDate || current.endDate,
         location: draft.location ?? current.location,
+        meetingUrl: draft.meetingUrl ?? current.meetingUrl,
+        registrationUrl: draft.registrationUrl ?? current.registrationUrl,
         notes: draft.notes ?? current.notes,
       }));
       setSelectedLocation(draft.location ?? "");
@@ -984,6 +1036,7 @@ export default function CommunityGroupPage() {
         ...eventForm,
         date,
         endDate: localDateTimeToIso(eventForm.endDate),
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         items: starterItems,
       }),
     });
@@ -1013,6 +1066,8 @@ export default function CommunityGroupPage() {
       recurringEndDate: event.recurringEndDate ? event.recurringEndDate.slice(0, 10) : "",
       recurringCount: event.recurringCount ?? 1,
       location: event.location ?? "",
+      meetingUrl: event.meetingUrl ?? "",
+      registrationUrl: event.registrationUrl ?? "",
       imageUrl: event.imageUrl ?? "",
       visibility: event.visibility,
       notes: event.notes ?? "",
@@ -1404,7 +1459,9 @@ export default function CommunityGroupPage() {
                         <SelectItem value="daily">Daily</SelectItem>
                         <SelectItem value="weekly">Weekly</SelectItem>
                         <SelectItem value="biweekly">Every 2 weeks</SelectItem>
-                        <SelectItem value="monthly">Monthly</SelectItem>
+                        <SelectItem value="monthly-date">{monthlyPatternLabels(eventForm.date).date}</SelectItem>
+                        <SelectItem value="monthly-weekday">{monthlyPatternLabels(eventForm.date).weekday}</SelectItem>
+                        <SelectItem value="monthly-last-weekday">{monthlyPatternLabels(eventForm.date).lastWeekday}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1441,6 +1498,14 @@ export default function CommunityGroupPage() {
                         <SelectItem value="public">Public event link</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-bold">Video meeting link optional</Label>
+                    <Input type="url" value={eventForm.meetingUrl} onChange={(event) => setEventForm((current) => ({ ...current, meetingUrl: event.target.value }))} placeholder="https://zoom.us/j/..." className="mt-1 rounded-2xl" />
+                  </div>
+                  <div>
+                    <Label className="text-sm font-bold">Registration link optional</Label>
+                    <Input type="url" value={eventForm.registrationUrl} onChange={(event) => setEventForm((current) => ({ ...current, registrationUrl: event.target.value }))} placeholder="https://example.com/register" className="mt-1 rounded-2xl" />
                   </div>
                   <div className="md:col-span-2">
                     <Label className="text-sm font-bold">Location</Label>
@@ -1606,6 +1671,20 @@ export default function CommunityGroupPage() {
                         </div>
                       </div>
                       {event.location && <p className="mt-2 flex items-center gap-1 text-sm font-bold text-slate-500"><MapPin size={15} /> {event.location}</p>}
+                      {(event.meetingUrl || event.registrationUrl) && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {event.meetingUrl && (
+                            <a href={event.meetingUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-xl bg-blue-50 px-3 py-2 text-sm font-black text-blue-700 hover:bg-blue-100">
+                              <Video size={15} /> Join online
+                            </a>
+                          )}
+                          {event.registrationUrl && (
+                            <a href={event.registrationUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-sm font-black text-emerald-700 hover:bg-emerald-100">
+                              <ExternalLink size={15} /> Register
+                            </a>
+                          )}
+                        </div>
+                      )}
                       {event.imageUrl?.startsWith("/uploads/") && (
                         <div className="mt-3 overflow-hidden rounded-2xl border border-slate-100">
                           <img src={event.imageUrl} alt="" className="max-h-80 w-full object-cover" />
@@ -1974,7 +2053,7 @@ export default function CommunityGroupPage() {
                         </div>
                         {editEventForm.recurring !== "none" && (
                           <div className="rounded-2xl bg-white p-3 text-sm font-bold text-violet-700 md:col-span-2">
-                            Repeats {editEventForm.recurring}. Saving updates this session and all future sessions; completed session data is preserved.
+                            {recurringLabel(editEventForm.recurring, editEventForm.date)}. Saving updates this session and all future sessions; completed session data is preserved.
                           </div>
                         )}
                         <div>
@@ -1997,6 +2076,14 @@ export default function CommunityGroupPage() {
                             onChange={(input) => setEditEventForm((current) => ({ ...current, location: input.target.value }))}
                             className="mt-1 rounded-2xl bg-white"
                           />
+                        </div>
+                        <div>
+                          <Label className="text-sm font-bold">Video meeting link optional</Label>
+                          <Input type="url" value={editEventForm.meetingUrl} onChange={(input) => setEditEventForm((current) => ({ ...current, meetingUrl: input.target.value }))} placeholder="https://zoom.us/j/..." className="mt-1 rounded-2xl bg-white" />
+                        </div>
+                        <div>
+                          <Label className="text-sm font-bold">Registration link optional</Label>
+                          <Input type="url" value={editEventForm.registrationUrl} onChange={(input) => setEditEventForm((current) => ({ ...current, registrationUrl: input.target.value }))} placeholder="https://example.com/register" className="mt-1 rounded-2xl bg-white" />
                         </div>
                         <div className="md:col-span-2">
                           <Label className="text-sm font-bold">Notes</Label>

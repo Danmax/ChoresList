@@ -759,6 +759,9 @@ model CommunityEvent {
   seriesId          String?   @db.Char(36)
   sessionNumber     Int?
   location          String?   @db.VarChar(255)
+  meetingUrl        String?   @db.VarChar(1024)
+  registrationUrl   String?   @db.VarChar(1024)
+  timeZone          String    @default("UTC") @db.VarChar(64)
   imageUrl          String?   @db.VarChar(512)
   visibility        String    @default("private") @db.VarChar(64)
   notes             String?   @db.Text

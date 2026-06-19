@@ -6,7 +6,7 @@ import { rateLimit } from "@/lib/rate-limit";
 export const runtime = "nodejs";
 
 const client = new OpenAI({ apiKey: process.env.CHATGPT_API_KEY ?? "" });
-const EVENT_TYPES = ["potluck", "service", "practice", "meeting", "game", "class", "social", "other"];
+const EVENT_TYPES = ["potluck", "service", "practice", "meeting", "appointment", "doctor", "conference", "worship", "workshop", "fundraiser", "game", "class", "social", "other"];
 const COMMON_POTLUCK_ITEMS = [
   { title: "Main dish", quantity: "2 trays", note: "Enough to share" },
   { title: "Side dish", quantity: "2 bowls", note: "" },
@@ -35,6 +35,16 @@ function validDate(value: unknown) {
 function validTime(value: unknown) {
   if (typeof value !== "string" || !/^\d{2}:\d{2}$/.test(value)) return "18:00";
   return value;
+}
+
+function validUrl(value: unknown) {
+  if (typeof value !== "string" || !value.trim()) return "";
+  try {
+    const url = new URL(value.trim());
+    return ['http:', 'https:'].includes(url.protocol) ? url.toString().slice(0, 1024) : "";
+  } catch {
+    return "";
+  }
 }
 
 function parseJson(text: string) {
@@ -85,6 +95,8 @@ function normalizeDraft(raw: Record<string, unknown>) {
     date: dateTimeLocal,
     endDate: dateTimeLocal ? addMinutes(dateTimeLocal, durationMinutes) : "",
     location: cleanString(raw.location, "", 180),
+    meetingUrl: validUrl(raw.meetingUrl),
+    registrationUrl: validUrl(raw.registrationUrl),
     notes: cleanString(raw.notes, "", 1000),
     items: normalizeItems(raw.items, eventType),
   };
@@ -100,13 +112,14 @@ Today's date is ${today}.
 Request: ${JSON.stringify(safePrompt)}
 
 Return one JSON object with these exact keys:
-title, eventType, date, startTime, durationMinutes, location, notes, items.
+title, eventType, date, startTime, durationMinutes, location, meetingUrl, registrationUrl, notes, items.
 
 Rules:
 - eventType must be one of: ${EVENT_TYPES.join(", ")}
 - date must be YYYY-MM-DD. If no date is clear, return an empty string.
 - startTime must be HH:mm in 24-hour time.
 - durationMinutes must be 30 to 480.
+- meetingUrl and registrationUrl must be HTTP(S) URLs copied from the request, or empty strings. Never invent URLs.
 - If this is a potluck, include 5 to 10 practical items in items.
 - If this is not a potluck but the request asks people to bring supplies, include practical items.
 - items must be an array of objects with title, quantity, note.

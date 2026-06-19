@@ -1,0 +1,4 @@
+ALTER TABLE `CommunityEvent`
+  ADD COLUMN `meetingUrl` VARCHAR(1024) NULL,
+  ADD COLUMN `registrationUrl` VARCHAR(1024) NULL,
+  ADD COLUMN `timeZone` VARCHAR(64) NOT NULL DEFAULT 'UTC';

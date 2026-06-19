@@ -43,6 +43,8 @@ export const GET = withErrors(async (req: NextRequest) => {
               endDate: true,
               allDay: true,
               location: true,
+              meetingUrl: true,
+              registrationUrl: true,
               imageUrl: true,
               visibility: true,
               notes: true,
