@@ -47,7 +47,8 @@ const groupInclude = {
     orderBy: { createdAt: "desc" },
   },
   events: {
-    orderBy: { date: "asc" },
+    orderBy: { date: "desc" },
+    take: 500,
     include: {
       classPlan: {
         include: {
@@ -89,6 +90,7 @@ const groupInclude = {
       },
       messages: {
         orderBy: { createdAt: "asc" },
+        take: 200,
         include: { parent: { select: { id: true, email: true, displayName: true, relationshipLabel: true } } },
       },
     },

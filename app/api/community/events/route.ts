@@ -42,12 +42,25 @@ function cleanDate(value: unknown) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function cleanRecurringEndDate(value: unknown) {
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return cleanDate(`${value}T23:59:59.999Z`);
+  }
+  return cleanDate(value);
+}
+
 function addRecurringInterval(date: Date, recurring: string, step: number) {
   const next = new Date(date);
   if (recurring === "daily") next.setDate(next.getDate() + step);
   if (recurring === "weekly") next.setDate(next.getDate() + step * 7);
   if (recurring === "biweekly") next.setDate(next.getDate() + step * 14);
-  if (recurring === "monthly") next.setMonth(next.getMonth() + step);
+  if (recurring === "monthly") {
+    const preferredDay = next.getDate();
+    next.setDate(1);
+    next.setMonth(next.getMonth() + step);
+    const lastDay = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate();
+    next.setDate(Math.min(preferredDay, lastDay));
+  }
   return next;
 }
 
@@ -203,7 +216,7 @@ export const POST = withErrors(async (req: NextRequest) => {
   const endDate = cleanDate(body.endDate);
   const recurring = cleanRecurring(body.recurring);
   const recurringCount = cleanRecurringCount(body.recurringCount, recurring);
-  const recurringEndDate = recurring === "none" ? null : cleanDate(body.recurringEndDate);
+  const recurringEndDate = recurring === "none" ? null : cleanRecurringEndDate(body.recurringEndDate);
   const occurrences = buildOccurrences(date, endDate, recurring, recurringCount, recurringEndDate);
   const seriesId = occurrences.length > 1 ? randomUUID() : null;
   const starterItems = cleanStarterItems(body.items);
@@ -256,31 +269,81 @@ export const PUT = withErrors(async (req: NextRequest) => {
     return NextResponse.json({ error: "Event is required" }, { status: 400 });
   }
   const { membership } = await requireEventCommunityRole(id, parentId, "manager");
+  const currentEvent = await prisma.communityEvent.findUnique({
+    where: { id },
+    select: { id: true, groupId: true, date: true, endDate: true, seriesId: true, recurring: true },
+  });
+  if (!currentEvent) return NextResponse.json({ error: "Event not found" }, { status: 404 });
 
   const title = body.title !== undefined ? cleanRequiredText(body.title, 120) : undefined;
   if (title !== undefined && !title) return NextResponse.json({ error: "Event title is required" }, { status: 400 });
   const date = body.date !== undefined ? cleanDate(body.date) : undefined;
   if (date === null) return NextResponse.json({ error: "Event date is required" }, { status: 400 });
 
-  const recurring = body.recurring !== undefined ? cleanRecurring(body.recurring) : undefined;
-  const event = await prisma.communityEvent.update({
-    where: { id },
-    data: {
+  const requestedRecurring = body.recurring !== undefined ? cleanRecurring(body.recurring) : undefined;
+  if (requestedRecurring !== undefined && requestedRecurring !== currentEvent.recurring) {
+    return NextResponse.json({ error: "Recurrence cannot be changed after a series is created" }, { status: 400 });
+  }
+
+  const sharedData = {
       ...(title !== undefined && { title }),
       ...(body.eventType !== undefined && { eventType: cleanType(body.eventType) }),
-      ...(date !== undefined && { date }),
-      ...(body.endDate !== undefined && { endDate: cleanDate(body.endDate) }),
       ...(body.allDay !== undefined && { allDay: Boolean(body.allDay) }),
-      ...(recurring !== undefined && { recurring }),
-      ...(body.recurringEndDate !== undefined && { recurringEndDate: recurring === "none" ? null : cleanDate(body.recurringEndDate) }),
-      ...(body.recurringCount !== undefined && { recurringCount: recurring === "none" ? null : cleanRecurringCount(body.recurringCount, recurring ?? "weekly") }),
       ...(body.location !== undefined && { location: cleanText(body.location, 180) }),
       ...(body.imageUrl !== undefined && { imageUrl: cleanText(body.imageUrl, 512) }),
       ...(body.visibility !== undefined && { visibility: cleanVisibility(body.visibility) }),
       ...(body.notes !== undefined && { notes: cleanText(body.notes, 1000) }),
+  };
+
+  const updateFutureSeries = body.scope === "future" && currentEvent.seriesId;
+  if (updateFutureSeries) {
+    const futureEvents = await prisma.communityEvent.findMany({
+      where: { groupId: currentEvent.groupId, seriesId: currentEvent.seriesId, date: { gte: currentEvent.date } },
+      select: { id: true, date: true, endDate: true },
+      orderBy: { date: "asc" },
+    });
+    const nextStart = date ?? currentEvent.date;
+    const startDelta = nextStart.getTime() - currentEvent.date.getTime();
+    const requestedEnd = body.endDate !== undefined ? cleanDate(body.endDate) : undefined;
+    const requestedDuration = requestedEnd ? requestedEnd.getTime() - nextStart.getTime() : null;
+    if (requestedDuration !== null && requestedDuration < 0) {
+      return NextResponse.json({ error: "Event end must be after its start" }, { status: 400 });
+    }
+
+    await prisma.$transaction(futureEvents.map((seriesEvent) => {
+      const shiftedDate = new Date(seriesEvent.date.getTime() + startDelta);
+      const existingDuration = seriesEvent.endDate
+        ? seriesEvent.endDate.getTime() - seriesEvent.date.getTime()
+        : null;
+      const shiftedEnd = body.endDate !== undefined
+        ? requestedDuration === null ? null : new Date(shiftedDate.getTime() + requestedDuration)
+        : existingDuration === null ? null : new Date(shiftedDate.getTime() + existingDuration);
+      return prisma.communityEvent.update({
+        where: { id: seriesEvent.id },
+        data: { ...sharedData, date: shiftedDate, endDate: shiftedEnd },
+      });
+    }));
+  } else {
+    const startDelta = date ? date.getTime() - currentEvent.date.getTime() : 0;
+    const endDate = body.endDate !== undefined
+      ? cleanDate(body.endDate)
+      : date && currentEvent.endDate
+        ? new Date(currentEvent.endDate.getTime() + startDelta)
+        : undefined;
+    if (date && endDate && endDate < date) {
+      return NextResponse.json({ error: "Event end must be after its start" }, { status: 400 });
+    }
+    await prisma.communityEvent.update({
+      where: { id },
+      data: {
+        ...sharedData,
+        ...(date !== undefined && { date }),
+        ...(endDate !== undefined && { endDate }),
       },
-    include: eventInclude,
-  });
+    });
+  }
+
+  const event = await prisma.communityEvent.findUniqueOrThrow({ where: { id }, include: eventInclude });
 
   return NextResponse.json(publicEvent(event, membership.role === "owner" || membership.role === "manager"));
 });

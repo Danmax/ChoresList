@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Award, BookOpen, CalendarDays, CheckCircle2, ClipboardCheck, Copy, Mail, MapPin, MessageCircle, Pencil, Plus, QrCode, Save, Search, Send, Share2, SmilePlus, Trash2, UserPlus, Users, X, Wand2 } from "lucide-react";
+import { ArrowLeft, Award, BookOpen, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCheck, Copy, List, Mail, MapPin, MessageCircle, Pencil, Plus, QrCode, Save, Search, Send, Share2, SmilePlus, Trash2, UserPlus, Users, X, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { LocalQrCode } from "@/components/local-qr-code";
 
 type CommunityRole = "owner" | "manager" | "member";
 type RsvpStatus = "going" | "maybe" | "not-going";
@@ -249,6 +250,98 @@ function toDateTimeLocal(value: string | null) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+function dateKey(value: string | Date) {
+  const date = value instanceof Date ? value : new Date(value);
+  const pad = (number: number) => String(number).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function CommunityMonthCalendar({
+  events,
+  anchor,
+  onAnchorChange,
+  onSelectEvent,
+  onShowAll,
+}: {
+  events: CommunityEvent[];
+  anchor: Date;
+  onAnchorChange: (date: Date) => void;
+  onSelectEvent: (event: CommunityEvent) => void;
+  onShowAll: () => void;
+}) {
+  const year = anchor.getFullYear();
+  const month = anchor.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const gridStart = new Date(year, month, 1 - firstDay.getDay());
+  const days = Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(gridStart);
+    date.setDate(gridStart.getDate() + index);
+    return date;
+  });
+  const eventsByDate = new Map<string, CommunityEvent[]>();
+  events.forEach((event) => {
+    const key = dateKey(event.date);
+    eventsByDate.set(key, [...(eventsByDate.get(key) ?? []), event]);
+  });
+
+  function moveMonth(amount: number) {
+    onAnchorChange(new Date(year, month + amount, 1));
+  }
+
+  return (
+    <div className="rounded-3xl bg-white p-3 shadow-sm sm:p-5">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <button type="button" onClick={() => moveMonth(-1)} className="rounded-xl bg-slate-100 p-2 text-slate-600 hover:bg-slate-200" aria-label="Previous month">
+          <ChevronLeft size={18} />
+        </button>
+        <div className="text-center">
+          <h2 className="font-black text-slate-800">{anchor.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</h2>
+          <button type="button" onClick={() => onAnchorChange(new Date())} className="text-xs font-black text-violet-600 hover:text-violet-700">Today</button>
+        </div>
+        <button type="button" onClick={() => moveMonth(1)} className="rounded-xl bg-slate-100 p-2 text-slate-600 hover:bg-slate-200" aria-label="Next month">
+          <ChevronRight size={18} />
+        </button>
+      </div>
+      <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-black uppercase text-slate-400 sm:text-xs">
+        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => <div key={day} className="py-1">{day}</div>)}
+      </div>
+      <div className="grid grid-cols-7 gap-1">
+        {days.map((day) => {
+          const key = dateKey(day);
+          const dayEvents = eventsByDate.get(key) ?? [];
+          const inMonth = day.getMonth() === month;
+          const isToday = key === dateKey(new Date());
+          return (
+            <div key={key} className={`min-h-20 rounded-xl border p-1 sm:min-h-28 sm:p-1.5 ${inMonth ? "border-slate-100 bg-slate-50" : "border-transparent bg-slate-50/30"}`}>
+              <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-black ${isToday ? "bg-violet-500 text-white" : inMonth ? "text-slate-600" : "text-slate-300"}`}>
+                {day.getDate()}
+              </span>
+              <div className="mt-1 space-y-1">
+                {dayEvents.slice(0, 3).map((event) => (
+                  <button
+                    key={event.id}
+                    type="button"
+                    onClick={() => onSelectEvent(event)}
+                    className="block w-full truncate rounded-md bg-violet-100 px-1 py-0.5 text-left text-[10px] font-black text-violet-700 hover:bg-violet-200 sm:px-1.5 sm:text-xs"
+                    title={`${event.title} — ${formatDate(event.date)}`}
+                  >
+                    {eventMeta(event.eventType).icon} {event.title}
+                  </button>
+                ))}
+                {dayEvents.length > 3 && (
+                  <button type="button" onClick={onShowAll} className="px-1 text-[10px] font-black text-violet-600 hover:text-violet-700">
+                    +{dayEvents.length - 3} more
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function localDateTimeToIso(value: string) {
   if (!value) return null;
   const date = new Date(value);
@@ -303,6 +396,8 @@ export default function CommunityGroupPage() {
   const [imageUploading, setImageUploading] = useState(false);
   const [starterItems, setStarterItems] = useState<StarterItem[]>([]);
   const [showCreateEvent, setShowCreateEvent] = useState(false);
+  const [eventView, setEventView] = useState<"list" | "calendar">("list");
+  const [calendarAnchor, setCalendarAnchor] = useState(() => new Date());
   const [locationSuggestions, setLocationSuggestions] = useState<LocationSuggestion[]>([]);
   const [locationStatus, setLocationStatus] = useState<"idle" | "loading" | "error">("idle");
   const [selectedLocation, setSelectedLocation] = useState("");
@@ -437,19 +532,15 @@ export default function CommunityGroupPage() {
     return origin ? `${origin}${path}` : path;
   }
 
-  function eventQrUrl(event: CommunityEvent) {
-    return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(eventShareUrl(event))}`;
-  }
-
-  function groupQrUrl() {
-    if (!group?.groupInviteUrl) return "";
-    return `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(group.groupInviteUrl)}`;
-  }
-
   const upcomingEvents = useMemo(
     () => [...(group?.events ?? [])].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
     [group?.events]
   );
+
+  function openEventFromCalendar(event: CommunityEvent) {
+    setSelectedEventId(event.id);
+    setEventView("list");
+  }
 
   function familyMemberLabel(memberId: string) {
     const member = familyMembers.find((item) => item.id === memberId);
@@ -947,6 +1038,7 @@ export default function CommunityGroupPage() {
         ...editEventForm,
         date,
         endDate: localDateTimeToIso(editEventForm.endDate),
+        scope: group?.events.find((event) => event.id === editingEventId)?.seriesId ? "future" : "single",
       }),
     });
     const data = await res.json().catch(() => null);
@@ -1242,14 +1334,24 @@ export default function CommunityGroupPage() {
               <div className="rounded-3xl bg-white p-4 shadow-sm sm:p-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <h2 className="flex items-center gap-2 font-black text-slate-800"><CalendarDays size={18} className="text-violet-500" /> Events</h2>
-                  <button
-                    type="button"
-                    onClick={() => setShowCreateEvent((current) => !current)}
-                    className="inline-flex items-center gap-2 rounded-2xl bg-violet-500 px-4 py-2.5 font-black text-white hover:bg-violet-600"
-                  >
-                    {showCreateEvent ? <X size={17} /> : <Plus size={17} />}
-                    {showCreateEvent ? "Close Form" : "Create Event"}
-                  </button>
+                  <div className="flex flex-wrap gap-2">
+                    <div className="flex rounded-2xl bg-slate-100 p-1">
+                      <button type="button" onClick={() => setEventView("list")} className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-black ${eventView === "list" ? "bg-white text-violet-700 shadow-sm" : "text-slate-500"}`}>
+                        <List size={15} /> List
+                      </button>
+                      <button type="button" onClick={() => setEventView("calendar")} className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-black ${eventView === "calendar" ? "bg-white text-violet-700 shadow-sm" : "text-slate-500"}`}>
+                        <CalendarDays size={15} /> Calendar
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateEvent((current) => !current)}
+                      className="inline-flex items-center gap-2 rounded-2xl bg-violet-500 px-4 py-2.5 font-black text-white hover:bg-violet-600"
+                    >
+                      {showCreateEvent ? <X size={17} /> : <Plus size={17} />}
+                      {showCreateEvent ? "Close Form" : "Create Event"}
+                    </button>
+                  </div>
                 </div>
                 {showCreateEvent && (
                   <>
@@ -1448,7 +1550,31 @@ export default function CommunityGroupPage() {
               </div>
             )}
 
-            {upcomingEvents.map((event) => {
+            {!canManage && (
+              <div className="flex items-center justify-between gap-3 rounded-3xl bg-white p-4 shadow-sm">
+                <h2 className="flex items-center gap-2 font-black text-slate-800"><CalendarDays size={18} className="text-violet-500" /> Events</h2>
+                <div className="flex rounded-2xl bg-slate-100 p-1">
+                  <button type="button" onClick={() => setEventView("list")} className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-black ${eventView === "list" ? "bg-white text-violet-700 shadow-sm" : "text-slate-500"}`}>
+                    <List size={15} /> List
+                  </button>
+                  <button type="button" onClick={() => setEventView("calendar")} className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-black ${eventView === "calendar" ? "bg-white text-violet-700 shadow-sm" : "text-slate-500"}`}>
+                    <CalendarDays size={15} /> Calendar
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {eventView === "calendar" && (
+              <CommunityMonthCalendar
+                events={upcomingEvents}
+                anchor={calendarAnchor}
+                onAnchorChange={setCalendarAnchor}
+                onSelectEvent={openEventFromCalendar}
+                onShowAll={() => setEventView("list")}
+              />
+            )}
+
+            {eventView === "list" && upcomingEvents.map((event) => {
               const counts = rsvpCounts(event);
               const myRsvp = event.rsvps.find((rsvpItem) => rsvpItem.parentId === group.currentParentId);
               const eMeta = eventMeta(event.eventType);
@@ -1785,7 +1911,7 @@ export default function CommunityGroupPage() {
                     </div>
                     <div className="flex min-w-0 items-center justify-center gap-3 rounded-2xl bg-white p-3 lg:flex-col">
                       <QrCode size={18} className="text-violet-500 lg:hidden" />
-                      <img src={eventQrUrl(event)} alt={`${event.title} QR code`} className="h-28 w-28 max-w-full rounded-xl bg-white object-contain" />
+                      <LocalQrCode value={eventShareUrl(event)} alt={`${event.title} QR code`} size={112} className="h-28 w-28 max-w-full rounded-xl bg-white object-contain" />
                       <p className="text-xs font-black text-slate-500 lg:text-center">Scan to open</p>
                     </div>
                   </div>
@@ -1846,45 +1972,10 @@ export default function CommunityGroupPage() {
                             className="mt-1 rounded-2xl bg-white"
                           />
                         </div>
-                        <div>
-                          <Label className="text-sm font-bold">Repeats</Label>
-                          <Select
-                            value={editEventForm.recurring}
-                            onValueChange={(value) => setEditEventForm((current) => ({ ...current, recurring: value ?? "none" }))}
-                          >
-                            <SelectTrigger className="mt-1 rounded-2xl bg-white"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">Does not repeat</SelectItem>
-                              <SelectItem value="daily">Daily</SelectItem>
-                              <SelectItem value="weekly">Weekly</SelectItem>
-                              <SelectItem value="biweekly">Every 2 weeks</SelectItem>
-                              <SelectItem value="monthly">Monthly</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
                         {editEventForm.recurring !== "none" && (
-                          <>
-                            <div>
-                              <Label className="text-sm font-bold">Sessions</Label>
-                              <Input
-                                type="number"
-                                min={1}
-                                max={104}
-                                value={editEventForm.recurringCount}
-                                onChange={(input) => setEditEventForm((current) => ({ ...current, recurringCount: Math.max(1, Math.min(104, Number(input.target.value) || 1)) }))}
-                                className="mt-1 rounded-2xl bg-white"
-                              />
-                            </div>
-                            <div>
-                              <Label className="text-sm font-bold">Repeat until optional</Label>
-                              <Input
-                                type="date"
-                                value={editEventForm.recurringEndDate}
-                                onChange={(input) => setEditEventForm((current) => ({ ...current, recurringEndDate: input.target.value }))}
-                                className="mt-1 rounded-2xl bg-white"
-                              />
-                            </div>
-                          </>
+                          <div className="rounded-2xl bg-white p-3 text-sm font-bold text-violet-700 md:col-span-2">
+                            Repeats {editEventForm.recurring}. Saving updates this session and all future sessions; completed session data is preserved.
+                          </div>
                         )}
                         <div>
                           <Label className="text-sm font-bold">Visibility</Label>
@@ -2320,7 +2411,7 @@ export default function CommunityGroupPage() {
               <div className="min-w-0 rounded-3xl bg-white p-4 shadow-sm">
                 <h2 className="mb-3 flex items-center gap-2 font-black text-slate-800"><QrCode size={18} className="text-violet-500" /> Group Join QR</h2>
                 <div className="flex justify-center rounded-2xl bg-violet-50 p-3">
-                  <img src={groupQrUrl()} alt={`${group.name} join QR code`} className="h-auto w-full max-w-52 rounded-xl bg-white p-2 object-contain" />
+                  <LocalQrCode value={group.groupInviteUrl} alt={`${group.name} join QR code`} size={208} className="h-auto w-full max-w-52 rounded-xl bg-white p-2 object-contain" />
                 </div>
                 <p className="mt-3 text-sm font-semibold leading-6 text-slate-500">
                   Scan to create a parent account or sign in, then join this group as a member.

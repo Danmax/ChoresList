@@ -45,7 +45,17 @@ function fromRequestUrl(req: NextRequest): string | null {
 
 export function getBaseUrl(req: NextRequest): string {
   const fromEnv = process.env.PUBLIC_BASE_URL?.trim();
-  if (fromEnv) return fromEnv.replace(/\/$/, "");
+  if (fromEnv) {
+    const url = new URL(fromEnv);
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash) {
+      throw new Error("PUBLIC_BASE_URL must be an HTTP(S) URL without credentials, a query, or a fragment");
+    }
+    return url.toString().replace(/\/$/, "");
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("PUBLIC_BASE_URL is required in production");
+  }
 
   const forwarded = fromForwardedHeaders(req);
   if (forwarded) return forwarded;
@@ -53,10 +63,5 @@ export function getBaseUrl(req: NextRequest): string {
   const hostHeader = fromHostHeader(req);
   if (hostHeader) return hostHeader;
 
-  if (process.env.NODE_ENV === "production") {
-    throw new Error(
-      "PUBLIC_BASE_URL is not set and no usable Host / X-Forwarded-Host header was found"
-    );
-  }
   return fromRequestUrl(req) ?? "http://localhost:3000";
 }

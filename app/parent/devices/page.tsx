@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, MonitorSmartphone, Plus, QrCode, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { LocalQrCode } from "@/components/local-qr-code";
 
 type Member = {
   id: string;
@@ -95,10 +96,6 @@ export default function DevicesPage() {
     toast.success("Device revoked");
     load();
   }
-
-  const qrUrl = pairing
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(pairing.pairUrl)}`
-    : "";
 
   return (
     <div className="min-h-screen p-4 sm:p-6">
@@ -198,7 +195,7 @@ export default function DevicesPage() {
             <div className="mt-5 rounded-3xl border-2 border-violet-100 bg-violet-50 p-4 text-center">
               <p className="text-xs font-black uppercase tracking-wide text-violet-500">Pairing code</p>
               <div className="my-2 font-mono text-5xl font-black tracking-widest text-slate-800">{pairing.code}</div>
-              <img src={qrUrl} alt="Device pairing QR code" className="mx-auto my-4 rounded-2xl bg-white p-3 shadow-sm" />
+              <LocalQrCode value={pairing.pairUrl} alt="Device pairing QR code" className="mx-auto my-4 rounded-2xl bg-white p-3 shadow-sm" />
               <p className="break-all text-xs font-bold text-slate-500">{pairing.pairUrl}</p>
               <p className="mt-2 text-xs font-bold text-slate-400">
                 Expires {new Date(pairing.expiresAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
