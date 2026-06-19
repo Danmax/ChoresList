@@ -1,12 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Star, Trophy, Calendar, DollarSign, Sparkles, ClipboardList, Gift, Wrench, BarChart2, Users, ShoppingCart, MonitorSmartphone, ShieldCheck } from "lucide-react";
+import { Star, Trophy, DollarSign, Sparkles, ClipboardList, BarChart2, Users, ShoppingCart, MonitorSmartphone, Puzzle, BellRing, HeartHandshake } from "lucide-react";
 
 const features = [
   {
     icon: "✅",
-    title: "Chore Assignments",
-    description: "Assign daily, weekly, or one-time chores to each family member with custom schedules.",
+    title: "Flexible Chore Assignments",
+    description: "Select and assign several chores at once, then schedule daily, weekly, or one-time work.",
   },
   {
     icon: "⭐",
@@ -21,7 +21,7 @@ const features = [
   {
     icon: "📅",
     title: "Family Calendar",
-    description: "Track family events, recurring activities, and chore due dates in one place.",
+    description: "Plan appointments, vacations, Bible studies, work, sports, rehearsals, training, and recurring activities.",
   },
   {
     icon: "💵",
@@ -41,7 +41,7 @@ const features = [
   {
     icon: "🛒",
     title: "Grocery Lists",
-    description: "Build one-time and recurring shopping lists alongside the family schedule.",
+    description: "Create recurring lists with item descriptions and units, mark pantry items on hand, and upload receipts.",
   },
   {
     icon: "📺",
@@ -51,18 +51,27 @@ const features = [
   {
     icon: "👥",
     title: "Community Events",
-    description: "Create groups, plan public or private events, manage RSVPs, and organize potlucks.",
+    description: "Manage groups, calendars, advanced recurring meetings, RSVPs, registrations, potlucks, and online links.",
   },
   {
-    icon: "🛡️",
-    title: "Admin Controls",
-    description: "Owners can review parent users, household profiles, and connected communities.",
+    icon: "🔔",
+    title: "Event Notifications",
+    description: "Send assignment and registration emails, event reminders, and weekly manager summaries.",
   },
   {
     icon: "📊",
     title: "Reports",
-    description: "See completion rates, points history, and skill growth over time.",
+    description: "Review chore completion feedback, completion rates, points history, and skill growth over time.",
   },
+];
+
+const optionalPlugins = [
+  { icon: "🛒", title: "Grocery & Pantry", description: "Recurring lists, pantry status, detailed items, and receipt photos." },
+  { icon: "👥", title: "Community Events", description: "Groups, events, RSVP, potlucks, classes, badges, and community calendars." },
+  { icon: "🎓", title: "Learning & Badges", description: "Skills, tests, projects, passing scores, XP, and merit badges." },
+  { icon: "🍲", title: "Recipes", description: "Save recipes, preparation instructions, photos, and shopping-list ingredients." },
+  { icon: "🌳", title: "Family Tree", description: "Create a visual family diagram with relatives, guardians, partners, and branches." },
+  { icon: "💗", title: "Emotional Wellbeing", description: "Private qualitative check-ins with no points, rankings, or public comparisons." },
 ];
 
 export default function LandingPage() {
@@ -86,7 +95,7 @@ export default function LandingPage() {
             Make chores fun for the whole family
           </p>
           <p className="text-slate-400 text-base sm:text-lg mb-10 max-w-xl mx-auto">
-            Assign chores, earn points, plan groceries, coordinate community events, and manage parent controls in one family app.
+            Assign chores, coordinate schedules, plan shopping, manage community events, and activate only the family tools you need.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -108,20 +117,43 @@ export default function LandingPage() {
 
       {/* Stats strip */}
       <div className="bg-white/60 backdrop-blur border-y border-slate-100 py-6">
-        <div className="max-w-3xl mx-auto px-6 grid grid-cols-3 gap-4 text-center">
+        <div className="max-w-3xl mx-auto px-6 grid grid-cols-2 gap-4 text-center sm:grid-cols-4">
           {[
             { icon: <Trophy size={22} className="text-yellow-500" />, label: "Points & Levels" },
             { icon: <Sparkles size={22} className="text-violet-500" />, label: "AI Instructions" },
             { icon: <DollarSign size={22} className="text-emerald-500" />, label: "Allowance Tracking" },
             { icon: <ShoppingCart size={22} className="text-green-500" />, label: "Grocery Lists" },
             { icon: <MonitorSmartphone size={22} className="text-indigo-500" />, label: "Kid Screens" },
-            { icon: <ShieldCheck size={22} className="text-slate-500" />, label: "Admin Controls" },
+            { icon: <Puzzle size={22} className="text-slate-500" />, label: "Optional Plugins" },
+            { icon: <BellRing size={22} className="text-blue-500" />, label: "Event Reminders" },
+            { icon: <HeartHandshake size={22} className="text-pink-500" />, label: "Private Check-ins" },
           ].map(({ icon, label }) => (
             <div key={label} className="flex flex-col items-center gap-1.5">
               {icon}
               <span className="text-xs sm:text-sm font-bold text-slate-600">{label}</span>
             </div>
           ))}
+        </div>
+      </div>
+
+      <div className="border-y border-violet-100 bg-violet-50/60 px-6 py-16">
+        <div className="mx-auto max-w-4xl">
+          <div className="mx-auto mb-10 max-w-2xl text-center">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-black text-violet-600 shadow-sm">
+              <Puzzle size={17} /> Feature Plugins
+            </div>
+            <h2 className="text-3xl font-black text-slate-800">Use the tools your household needs</h2>
+            <p className="mt-3 font-semibold text-slate-500">Household owners can activate or deactivate optional features. Turning one off hides it and stops its scheduled work while preserving existing data.</p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {optionalPlugins.map((plugin) => (
+              <div key={plugin.title} className="rounded-3xl border border-violet-100 bg-white p-5 shadow-sm">
+                <div className="mb-3 text-3xl">{plugin.icon}</div>
+                <h3 className="font-black text-slate-800">{plugin.title}</h3>
+                <p className="mt-1.5 text-xs font-semibold leading-relaxed text-slate-400">{plugin.description}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -146,7 +178,7 @@ export default function LandingPage() {
       <div className="bg-violet-500 text-white py-16 px-6 text-center">
         <div className="text-5xl mb-4">🎉</div>
         <h2 className="text-3xl font-black mb-3">Ready to get started?</h2>
-        <p className="text-violet-200 mb-8 text-lg">Jump into the parent panel to add family members, assign chores, and configure your household.</p>
+        <p className="text-violet-200 mb-8 text-lg">Add family members, assign chores, and activate the features that fit your household.</p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Link
             href="/dashboard"
