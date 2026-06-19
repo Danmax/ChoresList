@@ -249,6 +249,12 @@ function toDateTimeLocal(value: string | null) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+function localDateTimeToIso(value: string) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
 function emailName(email?: string | null) {
   return email ? email.split("@")[0] : "Someone";
 }
@@ -874,10 +880,21 @@ export default function CommunityGroupPage() {
       toast.error("Event title and date are required");
       return;
     }
+    const date = localDateTimeToIso(eventForm.date);
+    if (!date) {
+      toast.error("Enter a valid event date and time");
+      return;
+    }
     const res = await fetch("/api/community/events", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ groupId, ...eventForm, endDate: eventForm.endDate || null, items: starterItems }),
+      body: JSON.stringify({
+        groupId,
+        ...eventForm,
+        date,
+        endDate: localDateTimeToIso(eventForm.endDate),
+        items: starterItems,
+      }),
     });
     const data = await res.json().catch(() => null);
     if (!res.ok) {
@@ -917,13 +934,19 @@ export default function CommunityGroupPage() {
       toast.error("Event title and date are required");
       return;
     }
+    const date = localDateTimeToIso(editEventForm.date);
+    if (!date) {
+      toast.error("Enter a valid event date and time");
+      return;
+    }
     const res = await fetch("/api/community/events", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         id: editingEventId,
         ...editEventForm,
-        endDate: editEventForm.endDate || null,
+        date,
+        endDate: localDateTimeToIso(editEventForm.endDate),
       }),
     });
     const data = await res.json().catch(() => null);

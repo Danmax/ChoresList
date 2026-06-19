@@ -61,11 +61,21 @@ export const POST = withErrors(async (req: NextRequest) => {
   if (!(await canAccessMember(parentId, householdId, String(body.memberId ?? "")))) {
     return NextResponse.json({ error: "You do not have access to this family member" }, { status: 403 });
   }
-  const [member, chore] = await Promise.all([
+  const requestedChoreIds: unknown[] = Array.isArray(body.choreIds) ? body.choreIds : [body.choreId];
+  const choreIds: string[] = Array.from(new Set(
+    requestedChoreIds.filter((id): id is string => typeof id === "string" && id.length > 0)
+  ));
+  if (choreIds.length === 0) {
+    return NextResponse.json({ error: "Choose at least one chore" }, { status: 400 });
+  }
+
+  const [member, chores] = await Promise.all([
     prisma.familyMember.findFirst({ where: { id: body.memberId, householdId } }),
-    prisma.chore.findFirst({ where: { id: body.choreId, householdId } }),
+    prisma.chore.findMany({ where: { id: { in: choreIds }, householdId }, select: { id: true } }),
   ]);
-  if (!member || !chore) return NextResponse.json({ error: "Member or chore not found" }, { status: 404 });
+  if (!member || chores.length !== choreIds.length) {
+    return NextResponse.json({ error: "Member or chore not found" }, { status: 404 });
+  }
 
   const frequency = typeof body.frequency === "string" ? body.frequency : "daily";
   const dayOfWeeks = Array.isArray(body.dayOfWeeks)
@@ -85,14 +95,16 @@ export const POST = withErrors(async (req: NextRequest) => {
     return NextResponse.json({ error: "Choose a date" }, { status: 400 });
   }
 
-  const data = weeklyDays.map((dayOfWeek) => ({
-    householdId,
-    memberId: body.memberId,
-    choreId: body.choreId,
-    frequency,
-    dueDate,
-    dayOfWeek,
-  }));
+  const data = choreIds.flatMap((choreId) =>
+    weeklyDays.map((dayOfWeek) => ({
+      householdId,
+      memberId: body.memberId,
+      choreId,
+      frequency,
+      dueDate,
+      dayOfWeek,
+    }))
+  );
 
   const assignments = await prisma.$transaction(
     data.map((assignmentData) =>

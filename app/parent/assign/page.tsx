@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { ArrowLeft, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, Plus, RefreshCw, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -36,8 +36,9 @@ export default function AssignPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [selectedMember, setSelectedMember] = useState<string>("");
   const [open, setOpen] = useState(false);
+  const [isAssigning, setIsAssigning] = useState(false);
   const [form, setForm] = useState({
-    memberId: "", choreId: "", frequency: "daily", dueDate: "", dayOfWeeks: ["1"],
+    memberId: "", choreIds: [] as string[], frequency: "daily", dueDate: "", dayOfWeeks: ["1"],
   });
 
   const load = useCallback(async () => {
@@ -61,30 +62,35 @@ export default function AssignPage() {
   useEffect(() => { load(); }, [load]);
 
   async function assign() {
-    if (!form.memberId || !form.choreId) { toast.error("Select member and chore"); return; }
+    if (!form.memberId || form.choreIds.length === 0) { toast.error("Select a member and at least one chore"); return; }
     if (form.frequency === "weekly" && form.dayOfWeeks.length === 0) {
       toast.error("Choose at least one weekday");
       return;
     }
-    const res = await fetch("/api/assignments", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        memberId: form.memberId,
-        choreId: form.choreId,
-        frequency: form.frequency,
-        dueDate: form.dueDate || null,
-        dayOfWeeks: form.frequency === "weekly" ? form.dayOfWeeks.map(Number) : [],
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      toast.error(data.error ?? "Could not assign chore");
-      return;
+    setIsAssigning(true);
+    try {
+      const res = await fetch("/api/assignments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          memberId: form.memberId,
+          choreIds: form.choreIds,
+          frequency: form.frequency,
+          dueDate: form.dueDate || null,
+          dayOfWeeks: form.frequency === "weekly" ? form.dayOfWeeks.map(Number) : [],
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error ?? "Could not assign chores");
+        return;
+      }
+      toast.success(`${form.choreIds.length} ${form.choreIds.length === 1 ? "chore" : "chores"} assigned!`);
+      setOpen(false);
+      load();
+    } finally {
+      setIsAssigning(false);
     }
-    toast.success("Chore assigned!");
-    setOpen(false);
-    load();
   }
 
   async function unassign(id: string) {
@@ -98,7 +104,6 @@ export default function AssignPage() {
     : assignments;
 
   const selectedMemberObj = members.find((m) => m.id === form.memberId);
-  const selectedChoreObj = chores.find((c) => c.id === form.choreId);
   const availableChores = selectedMemberObj
     ? chores.filter((c) => {
         const isParent = selectedMemberObj.role === "parent" || selectedMemberObj.role === "mom" || selectedMemberObj.role === "dad" || selectedMemberObj.role === "grandparent";
@@ -107,7 +112,16 @@ export default function AssignPage() {
     : chores;
 
   function resetForm() {
-    setForm({ memberId: "", choreId: "", frequency: "daily", dueDate: "", dayOfWeeks: ["1"] });
+    setForm({ memberId: "", choreIds: [], frequency: "daily", dueDate: "", dayOfWeeks: ["1"] });
+  }
+
+  function toggleChore(choreId: string) {
+    setForm((previous) => ({
+      ...previous,
+      choreIds: previous.choreIds.includes(choreId)
+        ? previous.choreIds.filter((id) => id !== choreId)
+        : [...previous.choreIds, choreId],
+    }));
   }
 
   function toggleWeeklyDay(day: string) {
@@ -200,12 +214,12 @@ export default function AssignPage() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-md rounded-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="font-black">Assign a Chore</DialogTitle>
+            <DialogTitle className="font-black">Assign Chores</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
               <Label className="font-bold">Family Member</Label>
-              <Select value={form.memberId} onValueChange={(v) => setForm((p) => ({ ...p, memberId: v ?? "", choreId: "" }))}>
+              <Select value={form.memberId} onValueChange={(v) => setForm((p) => ({ ...p, memberId: v ?? "", choreIds: [] }))}>
                 <SelectTrigger className="mt-1 w-full rounded-xl">
                   <span className={`flex flex-1 items-center gap-1.5 truncate text-left ${selectedMemberObj ? "" : "text-slate-400"}`}>
                     {selectedMemberObj ? `${selectedMemberObj.avatar} ${selectedMemberObj.name}` : "Select a family member"}
@@ -222,19 +236,60 @@ export default function AssignPage() {
               </Select>
             </div>
             <div>
-              <Label className="font-bold">Chore</Label>
-              <Select value={form.choreId} onValueChange={(v) => setForm((p) => ({ ...p, choreId: v ?? "" }))}>
-                <SelectTrigger className="mt-1 w-full rounded-xl">
-                  <span className={`flex flex-1 items-center gap-1.5 truncate text-left ${selectedChoreObj ? "" : "text-slate-400"}`}>
-                    {selectedChoreObj ? `${selectedChoreObj.icon} ${selectedChoreObj.name}` : "Select a chore"}
-                  </span>
-                </SelectTrigger>
-                <SelectContent>
-                  {availableChores.map((c) => (
-                    <SelectItem key={c.id} value={String(c.id)}>{c.icon} {c.name} (⭐{c.pointsValue})</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center justify-between gap-3">
+                <Label className="font-bold">Chores</Label>
+                {availableChores.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setForm((previous) => ({
+                      ...previous,
+                      choreIds: previous.choreIds.length === availableChores.length
+                        ? []
+                        : availableChores.map((chore) => chore.id),
+                    }))}
+                    className="text-xs font-black text-emerald-600 hover:text-emerald-700"
+                  >
+                    {form.choreIds.length === availableChores.length ? "Clear all" : "Select all"}
+                  </button>
+                )}
+              </div>
+              <div className="mt-2 max-h-64 space-y-2 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 p-2">
+                {availableChores.length === 0 ? (
+                  <p className="px-2 py-6 text-center text-sm font-semibold text-slate-400">
+                    {form.memberId ? "No age-appropriate chores available" : "Select a family member first"}
+                  </p>
+                ) : availableChores.map((chore) => {
+                  const selected = form.choreIds.includes(chore.id);
+                  return (
+                    <button
+                      key={chore.id}
+                      type="button"
+                      role="checkbox"
+                      aria-checked={selected}
+                      onClick={() => toggleChore(chore.id)}
+                      className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-colors ${
+                        selected
+                          ? "border-emerald-300 bg-emerald-50"
+                          : "border-transparent bg-white hover:border-slate-200"
+                      }`}
+                    >
+                      <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 ${
+                        selected ? "border-emerald-500 bg-emerald-500 text-white" : "border-slate-300"
+                      }`}>
+                        {selected && <Check size={14} strokeWidth={4} />}
+                      </span>
+                      <span className="text-2xl" aria-hidden="true">{chore.icon}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-black text-slate-700">{chore.name}</span>
+                        <span className="block text-xs font-semibold text-slate-400">⭐ {chore.pointsValue} points</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-1.5 text-xs font-bold text-slate-500">
+                {form.choreIds.length === 0 ? "Choose one or more chores" : `${form.choreIds.length} selected`}
+              </p>
             </div>
             <div>
               <Label className="font-bold">Frequency</Label>
@@ -296,9 +351,14 @@ export default function AssignPage() {
             )}
             <button
               onClick={assign}
-              className="w-full bg-emerald-500 text-white rounded-xl py-3 font-black hover:bg-emerald-600 transition-colors"
+              disabled={isAssigning}
+              className="w-full bg-emerald-500 text-white rounded-xl py-3 font-black hover:bg-emerald-600 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Assign Chore
+              {isAssigning
+                ? "Assigning…"
+                : form.choreIds.length > 0
+                  ? `Assign ${form.choreIds.length} ${form.choreIds.length === 1 ? "Chore" : "Chores"}`
+                  : "Assign Chores"}
             </button>
           </div>
         </DialogContent>
