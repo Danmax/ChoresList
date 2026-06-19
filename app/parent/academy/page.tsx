@@ -2,7 +2,7 @@
 
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, BookOpenCheck, ClipboardList, GraduationCap, Pencil, Plus, Trophy, Wand2, X } from "lucide-react";
+import { ArrowLeft, BookOpenCheck, ClipboardList, FileText, GraduationCap, Pencil, Plus, Trophy, Wand2, X } from "lucide-react";
 import { toast } from "sonner";
 
 type Member = {
@@ -52,6 +52,10 @@ type Project = {
   status: string;
   pointsReward: number;
   dueDate?: string | null;
+  submissionTitle?: string | null;
+  submissionDescription?: string | null;
+  submittedAt?: string | null;
+  submissionFiles?: { id: string; name: string; type: string; size: number }[] | null;
   member?: Pick<Member, "id" | "name" | "avatar" | "color"> | null;
 };
 
@@ -403,26 +407,44 @@ export default function ParentAcademyPage() {
             </div>
             <div className="space-y-3">
               {projects.map((project) => (
-                <div key={project.id} className="flex flex-col gap-3 rounded-2xl bg-slate-50 p-4 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <h3 className="font-black text-slate-800">{project.title}</h3>
-                    <p className="text-sm font-semibold text-slate-500">
-                      {project.member ? `${project.member.avatar} ${project.member.name} · ` : ""}{project.subject} · Due {formatDate(project.dueDate)}
-                    </p>
+                <div key={project.id} className="rounded-2xl bg-slate-50 p-4">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <h3 className="font-black text-slate-800">{project.title}</h3>
+                      <p className="text-sm font-semibold text-slate-500">
+                        {project.member ? `${project.member.avatar} ${project.member.name} · ` : ""}{project.subject} · Due {formatDate(project.dueDate)}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <span className="rounded-full bg-white px-3 py-1 text-sm font-black text-slate-600">{project.status}</span>
+                      <span className="rounded-full bg-white px-3 py-1 text-sm font-black text-slate-600">{project.pointsReward} pts</span>
+                      {project.status === "submitted" && (
+                        <button
+                          onClick={() => completeProject(project)}
+                          disabled={saving === `project-${project.id}`}
+                          className="rounded-full bg-blue-600 px-3 py-1 text-sm font-black text-white hover:bg-blue-700 disabled:opacity-40"
+                        >
+                          Mark Complete
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <span className="rounded-full bg-white px-3 py-1 text-sm font-black text-slate-600">{project.status}</span>
-                    <span className="rounded-full bg-white px-3 py-1 text-sm font-black text-slate-600">{project.pointsReward} pts</span>
-                    {project.status === "submitted" && (
-                      <button
-                        onClick={() => completeProject(project)}
-                        disabled={saving === `project-${project.id}`}
-                        className="rounded-full bg-blue-600 px-3 py-1 text-sm font-black text-white hover:bg-blue-700 disabled:opacity-40"
-                      >
-                        Mark Complete
-                      </button>
-                    )}
-                  </div>
+                  {project.submissionTitle && (
+                    <div className="mt-4 rounded-2xl border border-blue-100 bg-white p-4">
+                      <p className="text-xs font-black uppercase tracking-wide text-blue-600">Member submission</p>
+                      <h4 className="mt-1 font-black text-slate-800">{project.submissionTitle}</h4>
+                      {project.submissionDescription && <p className="mt-2 whitespace-pre-wrap text-sm font-semibold text-slate-600">{project.submissionDescription}</p>}
+                      {(project.submissionFiles?.length ?? 0) > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {project.submissionFiles?.map((file) => (
+                            <a key={file.id} href={`/api/education/projects/${project.id}/files/${file.id}`} className="inline-flex items-center gap-2 rounded-xl bg-blue-50 px-3 py-2 text-sm font-black text-blue-700 hover:bg-blue-100">
+                              <FileText size={15} /> {file.name}
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
               {projects.length === 0 && (

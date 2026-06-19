@@ -315,20 +315,24 @@ model EducationAttempt {
 }
 
 model EducationProject {
-  id           String    @id @default(uuid()) @db.Char(36)
-  householdId  String    @db.Char(36)
-  memberId     String?   @db.Char(36)
-  skillId      String?   @db.Char(36)
-  title        String    @db.VarChar(255)
-  subject      String    @default("project") @db.VarChar(64)
-  description  String?   @db.Text
-  rubric       String?   @db.Text
-  status       String    @default("open") @db.VarChar(64)
-  dueDate      DateTime?
-  pointsReward Int       @default(25)
-  completedAt  DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @default(now()) @updatedAt
+  id                    String    @id @default(uuid()) @db.Char(36)
+  householdId           String    @db.Char(36)
+  memberId              String?   @db.Char(36)
+  skillId               String?   @db.Char(36)
+  title                 String    @db.VarChar(255)
+  subject               String    @default("project") @db.VarChar(64)
+  description           String?   @db.Text
+  rubric                String?   @db.Text
+  status                String    @default("open") @db.VarChar(64)
+  dueDate               DateTime?
+  pointsReward          Int       @default(25)
+  submissionTitle       String?   @db.VarChar(255)
+  submissionDescription String?   @db.Text
+  submissionFiles       Json?
+  submittedAt           DateTime?
+  completedAt           DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @default(now()) @updatedAt
 
   household Household      @relation(fields: [householdId], references: [id], onDelete: Cascade)
   member    FamilyMember?  @relation(fields: [memberId], references: [id], onDelete: SetNull)

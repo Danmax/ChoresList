@@ -3,7 +3,7 @@
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, CheckCircle2, GraduationCap, Send, Zap } from "lucide-react";
+import { ArrowLeft, CheckCircle2, FileText, GraduationCap, Send, Upload, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { choicesForDisplay } from "@/lib/education";
 
@@ -41,7 +41,13 @@ type Project = {
   status: string;
   pointsReward: number;
   dueDate?: string | null;
+  submissionTitle?: string | null;
+  submissionDescription?: string | null;
+  submittedAt?: string | null;
+  submissionFiles?: { id: string; name: string; type: string; size: number }[] | null;
 };
+
+type ProjectDraft = { title: string; description: string; files: File[] };
 
 type Member = {
   id: string;
@@ -83,6 +89,7 @@ export default function KidAcademyPage() {
   const [member, setMember] = useState<Member | null>(null);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [projectDrafts, setProjectDrafts] = useState<Record<string, ProjectDraft>>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [flipped, setFlipped] = useState<Record<string, boolean>>({});
@@ -154,14 +161,26 @@ export default function KidAcademyPage() {
     }
   }
 
+  function updateProjectDraft(project: Project, patch: Partial<ProjectDraft>) {
+    setProjectDrafts((current) => ({
+      ...current,
+      [project.id]: { title: current[project.id]?.title ?? project.title, description: current[project.id]?.description ?? "", files: current[project.id]?.files ?? [], ...patch },
+    }));
+  }
+
   async function submitProject(project: Project) {
+    const draft = projectDrafts[project.id] ?? { title: project.title, description: "", files: [] };
+    if (!draft.title.trim() || !draft.description.trim()) {
+      toast.error("Add a submission title and description");
+      return;
+    }
     setSaving(true);
     try {
-      const res = await fetch("/api/education/projects", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: project.id }),
-      });
+      const formData = new FormData();
+      formData.set("title", draft.title);
+      formData.set("description", draft.description);
+      draft.files.forEach((file) => formData.append("files", file));
+      const res = await fetch(`/api/education/projects/${project.id}/submission`, { method: "POST", body: formData });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
         toast.error(data?.error ?? "Could not submit project");
@@ -258,9 +277,29 @@ export default function KidAcademyPage() {
                   <p className="font-black text-slate-800">{project.title}</p>
                   <p className="text-xs font-bold text-slate-500">Due {formatDate(project.dueDate)} · {project.pointsReward} pts</p>
                   {project.description && <p className="mt-2 text-sm font-semibold text-slate-500">{project.description}</p>}
-                  <button disabled={saving} onClick={() => submitProject(project)} className="mt-3 rounded-2xl bg-blue-600 px-3 py-1.5 text-sm font-black text-white hover:bg-blue-700 disabled:opacity-40">
-                    Submit for Review
-                  </button>
+                  {project.status === "submitted" ? (
+                    <div className="mt-3 rounded-2xl bg-emerald-50 p-3">
+                      <p className="flex items-center gap-2 font-black text-emerald-700"><CheckCircle2 size={16} /> Submitted for review</p>
+                      <p className="mt-2 font-black text-slate-700">{project.submissionTitle}</p>
+                      <p className="mt-1 whitespace-pre-wrap text-sm font-semibold text-slate-500">{project.submissionDescription}</p>
+                      {(project.submissionFiles?.length ?? 0) > 0 && <div className="mt-2 space-y-1">{project.submissionFiles?.map((file) => (
+                        <a key={file.id} href={`/api/education/projects/${project.id}/files/${file.id}`} className="flex items-center gap-2 text-sm font-black text-blue-600 hover:text-blue-700"><FileText size={14} /> {file.name}</a>
+                      ))}</div>}
+                    </div>
+                  ) : (
+                    <div className="mt-3 space-y-2">
+                      <input value={projectDrafts[project.id]?.title ?? project.title} onChange={(event) => updateProjectDraft(project, { title: event.target.value })} placeholder="Submission title" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800 outline-none focus:border-blue-300" />
+                      <textarea value={projectDrafts[project.id]?.description ?? ""} onChange={(event) => updateProjectDraft(project, { description: event.target.value })} placeholder="Describe what you completed and what you learned" rows={4} className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 outline-none focus:border-blue-300" />
+                      <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-blue-200 bg-blue-50 px-3 py-2 text-sm font-black text-blue-700 hover:bg-blue-100">
+                        <Upload size={16} /> Add files
+                        <input type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp" className="sr-only" onChange={(event) => updateProjectDraft(project, { files: Array.from(event.target.files ?? []) })} />
+                      </label>
+                      {(projectDrafts[project.id]?.files.length ?? 0) > 0 && <p className="text-xs font-bold text-slate-500">{projectDrafts[project.id].files.map((file) => file.name).join(", ")}</p>}
+                      <button disabled={saving} onClick={() => submitProject(project)} className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-3 py-2 text-sm font-black text-white hover:bg-blue-700 disabled:opacity-40">
+                        <Send size={15} /> Submit for Review
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
               {projects.length === 0 && <p className="text-sm font-bold text-slate-400">No projects assigned.</p>}

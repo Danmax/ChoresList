@@ -31,7 +31,7 @@ export const GET = withErrors(async (req: NextRequest) => {
       orderBy: [{ status: "asc" }, { dueDate: "asc" }, { createdAt: "desc" }],
     }),
     prisma.educationProject.findMany({
-      where: { householdId, memberId, status: "open" },
+      where: { householdId, memberId, status: { in: ["open", "submitted"] } },
       orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
     }),
   ]);

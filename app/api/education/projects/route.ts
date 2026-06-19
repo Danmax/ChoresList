@@ -15,9 +15,5 @@ export const PUT = withErrors(async (req: NextRequest) => {
     return NextResponse.json({ error: "You do not have access to this family member" }, { status: 403 });
   }
 
-  const updated = await prisma.educationProject.update({
-    where: { id },
-    data: { status: "submitted" },
-  });
-  return NextResponse.json(updated);
+  return NextResponse.json({ error: "Submit project work with a title and description" }, { status: 400 });
 });
