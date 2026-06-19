@@ -30,8 +30,17 @@ set -euo pipefail
 APP_DIR="${APP_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 ARCHIVE_DIR="${ARCHIVE_DIR:-$APP_DIR/.next-static-archive}"
 KEEP_DAYS="${KEEP_DAYS:-7}"
+UPLOADS_DIR="${UPLOADS_DIR:-$(cd "$APP_DIR/.." && pwd)/chores-uploads}"
 
 cd "$APP_DIR"
+
+# Keep user uploads outside the application release so pulls/redeployments cannot remove them.
+mkdir -p "$UPLOADS_DIR"
+echo "[deploy] persistent uploads: $UPLOADS_DIR"
+if [ -d "$APP_DIR/public/uploads" ]; then
+  echo "[deploy] migrating legacy public/uploads into persistent storage"
+  cp -an "$APP_DIR/public/uploads/." "$UPLOADS_DIR/"
+fi
 
 # --- 1. Snapshot the current static dir BEFORE the build wipes it -------------
 if [ -d ".next/static" ]; then

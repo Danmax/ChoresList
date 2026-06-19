@@ -5,12 +5,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { authErrorResponse, requireParentSession } from "@/lib/api";
 import { optimizeToWebp } from "@/lib/image";
 import { requirePluginActive } from "@/lib/plugins/registry";
+import { uploadPath } from "@/lib/uploads";
 
 export const runtime = "nodejs";
 
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
 const ACCEPTED_MIME = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
-const UPLOADS_ROOT = path.resolve(process.cwd(), "public", "uploads");
 
 export async function POST(req: NextRequest) {
   try {
@@ -33,14 +33,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Could not read image" }, { status: 400 });
     }
 
-    const recipeDir = path.resolve(UPLOADS_ROOT, "recipes", String(householdId));
-    if (!recipeDir.startsWith(UPLOADS_ROOT + path.sep)) {
-      return NextResponse.json({ error: "Invalid destination" }, { status: 400 });
-    }
+    const recipeDir = uploadPath("recipes", String(householdId));
+    if (!recipeDir) return NextResponse.json({ error: "Invalid destination" }, { status: 400 });
     await mkdir(recipeDir, { recursive: true });
 
     const filename = `${Date.now()}-recipe-${randomBytes(6).toString("hex")}.webp`;
-    const filePath = path.resolve(recipeDir, filename);
+    const filePath = uploadPath("recipes", String(householdId), filename);
+    if (!filePath) return NextResponse.json({ error: "Invalid destination" }, { status: 400 });
     if (!filePath.startsWith(recipeDir + path.sep)) {
       return NextResponse.json({ error: "Invalid destination" }, { status: 400 });
     }

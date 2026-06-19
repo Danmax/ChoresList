@@ -33,6 +33,8 @@ interface BirthdayMember {
   name: string;
   birthdayMonth?: number | null;
   birthdayDay?: number | null;
+  anniversaryMonth?: number | null;
+  anniversaryDay?: number | null;
 }
 
 interface FamilyEvent {
@@ -57,11 +59,12 @@ interface FamilyEvent {
   icon: string;
 }
 
-type CalendarSourceKind = "family" | "birthday" | "community";
+type CalendarSourceKind = "family" | "birthday" | "anniversary" | "community";
 type DisplayEvent = FamilyEvent & {
   _seriesId: string;
   _isOccurrence: boolean;
   _isBirthday?: boolean;
+  _isAnniversary?: boolean;
   _isCommunity?: boolean;
   _source: CalendarSourceKind;
   _sourceId: string;
@@ -342,6 +345,45 @@ function birthdayEventsForWindow(members: BirthdayMember[], windowStart: Date, w
   });
 }
 
+function anniversaryEventsForWindow(members: BirthdayMember[], windowStart: Date, windowEnd: Date): FamilyEvent[] {
+  const years: number[] = [];
+  for (let year = windowStart.getFullYear(); year <= windowEnd.getFullYear(); year++) years.push(year);
+
+  return members.flatMap((member) => {
+    if (!member.anniversaryMonth || !member.anniversaryDay) return [];
+    const anniversaryMonth = member.anniversaryMonth;
+    const anniversaryDay = member.anniversaryDay;
+
+    return years.flatMap((year) => {
+      const maxDay = new Date(year, anniversaryMonth, 0).getDate();
+      const date = new Date(Date.UTC(year, anniversaryMonth - 1, Math.min(anniversaryDay, maxDay)));
+      if (date.getTime() < windowStart.getTime() || date.getTime() > windowEnd.getTime()) return [];
+
+      return [{
+        id: `anniversary-${year}-${member.id}`,
+        title: `${member.name}'s Anniversary`,
+        eventType: "other",
+        date: date.toISOString(),
+        endDate: null,
+        allDay: true,
+        recurring: "none",
+        recurringEndDate: null,
+        recurringCount: null,
+        location: null,
+        meetingUrl: null,
+        rsvpUrl: null,
+        flyerUrl: null,
+        registrationUrl: null,
+        registrationNotes: null,
+        resources: null,
+        notes: "Anniversary celebration",
+        color: "#f59e0b",
+        icon: "💍",
+      }];
+    });
+  });
+}
+
 export default function CalendarPage() {
   return (
     <ParentPinGate>
@@ -459,6 +501,9 @@ function CalendarContent() {
     const birthdayEvents = hiddenCalendarIds.includes("birthdays")
       ? []
       : birthdayEventsForWindow(birthdayMembers, windowRange.start, windowRange.end);
+    const anniversaryEvents = hiddenCalendarIds.includes("anniversaries")
+      ? []
+      : anniversaryEventsForWindow(birthdayMembers, windowRange.start, windowRange.end);
     const expandedEvents = expandOccurrences(familyEvents, windowRange.start, windowRange.end);
     const expandedBirthdays: DisplayEvent[] = birthdayEvents.map((event) => ({
       ...event,
@@ -468,6 +513,15 @@ function CalendarContent() {
       _source: "birthday",
       _sourceId: "birthdays",
       _sourceName: "Birthdays",
+    }));
+    const expandedAnniversaries: DisplayEvent[] = anniversaryEvents.map((event) => ({
+      ...event,
+      _seriesId: event.id,
+      _isOccurrence: false,
+      _isAnniversary: true,
+      _source: "anniversary",
+      _sourceId: "anniversaries",
+      _sourceName: "Anniversaries",
     }));
     const expandedCommunity: DisplayEvent[] = communityCalendars
       .filter((calendar) => !hiddenCalendarIds.includes(calendarSourceId(calendar.id)))
@@ -483,7 +537,7 @@ function CalendarContent() {
           _sourceHref: `/community/${calendar.id}?event=${event.id}`,
         }))
       );
-    return [...expandedEvents, ...expandedBirthdays, ...expandedCommunity];
+    return [...expandedEvents, ...expandedBirthdays, ...expandedAnniversaries, ...expandedCommunity];
   }, [events, hiddenCalendarIds, birthdayMembers, windowRange, communityCalendars]);
 
   const eventsByDayKey = useMemo(() => {
@@ -659,8 +713,8 @@ function CalendarContent() {
   }
 
   async function deleteEvent(displayEvent: DisplayEvent) {
-    if (displayEvent._isBirthday) {
-      toast.info("Birthdays are managed from Family Members");
+    if (displayEvent._isBirthday || displayEvent._isAnniversary) {
+      toast.info("Birthdays and anniversaries are managed from Family Members");
       return;
     }
     if (displayEvent._isCommunity) {
@@ -775,6 +829,12 @@ function CalendarContent() {
             color="#f472b6"
             checked={!hiddenCalendarIds.includes("birthdays")}
             onClick={() => toggleCalendar("birthdays")}
+          />
+          <CalendarToggle
+            label="Anniversaries"
+            color="#f59e0b"
+            checked={!hiddenCalendarIds.includes("anniversaries")}
+            onClick={() => toggleCalendar("anniversaries")}
           />
           {communityCalendars.map((calendar) => {
             const id = calendarSourceId(calendar.id);
@@ -1382,7 +1442,7 @@ function WeekGrid({
                         <p className="truncate">{e.title}</p>
                         {time && <p className="text-[10px] font-bold text-slate-500">{time}</p>}
                       </div>
-                      {!e._isBirthday && !e._isCommunity && (
+                      {!e._isBirthday && !e._isAnniversary && !e._isCommunity && (
                         <button
                           onClick={(event) => {
                             event.stopPropagation();
@@ -1500,8 +1560,8 @@ function EventRow({ e, onOpen, onDelete }: { e: DisplayEvent; onOpen?: () => voi
           event.stopPropagation();
           onDelete();
         }}
-        className={`p-1 transition-colors ${e._isBirthday || e._isCommunity ? "invisible" : "text-red-400 hover:text-red-600"}`}
-        disabled={e._isBirthday || e._isCommunity}
+        className={`p-1 transition-colors ${e._isBirthday || e._isAnniversary || e._isCommunity ? "invisible" : "text-red-400 hover:text-red-600"}`}
+        disabled={e._isBirthday || e._isAnniversary || e._isCommunity}
       >
         <Trash2 size={14} />
       </button>
@@ -1564,7 +1624,7 @@ function EventDetailsDialog({
               </div>
             )}
 
-            {!event._isBirthday && !event._isCommunity && (
+            {!event._isBirthday && !event._isAnniversary && !event._isCommunity && (
               <button
                 type="button"
                 onClick={() => onDelete(event)}

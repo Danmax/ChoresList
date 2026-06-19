@@ -8,6 +8,8 @@ import { ensureParentFamilyMember } from "@/lib/parent-member";
 type BirthdayInput = {
   birthdayMonth?: unknown;
   birthdayDay?: unknown;
+  anniversaryMonth?: unknown;
+  anniversaryDay?: unknown;
 };
 
 const ADULT_ROLES = new Set(["mom", "dad", "parent", "grandparent"]);
@@ -76,6 +78,11 @@ function validBirthday(month: number | null, day: number | null) {
 
 function birthdayFields(body: BirthdayInput) {
   return validBirthday(cleanInt(body.birthdayMonth), cleanInt(body.birthdayDay));
+}
+
+function anniversaryFields(body: BirthdayInput) {
+  const date = validBirthday(cleanInt(body.anniversaryMonth), cleanInt(body.anniversaryDay));
+  return { anniversaryMonth: date.birthdayMonth, anniversaryDay: date.birthdayDay };
 }
 
 function birthdayHasOccurredThisYear(birthdayMonth: number | null, birthdayDay: number | null) {
@@ -168,6 +175,7 @@ export const POST = withErrors(async (req: NextRequest) => {
     return NextResponse.json({ error: "Name and age are required" }, { status: 400 });
   }
   const birthday = birthdayFields(body);
+  const anniversary = anniversaryFields(body);
   const role = cleanRole(body.role);
   const member = await prisma.familyMember.create({
     data: {
@@ -175,6 +183,7 @@ export const POST = withErrors(async (req: NextRequest) => {
       name,
       age,
       ...birthday,
+      ...anniversary,
       lastBirthdayAgeUpdateYear: birthdayAgeUpdateYear(birthday.birthdayMonth, birthday.birthdayDay),
       role,
       relationshipToHousehold: cleanRelationship(body.relationshipToHousehold, defaultRelationshipForRole(role)),
@@ -209,6 +218,7 @@ export const PUT = withErrors(async (req: NextRequest) => {
     return NextResponse.json({ error: "Age must be a number" }, { status: 400 });
   }
   const birthday = body.birthdayMonth !== undefined || body.birthdayDay !== undefined ? birthdayFields(body) : undefined;
+  const anniversary = body.anniversaryMonth !== undefined || body.anniversaryDay !== undefined ? anniversaryFields(body) : undefined;
   const member = await prisma.familyMember.update({
     where: { id, householdId },
     data: {
@@ -223,6 +233,7 @@ export const PUT = withErrors(async (req: NextRequest) => {
         ...birthday,
         lastBirthdayAgeUpdateYear: birthdayAgeUpdateYear(birthday.birthdayMonth, birthday.birthdayDay),
       }),
+      ...(anniversary !== undefined && anniversary),
       ...(body.avatar !== undefined && { avatar: cleanShortText(body.avatar, "🧒") }),
       ...(body.color !== undefined && { color: cleanShortText(body.color, "#a78bfa") }),
     },

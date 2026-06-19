@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { ArrowLeft, Plus, Trash2, Save, ClipboardList, Sparkles, UserPlus, Copy } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { AVATAR_OPTIONS, KID_COLORS, STARTER_CHORE_TEMPLATES_BY_AGE, type StarterChoreFrequency, type StarterChoreTemplate } from "@/types";
+import { AVATAR_OPTIONS, KID_COLORS, PARENT_AVATARS, STARTER_CHORE_TEMPLATES_BY_AGE, type StarterChoreFrequency, type StarterChoreTemplate } from "@/types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -57,6 +57,8 @@ interface Member {
   age: number;
   birthdayMonth?: number | null;
   birthdayDay?: number | null;
+  anniversaryMonth?: number | null;
+  anniversaryDay?: number | null;
   role: string;
   relationshipToHousehold?: string;
   familyBranch?: string;
@@ -132,6 +134,12 @@ function birthdayLabel(member: Pick<Member, "birthdayMonth" | "birthdayDay">) {
   const month = MONTH_OPTIONS.find((option) => option.value === member.birthdayMonth)?.label;
   if (!month) return null;
   return `${month} ${member.birthdayDay}`;
+}
+
+function anniversaryLabel(member: Pick<Member, "anniversaryMonth" | "anniversaryDay">) {
+  if (!member.anniversaryMonth || !member.anniversaryDay) return null;
+  const month = MONTH_OPTIONS.find((option) => option.value === member.anniversaryMonth)?.label;
+  return month ? `${month} ${member.anniversaryDay}` : null;
 }
 
 function starterBandForAge(age?: number) {
@@ -228,6 +236,8 @@ export default function MembersPage() {
       age: 8,
       birthdayMonth: null,
       birthdayDay: null,
+      anniversaryMonth: null,
+      anniversaryDay: null,
       role: "child",
       relationshipToHousehold: "child",
       familyBranch: "primary",
@@ -598,6 +608,9 @@ export default function MembersPage() {
               {birthdayLabel(m) && (
                 <p className="text-slate-400 text-xs font-bold">🎂 {birthdayLabel(m)}</p>
               )}
+              {anniversaryLabel(m) && (
+                <p className="text-slate-400 text-xs font-bold">💍 {anniversaryLabel(m)}</p>
+              )}
               <p className="text-slate-500 text-sm font-semibold">⭐ {m.totalPoints} pts • Lv.{m.level}</p>
               {m.skills && m.skills.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1.5">
@@ -678,6 +691,9 @@ export default function MembersPage() {
                         role: r.value,
                         relationshipToHousehold: relationshipForRole(r.value, p?.relationshipToHousehold),
                         age: isChildRole(r.value) ? p?.age ?? 8 : p?.age && p.age >= 18 ? p.age : 18,
+                        avatar: isChildRole(r.value)
+                          ? (PARENT_AVATARS.includes(p?.avatar ?? "") ? "🧒" : p?.avatar)
+                          : (AVATAR_OPTIONS.includes(p?.avatar ?? "") ? (r.value === "mom" ? "👩" : r.value === "dad" ? "👨" : "🧑") : p?.avatar),
                       }))}
                       className={`py-2 px-3 rounded-xl font-bold text-sm transition-all border-2 ${
                         editing.role === r.value
@@ -715,43 +731,6 @@ export default function MembersPage() {
                       className="rounded-xl mt-1"
                     />
                   </div>
-                  <div>
-                    <Label className="font-bold">Birthday</Label>
-                    <div className="mt-1 grid grid-cols-[1fr_6rem] gap-2">
-                      <select
-                        value={editing.birthdayMonth ?? ""}
-                        onChange={(e) => {
-                          const birthdayMonth = e.target.value ? parseInt(e.target.value, 10) : null;
-                          setEditing((p) => {
-                            const maxDay = daysInMonth(birthdayMonth);
-                            const currentDay = p?.birthdayDay ?? null;
-                            return {
-                              ...p!,
-                              birthdayMonth,
-                              birthdayDay: birthdayMonth ? (currentDay && currentDay <= maxDay ? currentDay : 1) : null,
-                            };
-                          });
-                        }}
-                        className="h-8 w-full rounded-xl border border-input bg-transparent px-2.5 py-1 text-sm font-semibold text-slate-800 outline-none focus:border-violet-300"
-                      >
-                        <option value="">Month</option>
-                        {MONTH_OPTIONS.map((month) => (
-                          <option key={month.value} value={month.value}>{month.label}</option>
-                        ))}
-                      </select>
-                      <select
-                        value={editing.birthdayDay ?? ""}
-                        disabled={!editing.birthdayMonth}
-                        onChange={(e) => setEditing((p) => ({ ...p!, birthdayDay: e.target.value ? parseInt(e.target.value, 10) : null }))}
-                        className="h-8 w-full rounded-xl border border-input bg-transparent px-2.5 py-1 text-sm font-semibold text-slate-800 outline-none focus:border-violet-300 disabled:opacity-50"
-                      >
-                        <option value="">Day</option>
-                        {Array.from({ length: daysInMonth(editing.birthdayMonth) }, (_, i) => i + 1).map((day) => (
-                          <option key={day} value={day}>{day}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
                 </div>
               ) : (
                 <div>
@@ -765,6 +744,22 @@ export default function MembersPage() {
                     className="rounded-xl mt-1"
                   />
                 </div>
+              )}
+
+              <CelebrationDateField
+                label="Birthday"
+                month={editing.birthdayMonth}
+                day={editing.birthdayDay}
+                onChange={(birthdayMonth, birthdayDay) => setEditing((p) => ({ ...p!, birthdayMonth, birthdayDay }))}
+              />
+
+              {!isChildRole(editing.role) && (
+                <CelebrationDateField
+                  label="Anniversary"
+                  month={editing.anniversaryMonth}
+                  day={editing.anniversaryDay}
+                  onChange={(anniversaryMonth, anniversaryDay) => setEditing((p) => ({ ...p!, anniversaryMonth, anniversaryDay }))}
+                />
               )}
 
               <div className="grid gap-3 sm:grid-cols-2">
@@ -891,7 +886,7 @@ export default function MembersPage() {
               <div>
                 <Label className="font-bold mb-2 block">Avatar</Label>
                 <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-1 rounded-xl border border-slate-100 bg-slate-50">
-                  {AVATAR_OPTIONS.map((a) => (
+                  {(isChildRole(editing.role) ? AVATAR_OPTIONS : PARENT_AVATARS).map((a) => (
                     <button
                       key={a}
                       onClick={() => setEditing((p) => ({ ...p!, avatar: a }))}
@@ -933,6 +928,49 @@ export default function MembersPage() {
           )}
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function CelebrationDateField({
+  label,
+  month,
+  day,
+  onChange,
+}: {
+  label: string;
+  month?: number | null;
+  day?: number | null;
+  onChange: (month: number | null, day: number | null) => void;
+}) {
+  return (
+    <div>
+      <Label className="font-bold">{label}</Label>
+      <div className="mt-1 grid grid-cols-[1fr_6rem] gap-2">
+        <select
+          value={month ?? ""}
+          onChange={(event) => {
+            const nextMonth = event.target.value ? parseInt(event.target.value, 10) : null;
+            const maxDay = daysInMonth(nextMonth);
+            onChange(nextMonth, nextMonth ? (day && day <= maxDay ? day : 1) : null);
+          }}
+          className="h-8 w-full rounded-xl border border-input bg-transparent px-2.5 py-1 text-sm font-semibold text-slate-800 outline-none focus:border-violet-300"
+        >
+          <option value="">Month</option>
+          {MONTH_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+        </select>
+        <select
+          value={day ?? ""}
+          disabled={!month}
+          onChange={(event) => onChange(month ?? null, event.target.value ? parseInt(event.target.value, 10) : null)}
+          className="h-8 w-full rounded-xl border border-input bg-transparent px-2.5 py-1 text-sm font-semibold text-slate-800 outline-none focus:border-violet-300 disabled:opacity-50"
+        >
+          <option value="">Day</option>
+          {Array.from({ length: daysInMonth(month) }, (_, index) => index + 1).map((option) => (
+            <option key={option} value={option}>{option}</option>
+          ))}
+        </select>
+      </div>
     </div>
   );
 }

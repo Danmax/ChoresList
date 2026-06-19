@@ -55,8 +55,6 @@ export async function ensureParentFamilyMember(parentId: string, householdId: st
     name,
     role,
     relationshipToHousehold: role,
-    avatar: parentAvatar(parent.parentType),
-    color: "#14b8a6",
     familyNotes: parent.relationshipLabel,
   };
 
@@ -93,6 +91,8 @@ export async function ensureParentFamilyMember(parentId: string, householdId: st
       level: 1,
       totalPoints: 0,
       familyBranch: "primary",
+      avatar: parentAvatar(parent.parentType),
+      color: "#14b8a6",
       ...data,
     },
   });

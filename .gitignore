@@ -51,5 +51,6 @@ prisma/dev.db
 
 # Uploads
 /public/uploads/
+/storage/uploads/
 /storage/grocery-receipts/
 /public/next-assets/
