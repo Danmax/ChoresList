@@ -137,6 +137,32 @@ export const PUT = withErrors(async (req: NextRequest) => {
   await requirePluginAccess(householdId, parentId, "education-academy");
   const body = await req.json();
 
+  if (body.action === "set") {
+    const id = typeof body.id === "string" ? body.id : "";
+    const existing = await prisma.educationMaterialSet.findFirst({ where: { id, householdId }, select: { id: true } });
+    if (!existing) return NextResponse.json({ error: "Information set not found" }, { status: 404 });
+    const title = cleanText(body.title, "", 255);
+    const materials = parseMaterialLines(body.materialsText);
+    if (!title || materials.length === 0) return NextResponse.json({ error: "Title and at least one information line are required" }, { status: 400 });
+    const set = await prisma.$transaction(async (tx) => {
+      await tx.educationMaterial.deleteMany({ where: { setId: id } });
+      return tx.educationMaterialSet.update({
+        where: { id },
+        data: {
+          title,
+          subject: EDUCATION_SUBJECTS.has(body.subject) ? body.subject : "vocabulary",
+          mode: EDUCATION_MODES.has(body.mode) ? body.mode : "drill",
+          description: cleanOptionalText(body.description, 2000),
+          passingScore: cleanInt(body.passingScore, 85, 1, 100),
+          pointsReward: cleanInt(body.pointsReward, 10, 0, 500),
+          materials: { create: materials.map((material) => ({ prompt: material.prompt, answer: material.answer, choices: material.choices, explanation: material.explanation, sortOrder: material.sortOrder })) },
+        },
+        include: { materials: { orderBy: { sortOrder: "asc" } }, _count: { select: { assignments: true } } },
+      });
+    });
+    return NextResponse.json(set);
+  }
+
   if (body.action === "project") {
     const id = typeof body.id === "string" ? body.id : "";
     const project = await prisma.educationProject.findFirst({ where: { id, householdId }, select: { memberId: true, skillId: true, subject: true, pointsReward: true, status: true } });

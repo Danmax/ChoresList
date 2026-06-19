@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { withErrors } from "@/lib/api";
 import { hashDeviceSecret, requireDeviceSession } from "@/lib/device-session";
 
-const MOODS = new Set(["great", "good", "okay", "low", "sad", "frustrated", "tired", "overwhelmed"]);
+const MOODS = new Set(["great", "awesome", "cool", "good", "okay", "low", "sad", "frustrated", "tired", "overwhelmed"]);
 
 async function verifiedDevice(req: NextRequest) {
   const session = requireDeviceSession(req);

@@ -6,7 +6,7 @@ import { requireSession, withErrors } from "@/lib/api";
 import { requireCommunityRole, requireEventCommunityRole } from "@/lib/community";
 import { syncOneTimeEventReminders } from "@/lib/community-notifications";
 
-const EVENT_TYPES = new Set(["potluck", "service", "practice", "meeting", "appointment", "doctor", "conference", "worship", "workshop", "fundraiser", "game", "class", "social", "other"]);
+const EVENT_TYPES = new Set(["potluck", "service", "practice", "meeting", "appointment", "conference", "worship", "workshop", "fundraiser", "game", "class", "social", "other"]);
 const VISIBILITIES = new Set(["private", "public"]);
 const RECURRING = new Set(["none", "daily", "weekly", "biweekly", "monthly", "monthly-date", "monthly-weekday", "monthly-last-weekday"]);
 

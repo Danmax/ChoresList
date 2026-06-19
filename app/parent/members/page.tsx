@@ -161,6 +161,10 @@ function isChildRole(role?: string | null) {
   return role === "child" || role === "young-adult";
 }
 
+function usesAdultAvatars(role?: string | null) {
+  return role !== "child";
+}
+
 function relationshipForRole(role: string, current?: string | null) {
   if (role === "young-adult") return "young-adult";
   if (role === "mom" || role === "dad" || role === "parent") return role;
@@ -691,9 +695,9 @@ export default function MembersPage() {
                         role: r.value,
                         relationshipToHousehold: relationshipForRole(r.value, p?.relationshipToHousehold),
                         age: isChildRole(r.value) ? p?.age ?? 8 : p?.age && p.age >= 18 ? p.age : 18,
-                        avatar: isChildRole(r.value)
-                          ? (PARENT_AVATARS.includes(p?.avatar ?? "") ? "🧒" : p?.avatar)
-                          : (AVATAR_OPTIONS.includes(p?.avatar ?? "") ? (r.value === "mom" ? "👩" : r.value === "dad" ? "👨" : "🧑") : p?.avatar),
+                        avatar: usesAdultAvatars(r.value)
+                          ? (AVATAR_OPTIONS.includes(p?.avatar ?? "") ? (r.value === "mom" ? "👩" : r.value === "dad" ? "👨" : "🧑") : p?.avatar)
+                          : (PARENT_AVATARS.includes(p?.avatar ?? "") ? "🧒" : p?.avatar),
                       }))}
                       className={`py-2 px-3 rounded-xl font-bold text-sm transition-all border-2 ${
                         editing.role === r.value
@@ -886,7 +890,7 @@ export default function MembersPage() {
               <div>
                 <Label className="font-bold mb-2 block">Avatar</Label>
                 <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-1 rounded-xl border border-slate-100 bg-slate-50">
-                  {(isChildRole(editing.role) ? AVATAR_OPTIONS : PARENT_AVATARS).map((a) => (
+                  {(usesAdultAvatars(editing.role) ? PARENT_AVATARS : AVATAR_OPTIONS).map((a) => (
                     <button
                       key={a}
                       onClick={() => setEditing((p) => ({ ...p!, avatar: a }))}

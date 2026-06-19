@@ -2,7 +2,7 @@
 
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, BookOpenCheck, ClipboardList, GraduationCap, Plus, Trophy, Wand2 } from "lucide-react";
+import { ArrowLeft, BookOpenCheck, ClipboardList, GraduationCap, Pencil, Plus, Trophy, Wand2, X } from "lucide-react";
 import { toast } from "sonner";
 
 type Member = {
@@ -18,6 +18,7 @@ type Material = {
   prompt: string;
   answer: string;
   choices?: string[] | null;
+  explanation?: string | null;
 };
 
 type MaterialSet = {
@@ -27,6 +28,7 @@ type MaterialSet = {
   mode: string;
   passingScore: number;
   pointsReward: number;
+  description?: string | null;
   materials: Material[];
   _count?: { assignments: number };
 };
@@ -68,6 +70,7 @@ const MODES = [
   { value: "lightning", label: "Lightning" },
   { value: "drill", label: "Drill" },
   { value: "exam", label: "Exam" },
+  { value: "training", label: "Training" },
   { value: "real-life", label: "Real-Life" },
 ];
 
@@ -119,6 +122,7 @@ export default function ParentAcademyPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState("");
   const [loadError, setLoadError] = useState("");
+  const [editingSetId, setEditingSetId] = useState<string | null>(null);
 
   const activeAssignments = useMemo(() => assignments.filter((assignment) => assignment.status !== "archived"), [assignments]);
   const completedCount = activeAssignments.filter((assignment) => assignment.status === "completed").length;
@@ -167,8 +171,35 @@ export default function ParentAcademyPage() {
 
   async function createSet(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const ok = await post(setDraft, "Material set created", "set");
+    if (editingSetId) {
+      setSaving("set");
+      try {
+        const res = await fetch("/api/education/parent", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "set", id: editingSetId, ...setDraft }) });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) return toast.error(data?.error ?? "Could not update information set");
+        toast.success("Information set updated");
+        setEditingSetId(null);
+        setSetDraft(DEFAULT_SET);
+        await load();
+      } finally { setSaving(""); }
+      return;
+    }
+    const ok = await post(setDraft, "Information set created", "set");
     if (ok) setSetDraft(DEFAULT_SET);
+  }
+
+  function editSet(set: MaterialSet) {
+    setEditingSetId(set.id);
+    setSetDraft({
+      title: set.title,
+      subject: set.subject,
+      mode: set.mode,
+      passingScore: set.passingScore,
+      pointsReward: set.pointsReward,
+      description: set.description ?? "",
+      materialsText: set.materials.map((material) => [material.prompt, material.answer, material.choices?.join(", ") ?? "", material.explanation ?? ""].join(" | ").replace(/( \|)+$/g, "")).join("\n"),
+    });
+    document.getElementById("information-editor")?.scrollIntoView({ behavior: "smooth" });
   }
 
   async function generateLessonDraft() {
@@ -182,7 +213,7 @@ export default function ParentAcademyPage() {
       const res = await fetch("/api/education/ai/draft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: lessonPrompt, itemCount: lessonItemCount }),
+        body: JSON.stringify({ prompt: lessonPrompt, itemCount: lessonItemCount, preferredMode: setDraft.mode }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
@@ -295,7 +326,7 @@ export default function ParentAcademyPage() {
           <section className="rounded-3xl bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center gap-2">
               <BookOpenCheck size={20} className="text-blue-600" />
-              <h2 className="font-black text-slate-800">Material Sets</h2>
+              <h2 className="font-black text-slate-800">Information Library</h2>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               {sets.map((set) => (
@@ -316,6 +347,7 @@ export default function ParentAcademyPage() {
                       <p key={material.id} className="truncate text-sm font-semibold text-slate-500">{material.prompt} → {material.answer}</p>
                     ))}
                   </div>
+                  <button type="button" onClick={() => editSet(set)} className="mt-3 inline-flex items-center gap-1 rounded-xl bg-white px-3 py-1.5 text-xs font-black text-blue-700"><Pencil size={13} /> Edit & Correct</button>
                 </div>
               ))}
               {sets.length === 0 && (
@@ -428,6 +460,9 @@ export default function ParentAcademyPage() {
                   className="rounded-2xl border-2 border-slate-100 bg-slate-50 px-3 py-2 font-semibold outline-none focus:border-blue-300"
                 />
               </div>
+              <select value={setDraft.mode} onChange={(event) => setSetDraft((current) => ({ ...current, mode: event.target.value }))} className="w-full rounded-2xl border-2 border-slate-100 bg-slate-50 px-3 py-2 font-semibold">
+                {MODES.map((mode) => <option key={mode.value} value={mode.value}>{mode.label}</option>)}
+              </select>
               <button
                 type="button"
                 onClick={generateLessonDraft}
@@ -439,10 +474,11 @@ export default function ParentAcademyPage() {
             </div>
           </section>
 
-          <section className="rounded-3xl bg-white p-5 shadow-sm">
+          <section id="information-editor" className="scroll-mt-6 rounded-3xl bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center gap-2">
               <Plus size={18} className="text-blue-600" />
-              <h2 className="font-black text-slate-800">Load Daily Material</h2>
+              <h2 className="font-black text-slate-800">{editingSetId ? "Edit Information" : "Add to Information Library"}</h2>
+              {editingSetId && <button type="button" onClick={() => { setEditingSetId(null); setSetDraft(DEFAULT_SET); }} className="ml-auto text-slate-400"><X size={18} /></button>}
             </div>
             <form onSubmit={createSet} className="space-y-3">
               <input value={setDraft.title} onChange={(e) => setSetDraft((d) => ({ ...d, title: e.target.value }))} placeholder="Set title" className="w-full rounded-2xl border-2 border-slate-100 bg-slate-50 px-3 py-2 font-semibold outline-none focus:border-blue-300" />
@@ -462,7 +498,7 @@ export default function ParentAcademyPage() {
               <textarea value={setDraft.materialsText} onChange={(e) => setSetDraft((d) => ({ ...d, materialsText: e.target.value }))} rows={7} className="w-full rounded-2xl border-2 border-slate-100 bg-slate-50 px-3 py-2 font-mono text-sm outline-none focus:border-blue-300" />
               <p className="text-xs font-bold text-slate-400">Format: prompt | answer | optional choices | optional explanation</p>
               <button disabled={saving === "set"} className="w-full rounded-2xl bg-blue-600 px-4 py-2.5 font-black text-white hover:bg-blue-700 disabled:opacity-40">
-                {saving === "set" ? "Saving..." : "Create Material Set"}
+                {saving === "set" ? "Saving..." : editingSetId ? "Save Corrections" : "Create Information Set"}
               </button>
             </form>
           </section>

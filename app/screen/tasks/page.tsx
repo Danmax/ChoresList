@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Award, BookOpen, CalendarDays, Camera, CheckCircle2, Download, Gift, GraduationCap, Heart, ListPlus, LogOut, Plus, RefreshCw, ShieldCheck, Sparkles, Star, Utensils } from "lucide-react";
+import { Award, BookOpen, CalendarDays, Camera, CheckCircle2, Download, Gift, GraduationCap, Heart, ListPlus, LogOut, Plus, RefreshCw, Send, ShieldCheck, Sparkles, Star, Utensils } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { COMPLETION_EMOJIS, WISH_CATEGORIES, WISH_EMOJIS } from "@/types";
+import { choicesForDisplay } from "@/lib/education";
 
 type Device = {
   id: string;
@@ -73,8 +74,21 @@ type DashboardData = {
   potlucks: { id: string; title: string; date: string; location: string | null; group: { name: string }; items: { id: string; title: string; quantity: string | null; note: string | null; status: string }[] }[];
 };
 
+type DeviceEducationAssignment = {
+  id: string; title: string; status: string; passingScore: number; pointsReward: number;
+  member: { id: string; name: string; avatar: string };
+  set: { title: string; subject: string; mode: string; materials: { id: string; prompt: string; answer: string; choices: string[] | null; explanation: string | null }[] };
+};
+
+type EducationResult = {
+  score: number; correctCount: number; totalCount: number; passed: boolean; passingScore: number; pointsAwarded: number;
+  answers: { materialId: string; prompt: string; answer: string; correctAnswer: string; correct: boolean; explanation: string | null }[];
+};
+
 const MOODS = [
   { value: "great", label: "Great", icon: "😄" },
+  { value: "awesome", label: "Awesome", icon: "🤩" },
+  { value: "cool", label: "Cool", icon: "😎" },
   { value: "good", label: "Good", icon: "🙂" },
   { value: "okay", label: "Okay", icon: "😐" },
   { value: "sad", label: "Sad", icon: "😢" },
@@ -120,6 +134,12 @@ export default function TaskScreenPage() {
   const [mood, setMood] = useState("okay");
   const [moodNote, setMoodNote] = useState("");
   const [savingMood, setSavingMood] = useState(false);
+  const [educationAssignment, setEducationAssignment] = useState<DeviceEducationAssignment | null>(null);
+  const [educationAnswers, setEducationAnswers] = useState<Record<string, string>>({});
+  const [educationFlipped, setEducationFlipped] = useState<Record<string, boolean>>({});
+  const [educationResult, setEducationResult] = useState<EducationResult | null>(null);
+  const [educationLoading, setEducationLoading] = useState(false);
+  const [educationSaving, setEducationSaving] = useState(false);
 
   const load = useCallback(async () => {
     const [sessionRes, tasksRes, dashboardRes] = await Promise.all([
@@ -360,6 +380,43 @@ export default function TaskScreenPage() {
     }
   }
 
+  async function openEducation(assignmentId: string) {
+    setEducationLoading(true);
+    setEducationAnswers({});
+    setEducationFlipped({});
+    setEducationResult(null);
+    try {
+      const res = await fetch(`/api/kid-device/education?assignmentId=${encodeURIComponent(assignmentId)}`);
+      const data = await res.json().catch(() => null);
+      if (!res.ok) return toast.error(data?.error ?? "Could not open assignment");
+      setEducationAssignment(data);
+    } finally {
+      setEducationLoading(false);
+    }
+  }
+
+  async function submitEducation() {
+    if (!educationAssignment) return;
+    setEducationSaving(true);
+    try {
+      const res = await fetch("/api/kid-device/education", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          assignmentId: educationAssignment.id,
+          answers: educationAssignment.set.materials.map((material) => ({ materialId: material.id, answer: educationAnswers[material.id] ?? "" })),
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) return toast.error(data?.error ?? "Could not submit assignment");
+      setEducationResult(data);
+      toast.success(data.passed ? `Passed with ${data.score}%` : `Score: ${data.score}%`);
+      await load();
+    } finally {
+      setEducationSaving(false);
+    }
+  }
+
   function parseGuideList(value?: string | null) {
     if (!value) return [];
     try {
@@ -388,7 +445,7 @@ export default function TaskScreenPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 p-3 sm:p-6">
-      <div className="mx-auto max-w-7xl">
+      <div className="mx-auto flex max-w-7xl flex-col">
         <header className="mb-4 rounded-3xl bg-white p-4 shadow-sm sm:p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
@@ -453,17 +510,17 @@ export default function TaskScreenPage() {
         </header>
 
         {dashboard && (
-          <div className="mb-5 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+          <div className="order-2 mb-5 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
             <DashboardPanel icon={<GraduationCap size={20} />} title="Education Assignments" color="blue">
               {dashboard.education.filter((item) => item.set.mode !== "drill").map((item) => (
-                <DashboardRow key={item.id} icon={item.member.avatar} title={item.title} detail={`${item.set.mode} · ${item.set._count.materials} questions · +${item.pointsReward} pts${item.dueDate ? ` · due ${new Date(item.dueDate).toLocaleDateString()}` : ""}`} />
+                <DashboardRow key={item.id} icon={item.member.avatar} title={item.title} detail={`${item.set.mode} · ${item.set._count.materials} questions · +${item.pointsReward} pts${item.dueDate ? ` · due ${new Date(item.dueDate).toLocaleDateString()}` : ""}`} onClick={() => openEducation(item.id)} />
               ))}
               {dashboard.education.filter((item) => item.set.mode !== "drill").length === 0 && <EmptyRow text="No education assignments" />}
             </DashboardPanel>
 
             <DashboardPanel icon={<Sparkles size={20} />} title="Practice Drills" color="violet">
               {dashboard.education.filter((item) => item.set.mode === "drill").map((item) => (
-                <DashboardRow key={item.id} icon="⚡" title={`${item.member.avatar} ${item.title}`} detail={`${item.set.subject} · ${item.set._count.materials} questions${item.attempts[0] ? ` · last score ${item.attempts[0].score}%` : ""}`} />
+                <DashboardRow key={item.id} icon="⚡" title={`${item.member.avatar} ${item.title}`} detail={`${item.set.subject} · ${item.set._count.materials} questions${item.attempts[0] ? ` · last score ${item.attempts[0].score}%` : ""}`} onClick={() => openEducation(item.id)} />
               ))}
               {dashboard.education.filter((item) => item.set.mode === "drill").length === 0 && <EmptyRow text="No practice drills" />}
             </DashboardPanel>
@@ -513,7 +570,7 @@ export default function TaskScreenPage() {
           </div>
         )}
 
-        <div className="overflow-hidden rounded-3xl bg-white shadow-sm">
+        <div className="order-1 mb-5 overflow-hidden rounded-3xl bg-white shadow-sm">
           <div className="divide-y divide-slate-100 md:hidden">
             {visibleAssignments.map((assignment) => {
               const done = assignment.completions.length > 0;
@@ -972,6 +1029,41 @@ export default function TaskScreenPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!educationAssignment || educationLoading} onOpenChange={(open) => !open && setEducationAssignment(null)}>
+        <DialogContent className="max-h-[92vh] max-w-3xl overflow-y-auto rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="font-black">{educationAssignment ? `${educationAssignment.member.avatar} ${educationAssignment.title}` : "Loading assignment…"}</DialogTitle>
+          </DialogHeader>
+          {educationAssignment && (
+            <div className="space-y-4">
+              <p className="text-sm font-bold text-slate-500">{educationAssignment.set.mode} · Pass {educationAssignment.passingScore}% · Earn {educationAssignment.pointsReward} points</p>
+              {educationResult && (
+                <div className={`rounded-2xl p-4 ${educationResult.passed ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+                  <p className="text-xl font-black">{educationResult.passed ? "Passed" : "Keep Practicing"} · {educationResult.score}%</p>
+                  <p className="font-bold">{educationResult.correctCount}/{educationResult.totalCount} correct{educationResult.pointsAwarded ? ` · +${educationResult.pointsAwarded} points` : ""}</p>
+                </div>
+              )}
+              {educationAssignment.set.materials.map((material, index) => {
+                const choices = choicesForDisplay(material.id, material.choices, material.answer);
+                const hasChoices = Array.isArray(material.choices) && material.choices.length > 0;
+                const result = educationResult?.answers.find((item) => item.materialId === material.id);
+                return <section key={material.id} className="rounded-2xl border-2 border-slate-100 bg-slate-50 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div><p className="text-xs font-black uppercase text-blue-500">Question {index + 1}</p><p className="text-lg font-black text-slate-800">{material.prompt}</p></div>
+                    {educationAssignment.set.mode === "flashcards" && <button type="button" onClick={() => setEducationFlipped((current) => ({ ...current, [material.id]: !current[material.id] }))} className="rounded-xl bg-white px-3 py-1.5 text-sm font-black text-blue-600">{educationFlipped[material.id] ? "Hide" : "Flip"}</button>}
+                  </div>
+                  {educationFlipped[material.id] && <p className="mt-3 rounded-xl bg-white p-3 font-black text-emerald-700">{material.answer}</p>}
+                  {hasChoices ? <div className="mt-3 grid gap-2 sm:grid-cols-2">{choices.map((choice) => <button key={choice} type="button" disabled={!!educationResult} onClick={() => setEducationAnswers((current) => ({ ...current, [material.id]: choice }))} className={`rounded-xl border-2 px-3 py-2 text-left font-bold ${educationAnswers[material.id] === choice ? "border-blue-500 bg-blue-50 text-blue-700" : "border-white bg-white text-slate-600"}`}>{choice}</button>)}</div> : <Input disabled={!!educationResult} value={educationAnswers[material.id] ?? ""} onChange={(event) => setEducationAnswers((current) => ({ ...current, [material.id]: event.target.value }))} placeholder={educationAssignment.set.mode === "training" || educationAssignment.set.mode === "real-life" ? "Describe your answer or what you practiced" : "Type your answer"} className="mt-3 rounded-xl bg-white" />}
+                  {result && !result.correct && <div className="mt-3 rounded-xl bg-white p-3 text-sm"><p className="font-bold text-red-500">Your answer: {result.answer || "blank"}</p><p className="font-bold text-emerald-600">Correct answer: {result.correctAnswer}</p>{result.explanation && <p className="mt-1 font-semibold text-slate-500">{result.explanation}</p>}</div>}
+                </section>;
+              })}
+              <button type="button" onClick={submitEducation} disabled={educationSaving || !!educationResult || educationAssignment.status === "completed"} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 font-black text-white disabled:opacity-40"><Send size={18} /> {educationAssignment.status === "completed" ? "Already Completed" : educationSaving ? "Submitting…" : "Submit Assignment"}</button>
+              {educationResult && !educationResult.passed && <button type="button" onClick={() => { setEducationResult(null); setEducationAnswers({}); }} className="w-full rounded-2xl bg-amber-100 px-5 py-3 font-black text-amber-700">Try Again</button>}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -992,11 +1084,12 @@ function DashboardPanel({ icon, title, color, children }: { icon: React.ReactNod
   </section>;
 }
 
-function DashboardRow({ icon, title, detail }: { icon: string; title: string; detail: string }) {
-  return <div className="flex gap-3 rounded-2xl bg-slate-50 p-3">
+function DashboardRow({ icon, title, detail, onClick }: { icon: string; title: string; detail: string; onClick?: () => void }) {
+  const Component = onClick ? "button" : "div";
+  return <Component {...(onClick ? { type: "button" as const, onClick } : {})} className="flex w-full gap-3 rounded-2xl bg-slate-50 p-3 text-left hover:bg-slate-100">
     <span className="text-2xl">{icon}</span>
     <div className="min-w-0"><p className="font-black text-slate-700">{title}</p><p className="text-xs font-bold text-slate-400">{detail}</p></div>
-  </div>;
+  </Component>;
 }
 
 function EmptyRow({ text }: { text: string }) {

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, CheckCircle2, GraduationCap, Send, Zap } from "lucide-react";
 import { toast } from "sonner";
+import { choicesForDisplay } from "@/lib/education";
 
 type Material = {
   id: string;
@@ -314,7 +315,7 @@ export default function KidAcademyPage() {
 
               <form onSubmit={submit} className="space-y-4">
                 {selected.set.materials.map((material, index) => {
-                  const choices = Array.isArray(material.choices) ? material.choices : [];
+                  const choices = choicesForDisplay(material.id, material.choices, material.answer);
                   return (
                     <section key={material.id} className="rounded-3xl border-2 border-slate-100 bg-slate-50 p-4">
                       <div className="mb-3 flex items-start justify-between gap-3">
@@ -335,7 +336,7 @@ export default function KidAcademyPage() {
                       )}
                       {choices.length > 0 ? (
                         <div className="grid gap-2 sm:grid-cols-2">
-                          {choices.concat(choices.includes(material.answer) ? [] : [material.answer]).map((choice) => (
+                          {choices.map((choice) => (
                             <button
                               key={choice}
                               type="button"

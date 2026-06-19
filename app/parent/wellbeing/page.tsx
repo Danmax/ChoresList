@@ -10,6 +10,8 @@ type CheckIn = { id: string; mood: string; note: string | null; supportRequested
 
 const MOODS = [
   { value: "great", label: "Great", icon: "😄" },
+  { value: "awesome", label: "Awesome", icon: "🤩" },
+  { value: "cool", label: "Cool", icon: "😎" },
   { value: "good", label: "Good", icon: "🙂" },
   { value: "okay", label: "Okay", icon: "😐" },
   { value: "low", label: "Low", icon: "😔" },

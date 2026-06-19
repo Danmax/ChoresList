@@ -7,7 +7,7 @@ import { rateLimit } from "@/lib/rate-limit";
 export const runtime = "nodejs";
 
 const client = new OpenAI({ apiKey: process.env.CHATGPT_API_KEY ?? "" });
-const EVENT_TYPES = ["potluck", "service", "practice", "meeting", "appointment", "doctor", "conference", "worship", "workshop", "fundraiser", "game", "class", "social", "other"];
+const EVENT_TYPES = ["potluck", "service", "practice", "meeting", "appointment", "conference", "worship", "workshop", "fundraiser", "game", "class", "social", "other"];
 const COMMON_POTLUCK_ITEMS = [
   { title: "Main dish", quantity: "2 trays", note: "Enough to share" },
   { title: "Side dish", quantity: "2 bowls", note: "" },

@@ -186,7 +186,6 @@ const EVENT_TYPES = [
   { value: "practice", label: "Practice", icon: "🏃" },
   { value: "meeting", label: "Meeting", icon: "🗣️" },
   { value: "appointment", label: "Appointment", icon: "📆" },
-  { value: "doctor", label: "Doctor's Appointment", icon: "🩺" },
   { value: "conference", label: "Conference", icon: "🎤" },
   { value: "worship", label: "Worship Night", icon: "🙏" },
   { value: "workshop", label: "Workshop", icon: "🛠️" },
