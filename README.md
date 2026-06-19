@@ -30,6 +30,14 @@ Parent accounts are household-scoped. New households can sign up from `/parent`;
 
 For Gmail SMTP, `SMTP_PASSWORD` must be a Google app password for `chores@frowear.com`, not the normal Gmail password. In the Google account, enable 2-Step Verification, then create an app password for Mail and paste that 16-character password into `.env` and the production host environment variables.
 
+Community email notifications use a database-backed outbox. Run the processor once per minute in production so reminders are delivered on schedule:
+
+```cron
+* * * * * cd /path/to/ChoresList && /usr/bin/npm run notifications:run
+```
+
+The processor sends one-time event reminders at 8:00 AM in the event time zone 10 days before, 3 days before, and on the event date. It also sends item assignments, RSVP/registration confirmations, and Monday manager summaries. `PUBLIC_BASE_URL` and SMTP settings are required for delivery.
+
 `GIPHY_API_KEY` is optional and enables GIF search on event message boards. Members can still paste an HTTPS GIF URL when it is not configured.
 
 First, run the development server:

@@ -4,6 +4,7 @@ import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { requireSession, withErrors } from "@/lib/api";
 import { requireCommunityRole, requireEventCommunityRole } from "@/lib/community";
+import { syncOneTimeEventReminders } from "@/lib/community-notifications";
 
 const EVENT_TYPES = new Set(["potluck", "service", "practice", "meeting", "appointment", "doctor", "conference", "worship", "workshop", "fundraiser", "game", "class", "social", "other"]);
 const VISIBILITIES = new Set(["private", "public"]);
@@ -446,6 +447,7 @@ export const PUT = withErrors(async (req: NextRequest) => {
   }
 
   const event = await prisma.communityEvent.findUniqueOrThrow({ where: { id }, include: eventInclude });
+  await syncOneTimeEventReminders(event.id).catch((error) => console.error("[notifications event update]", error));
 
   return NextResponse.json(publicEvent(event, membership.role === "owner" || membership.role === "manager"));
 });
@@ -458,6 +460,10 @@ export const DELETE = withErrors(async (req: NextRequest) => {
     return NextResponse.json({ error: "Event is required" }, { status: 400 });
   }
   await requireEventCommunityRole(id, parentId, "manager");
+  await prisma.emailNotification.updateMany({
+    where: { eventId: id, status: { in: ["pending", "failed"] } },
+    data: { status: "cancelled" },
+  });
   await prisma.communityEvent.delete({ where: { id } });
   return NextResponse.json({ ok: true });
 });

@@ -13,6 +13,12 @@ import { LocalQrCode } from "@/components/local-qr-code";
 
 type CommunityRole = "owner" | "manager" | "member";
 type RsvpStatus = "going" | "maybe" | "not-going";
+type NotificationPreference =
+  | "emailNotificationsEnabled"
+  | "emailItemAssignments"
+  | "emailEventReminders"
+  | "emailRegistrationUpdates"
+  | "emailManagerWeeklySummary";
 
 type ParentRef = {
   id: string;
@@ -147,7 +153,15 @@ type CommunityGroup = {
   visibility: string;
   groupInviteUrl: string | null;
   currentParentId: string | null;
-  currentMembership: { role: CommunityRole; parentId: string } | null;
+  currentMembership: {
+    role: CommunityRole;
+    parentId: string;
+    emailNotificationsEnabled: boolean;
+    emailItemAssignments: boolean;
+    emailEventReminders: boolean;
+    emailRegistrationUpdates: boolean;
+    emailManagerWeeklySummary: boolean;
+  } | null;
   members: CommunityMember[];
   participants: CommunityParticipant[];
   meritBadges: MeritBadge[];
@@ -949,6 +963,28 @@ export default function CommunityGroupPage() {
     toast.success("Community group updated");
     setEditingGroup(false);
     await load();
+  }
+
+  async function updateNotificationPreference(field: NotificationPreference, value: boolean) {
+    if (!group?.currentMembership) return;
+    const previous = group.currentMembership[field];
+    setGroup((current) => current?.currentMembership ? {
+      ...current,
+      currentMembership: { ...current.currentMembership, [field]: value },
+    } : current);
+    const res = await fetch("/api/community/notifications", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ groupId, field, value }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      setGroup((current) => current?.currentMembership ? {
+        ...current,
+        currentMembership: { ...current.currentMembership, [field]: previous },
+      } : current);
+      toast.error(data?.error ?? "Could not update notification preference");
+    }
   }
 
   async function generateEventDraft() {
@@ -2398,6 +2434,39 @@ export default function CommunityGroupPage() {
                 ))}
               </div>
             </div>
+
+            {group.currentMembership && (
+              <div className="rounded-3xl bg-white p-4 shadow-sm">
+                <h2 className="mb-3 flex items-center gap-2 font-black text-slate-800"><Mail size={18} className="text-blue-500" /> Email Notifications</h2>
+                <div className="space-y-3">
+                  {([
+                    ["emailNotificationsEnabled", "Email notifications", "Master control for this community"],
+                    ["emailItemAssignments", "Item assignments", "When a potluck or event item is assigned to you"],
+                    ["emailEventReminders", "Event reminders", "10 days, 3 days, and event day at 8 AM"],
+                    ["emailRegistrationUpdates", "RSVP and registration", "Confirm RSVP and registration changes"],
+                    ...(canManage ? [["emailManagerWeeklySummary", "Manager weekly summary", "Upcoming events and new registrations"]] : []),
+                  ] as [NotificationPreference, string, string][]).map(([field, label, description]) => {
+                    const masterEnabled = group.currentMembership!.emailNotificationsEnabled;
+                    const disabled = field !== "emailNotificationsEnabled" && !masterEnabled;
+                    return (
+                      <label key={field} className={`flex cursor-pointer items-start justify-between gap-3 rounded-2xl bg-slate-50 px-3 py-2.5 ${disabled ? "opacity-50" : ""}`}>
+                        <span className="min-w-0">
+                          <span className="block text-sm font-black text-slate-700">{label}</span>
+                          <span className="block text-xs font-bold text-slate-400">{description}</span>
+                        </span>
+                        <input
+                          type="checkbox"
+                          className="mt-1 h-4 w-4 shrink-0 accent-blue-500"
+                          checked={group.currentMembership![field]}
+                          disabled={disabled}
+                          onChange={(event) => updateNotificationPreference(field, event.target.checked)}
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {canParticipate && (
               <div className="rounded-3xl bg-white p-4 shadow-sm">

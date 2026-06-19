@@ -233,6 +233,11 @@ export const GET = withErrors(async (req: NextRequest) => {
             parentId: currentMembership.parentId,
             role: currentMembership.role,
             status: currentMembership.status,
+            emailNotificationsEnabled: currentMembership.emailNotificationsEnabled,
+            emailItemAssignments: currentMembership.emailItemAssignments,
+            emailEventReminders: currentMembership.emailEventReminders,
+            emailRegistrationUpdates: currentMembership.emailRegistrationUpdates,
+            emailManagerWeeklySummary: currentMembership.emailManagerWeeklySummary,
             joinedAt: currentMembership.joinedAt,
           }
         : null,

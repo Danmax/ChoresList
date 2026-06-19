@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireSession, withErrors } from "@/lib/api";
 import { requireCommunityRole, requireEventCommunityRole } from "@/lib/community";
+import { enqueueItemAssignment } from "@/lib/community-notifications";
 
 function cleanText(value: unknown, max: number) {
   return typeof value === "string" && value.trim() ? value.trim().slice(0, max) : null;
@@ -93,6 +94,7 @@ export const POST = withErrors(async (req: NextRequest) => {
     },
     include: itemInclude,
   });
+  if (item.assignedToParentId) await enqueueItemAssignment(item.id).catch((error) => console.error("[notifications item]", error));
 
   return NextResponse.json(publicItem(item, membership.role === "owner" || membership.role === "manager"), { status: 201 });
 });
@@ -169,6 +171,9 @@ export const PUT = withErrors(async (req: NextRequest) => {
     },
     include: itemInclude,
   });
+  if (body.assignedToParentId !== undefined && item.assignedToParentId !== existing.assignedToParentId) {
+    await enqueueItemAssignment(item.id).catch((error) => console.error("[notifications item]", error));
+  }
 
   return NextResponse.json(publicItem(item, membership.role === "owner" || membership.role === "manager"));
 });

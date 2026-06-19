@@ -23,6 +23,13 @@ type CommunityInviteEmail = {
   inviterEmail: string;
 };
 
+type NotificationEmail = {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+};
+
 function smtpConfigured() {
   return Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASSWORD && process.env.SMTP_FROM);
 }
@@ -164,5 +171,14 @@ export async function sendCommunityInviteEmail({
     `,
   });
 
+  return { sent: true as const };
+}
+
+export async function sendNotificationEmail({ to, subject, text, html }: NotificationEmail) {
+  if (!smtpConfigured()) {
+    console.info(`[email] SMTP not configured. Notification for ${to}: ${subject}`);
+    return { sent: false, reason: "smtp-not-configured" as const };
+  }
+  await createTransporter().sendMail({ from: process.env.SMTP_FROM, to, subject, text, html });
   return { sent: true as const };
 }

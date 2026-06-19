@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSession, withErrors } from "@/lib/api";
 import { requireEventCommunityRole } from "@/lib/community";
+import { enqueueRsvpConfirmation, syncOneTimeEventReminders } from "@/lib/community-notifications";
 
 const RSVP_STATUSES = new Set(["going", "maybe", "not-going"]);
 
@@ -58,6 +59,11 @@ export const PUT = withErrors(async (req: NextRequest) => {
     include: { parent: { select: { id: true, email: true, displayName: true, relationshipLabel: true } } },
   });
 
+  await Promise.all([
+    enqueueRsvpConfirmation(eventId, parentId, rsvp.status),
+    syncOneTimeEventReminders(eventId, parentId),
+  ]).catch((error) => console.error("[notifications RSVP]", error));
+
   return NextResponse.json({
     ...rsvp,
     parent: publicParent(rsvp.parent, membership.role === "owner" || membership.role === "manager"),
@@ -73,5 +79,9 @@ export const DELETE = withErrors(async (req: NextRequest) => {
   }
   await requireEventCommunityRole(eventId, parentId, "member");
   await prisma.communityRsvp.delete({ where: { eventId_parentId: { eventId, parentId } } });
+  await prisma.emailNotification.updateMany({
+    where: { eventId, recipientParentId: parentId, type: { startsWith: "event-reminder-" }, status: { in: ["pending", "failed"] } },
+    data: { status: "cancelled" },
+  });
   return NextResponse.json({ ok: true });
 });

@@ -739,12 +739,40 @@ model CommunityMember {
   parentId String   @db.Char(36)
   role     String   @default("member") @db.VarChar(64)
   status   String   @default("active") @db.VarChar(64)
+  emailNotificationsEnabled Boolean @default(true)
+  emailItemAssignments Boolean @default(true)
+  emailEventReminders Boolean @default(true)
+  emailRegistrationUpdates Boolean @default(true)
+  emailManagerWeeklySummary Boolean @default(true)
   joinedAt DateTime @default(now())
 
   group  CommunityGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   parent ParentAccount  @relation(fields: [parentId], references: [id], onDelete: Cascade)
 
   @@unique([groupId, parentId])
+}
+
+model EmailNotification {
+  id                String    @id @default(uuid()) @db.Char(36)
+  type              String    @db.VarChar(64)
+  recipientParentId String?   @db.Char(36)
+  recipientEmail    String    @db.VarChar(255)
+  groupId           String?   @db.Char(36)
+  eventId           String?   @db.Char(36)
+  dedupeKey         String    @unique @db.VarChar(255)
+  status            String    @default("pending") @db.VarChar(32)
+  scheduledFor      DateTime
+  payload           Json
+  attempts          Int       @default(0)
+  lastError         String?   @db.Text
+  lockedAt          DateTime?
+  sentAt            DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @default(now()) @updatedAt
+
+  @@index([status, scheduledFor])
+  @@index([eventId, recipientParentId])
+  @@index([groupId, type])
 }
 
 model CommunityEvent {

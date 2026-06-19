@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireSession, withErrors } from "@/lib/api";
 import { canAccessMember } from "@/lib/child-access";
 import { requireCommunityRole } from "@/lib/community";
+import { enqueueRegistrationConfirmation, syncOneTimeEventReminders } from "@/lib/community-notifications";
 
 function cleanText(value: unknown, max: number) {
   return typeof value === "string" && value.trim() ? value.trim().slice(0, max) : null;
@@ -81,6 +82,13 @@ export const POST = withErrors(async (req: NextRequest) => {
 
     return created;
   });
+
+  if (eventId) {
+    await Promise.all([
+      enqueueRegistrationConfirmation(eventId, parentId),
+      syncOneTimeEventReminders(eventId, parentId),
+    ]).catch((error) => console.error("[notifications registration]", error));
+  }
 
   return NextResponse.json(participant, { status: 201 });
 });
