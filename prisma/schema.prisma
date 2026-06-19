@@ -621,6 +621,8 @@ model GroceryList {
   status           String    @default("active") @db.VarChar(64)
   sourceTemplateId String?   @db.Char(36)
   completedAt      DateTime?
+  completionNote   String?   @db.Text
+  receiptPath      String?   @db.VarChar(512)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @default(now()) @updatedAt
 
@@ -638,6 +640,7 @@ model GroceryListItem {
   unit      String?  @db.VarChar(64)
   note      String?  @db.Text
   checked   Boolean  @default(false)
+  onHand    Boolean  @default(false)
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())
 

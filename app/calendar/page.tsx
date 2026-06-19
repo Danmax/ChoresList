@@ -96,6 +96,7 @@ interface LocationSuggestion {
   fullAddress: string;
   latitude: number;
   longitude: number;
+  matchType?: "address" | "street";
 }
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -1073,7 +1074,9 @@ function CalendarContent() {
                           <MapPin size={15} className="mt-0.5 shrink-0 text-violet-400" />
                           <span className="min-w-0">
                             <span className="block text-sm font-black text-slate-700">{suggestion.label}</span>
-                            <span className="block truncate text-xs font-semibold text-slate-400">{suggestion.fullAddress}</span>
+                            <span className="block truncate text-xs font-semibold text-slate-400">
+                              {suggestion.fullAddress}{suggestion.matchType === "street" ? " · Street-level match" : ""}
+                            </span>
                           </span>
                         </button>
                       ))}

@@ -1,0 +1,2 @@
+ALTER TABLE `GroceryListItem`
+  ADD COLUMN `onHand` BOOLEAN NOT NULL DEFAULT false;

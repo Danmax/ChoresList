@@ -98,11 +98,16 @@ export const PUT = withErrors(async (req: NextRequest) => {
     });
     if (!existing) return NextResponse.json({ error: "Item not found" }, { status: 404 });
 
+    const checked = body.checked !== undefined ? Boolean(body.checked) : undefined;
+    const onHand = body.onHand !== undefined ? Boolean(body.onHand) : undefined;
     const item = await prisma.groceryListItem.update({
       where: { id },
       data: {
         ...data,
-        ...(body.checked !== undefined && { checked: Boolean(body.checked) }),
+        ...(checked !== undefined && { checked }),
+        ...(onHand !== undefined && { onHand }),
+        ...(checked === true && { onHand: false }),
+        ...(onHand === true && { checked: false }),
       },
     });
     return NextResponse.json(item);

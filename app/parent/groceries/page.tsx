@@ -4,18 +4,25 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
+  Archive,
   CalendarClock,
+  Camera,
   CheckCircle2,
   History,
+  Loader2,
   Plus,
+  ReceiptText,
   RotateCcw,
   ShoppingCart,
   Trash2,
+  Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 
 type Cadence = "weekly" | "biweekly" | "monthly";
 type Tab = "active" | "recurring" | "history";
@@ -28,6 +35,7 @@ type GroceryItem = {
   unit: string | null;
   note: string | null;
   checked?: boolean;
+  onHand?: boolean;
   sortOrder: number;
   createdAt: string;
 };
@@ -37,6 +45,8 @@ type GroceryList = {
   title: string;
   status: "active" | "completed" | "archived";
   completedAt: string | null;
+  completionNote: string | null;
+  receiptPath: string | null;
   createdAt: string;
   items: GroceryItem[];
   sourceTemplate: { id: string; title: string; cadence: Cadence } | null;
@@ -73,6 +83,26 @@ const CADENCE_META: Record<Cadence, { label: string; icon: string }> = {
   monthly: { label: "Monthly", icon: "🗓️" },
 };
 
+const GROCERY_UNITS = [
+  { value: "each", label: "Each" },
+  { value: "bag", label: "Bag" },
+  { value: "box", label: "Box" },
+  { value: "bottle", label: "Bottle" },
+  { value: "can", label: "Can" },
+  { value: "jar", label: "Jar" },
+  { value: "pack", label: "Pack" },
+  { value: "dozen", label: "Dozen" },
+  { value: "bunch", label: "Bunch" },
+  { value: "oz", label: "Ounces (oz)" },
+  { value: "lb", label: "Pounds (lb)" },
+  { value: "g", label: "Grams (g)" },
+  { value: "kg", label: "Kilograms (kg)" },
+  { value: "fl-oz", label: "Fluid ounces" },
+  { value: "pt", label: "Pint" },
+  { value: "qt", label: "Quart" },
+  { value: "gal", label: "Gallon" },
+];
+
 function categoryMeta(category: string) {
   return GROCERY_CATEGORIES.find((c) => c.value === category) ?? GROCERY_CATEGORIES[GROCERY_CATEGORIES.length - 1];
 }
@@ -81,8 +111,8 @@ function itemAmount(item: GroceryItem) {
   return [item.quantity, item.unit].filter(Boolean).join(" ");
 }
 
-function checkedCount(items: GroceryItem[]) {
-  return items.filter((item) => item.checked).length;
+function resolvedCount(items: GroceryItem[]) {
+  return items.filter((item) => item.checked || item.onHand).length;
 }
 
 export default function ParentGroceriesPage() {
@@ -95,6 +125,10 @@ export default function ParentGroceriesPage() {
   const [newTemplate, setNewTemplate] = useState(BLANK_TEMPLATE);
   const [listItemForm, setListItemForm] = useState(BLANK_ITEM);
   const [templateItemForm, setTemplateItemForm] = useState(BLANK_ITEM);
+  const [completingList, setCompletingList] = useState<GroceryList | null>(null);
+  const [completionNote, setCompletionNote] = useState("");
+  const [receiptUploading, setReceiptUploading] = useState(false);
+  const [receiptVersion, setReceiptVersion] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -152,17 +186,47 @@ export default function ParentGroceriesPage() {
     setTab("active");
   }
 
-  async function completeList(list: GroceryList) {
+  function openCompleteList(list: GroceryList) {
+    setCompletingList(list);
+    setCompletionNote(list.completionNote ?? "");
+  }
+
+  async function uploadReceipt(file: File) {
+    if (!completingList) return;
+    setReceiptUploading(true);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const res = await fetch(`/api/groceries/lists/${completingList.id}/receipt`, { method: "POST", body });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        toast.error(data?.error ?? "Could not upload receipt");
+        return;
+      }
+      const updated = { ...completingList, receiptPath: data.receiptPath as string };
+      setCompletingList(updated);
+      setLists((current) => current.map((list) => list.id === updated.id ? { ...list, receiptPath: updated.receiptPath } : list));
+      setReceiptVersion(Date.now());
+      toast.success("Receipt added");
+    } finally {
+      setReceiptUploading(false);
+    }
+  }
+
+  async function completeList() {
+    if (!completingList) return;
     const res = await fetch("/api/groceries/lists", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: list.id, status: "completed" }),
+      body: JSON.stringify({ id: completingList.id, status: "completed", completionNote }),
     });
     if (!res.ok) {
       toast.error("Could not complete list");
       return;
     }
     toast.success("Shopping list completed");
+    setCompletingList(null);
+    setCompletionNote("");
     await load();
   }
 
@@ -205,6 +269,15 @@ export default function ParentGroceriesPage() {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ scope: "list", id: item.id, checked: !item.checked }),
+    });
+    await load();
+  }
+
+  async function toggleOnHand(item: GroceryItem) {
+    await fetch("/api/groceries/items", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scope: "list", id: item.id, onHand: !item.onHand }),
     });
     await load();
   }
@@ -311,7 +384,7 @@ export default function ParentGroceriesPage() {
           <div className="space-y-3">
             {activeLists.map((list) => {
               const total = list.items.length;
-              const done = checkedCount(list.items);
+              const done = resolvedCount(list.items);
               return (
                 <button
                   key={list.id}
@@ -325,7 +398,7 @@ export default function ParentGroceriesPage() {
                     <span className="text-3xl">🛒</span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-black text-slate-800">{list.title}</p>
-                      <p className="text-xs font-bold text-slate-400">{done}/{total} items checked</p>
+                      <p className="text-xs font-bold text-slate-400">{done}/{total} items resolved</p>
                       {list.sourceTemplate && (
                         <p className="mt-1 truncate text-xs font-bold text-emerald-600">
                           From {list.sourceTemplate.title}
@@ -358,13 +431,13 @@ export default function ParentGroceriesPage() {
                   <div className="flex-1">
                     <h2 className="text-xl font-black text-slate-800">{selectedList.title}</h2>
                     <p className="text-sm font-bold text-slate-400">
-                      {checkedCount(selectedList.items)} of {selectedList.items.length} items checked
+                      {resolvedCount(selectedList.items)} of {selectedList.items.length} items purchased or on hand
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
-                      onClick={() => completeList(selectedList)}
+                      onClick={() => openCompleteList(selectedList)}
                       className="flex items-center gap-1.5 rounded-2xl bg-emerald-500 px-3 py-2 text-sm font-black text-white hover:bg-emerald-600"
                     >
                       <CheckCircle2 size={16} /> Complete
@@ -392,12 +465,13 @@ export default function ParentGroceriesPage() {
                     placeholder="Qty"
                     className="rounded-2xl bg-white"
                   />
-                  <Input
-                    value={listItemForm.unit}
-                    onChange={(event) => setListItemForm((current) => ({ ...current, unit: event.target.value }))}
-                    placeholder="Unit"
-                    className="rounded-2xl bg-white"
-                  />
+                  <Select value={listItemForm.unit || "none"} onValueChange={(value) => setListItemForm((current) => ({ ...current, unit: value === "none" ? "" : (value ?? "") }))}>
+                    <SelectTrigger className="rounded-2xl bg-white"><SelectValue placeholder="Unit" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No unit</SelectItem>
+                      {GROCERY_UNITS.map((unit) => <SelectItem key={unit.value} value={unit.value}>{unit.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                   <Select
                     value={listItemForm.category}
                     onValueChange={(value) => setListItemForm((current) => ({ ...current, category: value ?? "other" }))}
@@ -418,6 +492,14 @@ export default function ParentGroceriesPage() {
                   >
                     Add
                   </button>
+                  <Input
+                    value={listItemForm.note}
+                    onChange={(event) => setListItemForm((current) => ({ ...current, note: event.target.value }))}
+                    placeholder="Description or note — brand, size, substitution, etc."
+                    maxLength={500}
+                    autoComplete="off"
+                    className="rounded-2xl bg-white md:col-span-5"
+                  />
                 </div>
 
                 <div className="space-y-5">
@@ -431,7 +513,11 @@ export default function ParentGroceriesPage() {
                           <div
                             key={item.id}
                             className={`flex items-center gap-3 rounded-2xl border p-3 ${
-                              item.checked ? "border-emerald-100 bg-emerald-50" : "border-slate-100 bg-white"
+                              item.checked
+                                ? "border-emerald-100 bg-emerald-50"
+                                : item.onHand
+                                  ? "border-amber-100 bg-amber-50"
+                                  : "border-slate-100 bg-white"
                             }`}
                           >
                             <button
@@ -444,15 +530,24 @@ export default function ParentGroceriesPage() {
                               <CheckCircle2 size={17} />
                             </button>
                             <div className="min-w-0 flex-1">
-                              <p className={`font-black ${item.checked ? "text-slate-400 line-through" : "text-slate-800"}`}>
+                              <p className={`font-black ${item.checked || item.onHand ? "text-slate-400 line-through" : "text-slate-800"}`}>
                                 {item.name}
                               </p>
-                              {(itemAmount(item) || item.note) && (
+                              {(itemAmount(item) || item.note || item.onHand) && (
                                 <p className="text-xs font-bold text-slate-400">
-                                  {[itemAmount(item), item.note].filter(Boolean).join(" · ")}
+                                  {[itemAmount(item), item.note, item.onHand ? "Already on hand" : ""].filter(Boolean).join(" · ")}
                                 </p>
                               )}
                             </div>
+                            <button
+                              type="button"
+                              onClick={() => toggleOnHand(item)}
+                              className={`inline-flex shrink-0 items-center gap-1 rounded-xl px-2.5 py-1.5 text-xs font-black ${
+                                item.onHand ? "bg-amber-500 text-white" : "bg-amber-50 text-amber-700 hover:bg-amber-100"
+                              }`}
+                            >
+                              <Archive size={14} /> <span className="hidden sm:inline">{item.onHand ? "On hand" : "Have it"}</span>
+                            </button>
                             <button
                               type="button"
                               onClick={() => removeItem("list", item.id)}
@@ -488,6 +583,11 @@ export default function ParentGroceriesPage() {
           <div className="space-y-4">
             <div className="rounded-3xl bg-white p-4 shadow-sm">
               <h2 className="mb-3 font-black text-slate-800">New recurring list</h2>
+              <div className="mb-4 rounded-2xl bg-violet-50 p-3 text-xs font-bold leading-5 text-violet-700">
+                1. Name the reusable list and choose its cadence.<br />
+                2. Add its staple items after creating it.<br />
+                3. Press Generate whenever you need a fresh shopping list.
+              </div>
               <div className="space-y-3">
                 <div>
                   <Label className="font-bold text-sm">Title</Label>
@@ -585,12 +685,13 @@ export default function ParentGroceriesPage() {
                     placeholder="Qty"
                     className="rounded-2xl bg-white"
                   />
-                  <Input
-                    value={templateItemForm.unit}
-                    onChange={(event) => setTemplateItemForm((current) => ({ ...current, unit: event.target.value }))}
-                    placeholder="Unit"
-                    className="rounded-2xl bg-white"
-                  />
+                  <Select value={templateItemForm.unit || "none"} onValueChange={(value) => setTemplateItemForm((current) => ({ ...current, unit: value === "none" ? "" : (value ?? "") }))}>
+                    <SelectTrigger className="rounded-2xl bg-white"><SelectValue placeholder="Unit" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No unit</SelectItem>
+                      {GROCERY_UNITS.map((unit) => <SelectItem key={unit.value} value={unit.value}>{unit.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                   <Select
                     value={templateItemForm.category}
                     onValueChange={(value) => setTemplateItemForm((current) => ({ ...current, category: value ?? "other" }))}
@@ -611,6 +712,14 @@ export default function ParentGroceriesPage() {
                   >
                     Add
                   </button>
+                  <Input
+                    value={templateItemForm.note}
+                    onChange={(event) => setTemplateItemForm((current) => ({ ...current, note: event.target.value }))}
+                    placeholder="Description or note — brand, size, substitution, etc."
+                    maxLength={500}
+                    autoComplete="off"
+                    className="rounded-2xl bg-white md:col-span-5"
+                  />
                 </div>
 
                 <div className="space-y-2">
@@ -666,6 +775,14 @@ export default function ParentGroceriesPage() {
                   <p className="text-xs font-bold text-slate-400">
                     Completed {list.completedAt ? new Date(list.completedAt).toLocaleDateString() : "recently"} · {list.items.length} items
                   </p>
+                  {list.completionNote && (
+                    <p className="mt-2 whitespace-pre-wrap text-sm font-semibold text-slate-600">{list.completionNote}</p>
+                  )}
+                  {list.receiptPath && (
+                    <a href={`/api/groceries/lists/${list.id}/receipt`} target="_blank" rel="noopener noreferrer" className="mt-3 block w-fit overflow-hidden rounded-2xl border border-slate-100 bg-slate-50">
+                      <img src={`/api/groceries/lists/${list.id}/receipt`} alt={`Receipt for ${list.title}`} className="h-28 w-24 object-cover" />
+                    </a>
+                  )}
                   <div className="mt-2 flex flex-wrap gap-1">
                     {list.items.slice(0, 8).map((item) => {
                       const meta = categoryMeta(item.category);
@@ -700,6 +817,83 @@ export default function ParentGroceriesPage() {
           )}
         </div>
       )}
+
+      <Dialog open={Boolean(completingList)} onOpenChange={(open) => {
+        if (!open && !receiptUploading) {
+          setCompletingList(null);
+          setCompletionNote("");
+        }
+      }}>
+        <DialogContent className="max-w-lg rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 font-black"><ReceiptText size={20} className="text-emerald-500" /> Complete Shopping List</DialogTitle>
+          </DialogHeader>
+          {completingList && (
+            <div className="space-y-4">
+              <div>
+                <Label className="font-bold">Completion note optional</Label>
+                <Textarea
+                  value={completionNote}
+                  onChange={(event) => setCompletionNote(event.target.value)}
+                  maxLength={2000}
+                  placeholder="Store visited, substitutions, amount spent, or anything to remember..."
+                  className="mt-1 min-h-24 rounded-2xl"
+                />
+              </div>
+
+              <div>
+                <Label className="font-bold">Receipt optional</Label>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-blue-50 px-3 py-3 text-sm font-black text-blue-700 hover:bg-blue-100">
+                    <Camera size={17} /> Take Photo
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      disabled={receiptUploading}
+                      className="sr-only"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file) uploadReceipt(file);
+                        event.currentTarget.value = "";
+                      }}
+                    />
+                  </label>
+                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-violet-50 px-3 py-3 text-sm font-black text-violet-700 hover:bg-violet-100">
+                    <Upload size={17} /> Upload Receipt
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+                      disabled={receiptUploading}
+                      className="sr-only"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file) uploadReceipt(file);
+                        event.currentTarget.value = "";
+                      }}
+                    />
+                  </label>
+                </div>
+                {receiptUploading && <p className="mt-2 flex items-center gap-2 text-sm font-bold text-slate-400"><Loader2 size={15} className="animate-spin" /> Optimizing receipt...</p>}
+                {completingList.receiptPath && (
+                  <div className="mt-3 overflow-hidden rounded-2xl border border-slate-100 bg-slate-50 p-2">
+                    <img src={`/api/groceries/lists/${completingList.id}/receipt?v=${receiptVersion}`} alt="Receipt preview" className="mx-auto max-h-64 rounded-xl object-contain" />
+                  </div>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={completeList}
+                disabled={receiptUploading}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 py-3 font-black text-white hover:bg-emerald-600 disabled:opacity-50"
+              >
+                <CheckCircle2 size={18} /> Mark List Complete
+              </button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

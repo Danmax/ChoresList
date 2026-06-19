@@ -28,6 +28,7 @@ type LocationSuggestion = {
   fullAddress: string;
   latitude: number;
   longitude: number;
+  matchType?: "address" | "street";
 };
 type CommunityMember = { id: string; parentId: string; role: CommunityRole; parent: ParentRef };
 type CommunityItem = {
@@ -1544,7 +1545,9 @@ export default function CommunityGroupPage() {
                                 <MapPin size={15} className="mt-0.5 shrink-0 text-violet-400" />
                                 <span className="min-w-0">
                                   <span className="block text-sm font-black text-slate-700">{suggestion.label}</span>
-                                  <span className="block truncate text-xs font-semibold text-slate-400">{suggestion.fullAddress}</span>
+                                  <span className="block truncate text-xs font-semibold text-slate-400">
+                                    {suggestion.fullAddress}{suggestion.matchType === "street" ? " · Street-level match" : ""}
+                                  </span>
                                 </span>
                               </button>
                             ))}

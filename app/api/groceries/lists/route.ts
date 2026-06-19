@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import { unlink } from "fs/promises";
+import path from "path";
 import { prisma } from "@/lib/prisma";
 import { requireParentSession, requireSession, withErrors } from "@/lib/api";
 
 const LIST_STATUSES = new Set(["active", "completed", "archived"]);
+const RECEIPTS_ROOT = path.resolve(process.cwd(), "storage", "grocery-receipts");
+
+function receiptFilePath(receiptPath: string) {
+  const filePath = path.resolve(RECEIPTS_ROOT, receiptPath);
+  return filePath.startsWith(RECEIPTS_ROOT + path.sep) ? filePath : null;
+}
 
 function cleanText(value: unknown, max: number) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
@@ -61,13 +69,15 @@ export const PUT = withErrors(async (req: NextRequest) => {
   }
 
   const status = typeof body.status === "string" ? body.status : undefined;
+  const completionNote = body.completionNote !== undefined ? cleanText(body.completionNote, 2000) || null : undefined;
   const list = await prisma.groceryList.update({
     where: { id, householdId },
     data: {
       ...(title !== undefined && { title }),
       ...(status !== undefined && { status }),
       ...(status === "completed" && { completedAt: new Date() }),
-      ...(status === "active" && { completedAt: null }),
+      ...(status === "completed" && completionNote !== undefined && { completionNote }),
+      ...(status === "active" && { completedAt: null, completionNote: null, receiptPath: null }),
     },
     include: {
       items: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
@@ -86,6 +96,12 @@ export const DELETE = withErrors(async (req: NextRequest) => {
     return NextResponse.json({ error: "List is required" }, { status: 400 });
   }
 
+  const list = await prisma.groceryList.findUnique({ where: { id, householdId }, select: { receiptPath: true } });
+  if (!list) return NextResponse.json({ error: "Shopping list not found" }, { status: 404 });
   await prisma.groceryList.delete({ where: { id, householdId } });
+  if (list.receiptPath) {
+    const filePath = receiptFilePath(list.receiptPath);
+    if (filePath) await unlink(filePath).catch(() => undefined);
+  }
   return NextResponse.json({ ok: true });
 });
