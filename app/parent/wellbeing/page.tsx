@@ -13,6 +13,9 @@ const MOODS = [
   { value: "good", label: "Good", icon: "🙂" },
   { value: "okay", label: "Okay", icon: "😐" },
   { value: "low", label: "Low", icon: "😔" },
+  { value: "sad", label: "Sad", icon: "😢" },
+  { value: "frustrated", label: "Frustrated", icon: "😤" },
+  { value: "tired", label: "Tired", icon: "😴" },
   { value: "overwhelmed", label: "Overwhelmed", icon: "😣" },
 ];
 

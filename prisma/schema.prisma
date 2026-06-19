@@ -218,18 +218,21 @@ model WellbeingCheckIn {
   id                 String   @id @default(uuid()) @db.Char(36)
   householdId        String   @db.Char(36)
   memberId           String   @db.Char(36)
-  recordedByParentId String   @db.Char(36)
+  recordedByParentId String?  @db.Char(36)
+  recordedByDeviceId String?  @db.Char(36)
   mood               String   @db.VarChar(32)
   note               String?  @db.Text
   supportRequested   Boolean  @default(false)
   createdAt          DateTime @default(now())
 
-  household  Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  member     FamilyMember  @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  recordedBy ParentAccount @relation("WellbeingRecorder", fields: [recordedByParentId], references: [id], onDelete: Cascade)
+  household        Household        @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  member           FamilyMember     @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  recordedBy       ParentAccount?   @relation("WellbeingRecorder", fields: [recordedByParentId], references: [id], onDelete: SetNull)
+  recordedByDevice HouseholdDevice? @relation(fields: [recordedByDeviceId], references: [id], onDelete: SetNull)
 
   @@index([householdId, createdAt])
   @@index([memberId, createdAt])
+  @@index([recordedByDeviceId])
 }
 
 model EducationMaterialSet {
@@ -1059,8 +1062,9 @@ model HouseholdDevice {
   revokedAt   DateTime?
   createdAt   DateTime  @default(now())
 
-  household Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  member    FamilyMember? @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  household         Household          @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  member            FamilyMember?      @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  wellbeingCheckIns WellbeingCheckIn[]
 }
 
 model DevicePairingCode {

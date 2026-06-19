@@ -125,7 +125,7 @@ export const PLUGIN_REGISTRY: PluginDefinition[] = [
     key: "emotional-wellbeing", label: "Emotional Wellbeing",
     description: "Private, supportive family check-ins without public scores, rankings, or shame-based feedback.",
     icon: "HeartHandshake", route: "/parent/wellbeing", color: "#ec4899", bg: "#fce7f3",
-    roles: ["owner", "parent"], defaultStatus: "inactive", category: "family", dependencies: [],
+    roles: ["owner", "parent", "grandparent"], defaultStatus: "inactive", category: "family", dependencies: [],
     capabilities: ["private-wellbeing-check-ins"], backgroundJobs: [],
     dataRetention: "preserve-on-deactivate", settingsSchemaVersion: 1,
   },

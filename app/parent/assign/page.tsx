@@ -28,6 +28,18 @@ interface Assignment {
   dayOfWeek: number | null;
   chore: Chore;
   member: Member;
+  completions?: { id: string }[];
+}
+
+function isDueToday(assignment: Assignment) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (assignment.frequency === "daily") return true;
+  if (assignment.frequency === "weekly") return assignment.dayOfWeek === today.getDay();
+  if (!assignment.dueDate) return false;
+  const due = new Date(assignment.dueDate);
+  if (assignment.frequency === "monthly") return due.getDate() === today.getDate();
+  return assignment.frequency === "one-time" && due >= today;
 }
 
 export default function AssignPage() {
@@ -96,6 +108,18 @@ export default function AssignPage() {
   async function unassign(id: string) {
     await fetch(`/api/assignments?id=${id}`, { method: "DELETE" });
     toast.success("Assignment removed");
+    load();
+  }
+
+  async function complete(assignment: Assignment) {
+    const res = await fetch("/api/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ assignmentId: assignment.id }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) return toast.error(data?.error ?? "Could not complete chore");
+    toast.success(`${assignment.member.name} earned ${data.pointsEarned} points`);
     load();
   }
 
@@ -204,9 +228,16 @@ export default function AssignPage() {
                 <span>⭐ {a.chore.pointsValue} pts</span>
               </div>
             </div>
-            <button onClick={() => unassign(a.id)} className="self-end text-red-400 hover:text-red-600 p-1 transition-colors sm:self-auto">
-              <Trash2 size={16} />
-            </button>
+            <div className="flex items-center gap-2 self-end sm:self-auto">
+              {isDueToday(a) && (
+                <button type="button" disabled={(a.completions?.length ?? 0) > 0} onClick={() => complete(a)} className="rounded-xl bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700 disabled:bg-slate-100 disabled:text-slate-400">
+                  {(a.completions?.length ?? 0) > 0 ? "Completed" : "Complete Today"}
+                </button>
+              )}
+              <button onClick={() => unassign(a.id)} className="p-1 text-red-400 transition-colors hover:text-red-600">
+                <Trash2 size={16} />
+              </button>
+            </div>
           </div>
         ))}
       </div>

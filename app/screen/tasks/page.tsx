@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, Camera, CheckCircle2, Download, Gift, ListPlus, LogOut, Plus, RefreshCw, ShieldCheck, Sparkles, Star } from "lucide-react";
+import { Award, BookOpen, CalendarDays, Camera, CheckCircle2, Download, Gift, GraduationCap, Heart, ListPlus, LogOut, Plus, RefreshCw, ShieldCheck, Sparkles, Star, Utensils } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -63,6 +63,26 @@ type CatalogChore = {
   requiresPhoto: boolean;
 };
 
+type DashboardData = {
+  members: { id: string; name: string; avatar: string; totalPoints: number; level: number }[];
+  education: { id: string; memberId: string; title: string; dueDate: string | null; status: string; pointsReward: number; member: { name: string; avatar: string }; set: { subject: string; mode: string; _count: { materials: number } }; attempts: { score: number; passed: boolean }[] }[];
+  projects: { id: string; title: string; dueDate: string | null; status: string; pointsReward: number; member: { name: string; avatar: string } | null }[];
+  rewards: { id: string; rewardTitle: string; rewardEmoji: string; status: string; member: { name: string; avatar: string }; project: { title: string } }[];
+  badges: { id: string; member: { name: string; avatar: string }; badge: { title: string; icon: string; description: string | null; xpReward: number }; group: { name: string } | null }[];
+  classes: { id: string; title: string; eventType: string; date: string; location: string | null; group: { name: string }; classPlan: { lessonTitle: string; objectives: string | null; homework: string | null; badge: { title: string; icon: string } | null } | null }[];
+  potlucks: { id: string; title: string; date: string; location: string | null; group: { name: string }; items: { id: string; title: string; quantity: string | null; note: string | null; status: string }[] }[];
+};
+
+const MOODS = [
+  { value: "great", label: "Great", icon: "😄" },
+  { value: "good", label: "Good", icon: "🙂" },
+  { value: "okay", label: "Okay", icon: "😐" },
+  { value: "sad", label: "Sad", icon: "😢" },
+  { value: "frustrated", label: "Frustrated", icon: "😤" },
+  { value: "tired", label: "Tired", icon: "😴" },
+  { value: "overwhelmed", label: "Overwhelmed", icon: "😣" },
+];
+
 type Filter = "open" | "all" | "done";
 
 type BeforeInstallPromptEvent = Event & {
@@ -95,11 +115,17 @@ export default function TaskScreenPage() {
   const [activeCompletionId, setActiveCompletionId] = useState<string | null>(null);
   const [activeGuide, setActiveGuide] = useState<ChoreGuide | null>(null);
   const [reactionAssignment, setReactionAssignment] = useState<Assignment | null>(null);
+  const [dashboard, setDashboard] = useState<DashboardData | null>(null);
+  const [moodMemberId, setMoodMemberId] = useState("");
+  const [mood, setMood] = useState("okay");
+  const [moodNote, setMoodNote] = useState("");
+  const [savingMood, setSavingMood] = useState(false);
 
   const load = useCallback(async () => {
-    const [sessionRes, tasksRes] = await Promise.all([
+    const [sessionRes, tasksRes, dashboardRes] = await Promise.all([
       fetch("/api/device/session"),
       fetch("/api/kid-device/tasks"),
+      fetch("/api/kid-device/dashboard"),
     ]);
 
     if (sessionRes.status === 401 || tasksRes.status === 401) {
@@ -109,6 +135,11 @@ export default function TaskScreenPage() {
 
     if (sessionRes.ok) setDevice(await sessionRes.json());
     if (tasksRes.ok) setAssignments(await tasksRes.json());
+    if (dashboardRes.ok) {
+      const data = await dashboardRes.json();
+      setDashboard(data);
+      setMoodMemberId((current) => current || data.members?.[0]?.id || "");
+    }
     setLastUpdated(new Date());
     setLoading(false);
   }, [router]);
@@ -311,6 +342,24 @@ export default function TaskScreenPage() {
     router.replace("/pair");
   }
 
+  async function saveMood() {
+    if (!moodMemberId) return toast.error("Choose who is checking in");
+    setSavingMood(true);
+    try {
+      const res = await fetch("/api/kid-device/dashboard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberId: moodMemberId, mood, note: moodNote }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) return toast.error(data?.error ?? "Could not save check-in");
+      setMoodNote("");
+      toast.success("Check-in saved privately");
+    } finally {
+      setSavingMood(false);
+    }
+  }
+
   function parseGuideList(value?: string | null) {
     if (!value) return [];
     try {
@@ -402,6 +451,67 @@ export default function TaskScreenPage() {
             </div>
           </div>
         </header>
+
+        {dashboard && (
+          <div className="mb-5 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+            <DashboardPanel icon={<GraduationCap size={20} />} title="Education Assignments" color="blue">
+              {dashboard.education.filter((item) => item.set.mode !== "drill").map((item) => (
+                <DashboardRow key={item.id} icon={item.member.avatar} title={item.title} detail={`${item.set.mode} · ${item.set._count.materials} questions · +${item.pointsReward} pts${item.dueDate ? ` · due ${new Date(item.dueDate).toLocaleDateString()}` : ""}`} />
+              ))}
+              {dashboard.education.filter((item) => item.set.mode !== "drill").length === 0 && <EmptyRow text="No education assignments" />}
+            </DashboardPanel>
+
+            <DashboardPanel icon={<Sparkles size={20} />} title="Practice Drills" color="violet">
+              {dashboard.education.filter((item) => item.set.mode === "drill").map((item) => (
+                <DashboardRow key={item.id} icon="⚡" title={`${item.member.avatar} ${item.title}`} detail={`${item.set.subject} · ${item.set._count.materials} questions${item.attempts[0] ? ` · last score ${item.attempts[0].score}%` : ""}`} />
+              ))}
+              {dashboard.education.filter((item) => item.set.mode === "drill").length === 0 && <EmptyRow text="No practice drills" />}
+            </DashboardPanel>
+
+            <DashboardPanel icon={<CalendarDays size={20} />} title="Classes & Practices" color="emerald">
+              {dashboard.classes.map((item) => (
+                <DashboardRow key={item.id} icon={item.eventType === "practice" ? "🏃" : "🏫"} title={item.classPlan?.lessonTitle || item.title} detail={`${item.group.name} · ${new Date(item.date).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}${item.location ? ` · ${item.location}` : ""}`} />
+              ))}
+              {dashboard.classes.length === 0 && <EmptyRow text="No upcoming classes or practices" />}
+            </DashboardPanel>
+
+            <DashboardPanel icon={<Gift size={20} />} title="Rewards" color="amber">
+              {dashboard.rewards.map((item) => <DashboardRow key={item.id} icon={item.rewardEmoji} title={`${item.member.avatar} ${item.rewardTitle}`} detail={`${item.status} · earned from ${item.project.title}`} />)}
+              {dashboard.rewards.length === 0 && <EmptyRow text="No reward tickets yet" />}
+            </DashboardPanel>
+
+            <DashboardPanel icon={<Award size={20} />} title="Badges" color="pink">
+              {dashboard.badges.map((item) => <DashboardRow key={item.id} icon={item.badge.icon} title={`${item.member.avatar} ${item.badge.title}`} detail={`${item.group?.name ?? "Household badge"} · +${item.badge.xpReward} XP`} />)}
+              {dashboard.badges.length === 0 && <EmptyRow text="No badges earned yet" />}
+            </DashboardPanel>
+
+            <DashboardPanel icon={<Utensils size={20} />} title="Potluck Items to Bring" color="orange">
+              {dashboard.potlucks.flatMap((event) => event.items.map((item) => (
+                <DashboardRow key={item.id} icon="🥘" title={`${item.quantity ? `${item.quantity} ` : ""}${item.title}`} detail={`${event.title} · ${new Date(event.date).toLocaleDateString()}${event.location ? ` · ${event.location}` : ""}`} />
+              )))}
+              {dashboard.potlucks.length === 0 && <EmptyRow text="No assigned or claimed potluck items" />}
+            </DashboardPanel>
+
+            <section className="rounded-3xl bg-white p-4 shadow-sm lg:col-span-2 xl:col-span-3">
+              <h2 className="flex items-center gap-2 font-black text-slate-800"><Heart size={20} className="text-rose-500" /> How are you feeling?</h2>
+              <p className="mt-1 text-xs font-semibold text-slate-400">This check-in is private. The note is optional.</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {device?.mode !== "member" && (
+                  <select value={moodMemberId} onChange={(event) => setMoodMemberId(event.target.value)} className="rounded-xl border-2 border-slate-100 bg-slate-50 px-3 py-2 font-bold text-slate-700">
+                    {dashboard.members.map((member) => <option key={member.id} value={member.id}>{member.avatar} {member.name}</option>)}
+                  </select>
+                )}
+                {MOODS.map((item) => (
+                  <button key={item.value} type="button" onClick={() => setMood(item.value)} className={`rounded-xl px-3 py-2 text-sm font-black ${mood === item.value ? "bg-rose-100 text-rose-700 ring-2 ring-rose-300" : "bg-slate-50 text-slate-600"}`}>{item.icon} {item.label}</button>
+                ))}
+              </div>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <Input value={moodNote} maxLength={1000} onChange={(event) => setMoodNote(event.target.value)} placeholder="Optional note: What happened, or what would help?" className="rounded-xl" />
+                <button type="button" onClick={saveMood} disabled={savingMood || !moodMemberId} className="rounded-xl bg-rose-500 px-5 py-2.5 font-black text-white disabled:opacity-50">{savingMood ? "Saving…" : "Save Check-in"}</button>
+              </div>
+            </section>
+          </div>
+        )}
 
         <div className="overflow-hidden rounded-3xl bg-white shadow-sm">
           <div className="divide-y divide-slate-100 md:hidden">
@@ -864,4 +974,31 @@ export default function TaskScreenPage() {
       </Dialog>
     </div>
   );
+}
+
+const PANEL_COLORS = {
+  blue: "bg-blue-50 text-blue-700",
+  violet: "bg-violet-50 text-violet-700",
+  emerald: "bg-emerald-50 text-emerald-700",
+  amber: "bg-amber-50 text-amber-700",
+  pink: "bg-pink-50 text-pink-700",
+  orange: "bg-orange-50 text-orange-700",
+};
+
+function DashboardPanel({ icon, title, color, children }: { icon: React.ReactNode; title: string; color: keyof typeof PANEL_COLORS; children: React.ReactNode }) {
+  return <section className="rounded-3xl bg-white p-4 shadow-sm">
+    <h2 className={`flex items-center gap-2 rounded-2xl px-3 py-2 font-black ${PANEL_COLORS[color]}`}>{icon} {title}</h2>
+    <div className="mt-2 max-h-64 space-y-2 overflow-y-auto">{children}</div>
+  </section>;
+}
+
+function DashboardRow({ icon, title, detail }: { icon: string; title: string; detail: string }) {
+  return <div className="flex gap-3 rounded-2xl bg-slate-50 p-3">
+    <span className="text-2xl">{icon}</span>
+    <div className="min-w-0"><p className="font-black text-slate-700">{title}</p><p className="text-xs font-bold text-slate-400">{detail}</p></div>
+  </div>;
+}
+
+function EmptyRow({ text }: { text: string }) {
+  return <p className="p-4 text-center text-sm font-bold text-slate-400">{text}</p>;
 }

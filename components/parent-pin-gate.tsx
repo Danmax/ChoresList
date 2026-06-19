@@ -12,12 +12,10 @@ const POLL_MS = 60_000;
 const GRANDPARENT_BLOCKED_PATHS = [
   "/parent/admin",
   "/parent/allowance",
-  "/parent/assign",
   "/parent/chores",
   "/parent/devices",
   "/parent/groceries",
   "/parent/members",
-  "/parent/projects",
   "/parent/tasks",
 ];
 

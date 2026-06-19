@@ -113,7 +113,7 @@ export const GET = withErrors(async (req: NextRequest) => {
 });
 
 export const PUT = withErrors(async (req: NextRequest) => {
-  const { householdId } = await requireParentSession(req);
+  const { householdId, parentId } = await requireParentSession(req);
   const body = await req.json();
   const { id, verifiedByParent } = body;
 
@@ -122,6 +122,9 @@ export const PUT = withErrors(async (req: NextRequest) => {
     select: { id: true, verifiedByParent: true, pointsEarned: true, memberId: true, weekStartDate: true },
   });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!(await canAccessMember(parentId, householdId, existing.memberId))) {
+    return NextResponse.json({ error: "You do not have access to this family member" }, { status: 403 });
+  }
 
   const wasVerified = existing.verifiedByParent;
   const willVerify = verifiedByParent === undefined ? wasVerified : Boolean(verifiedByParent);

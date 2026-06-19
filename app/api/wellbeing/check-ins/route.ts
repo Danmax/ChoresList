@@ -4,7 +4,7 @@ import { canAccessMember, childAccessWhere } from "@/lib/child-access";
 import { requirePluginAccess } from "@/lib/plugins/registry";
 import { prisma } from "@/lib/prisma";
 
-const MOODS = new Set(["great", "good", "okay", "low", "overwhelmed"]);
+const MOODS = new Set(["great", "good", "okay", "low", "sad", "frustrated", "tired", "overwhelmed"]);
 
 function cleanNote(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim().slice(0, 1000) : null;
