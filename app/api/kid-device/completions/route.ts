@@ -31,6 +31,9 @@ export const POST = withErrors(async (req: NextRequest) => {
   const reactionEmoji = typeof body.reactionEmoji === "string" && COMPLETION_EMOJIS.includes(body.reactionEmoji)
     ? body.reactionEmoji
     : null;
+  const completionNote = typeof body.completionNote === "string" && body.completionNote.trim()
+    ? body.completionNote.trim().slice(0, 2000)
+    : null;
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
@@ -73,6 +76,7 @@ export const POST = withErrors(async (req: NextRequest) => {
           memberId: assignment.memberId,
           completionDate: todayStart,
           reactionEmoji,
+          completionNote,
           pointsEarned,
           weekStartDate: weekStart,
         },

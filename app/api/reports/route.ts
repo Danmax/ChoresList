@@ -117,6 +117,7 @@ export const GET = withErrors(async (req: NextRequest) => {
     member: completion.member,
     chore: completion.assignment.chore,
     reactionEmoji: completion.reactionEmoji,
+    completionNote: completion.completionNote,
     verifiedByParent: completion.verifiedByParent,
     hasPhoto: Boolean(completion.photoBeforePath || completion.photoAfterPath),
     pointsEarned: completion.pointsEarned,

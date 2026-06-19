@@ -15,6 +15,9 @@ export const POST = withErrors(async (req: NextRequest) => {
   const reactionEmoji = typeof body.reactionEmoji === "string" && COMPLETION_EMOJIS.includes(body.reactionEmoji)
     ? body.reactionEmoji
     : null;
+  const completionNote = typeof body.completionNote === "string" && body.completionNote.trim()
+    ? body.completionNote.trim().slice(0, 2000)
+    : null;
 
   const assignment = await prisma.choreAssignment.findFirst({
     where: { id: assignmentId, householdId, isActive: true },
@@ -50,7 +53,7 @@ export const POST = withErrors(async (req: NextRequest) => {
   try {
     const completion = await prisma.$transaction(async (tx) => {
       const created = await tx.taskCompletion.create({
-        data: { householdId, assignmentId, memberId, completionDate: todayStart, reactionEmoji, pointsEarned: pts, weekStartDate: weekStart },
+        data: { householdId, assignmentId, memberId, completionDate: todayStart, reactionEmoji, completionNote, pointsEarned: pts, weekStartDate: weekStart },
       });
 
       const member = await tx.familyMember.findUnique({ where: { id: memberId, householdId } });
@@ -121,9 +124,16 @@ export const PUT = withErrors(async (req: NextRequest) => {
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const wasVerified = existing.verifiedByParent;
-  const willVerify = Boolean(verifiedByParent);
+  const willVerify = verifiedByParent === undefined ? wasVerified : Boolean(verifiedByParent);
 
-  if (wasVerified === willVerify) {
+  const reactionEmoji = typeof body.reactionEmoji === "string" && COMPLETION_EMOJIS.includes(body.reactionEmoji)
+    ? body.reactionEmoji
+    : body.reactionEmoji === null ? null : undefined;
+  const completionNote = typeof body.completionNote === "string"
+    ? body.completionNote.trim().slice(0, 2000) || null
+    : body.completionNote === null ? null : undefined;
+
+  if (wasVerified === willVerify && reactionEmoji === undefined && completionNote === undefined) {
     return NextResponse.json(existing);
   }
 
@@ -135,7 +145,12 @@ export const PUT = withErrors(async (req: NextRequest) => {
 
   const completion = await prisma.taskCompletion.update({
     where: { id: existing.id, householdId },
-    data: { verifiedByParent: willVerify, pointsEarned: nextPoints },
+    data: {
+      verifiedByParent: willVerify,
+      pointsEarned: nextPoints,
+      ...(reactionEmoji !== undefined && { reactionEmoji }),
+      ...(completionNote !== undefined && { completionNote }),
+    },
   });
 
   if (delta !== 0) {

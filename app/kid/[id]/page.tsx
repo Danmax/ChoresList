@@ -72,6 +72,16 @@ type EducationProject = {
   dueDate?: string | null;
 };
 
+type HouseProject = {
+  id: string;
+  title: string;
+  emoji: string;
+  rewardTitle: string;
+  rewardEmoji: string;
+  pointsBonus: number;
+  status: string;
+};
+
 function formatDate(value?: string | null) {
   return value ? new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "No due date";
 }
@@ -89,10 +99,13 @@ export default function KidPage() {
   const [photoType, setPhotoType] = useState<"before" | "after">("before");
   const [activeCompletion, setActiveCompletion] = useState<string | null>(null);
   const [celebratePoints, setCelebratePoints] = useState<number | null>(null);
-  const [projects, setProjects] = useState<{id:string;title:string;emoji:string;rewardTitle:string;rewardEmoji:string;pointsBonus:number;status:string}[]>([]);
+  const [projects, setProjects] = useState<HouseProject[]>([]);
   const [earnedTicket, setEarnedTicket] = useState<{rewardTitle:string;rewardEmoji:string;projectTitle:string} | null>(null);
   const [ticketCelebration, setTicketCelebration] = useState(false);
   const [reactionAssignment, setReactionAssignment] = useState<Assignment | null>(null);
+  const [completionProject, setCompletionProject] = useState<HouseProject | null>(null);
+  const [projectReaction, setProjectReaction] = useState("");
+  const [projectNote, setProjectNote] = useState("");
   const [academyEnabled, setAcademyEnabled] = useState(false);
   const [educationAssignments, setEducationAssignments] = useState<EducationAssignment[]>([]);
   const [educationProjects, setEducationProjects] = useState<EducationProject[]>([]);
@@ -122,16 +135,25 @@ export default function KidPage() {
     }
   }, [id]);
 
-  async function completeProject(project: typeof projects[0]) {
+  async function completeProject(project: HouseProject) {
     const res = await fetch("/api/projects", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: project.id, status: "completed", completedById: id }),
+      body: JSON.stringify({
+        id: project.id,
+        status: "completed",
+        completedById: id,
+        reactionEmoji: projectReaction || null,
+        completionNote: projectNote,
+      }),
     });
     if (!res.ok) { toast.error("Could not complete project"); return; }
     const data = await res.json();
     setEarnedTicket({ rewardTitle: data.ticket.rewardTitle, rewardEmoji: data.ticket.rewardEmoji, projectTitle: project.title });
     setTicketCelebration(true);
+    setCompletionProject(null);
+    setProjectReaction("");
+    setProjectNote("");
     loadData();
   }
 
@@ -638,7 +660,11 @@ export default function KidPage() {
                     <p className="text-xs text-slate-400 font-semibold mt-1">⭐ +{p.pointsBonus} bonus pts</p>
                   </div>
                   <button
-                    onClick={() => completeProject(p)}
+                    onClick={() => {
+                      setCompletionProject(p);
+                      setProjectReaction("");
+                      setProjectNote("");
+                    }}
                     className="w-full rounded-2xl bg-orange-500 px-4 py-2.5 text-sm font-black text-white transition-colors hover:bg-orange-600 sm:w-auto"
                   >
                     Done! ✅
@@ -649,6 +675,42 @@ export default function KidPage() {
           </div>
         </div>
       )}
+
+      <Dialog open={!!completionProject} onOpenChange={(open) => !open && setCompletionProject(null)}>
+        <DialogContent className="max-w-sm rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="font-black">{completionProject?.emoji} Finish project</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm font-semibold text-slate-500">How did {completionProject?.title} go?</p>
+          <div className="grid grid-cols-6 gap-1.5">
+            {COMPLETION_EMOJIS.map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => setProjectReaction((current) => current === emoji ? "" : emoji)}
+                className={`rounded-xl p-2 text-xl ${projectReaction === emoji ? "bg-orange-100 ring-2 ring-orange-400" : "bg-slate-50"}`}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+          <textarea
+            value={projectNote}
+            onChange={(event) => setProjectNote(event.target.value)}
+            maxLength={2000}
+            rows={4}
+            placeholder="Add a note about what you completed…"
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold outline-none focus:border-orange-300"
+          />
+          <button
+            type="button"
+            onClick={() => completionProject && completeProject(completionProject)}
+            className="w-full rounded-xl bg-orange-500 py-3 font-black text-white hover:bg-orange-600"
+          >
+            Complete & earn reward
+          </button>
+        </DialogContent>
+      </Dialog>
 
       {/* Ticket celebration overlay */}
       <AnimatePresence>

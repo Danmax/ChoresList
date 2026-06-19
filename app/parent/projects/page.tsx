@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PROJECT_CATEGORIES, PROJECT_EMOJIS, REWARD_PRESETS } from "@/types";
+import { COMPLETION_EMOJIS, PROJECT_CATEGORIES, PROJECT_EMOJIS, REWARD_PRESETS } from "@/types";
 
 interface Member { id: string; name: string; avatar: string; color: string; role: string }
 interface Project {
@@ -16,12 +16,13 @@ interface Project {
   emoji: string; rewardTitle: string; rewardEmoji: string; pointsBonus: number;
   assignedTo: string | null; status: string; dueDate: string | null;
   assignee: Member | null;
+  participants: { id: string; completedAt: string | null; reactionEmoji: string | null; completionNote: string | null; member: Member }[];
   tickets: { id: string; member: Member; status: string }[];
 }
 
 const BLANK = {
   title: "", description: "", category: "repair", emoji: "🔧",
-  rewardTitle: "", rewardEmoji: "🎫", pointsBonus: 50, assignedTo: "", dueDate: "",
+  rewardTitle: "", rewardEmoji: "🎫", pointsBonus: 50, assignedMemberIds: [] as string[], dueDate: "",
 };
 
 export default function ProjectsPage() {
@@ -29,7 +30,9 @@ export default function ProjectsPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [open, setOpen] = useState(false);
   const [completingProject, setCompletingProject] = useState<Project | null>(null);
-  const [completedById, setCompletedById] = useState<string>("");
+  const [completedByIds, setCompletedByIds] = useState<string[]>([]);
+  const [completionReaction, setCompletionReaction] = useState("");
+  const [completionNote, setCompletionNote] = useState("");
   const [form, setForm] = useState(BLANK);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showRewardPicker, setShowRewardPicker] = useState(false);
@@ -56,7 +59,6 @@ export default function ProjectsPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...form,
-        assignedTo: form.assignedTo || null,
         dueDate: form.dueDate || null,
         pointsBonus: Number(form.pointsBonus),
       }),
@@ -68,18 +70,25 @@ export default function ProjectsPage() {
   }
 
   async function completeProject() {
-    if (!completingProject || !completedById) { toast.error("Select who completed it"); return; }
+    if (!completingProject || completedByIds.length === 0) { toast.error("Select who completed it"); return; }
     const res = await fetch("/api/projects", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: completingProject.id, status: "completed", completedById }),
+      body: JSON.stringify({
+        id: completingProject.id,
+        status: "completed",
+        completedByIds,
+        reactionEmoji: completionReaction || null,
+        completionNote,
+      }),
     });
     if (!res.ok) { toast.error("Could not mark complete"); return; }
     const data = await res.json();
-    const member = members.find((m) => m.id === completedById);
-    toast.success(`🎫 Reward ticket earned by ${member?.name ?? ""}! Check Reward Tickets to redeem.`);
+    toast.success(`🎫 ${data.tickets.length} reward ticket${data.tickets.length === 1 ? "" : "s"} issued.`);
     setCompletingProject(null);
-    setCompletedById("");
+    setCompletedByIds([]);
+    setCompletionReaction("");
+    setCompletionNote("");
     load();
   }
 
@@ -136,7 +145,11 @@ export default function ProjectsPage() {
                   <span className="bg-violet-50 text-violet-600 px-2 py-1 rounded-lg">
                     ⭐ +{p.pointsBonus} pts
                   </span>
-                  {p.assignee && (
+                  {p.participants.length > 0 ? p.participants.map((participant) => (
+                    <span key={participant.id} className={`px-2 py-1 rounded-lg ${participant.completedAt ? "bg-emerald-50 text-emerald-600" : "bg-slate-50 text-slate-600"}`}>
+                      {participant.member.avatar} {participant.member.name}{participant.completedAt ? " ✓" : ""}
+                    </span>
+                  )) : p.assignee && (
                     <span className="bg-slate-50 text-slate-600 px-2 py-1 rounded-lg">
                       {p.assignee.avatar} {p.assignee.name}
                     </span>
@@ -162,11 +175,26 @@ export default function ProjectsPage() {
                     ))}
                   </div>
                 )}
+                {p.participants.some((participant) => participant.completedAt && (participant.reactionEmoji || participant.completionNote)) && (
+                  <div className="mt-2 space-y-1">
+                    {p.participants.filter((participant) => participant.completedAt && (participant.reactionEmoji || participant.completionNote)).map((participant) => (
+                      <p key={participant.id} className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">
+                        {participant.reactionEmoji && <span className="mr-1 text-base">{participant.reactionEmoji}</span>}
+                        <strong>{participant.member.name}</strong>{participant.completionNote ? `: ${participant.completionNote}` : ""}
+                      </p>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="flex flex-col gap-2 shrink-0">
                 {p.status === "open" && (
                   <button
-                    onClick={() => { setCompletingProject(p); setCompletedById(p.assignedTo ? String(p.assignedTo) : ""); }}
+                    onClick={() => {
+                      setCompletingProject(p);
+                      setCompletedByIds(p.participants.filter((participant) => !participant.completedAt).map((participant) => participant.member.id));
+                      setCompletionReaction("");
+                      setCompletionNote("");
+                    }}
                     className="flex items-center gap-1 bg-emerald-500 text-white rounded-xl px-3 py-1.5 text-xs font-black hover:bg-emerald-600 transition-colors"
                   >
                     <CheckCircle2 size={13} /> Done
@@ -200,12 +228,16 @@ export default function ProjectsPage() {
             <div>
               <Label className="font-bold mb-2 block">Completed by</Label>
               <div className="grid grid-cols-2 gap-2">
-                {members.map((m) => (
+                {members.filter((member) => {
+                  if (!completingProject?.participants.length) return true;
+                  return completingProject.participants.some((participant) => participant.member.id === member.id && !participant.completedAt);
+                }).map((m) => (
                   <button
                     key={m.id}
-                    onClick={() => setCompletedById(String(m.id))}
+                    type="button"
+                    onClick={() => setCompletedByIds((current) => current.includes(m.id) ? current.filter((id) => id !== m.id) : [...current, m.id])}
                     className={`flex items-center gap-2 p-3 rounded-xl font-bold transition-all border-2 ${
-                      completedById === String(m.id)
+                      completedByIds.includes(m.id)
                         ? "bg-emerald-50 border-emerald-400 text-emerald-800"
                         : "bg-slate-50 border-transparent text-slate-600 hover:bg-slate-100"
                     }`}
@@ -216,7 +248,30 @@ export default function ProjectsPage() {
                 ))}
               </div>
             </div>
-            {completedById && completingProject && (
+            <div>
+              <Label className="font-bold mb-2 block">How did it go? (optional)</Label>
+              <div className="grid grid-cols-6 gap-1.5">
+                {COMPLETION_EMOJIS.map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => setCompletionReaction((current) => current === emoji ? "" : emoji)}
+                    className={`rounded-xl p-2 text-xl ${completionReaction === emoji ? "bg-emerald-100 ring-2 ring-emerald-400" : "bg-slate-50"}`}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+              <textarea
+                value={completionNote}
+                onChange={(event) => setCompletionNote(event.target.value)}
+                maxLength={2000}
+                rows={3}
+                placeholder="Add a completion note…"
+                className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold outline-none focus:border-emerald-300"
+              />
+            </div>
+            {completedByIds.length > 0 && completingProject && (
               <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-sm font-semibold text-amber-700">
                 🎫 This will generate a <strong>{completingProject.rewardEmoji} {completingProject.rewardTitle}</strong> reward ticket
                 {completingProject.pointsBonus > 0 && ` and award +${completingProject.pointsBonus} bonus points`}.
@@ -224,7 +279,7 @@ export default function ProjectsPage() {
             )}
             <button
               onClick={completeProject}
-              disabled={!completedById}
+              disabled={completedByIds.length === 0}
               className="w-full bg-emerald-500 text-white rounded-xl py-3 font-black hover:bg-emerald-600 transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
             >
               <CheckCircle2 size={18} /> Mark Complete & Issue Ticket
@@ -294,16 +349,25 @@ export default function ProjectsPage() {
             </div>
 
             <div>
-              <Label className="font-bold text-sm">Assign To (optional)</Label>
-              <Select value={form.assignedTo} onValueChange={(v) => setForm((p) => ({ ...p, assignedTo: v === "anyone" ? "" : (v ?? "") }))}>
-                <SelectTrigger className="rounded-xl mt-1"><SelectValue placeholder="Anyone in the family" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="anyone">👨‍👩‍👧‍👦 Anyone</SelectItem>
-                  {members.map((m) => (
-                    <SelectItem key={m.id} value={String(m.id)}>{m.avatar} {m.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label className="font-bold text-sm">Assign To (optional, select multiple)</Label>
+              <div className="mt-1 grid grid-cols-2 gap-2">
+                {members.map((member) => (
+                  <button
+                    key={member.id}
+                    type="button"
+                    onClick={() => setForm((previous) => ({
+                      ...previous,
+                      assignedMemberIds: previous.assignedMemberIds.includes(member.id)
+                        ? previous.assignedMemberIds.filter((id) => id !== member.id)
+                        : [...previous.assignedMemberIds, member.id],
+                    }))}
+                    className={`flex items-center gap-2 rounded-xl border-2 p-2 text-sm font-bold ${form.assignedMemberIds.includes(member.id) ? "border-orange-400 bg-orange-50 text-orange-800" : "border-transparent bg-slate-50 text-slate-600"}`}
+                  >
+                    <span>{member.avatar}</span> {member.name}
+                  </button>
+                ))}
+              </div>
+              {form.assignedMemberIds.length === 0 && <p className="mt-1 text-xs font-semibold text-slate-400">No selection means anyone can complete it.</p>}
             </div>
 
             <div>

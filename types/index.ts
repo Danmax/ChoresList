@@ -373,6 +373,10 @@ export const WISH_CATEGORIES = [
 
 export const PROJECT_CATEGORIES = [
   { value: "repair", label: "Repair", emoji: "🔧" },
+  { value: "car-wash", label: "Car Wash", emoji: "🚗" },
+  { value: "construct", label: "Construct", emoji: "🏗️" },
+  { value: "build", label: "Build", emoji: "🔨" },
+  { value: "present", label: "Present", emoji: "🗣️" },
   { value: "yard", label: "Yard Work", emoji: "🌿" },
   { value: "painting", label: "Painting", emoji: "🎨" },
   { value: "cleaning", label: "Deep Clean", emoji: "🧹" },
@@ -385,10 +389,13 @@ export const PROJECT_EMOJIS = [
   "🔧","🪛","🔨","🪚","🪜","🪣","🧰","⚙️","🔩","🪝",
   "🌿","🍂","🌳","🌱","🌻","🪴","🏡","🚰","⛏️","🌾",
   "🎨","🖌️","🖼️","✨","💡","🪟","🚪","🛋️","🪞","🛁",
-  "🧹","🧽","🫧","📦","🛒","♻️","🗑️","📬","🏠","🪤",
+  "🧹","🧽","🫧","📦","🛒","♻️","🗑️","📬","🏠","🪤","🚗","🏗️","🗣️",
 ];
 
 export const REWARD_PRESETS = [
+  { emoji: "🎁", title: "Gift Card" },
+  { emoji: "💵", title: "Cash" },
+  { emoji: "🍰", title: "Dessert" },
   { emoji: "🍦", title: "Ice Cream Treat" },
   { emoji: "🍩", title: "Dessert of Choice" },
   { emoji: "🍕", title: "Pick Tonight's Dinner" },

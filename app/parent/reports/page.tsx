@@ -49,6 +49,7 @@ interface ReportData {
       member: { id: string; name: string; color: string; avatar: string };
       chore: { name: string; icon: string; category: string };
       reactionEmoji: string | null;
+      completionNote: string | null;
       verifiedByParent: boolean;
       hasPhoto: boolean;
       pointsEarned: number;
@@ -297,6 +298,7 @@ export default function ReportsPage() {
                       <div className="min-w-0">
                         <p className="truncate font-black text-slate-800">{feedback.member.avatar} {feedback.member.name} · {feedback.chore.name}</p>
                         <p className="text-xs font-bold text-slate-400">{new Date(feedback.completedAt).toLocaleString()}</p>
+                        {feedback.completionNote && <p className="mt-1 text-sm font-semibold text-slate-600">{feedback.completionNote}</p>}
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 pl-9 sm:pl-0">

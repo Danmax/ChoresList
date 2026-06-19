@@ -46,7 +46,7 @@ model ParentAccount {
   familyTreeNodes            FamilyTreeNode[]
   createdRecipes             Recipe[]                   @relation("RecipeCreator")
   familyMemberProfile        FamilyMember?              @relation("ParentFamilyMember")
-  wellbeingCheckIns         WellbeingCheckIn[]          @relation("WellbeingRecorder")
+  wellbeingCheckIns          WellbeingCheckIn[]         @relation("WellbeingRecorder")
 }
 
 model Household {
@@ -77,6 +77,7 @@ model Household {
   allowanceSettings        AllowanceSettings[]
   wishList                 WishListItem[]
   houseProjects            HouseProject[]
+  projectParticipants      HouseProjectParticipant[]
   rewardTickets            RewardTicket[]
   events                   FamilyEvent[]
   devices                  HouseholdDevice[]
@@ -196,12 +197,13 @@ model FamilyMember {
   skillTestAttempts     SkillTestAttempt[]
   allowanceSetting      AllowanceSettings?
   wishList              WishListItem[]
-  houseProjects         HouseProject[]         @relation("ProjectAssignee")
+  houseProjects         HouseProject[]            @relation("ProjectAssignee")
+  projectParticipations HouseProjectParticipant[]
   rewardTickets         RewardTicket[]
   devices               HouseholdDevice[]
   pairingCodes          DevicePairingCode[]
-  household             Household              @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  parentAccount         ParentAccount?         @relation("ParentFamilyMember", fields: [parentAccountId], references: [id], onDelete: SetNull)
+  household             Household                 @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  parentAccount         ParentAccount?            @relation("ParentFamilyMember", fields: [parentAccountId], references: [id], onDelete: SetNull)
   familyTreeNodes       FamilyTreeNode[]
   educationAssignments  EducationAssignment[]
   educationAttempts     EducationAttempt[]
@@ -220,8 +222,8 @@ model WellbeingCheckIn {
   supportRequested   Boolean  @default(false)
   createdAt          DateTime @default(now())
 
-  household Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  member    FamilyMember  @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  household  Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  member     FamilyMember  @relation(fields: [memberId], references: [id], onDelete: Cascade)
   recordedBy ParentAccount @relation("WellbeingRecorder", fields: [recordedByParentId], references: [id], onDelete: Cascade)
 
   @@index([householdId, createdAt])
@@ -423,6 +425,7 @@ model TaskCompletion {
   photoBeforePath  String?
   photoAfterPath   String?
   reactionEmoji    String?  @db.VarChar(32)
+  completionNote   String?  @db.Text
   pointsEarned     Int      @default(0)
   verifiedByParent Boolean  @default(false)
   weekStartDate    DateTime @default(now())
@@ -614,9 +617,28 @@ model HouseProject {
   dueDate     DateTime?
   createdAt   DateTime  @default(now())
 
-  assignee  FamilyMember?  @relation("ProjectAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
-  tickets   RewardTicket[]
-  household Household      @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  assignee     FamilyMember?             @relation("ProjectAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
+  participants HouseProjectParticipant[]
+  tickets      RewardTicket[]
+  household    Household                 @relation(fields: [householdId], references: [id], onDelete: Cascade)
+}
+
+model HouseProjectParticipant {
+  id             String    @id @default(uuid()) @db.Char(36)
+  householdId    String    @db.Char(36)
+  projectId      String    @db.Char(36)
+  memberId       String    @db.Char(36)
+  completedAt    DateTime?
+  reactionEmoji  String?   @db.VarChar(32)
+  completionNote String?   @db.Text
+  createdAt      DateTime  @default(now())
+
+  household Household    @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  project   HouseProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  member    FamilyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, memberId])
+  @@index([householdId, memberId])
 }
 
 model RewardTicket {
@@ -755,17 +777,17 @@ model CommunityGroup {
 }
 
 model CommunityMember {
-  id       String   @id @default(uuid()) @db.Char(36)
-  groupId  String   @db.Char(36)
-  parentId String   @db.Char(36)
-  role     String   @default("member") @db.VarChar(64)
-  status   String   @default("active") @db.VarChar(64)
-  emailNotificationsEnabled Boolean @default(true)
-  emailItemAssignments Boolean @default(true)
-  emailEventReminders Boolean @default(true)
-  emailRegistrationUpdates Boolean @default(true)
-  emailManagerWeeklySummary Boolean @default(true)
-  joinedAt DateTime @default(now())
+  id                        String   @id @default(uuid()) @db.Char(36)
+  groupId                   String   @db.Char(36)
+  parentId                  String   @db.Char(36)
+  role                      String   @default("member") @db.VarChar(64)
+  status                    String   @default("active") @db.VarChar(64)
+  emailNotificationsEnabled Boolean  @default(true)
+  emailItemAssignments      Boolean  @default(true)
+  emailEventReminders       Boolean  @default(true)
+  emailRegistrationUpdates  Boolean  @default(true)
+  emailManagerWeeklySummary Boolean  @default(true)
+  joinedAt                  DateTime @default(now())
 
   group  CommunityGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   parent ParentAccount  @relation(fields: [parentId], references: [id], onDelete: Cascade)

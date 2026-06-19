@@ -4,11 +4,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Camera, CheckCircle2, RefreshCw, Star, UserCheck } from "lucide-react";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { COMPLETION_EMOJIS } from "@/types";
 
 const ADULT_ROLES = new Set(["mom", "dad", "parent"]);
 
 type Member = {
-  id: number;
+  id: string;
   name: string;
   avatar: string;
   color: string;
@@ -17,20 +19,20 @@ type Member = {
 };
 
 type Assignment = {
-  id: number;
+  id: string;
   frequency: string;
   dueDate: string | null;
   dayOfWeek: number | null;
   member: Member;
   chore: {
-    id: number;
+    id: string;
     name: string;
     icon: string;
     color: string;
     pointsValue: number;
     requiresPhoto: boolean;
   };
-  completions: { id: number; completedAt: string }[];
+  completions: { id: string; completedAt: string; reactionEmoji?: string | null; completionNote?: string | null }[];
 };
 
 function membersFromResponse(data: unknown) {
@@ -54,7 +56,10 @@ export default function ParentTasksPage() {
   const [selectedMemberId, setSelectedMemberId] = useState("");
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [completingId, setCompletingId] = useState<number | null>(null);
+  const [completingId, setCompletingId] = useState<string | null>(null);
+  const [completionAssignment, setCompletionAssignment] = useState<Assignment | null>(null);
+  const [completionReaction, setCompletionReaction] = useState("");
+  const [completionNote, setCompletionNote] = useState("");
 
   const adultMembers = useMemo(() => members.filter((member) => ADULT_ROLES.has(member.role)), [members]);
   const selectedMember = adultMembers.find((member) => String(member.id) === selectedMemberId) ?? adultMembers[0] ?? null;
@@ -101,7 +106,11 @@ export default function ParentTasksPage() {
       const res = await fetch("/api/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assignmentId: assignment.id }),
+        body: JSON.stringify({
+          assignmentId: assignment.id,
+          reactionEmoji: completionReaction || null,
+          completionNote,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -111,6 +120,9 @@ export default function ParentTasksPage() {
       }
 
       toast.success(`+${data.pointsEarned} points`);
+      setCompletionAssignment(null);
+      setCompletionReaction("");
+      setCompletionNote("");
       if (assignment.chore.requiresPhoto) {
         toast.message("Photo proof can be added from the member task screen.");
       }
@@ -237,7 +249,11 @@ export default function ParentTasksPage() {
                       <button
                         type="button"
                         disabled={done || completingId === assignment.id}
-                        onClick={() => markDone(assignment)}
+                        onClick={() => {
+                          setCompletionAssignment(assignment);
+                          setCompletionReaction("");
+                          setCompletionNote("");
+                        }}
                         className="flex min-w-32 items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-5 py-3 font-black text-white transition-colors hover:bg-emerald-600 disabled:bg-slate-200 disabled:text-slate-400"
                       >
                         <CheckCircle2 size={18} />
@@ -251,6 +267,43 @@ export default function ParentTasksPage() {
           )}
         </>
       )}
+
+      <Dialog open={!!completionAssignment} onOpenChange={(open) => !open && setCompletionAssignment(null)}>
+        <DialogContent className="max-w-sm rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="font-black">Complete {completionAssignment?.chore.name}</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-6 gap-1.5">
+            {COMPLETION_EMOJIS.map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => setCompletionReaction((current) => current === emoji ? "" : emoji)}
+                className={`rounded-xl p-2 text-xl ${completionReaction === emoji ? "bg-emerald-100 ring-2 ring-emerald-400" : "bg-slate-50"}`}
+                aria-label={`React with ${emoji}`}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+          <textarea
+            value={completionNote}
+            onChange={(event) => setCompletionNote(event.target.value)}
+            maxLength={2000}
+            rows={4}
+            placeholder="Add a completion note (optional)…"
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold outline-none focus:border-emerald-300"
+          />
+          <button
+            type="button"
+            onClick={() => completionAssignment && markDone(completionAssignment)}
+            disabled={!completionAssignment || completingId === completionAssignment.id}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 py-3 font-black text-white hover:bg-emerald-600 disabled:opacity-40"
+          >
+            <CheckCircle2 size={18} /> {completingId ? "Saving…" : "Complete chore"}
+          </button>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
