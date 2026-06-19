@@ -26,27 +26,29 @@ model ParentAccount {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @default(now()) @updatedAt
 
-  household                  Household                  @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  household                  Household                   @relation(fields: [householdId], references: [id], onDelete: Cascade)
   confirmationTokens         EmailConfirmationToken[]
   passwordResetTokens        PasswordResetToken[]
   pinResetTokens             PinResetToken[]
-  createdCommunities         CommunityGroup[]           @relation("CommunityCreator")
+  createdCommunities         CommunityGroup[]            @relation("CommunityCreator")
   communityMemberships       CommunityMember[]
-  createdCommunityEvents     CommunityEvent[]           @relation("CommunityEventCreator")
+  createdCommunityEvents     CommunityEvent[]            @relation("CommunityEventCreator")
   communityRsvps             CommunityRsvp[]
-  assignedCommunityItems     CommunityEventItem[]       @relation("CommunityItemAssignee")
-  claimedCommunityItems      CommunityEventItem[]       @relation("CommunityItemClaimer")
+  assignedCommunityItems     CommunityEventItem[]        @relation("CommunityItemAssignee")
+  claimedCommunityItems      CommunityEventItem[]        @relation("CommunityItemClaimer")
   communityMessages          CommunityEventMessage[]
   communityParticipants      CommunityParticipant[]
-  checkedCommunityAttendance CommunityEventAttendance[] @relation("CommunityAttendanceChecker")
-  reviewedSkillTests         SkillTestAttempt[]         @relation("SkillTestReviewer")
-  awardedSkillXpEvents       SkillXpEvent[]             @relation("SkillXpAwarder")
-  awardedBadges              MemberBadge[]              @relation("BadgeAwarder")
-  activatedPlugins           HouseholdPlugin[]          @relation("PluginActivator")
+  checkedCommunityAttendance CommunityEventAttendance[]  @relation("CommunityAttendanceChecker")
+  reviewedSkillTests         SkillTestAttempt[]          @relation("SkillTestReviewer")
+  awardedSkillXpEvents       SkillXpEvent[]              @relation("SkillXpAwarder")
+  awardedBadges              MemberBadge[]               @relation("BadgeAwarder")
+  activatedPlugins           HouseholdPlugin[]           @relation("PluginActivator")
   familyTreeNodes            FamilyTreeNode[]
-  createdRecipes             Recipe[]                   @relation("RecipeCreator")
-  familyMemberProfile        FamilyMember?              @relation("ParentFamilyMember")
-  wellbeingCheckIns          WellbeingCheckIn[]         @relation("WellbeingRecorder")
+  createdRecipes             Recipe[]                    @relation("RecipeCreator")
+  familyMemberProfile        FamilyMember?               @relation("ParentFamilyMember")
+  wellbeingCheckIns          WellbeingCheckIn[]          @relation("WellbeingRecorder")
+  createdCommunitySurveys    CommunitySurvey[]           @relation("CommunitySurveyCreator")
+  communitySurveySubmissions CommunitySurveySubmission[] @relation("CommunitySurveyRespondent")
 }
 
 model Household {
@@ -780,6 +782,7 @@ model CommunityGroup {
   meritBadges  MeritBadge[]
   memberBadges MemberBadge[]
   skillTests   SkillTest[]
+  surveys      CommunitySurvey[]
 }
 
 model CommunityMember {
@@ -873,11 +876,12 @@ model CommunityParticipant {
   status      String   @default("active") @db.VarChar(64)
   joinedAt    DateTime @default(now())
 
-  group        CommunityGroup             @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  parent       ParentAccount              @relation(fields: [parentId], references: [id], onDelete: Cascade)
-  member       FamilyMember               @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  attendance   CommunityEventAttendance[]
-  testAttempts SkillTestAttempt[]
+  group             CommunityGroup              @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  parent            ParentAccount               @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  member            FamilyMember                @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  attendance        CommunityEventAttendance[]
+  testAttempts      SkillTestAttempt[]
+  surveySubmissions CommunitySurveySubmission[]
 
   @@unique([groupId, parentId, memberId], map: "community_participant_uq")
   @@index([groupId, status], map: "community_participant_group_idx")
@@ -972,6 +976,138 @@ model SkillTestAttempt {
 
   @@index([testId, participantId], map: "skill_test_attempt_test_idx")
   @@index([memberId], map: "skill_test_attempt_member_idx")
+}
+
+model CommunitySurvey {
+  id                   String    @id @default(uuid()) @db.Char(36)
+  groupId              String    @db.Char(36)
+  createdByParentId    String?   @db.Char(36)
+  title                String    @db.VarChar(255)
+  description          String?   @db.Text
+  surveyType           String    @default("survey") @db.VarChar(32)
+  responseMode         String    @default("recorded") @db.VarChar(32)
+  resultMode           String    @default("none") @db.VarChar(32)
+  status               String    @default("draft") @db.VarChar(32)
+  showAggregateResults Boolean   @default(false)
+  opensAt              DateTime?
+  closesAt             DateTime?
+  publishedAt          DateTime?
+  closedAt             DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @default(now()) @updatedAt
+
+  group       CommunityGroup              @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdBy   ParentAccount?              @relation("CommunitySurveyCreator", fields: [createdByParentId], references: [id], onDelete: SetNull)
+  questions   CommunitySurveyQuestion[]
+  outcomes    CommunitySurveyOutcome[]
+  submissions CommunitySurveySubmission[]
+
+  @@index([groupId, status])
+  @@index([createdByParentId])
+}
+
+model CommunitySurveyQuestion {
+  id           String   @id @default(uuid()) @db.Char(36)
+  surveyId     String   @db.Char(36)
+  questionType String   @db.VarChar(32)
+  prompt       String   @db.Text
+  helpText     String?  @db.Text
+  required     Boolean  @default(false)
+  sortOrder    Int      @default(0)
+  config       Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  survey  CommunitySurvey         @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  options CommunitySurveyOption[]
+  answers CommunitySurveyAnswer[]
+
+  @@index([surveyId, sortOrder])
+}
+
+model CommunitySurveyOption {
+  id           String   @id @default(uuid()) @db.Char(36)
+  questionId   String   @db.Char(36)
+  label        String   @db.VarChar(255)
+  imageUrl     String?  @db.VarChar(1024)
+  sortOrder    Int      @default(0)
+  scoreWeights Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  question         CommunitySurveyQuestion       @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  answerSelections CommunitySurveyAnswerOption[]
+
+  @@index([questionId, sortOrder])
+}
+
+model CommunitySurveyOutcome {
+  id          String   @id @default(uuid()) @db.Char(36)
+  surveyId    String   @db.Char(36)
+  outcomeKey  String   @db.VarChar(64)
+  title       String   @db.VarChar(255)
+  description String?  @db.Text
+  imageUrl    String?  @db.VarChar(1024)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  survey      CommunitySurvey             @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  submissions CommunitySurveySubmission[]
+
+  @@unique([surveyId, outcomeKey])
+  @@index([surveyId, sortOrder])
+}
+
+model CommunitySurveySubmission {
+  id                 String   @id @default(uuid()) @db.Char(36)
+  surveyId           String   @db.Char(36)
+  respondentParentId String?  @db.Char(36)
+  participantId      String?  @db.Char(36)
+  respondentKey      String   @db.Char(64)
+  outcomeId          String?  @db.Char(36)
+  scoreSnapshot      Json?
+  submittedAt        DateTime @default(now())
+
+  survey      CommunitySurvey         @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  respondent  ParentAccount?          @relation("CommunitySurveyRespondent", fields: [respondentParentId], references: [id], onDelete: SetNull)
+  participant CommunityParticipant?   @relation(fields: [participantId], references: [id], onDelete: SetNull)
+  outcome     CommunitySurveyOutcome? @relation(fields: [outcomeId], references: [id], onDelete: SetNull)
+  answers     CommunitySurveyAnswer[]
+
+  @@unique([surveyId, respondentKey])
+  @@index([surveyId, submittedAt])
+  @@index([respondentParentId])
+  @@index([participantId])
+}
+
+model CommunitySurveyAnswer {
+  id           String   @id @default(uuid()) @db.Char(36)
+  submissionId String   @db.Char(36)
+  questionId   String   @db.Char(36)
+  textValue    String?  @db.Text
+  numberValue  Float?
+  createdAt    DateTime @default(now())
+
+  submission CommunitySurveySubmission     @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  question   CommunitySurveyQuestion       @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  selections CommunitySurveyAnswerOption[]
+
+  @@unique([submissionId, questionId])
+  @@index([questionId])
+}
+
+model CommunitySurveyAnswerOption {
+  id        String @id @default(uuid()) @db.Char(36)
+  answerId  String @db.Char(36)
+  optionId  String @db.Char(36)
+  sortOrder Int    @default(0)
+
+  answer CommunitySurveyAnswer @relation(fields: [answerId], references: [id], onDelete: Cascade)
+  option CommunitySurveyOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  @@unique([answerId, optionId])
+  @@index([optionId])
 }
 
 model CommunityRsvp {

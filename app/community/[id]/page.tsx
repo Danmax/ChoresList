@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Award, BookOpen, CalendarDays, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ClipboardCheck, Copy, ExternalLink, List, Mail, MapPin, MessageCircle, Pencil, Plus, QrCode, Save, Search, Send, Share2, SmilePlus, Trash2, UserPlus, Users, Video, X, Wand2 } from "lucide-react";
+import { ArrowLeft, Award, BookOpen, CalendarDays, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ClipboardCheck, ClipboardList, Copy, ExternalLink, List, Mail, MapPin, MessageCircle, Pencil, Plus, QrCode, Save, Search, Send, Share2, SmilePlus, Trash2, UserPlus, Users, Video, X, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1377,6 +1377,14 @@ export default function CommunityGroupPage() {
               >
                 Join Group
               </button>
+            )}
+            {role && (
+              <Link
+                href={`/community/${groupId}/surveys`}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-violet-500 px-4 py-3 font-black text-white shadow-sm hover:bg-violet-600"
+              >
+                <ClipboardList size={17} /> Surveys
+              </Link>
             )}
             {canManage && (
               <button

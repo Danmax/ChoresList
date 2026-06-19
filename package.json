@@ -15,7 +15,8 @@
     "db:seed": "npx tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "notifications:run": "tsx scripts/process-notifications.ts",
-    "test:plugins": "node --import tsx --test tests/plugins-registry.test.ts"
+    "test:plugins": "node --import tsx --test tests/plugins-registry.test.ts",
+    "test:surveys": "node --import tsx --test tests/community-surveys.test.ts"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"
