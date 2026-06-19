@@ -165,6 +165,7 @@ export default function ParentSettingsPage() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [syncingCalendar, setSyncingCalendar] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [pinForm, setPinForm] = useState({ currentPin: "", newPin: "", confirmPin: "" });
@@ -241,6 +242,23 @@ export default function ParentSettingsPage() {
       toast.success("Settings saved");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function syncCalendar() {
+    if (!canManage) return;
+    setSyncingCalendar(true);
+    try {
+      const res = await fetch("/api/google-calendar/sync", { method: "POST" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        toast.error(data?.error ?? "Could not sync Google Calendar");
+        return;
+      }
+      toast.success(`Synced ${data.synced} family event${data.synced === 1 ? "" : "s"}`);
+      await load();
+    } finally {
+      setSyncingCalendar(false);
     }
   }
 
@@ -576,6 +594,9 @@ export default function ParentSettingsPage() {
               />
             </label>
           </div>
+          <p className="mt-3 text-sm font-semibold text-slate-500">
+            Family events created in ChoresList are sent to Google Calendar. Events already in Google Calendar are not imported.
+          </p>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             {canManage && (
               <a
@@ -585,11 +606,22 @@ export default function ParentSettingsPage() {
                 {connection ? "Reconnect Google Calendar" : "Connect Google Calendar"}
               </a>
             )}
+            {canManage && connection && (
+              <button
+                type="button"
+                onClick={syncCalendar}
+                disabled={syncingCalendar}
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl bg-orange-100 px-4 py-2 text-sm font-black text-orange-700 disabled:opacity-50"
+              >
+                <RefreshCw size={16} className={syncingCalendar ? "animate-spin" : ""} />
+                {syncingCalendar ? "Syncing..." : "Sync now"}
+              </button>
+            )}
             <span
               className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide ${
                 calendarStatus === "synced" || calendarStatus === "connected"
                   ? "bg-emerald-100 text-emerald-700"
-                  : calendarStatus === "disconnected"
+                  : calendarStatus === "disconnected" || calendarStatus === "error"
                     ? "bg-red-100 text-red-700"
                     : "bg-slate-100 text-slate-600"
               }`}

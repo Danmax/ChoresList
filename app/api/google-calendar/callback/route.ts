@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession, withErrors } from "@/lib/api";
-import { exchangeGoogleAuthorizationCode } from "@/lib/google-calendar";
+import { exchangeGoogleAuthorizationCode, syncAllFamilyEventsToGoogle } from "@/lib/google-calendar";
 import { prisma } from "@/lib/prisma";
 import { getBaseUrl } from "@/lib/base-url";
 import { requirePluginAccess } from "@/lib/plugins/registry";
@@ -58,6 +58,8 @@ export const GET = withErrors(async (req: NextRequest) => {
       lastSyncAt: null,
     },
   });
+
+  await syncAllFamilyEventsToGoogle(session.householdId);
 
   const res = redirectToSettings(req, { googleCalendar: "connected" });
   res.cookies.set(STATE_COOKIE, "", { maxAge: 0, path: "/" });

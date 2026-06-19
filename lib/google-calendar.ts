@@ -92,15 +92,16 @@ function isInvalidGrant(error: unknown) {
 }
 
 async function markConnectionError(connection: GoogleCalendarConnection, error: unknown) {
-  if (isInvalidGrant(error)) {
-    try {
-      await prisma.googleCalendarConnection.update({
-        where: { id: connection.id },
-        data: { syncStatus: "disconnected", lastSyncAt: new Date() },
-      });
-    } catch (persistError) {
-      console.error("[Google Calendar] Failed to mark connection disconnected", persistError);
-    }
+  try {
+    await prisma.googleCalendarConnection.update({
+      where: { id: connection.id },
+      data: {
+        syncStatus: isInvalidGrant(error) ? "disconnected" : "error",
+        lastSyncAt: new Date(),
+      },
+    });
+  } catch (persistError) {
+    console.error("[Google Calendar] Failed to persist connection error", persistError);
   }
 }
 
@@ -308,6 +309,44 @@ export async function fetchFamilyEventForGoogleSync(eventId: string) {
       },
     },
   });
+}
+
+export async function syncAllFamilyEventsToGoogle(householdId: string) {
+  const household = await prisma.household.findUnique({
+    where: { id: householdId },
+    include: {
+      events: { orderBy: { date: "asc" } },
+      googleCalendarConnection: true,
+    },
+  });
+
+  if (!household) throw new Error("Household not found");
+  if (!(await isPluginActive(householdId, "calendar-sync"))) {
+    return { synced: 0, failed: 0, skipped: "Calendar Sync is inactive" };
+  }
+  if (!household.googleCalendarEnabled || !household.googleCalendarSyncEvents) {
+    return { synced: 0, failed: 0, skipped: "Google family-event sync is disabled" };
+  }
+  if (!household.googleCalendarConnection) {
+    return { synced: 0, failed: 0, skipped: "Google Calendar is not connected" };
+  }
+
+  let synced = 0;
+  let failed = 0;
+  for (const event of household.events) {
+    const result = await updateGoogleCalendarEvent({ ...event, household });
+    if (result) synced += 1;
+    else failed += 1;
+  }
+
+  if (household.events.length === 0) {
+    await prisma.googleCalendarConnection.update({
+      where: { id: household.googleCalendarConnection.id },
+      data: { syncStatus: "synced", lastSyncAt: new Date() },
+    });
+  }
+
+  return { synced, failed, skipped: null };
 }
 
 export function createGoogleAuthorizationUrl(state: string) {
