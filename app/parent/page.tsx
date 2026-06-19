@@ -2,7 +2,7 @@
 
 import { type FormEvent, useState, useEffect } from "react";
 import Link from "next/link";
-import { Users, ListChecks, CalendarDays, DollarSign, Home, BarChart2, Gift, Wrench, Ticket, Mail, LockKeyhole, MonitorSmartphone, LogOut, Settings, UserPlus, Copy, Share2, CheckCircle2, ShoppingCart, Network, GraduationCap, ChefHat, HeartHandshake } from "lucide-react";
+import { Users, ListChecks, CalendarDays, DollarSign, Home, BarChart2, Gift, Wrench, Ticket, Mail, LockKeyhole, MonitorSmartphone, LogOut, Settings, UserPlus, Copy, Share2, CheckCircle2, ShoppingCart, Network, GraduationCap, ChefHat, HeartHandshake, ChevronDown } from "lucide-react";
 
 type AccountRole = "owner" | "parent" | "grandparent";
 type InviteRole = "parent" | "grandparent";
@@ -59,6 +59,7 @@ export default function ParentPanel() {
   const [inviteUrl, setInviteUrl] = useState("");
   const [inviteRole, setInviteRole] = useState<InviteRole>("parent");
   const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteMenuOpen, setInviteMenuOpen] = useState(false);
   const [communityInviteToken, setCommunityInviteToken] = useState("");
   const [communityReturnTo, setCommunityReturnTo] = useState("");
   const [communityInvitePreview, setCommunityInvitePreview] = useState<CommunityInvitePreview | null>(null);
@@ -605,24 +606,40 @@ export default function ParentPanel() {
         </div>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:flex">
           {accountRole === "owner" && (
-            <>
+            <div className="relative">
               <button
                 type="button"
-                onClick={() => loadInvite("parent")}
+                onClick={() => setInviteMenuOpen((open) => !open)}
                 disabled={inviteLoading}
-                className="flex items-center justify-center gap-2 bg-violet-500 text-white rounded-2xl px-4 py-2.5 shadow-sm font-bold hover:bg-violet-600 transition-colors disabled:opacity-60"
+                aria-expanded={inviteMenuOpen}
+                aria-haspopup="menu"
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-violet-500 px-4 py-2.5 font-bold text-white shadow-sm transition-colors hover:bg-violet-600 disabled:opacity-60"
               >
-                <UserPlus size={18} /> {inviteLoading && inviteRole === "parent" ? "Loading..." : "Invite Parent"}
+                <UserPlus size={18} /> {inviteLoading ? "Loading..." : "Invite Parent / Grandparent"}
+                {!inviteLoading && <ChevronDown size={16} />}
               </button>
-              <button
-                type="button"
-                onClick={() => loadInvite("grandparent")}
-                disabled={inviteLoading}
-                className="flex items-center justify-center gap-2 bg-emerald-500 text-white rounded-2xl px-4 py-2.5 shadow-sm font-bold hover:bg-emerald-600 transition-colors disabled:opacity-60"
-              >
-                <UserPlus size={18} /> {inviteLoading && inviteRole === "grandparent" ? "Loading..." : "Invite Grandparent"}
-              </button>
-            </>
+              {inviteMenuOpen && (
+                <div
+                  role="menu"
+                  className="absolute right-0 z-20 mt-2 w-full min-w-56 overflow-hidden rounded-2xl bg-white p-1.5 shadow-lg ring-1 ring-slate-200"
+                >
+                  {(["parent", "grandparent"] as const).map((role) => (
+                    <button
+                      key={role}
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setInviteMenuOpen(false);
+                        void loadInvite(role);
+                      }}
+                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-bold text-slate-700 hover:bg-violet-50 hover:text-violet-700"
+                    >
+                      <UserPlus size={16} /> Invite {role === "parent" ? "Parent" : "Grandparent"}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
           <Link
             href="/dashboard"

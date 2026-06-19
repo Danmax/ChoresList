@@ -41,8 +41,12 @@ function isChildLike(member: Pick<MemberForTree, "role" | "relationshipToHouseho
 function relationshipTypeFor(parentType: string, memberRelationship: string) {
   if (parentType === "stepmom" || parentType === "stepdad" || memberRelationship === "step-child") return "step_parent";
   if (memberRelationship === "adopted-child") return "adoptive_parent";
-  if (parentType === "guardian" || parentType === "grandparent" || memberRelationship === "foster-child") return "guardian";
+  if (parentType === "guardian" || memberRelationship === "foster-child") return "guardian";
   return "parent_child";
+}
+
+function isGrandparent(parent: { accountRole: string; parentType: string }) {
+  return parent.accountRole === "grandparent" || parent.parentType === "grandparent";
 }
 
 async function ensureMemberNode(member: MemberForTree) {
@@ -73,7 +77,7 @@ async function ensureMemberNode(member: MemberForTree) {
 async function ensureParentNodes(householdId: string) {
   const parents = await prisma.parentAccount.findMany({
     where: { householdId },
-    select: { id: true, email: true, displayName: true, parentType: true, relationshipLabel: true },
+    select: { id: true, email: true, displayName: true, accountRole: true, parentType: true, relationshipLabel: true },
   });
 
   await Promise.all(
@@ -127,6 +131,7 @@ export async function syncFamilyTreeForMember(member: MemberForTree) {
     select: { id: true, parentAccountId: true },
   });
   const parentTypeById = new Map(parents.map((parent) => [parent.id, parent.parentType]));
+  const grandparentIds = new Set(parents.filter(isGrandparent).map((parent) => parent.id));
 
   if (parentNodes.length) {
     await prisma.familyTreeRelationship.createMany({
@@ -134,8 +139,51 @@ export async function syncFamilyTreeForMember(member: MemberForTree) {
         householdId: member.householdId,
         fromNodeId: parentNode.id,
         toNodeId: memberNode.id,
-        relationshipType: relationshipTypeFor(parentNode.parentAccountId ? parentTypeById.get(parentNode.parentAccountId) ?? "parent" : "parent", member.relationshipToHousehold),
+        relationshipType: parentNode.parentAccountId && grandparentIds.has(parentNode.parentAccountId)
+          ? "grandparent_grandchild"
+          : relationshipTypeFor(parentNode.parentAccountId ? parentTypeById.get(parentNode.parentAccountId) ?? "parent" : "parent", member.relationshipToHousehold),
       })),
+      skipDuplicates: true,
+    });
+  }
+
+  const siblings = await prisma.familyMember.findMany({
+    where: {
+      householdId: member.householdId,
+      id: { not: member.id },
+      parentAccountId: null,
+      OR: [
+        { role: { in: ["child", "young-adult"] } },
+        { relationshipToHousehold: { in: Array.from(CHILD_RELATIONSHIPS) } },
+      ],
+    },
+    select: {
+      id: true,
+      householdId: true,
+      parentAccountId: true,
+      name: true,
+      role: true,
+      relationshipToHousehold: true,
+      avatar: true,
+      color: true,
+      birthdayMonth: true,
+      birthdayDay: true,
+      familyNotes: true,
+    },
+  });
+
+  const siblingNodes = await Promise.all(siblings.map(ensureMemberNode));
+  if (siblingNodes.length) {
+    await prisma.familyTreeRelationship.createMany({
+      data: siblingNodes.map((siblingNode) => {
+        const [fromNodeId, toNodeId] = [memberNode.id, siblingNode.id].sort();
+        return {
+          householdId: member.householdId,
+          fromNodeId,
+          toNodeId,
+          relationshipType: "sibling",
+        };
+      }),
       skipDuplicates: true,
     });
   }
@@ -161,8 +209,46 @@ export async function syncHouseholdFamilyTree(householdId: string) {
     },
   });
 
-  await ensureParentNodes(householdId);
+  const parents = await ensureParentNodes(householdId);
   for (const member of members) {
     await syncFamilyTreeForMember(member);
+  }
+
+  const parentNodes = await prisma.familyTreeNode.findMany({
+    where: { householdId, parentAccountId: { in: parents.map((parent) => parent.id) } },
+    select: { id: true, parentAccountId: true },
+  });
+  const grandparentIds = new Set(parents.filter(isGrandparent).map((parent) => parent.id));
+  const grandparentNodes = parentNodes.filter((node) => node.parentAccountId && grandparentIds.has(node.parentAccountId));
+  const parentGenerationNodes = parentNodes.filter((node) => node.parentAccountId && !grandparentIds.has(node.parentAccountId));
+  const childMemberIds = members.filter((member) => !member.parentAccountId && isChildLike(member)).map((member) => member.id);
+
+  if (grandparentNodes.length && childMemberIds.length) {
+    const childNodes = await prisma.familyTreeNode.findMany({
+      where: { householdId, familyMemberId: { in: childMemberIds } },
+      select: { id: true },
+    });
+    await prisma.familyTreeRelationship.deleteMany({
+      where: {
+        householdId,
+        fromNodeId: { in: grandparentNodes.map((node) => node.id) },
+        toNodeId: { in: childNodes.map((node) => node.id) },
+        relationshipType: "guardian",
+      },
+    });
+  }
+
+  if (grandparentNodes.length && parentGenerationNodes.length) {
+    await prisma.familyTreeRelationship.createMany({
+      data: grandparentNodes.flatMap((grandparentNode) =>
+        parentGenerationNodes.map((parentNode) => ({
+          householdId,
+          fromNodeId: grandparentNode.id,
+          toNodeId: parentNode.id,
+          relationshipType: "parent_child",
+        }))
+      ),
+      skipDuplicates: true,
+    });
   }
 }

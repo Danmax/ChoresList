@@ -42,6 +42,7 @@ const RELATIONSHIP_LABELS: Record<string, string> = {
   guardian: "Guardian",
   step_parent: "Step Parent",
   adoptive_parent: "Adoptive Parent",
+  grandparent_grandchild: "Grandparent / Grandchild",
   sibling: "Sibling",
   other: "Other",
 };
@@ -95,21 +96,31 @@ function nodeSubtitle(node: TreeNode) {
 }
 
 function buildPositions(nodes: TreeNode[], relationships: TreeRelationship[]) {
-  const parentLike = new Set(["parent_child", "guardian", "step_parent", "adoptive_parent"]);
-  const parentIds = new Set<string>();
-  const childIds = new Set<string>();
+  const parentLike = new Set(["parent_child", "guardian", "step_parent", "adoptive_parent", "grandparent_grandchild"]);
+  const generations = new Map(nodes.map((node) => [node.id, 0]));
+  const generationLinks = relationships.filter((relationship) => parentLike.has(relationship.relationshipType));
 
-  relationships.forEach((relationship) => {
-    if (parentLike.has(relationship.relationshipType)) {
-      parentIds.add(relationship.fromNodeId);
-      childIds.add(relationship.toNodeId);
-    }
+  for (let pass = 0; pass < nodes.length; pass += 1) {
+    let changed = false;
+    generationLinks.forEach((relationship) => {
+      const nextGeneration = (generations.get(relationship.fromNodeId) ?? 0) + 1;
+      if (nextGeneration > (generations.get(relationship.toNodeId) ?? 0)) {
+        generations.set(relationship.toNodeId, nextGeneration);
+        changed = true;
+      }
+    });
+    if (!changed) break;
+  }
+
+  const connectedIds = new Set(generationLinks.flatMap((relationship) => [relationship.fromNodeId, relationship.toNodeId]));
+  nodes.forEach((node) => {
+    if (!connectedIds.has(node.id) && node.kind === "member") generations.set(node.id, 1);
   });
 
-  const parents = nodes.filter((node) => parentIds.has(node.id) || node.kind === "parent_account");
-  const children = nodes.filter((node) => !parents.some((parent) => parent.id === node.id) && (childIds.has(node.id) || node.kind === "member"));
-  const others = nodes.filter((node) => !parents.some((parent) => parent.id === node.id) && !children.some((child) => child.id === node.id));
-  const rows = [parents, children, others].filter((row) => row.length > 0);
+  const generationCount = Math.max(0, ...generations.values());
+  const rows = Array.from({ length: generationCount + 1 }, (_, generation) =>
+    nodes.filter((node) => generations.get(node.id) === generation)
+  ).filter((row) => row.length > 0);
   const maxColumns = Math.max(1, ...rows.map((row) => row.length));
   const width = Math.max(760, maxColumns * 230 + 80);
   const height = Math.max(360, rows.length * 180 + 80);

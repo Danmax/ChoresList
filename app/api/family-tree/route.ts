@@ -11,6 +11,7 @@ const RELATIONSHIP_TYPES = new Set([
   "guardian",
   "step_parent",
   "adoptive_parent",
+  "grandparent_grandchild",
   "sibling",
   "other",
 ]);

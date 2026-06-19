@@ -4,6 +4,7 @@ import { createConfirmationToken, hashConfirmationToken, hashPassword, normalize
 import { getBaseUrl } from "@/lib/base-url";
 import { sendConfirmationEmail } from "@/lib/email";
 import { seedHouseholdDefaults } from "@/lib/household-defaults";
+import { syncHouseholdFamilyTree } from "@/lib/family-tree";
 import { ensureParentFamilyMember } from "@/lib/parent-member";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
@@ -65,6 +66,7 @@ async function finalizeVerifiedParentAccount(parent: {
   }
 
   await ensureParentFamilyMember(parent.id, parent.householdId);
+  await syncHouseholdFamilyTree(parent.householdId);
 
   return updated;
 }
