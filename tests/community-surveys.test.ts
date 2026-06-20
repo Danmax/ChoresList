@@ -49,6 +49,26 @@ test("keeps uploaded personality result images and rejects unrelated local paths
   assert.equal(draft.outcomes[1].imageUrl, "");
 });
 
+test("repeat attempts and public sharing are limited to personality quizzes", () => {
+  const personality = normalizeSurveyDraft({
+    title: "Style quiz",
+    surveyType: "personality",
+    allowMultipleSubmissions: true,
+    allowResultSharing: true,
+  });
+  const survey = normalizeSurveyDraft({
+    title: "Feedback",
+    surveyType: "survey",
+    allowMultipleSubmissions: true,
+    allowResultSharing: true,
+  });
+
+  assert.equal(personality.allowMultipleSubmissions, true);
+  assert.equal(personality.allowResultSharing, true);
+  assert.equal(survey.allowMultipleSubmissions, false);
+  assert.equal(survey.allowResultSharing, false);
+});
+
 test("anonymous respondent keys are stable per survey and unlinkable across surveys", () => {
   const first = surveyRespondentKey("survey-a", "parent-1");
   assert.equal(first, surveyRespondentKey("survey-a", "parent-1"));

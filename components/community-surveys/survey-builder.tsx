@@ -17,6 +17,8 @@ const BLANK_DRAFT: SurveyDraft = {
   responseMode: "recorded",
   resultMode: "none",
   showAggregateResults: false,
+  allowMultipleSubmissions: false,
+  allowResultSharing: false,
   opensAt: "",
   closesAt: "",
   questions: [],
@@ -94,6 +96,8 @@ function fromStored(survey: StoredSurvey): SurveyDraft {
     responseMode: survey.responseMode,
     resultMode: survey.resultMode,
     showAggregateResults: survey.showAggregateResults,
+    allowMultipleSubmissions: survey.allowMultipleSubmissions,
+    allowResultSharing: survey.allowResultSharing,
     opensAt: dateInput(survey.opensAt),
     closesAt: dateInput(survey.closesAt),
     questions: survey.questions.map((question) => ({ ...question, helpText: question.helpText ?? "", config: question.config ?? {}, options: question.options.map((option) => ({ ...option, imageUrl: option.imageUrl ?? "", scoreWeights: option.scoreWeights ?? {} })) })),
@@ -147,7 +151,7 @@ export function SurveyBuilder({ groupId, surveyId }: { groupId: string; surveyId
       const res = await fetch("/api/community/surveys/ai", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ groupId, brief: aiBrief }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Could not generate survey");
-      setDraft({ ...data.draft, opensAt: "", closesAt: "" });
+      setDraft({ ...data.draft, allowMultipleSubmissions: Boolean(data.draft.allowMultipleSubmissions), allowResultSharing: Boolean(data.draft.allowResultSharing), opensAt: "", closesAt: "" });
       toast.success("Survey draft generated. Review it before saving.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not generate survey");
@@ -231,6 +235,10 @@ export function SurveyBuilder({ groupId, surveyId }: { groupId: string; surveyId
             <label className="font-bold text-slate-700">Opens at<Input type="datetime-local" value={draft.opensAt} onChange={(event) => setDraft({ ...draft, opensAt: event.target.value })} className="mt-1 h-11 rounded-2xl" /></label>
             <label className="font-bold text-slate-700">Closes at<Input type="datetime-local" value={draft.closesAt} onChange={(event) => setDraft({ ...draft, closesAt: event.target.value })} className="mt-1 h-11 rounded-2xl" /></label>
             <label className="flex items-center gap-2 font-bold text-slate-700 md:col-span-2"><input type="checkbox" checked={draft.showAggregateResults} onChange={(event) => setDraft({ ...draft, showAggregateResults: event.target.checked, resultMode: event.target.checked && draft.resultMode === "none" ? "aggregate" : draft.resultMode })} /> Let takers see aggregate results after responding</label>
+            {draft.surveyType === "personality" && <>
+              <label className="flex items-start gap-2 font-bold text-slate-700 md:col-span-2"><input type="checkbox" checked={draft.allowMultipleSubmissions} onChange={(event) => setDraft({ ...draft, allowMultipleSubmissions: event.target.checked })} className="mt-1" /><span>Allow multiple attempts<span className="block text-xs font-semibold text-slate-400">Members can retake the quiz and receive a new result.</span></span></label>
+              <label className="flex items-start gap-2 font-bold text-slate-700 md:col-span-2"><input type="checkbox" checked={draft.allowResultSharing} onChange={(event) => setDraft({ ...draft, allowResultSharing: event.target.checked })} className="mt-1" /><span>Allow public result sharing<span className="block text-xs font-semibold text-slate-400">Creates a public result page with social sharing links and a ChoresList signup prompt. Answers and identity stay private.</span></span></label>
+            </>}
           </div>
         </section>
 

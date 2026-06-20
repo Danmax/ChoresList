@@ -26,6 +26,8 @@ export type SurveyDraft = {
   responseMode: "anonymous" | "recorded";
   resultMode: "none" | "aggregate" | "outcome";
   showAggregateResults: boolean;
+  allowMultipleSubmissions: boolean;
+  allowResultSharing: boolean;
   opensAt: string;
   closesAt: string;
   questions: SurveyQuestion[];

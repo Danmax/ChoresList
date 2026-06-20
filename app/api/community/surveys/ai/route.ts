@@ -63,7 +63,7 @@ function generationRequest(body: Record<string, unknown>) {
 const surveySchema = {
   type: "object",
   additionalProperties: false,
-  required: ["title", "description", "surveyType", "responseMode", "resultMode", "showAggregateResults", "questions", "outcomes"],
+  required: ["title", "description", "surveyType", "responseMode", "resultMode", "showAggregateResults", "allowMultipleSubmissions", "allowResultSharing", "questions", "outcomes"],
   properties: {
     title: stringSchema,
     description: stringSchema,
@@ -71,6 +71,8 @@ const surveySchema = {
     responseMode: { type: "string", enum: ["anonymous", "recorded"] },
     resultMode: { type: "string", enum: ["none", "aggregate", "outcome"] },
     showAggregateResults: { type: "boolean" },
+    allowMultipleSubmissions: { type: "boolean" },
+    allowResultSharing: { type: "boolean" },
     questions: {
       type: "array",
       maxItems: 30,

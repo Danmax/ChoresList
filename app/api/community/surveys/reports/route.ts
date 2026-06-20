@@ -18,7 +18,7 @@ export const GET = withErrors(async (req: NextRequest) => {
   const membership = await requireCommunityRole(survey.groupId, parentId, "member");
   const canManage = membership.role === "owner" || membership.role === "manager";
   const respondentKey = surveyRespondentKey(survey.id, parentId);
-  const ownSubmission = await prisma.communitySurveySubmission.findUnique({ where: { surveyId_respondentKey: { surveyId, respondentKey } }, select: { id: true } });
+  const ownSubmission = await prisma.communitySurveySubmission.findFirst({ where: { surveyId, respondentKey }, select: { id: true } });
   if (!canManage && (!survey.showAggregateResults || !ownSubmission)) {
     return NextResponse.json({ error: "Survey results are not available" }, { status: 403 });
   }

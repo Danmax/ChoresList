@@ -983,22 +983,24 @@ model SkillTestAttempt {
 }
 
 model CommunitySurvey {
-  id                   String    @id @default(uuid()) @db.Char(36)
-  groupId              String    @db.Char(36)
-  createdByParentId    String?   @db.Char(36)
-  title                String    @db.VarChar(255)
-  description          String?   @db.Text
-  surveyType           String    @default("survey") @db.VarChar(32)
-  responseMode         String    @default("recorded") @db.VarChar(32)
-  resultMode           String    @default("none") @db.VarChar(32)
-  status               String    @default("draft") @db.VarChar(32)
-  showAggregateResults Boolean   @default(false)
-  opensAt              DateTime?
-  closesAt             DateTime?
-  publishedAt          DateTime?
-  closedAt             DateTime?
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @default(now()) @updatedAt
+  id                       String    @id @default(uuid()) @db.Char(36)
+  groupId                  String    @db.Char(36)
+  createdByParentId        String?   @db.Char(36)
+  title                    String    @db.VarChar(255)
+  description              String?   @db.Text
+  surveyType               String    @default("survey") @db.VarChar(32)
+  responseMode             String    @default("recorded") @db.VarChar(32)
+  resultMode               String    @default("none") @db.VarChar(32)
+  status                   String    @default("draft") @db.VarChar(32)
+  showAggregateResults     Boolean   @default(false)
+  allowMultipleSubmissions Boolean   @default(false)
+  allowResultSharing       Boolean   @default(false)
+  opensAt                  DateTime?
+  closesAt                 DateTime?
+  publishedAt              DateTime?
+  closedAt                 DateTime?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @default(now()) @updatedAt
 
   group       CommunityGroup              @relation(fields: [groupId], references: [id], onDelete: Cascade)
   createdBy   ParentAccount?              @relation("CommunitySurveyCreator", fields: [createdByParentId], references: [id], onDelete: SetNull)
@@ -1069,7 +1071,9 @@ model CommunitySurveySubmission {
   respondentParentId String?  @db.Char(36)
   participantId      String?  @db.Char(36)
   respondentKey      String   @db.Char(64)
+  attemptNumber      Int      @default(1)
   outcomeId          String?  @db.Char(36)
+  shareToken         String?  @unique @db.VarChar(64)
   scoreSnapshot      Json?
   submittedAt        DateTime @default(now())
 
@@ -1079,7 +1083,8 @@ model CommunitySurveySubmission {
   outcome     CommunitySurveyOutcome? @relation(fields: [outcomeId], references: [id], onDelete: SetNull)
   answers     CommunitySurveyAnswer[]
 
-  @@unique([surveyId, respondentKey])
+  @@unique([surveyId, respondentKey, attemptNumber])
+  @@index([surveyId, respondentKey])
   @@index([surveyId, submittedAt])
   @@index([respondentParentId])
   @@index([participantId])

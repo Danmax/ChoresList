@@ -50,6 +50,8 @@ export type SurveyDraft = {
   responseMode: ResponseMode;
   resultMode: ResultMode;
   showAggregateResults: boolean;
+  allowMultipleSubmissions: boolean;
+  allowResultSharing: boolean;
   opensAt: string | null;
   closesAt: string | null;
   questions: SurveyQuestionDraft[];
@@ -149,6 +151,8 @@ export function normalizeSurveyDraft(input: unknown): SurveyDraft {
     responseMode: oneOf(raw.responseMode, RESPONSE_MODES, "recorded"),
     resultMode,
     showAggregateResults: Boolean(raw.showAggregateResults),
+    allowMultipleSubmissions: surveyType === "personality" && Boolean(raw.allowMultipleSubmissions),
+    allowResultSharing: surveyType === "personality" && Boolean(raw.allowResultSharing),
     opensAt: cleanDate(raw.opensAt),
     closesAt: cleanDate(raw.closesAt),
     questions,

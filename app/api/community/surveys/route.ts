@@ -53,9 +53,10 @@ export const GET = withErrors(async (req: NextRequest) => {
     const canManage = membership.role === "owner" || membership.role === "manager";
     if (!canManage && survey.status === "draft") return NextResponse.json({ error: "Survey not found" }, { status: 404 });
     const respondentKey = surveyRespondentKey(survey.id, parentId);
-    const submission = await prisma.communitySurveySubmission.findUnique({
-      where: { surveyId_respondentKey: { surveyId: survey.id, respondentKey } },
+    const submission = await prisma.communitySurveySubmission.findFirst({
+      where: { surveyId: survey.id, respondentKey },
       include: { outcome: true },
+      orderBy: { attemptNumber: "desc" },
     });
     const visibleSurvey = canManage ? survey : {
       ...survey,
@@ -103,6 +104,8 @@ export const POST = withErrors(async (req: NextRequest) => {
       responseMode: draft.responseMode,
       resultMode: draft.resultMode,
       showAggregateResults: draft.showAggregateResults,
+      allowMultipleSubmissions: draft.allowMultipleSubmissions,
+      allowResultSharing: draft.allowResultSharing,
       opensAt: draft.opensAt,
       closesAt: draft.closesAt,
       questions: { create: nestedQuestions(draft.questions) },
@@ -155,6 +158,8 @@ export const PUT = withErrors(async (req: NextRequest) => {
         responseMode: draft.responseMode,
         resultMode: draft.resultMode,
         showAggregateResults: draft.showAggregateResults,
+        allowMultipleSubmissions: draft.allowMultipleSubmissions,
+        allowResultSharing: draft.allowResultSharing,
         opensAt: draft.opensAt,
         closesAt: draft.closesAt,
         questions: { create: nestedQuestions(draft.questions) },

@@ -63,6 +63,10 @@ export default function ParentPanel() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    if (params.get("signup") === "1") {
+      setMode("signup");
+      setNotice("Create your free ChoresList account.");
+    }
     if (params.has("confirmed")) setNotice("Email confirmed. You can sign in now.");
     if (params.has("confirmError")) setError("Confirmation link is invalid or expired.");
     const token = params.get("reset");

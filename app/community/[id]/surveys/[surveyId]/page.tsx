@@ -3,14 +3,14 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, BarChart3, CheckCircle2, Edit3, Lock, Send } from "lucide-react";
+import { ArrowLeft, BarChart3, CheckCircle2, Copy, Edit3, Lock, RotateCcw, Send, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { QUESTION_LABELS, type StoredSurvey } from "@/components/community-surveys/types";
 
 type AnswerState = { textValue?: string; numberValue?: number; optionIds?: string[] };
-type SubmissionResult = { outcome?: { title: string; description: string | null; imageUrl: string | null } | null };
+type SubmissionResult = { shareToken?: string | null; outcome?: { title: string; description: string | null; imageUrl: string | null } | null };
 
 export default function TakeSurveyPage() {
   const { id: groupId, surveyId } = useParams<{ id: string; surveyId: string }>();
@@ -22,6 +22,7 @@ export default function TakeSurveyPage() {
   const [answers, setAnswers] = useState<Record<string, AnswerState>>({});
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<SubmissionResult | null>(null);
+  const [shareOrigin, setShareOrigin] = useState("");
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/community/surveys?surveyId=${encodeURIComponent(surveyId)}`);
@@ -33,7 +34,7 @@ export default function TakeSurveyPage() {
     setPreviousSubmission(data.submission);
   }, [surveyId]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(); setShareOrigin(window.location.origin); }, [load]);
 
   function setAnswer(questionId: string, patch: AnswerState) {
     setAnswers((current) => ({ ...current, [questionId]: { ...current[questionId], ...patch } }));
@@ -70,8 +71,23 @@ export default function TakeSurveyPage() {
     }
   }
 
+  function retake() {
+    setAnswers({});
+    setResult(null);
+    setPreviousSubmission(null);
+    setHasSubmitted(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function copyShareLink(url: string) {
+    await navigator.clipboard.writeText(url);
+    toast.success("Public result link copied");
+  }
+
   if (!survey) return <div className="min-h-screen p-6 text-center font-bold text-slate-400">Loading survey...</div>;
   const shownResult = result ?? previousSubmission;
+  const shareUrl = shownResult?.shareToken && shareOrigin ? `${shareOrigin}/survey-results/${shownResult.shareToken}` : "";
+  const shareText = shownResult?.outcome ? `I got “${shownResult.outcome.title}” on ${survey.title}. Discover your result with ChoresList!` : "";
 
   return (
     <div className="min-h-screen p-4 sm:p-6">
@@ -86,7 +102,13 @@ export default function TakeSurveyPage() {
         </header>
 
         {survey.status === "draft" ? <div className="mt-5 rounded-3xl bg-amber-50 p-6 text-center font-bold text-amber-700">This is a draft. Publish it when it is ready for members.</div> : hasSubmitted ? (
-          <div className="mt-5 rounded-3xl bg-white p-8 text-center shadow-sm"><CheckCircle2 size={48} className="mx-auto text-emerald-500" /><h2 className="mt-3 text-2xl font-black text-slate-800">Response submitted</h2>{shownResult?.outcome && <div className="mx-auto mt-5 max-w-lg rounded-3xl bg-violet-50 p-6">{shownResult.outcome.imageUrl && <img src={shownResult.outcome.imageUrl} alt="" className="mx-auto mb-4 h-36 w-36 rounded-3xl object-cover" />}<p className="text-sm font-black uppercase text-violet-500">Your result</p><h3 className="mt-1 text-2xl font-black text-violet-800">{shownResult.outcome.title}</h3><p className="mt-2 font-semibold text-violet-700">{shownResult.outcome.description}</p></div>}{survey.showAggregateResults && <Link href={`/community/${groupId}/surveys/${surveyId}/report`} className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-violet-500 px-4 py-2.5 font-black text-white"><BarChart3 size={17} /> View Results</Link>}</div>
+          <div className="mt-5 rounded-3xl bg-white p-8 text-center shadow-sm">
+            <CheckCircle2 size={48} className="mx-auto text-emerald-500" />
+            <h2 className="mt-3 text-2xl font-black text-slate-800">Response submitted</h2>
+            {shownResult?.outcome && <div className="mx-auto mt-5 max-w-lg rounded-3xl bg-violet-50 p-6">{shownResult.outcome.imageUrl && <img src={shownResult.outcome.imageUrl} alt={shownResult.outcome.title} className="mx-auto mb-4 h-36 w-36 rounded-3xl object-cover" />}<p className="text-sm font-black uppercase text-violet-500">Your result</p><h3 className="mt-1 text-2xl font-black text-violet-800">{shownResult.outcome.title}</h3><p className="mt-2 font-semibold text-violet-700">{shownResult.outcome.description}</p></div>}
+            {shareUrl && <div className="mx-auto mt-5 max-w-lg rounded-2xl border border-violet-100 p-4"><p className="flex items-center justify-center gap-2 font-black text-slate-700"><Share2 size={17} className="text-violet-500" /> Share your result</p><p className="mt-1 text-xs font-semibold text-slate-400">The public page shows your result and quiz promotion, but never your identity or answers.</p><div className="mt-3 flex flex-wrap justify-center gap-2"><button onClick={() => void copyShareLink(shareUrl)} className="inline-flex items-center gap-1 rounded-xl bg-slate-100 px-3 py-2 text-sm font-black text-slate-700"><Copy size={14} /> Copy link</button><a href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`} target="_blank" rel="noreferrer" className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-black text-white">Facebook</a><a href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`} target="_blank" rel="noreferrer" className="rounded-xl bg-slate-900 px-3 py-2 text-sm font-black text-white">X</a><a href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`} target="_blank" rel="noreferrer" className="rounded-xl bg-sky-700 px-3 py-2 text-sm font-black text-white">LinkedIn</a>{typeof navigator !== "undefined" && "share" in navigator && <button onClick={() => void navigator.share({ title: survey.title, text: shareText, url: shareUrl })} className="rounded-xl bg-violet-500 px-3 py-2 text-sm font-black text-white">More</button>}</div></div>}
+            <div className="mt-5 flex flex-wrap justify-center gap-2">{survey.allowMultipleSubmissions && <button onClick={retake} className="inline-flex items-center gap-2 rounded-2xl bg-emerald-100 px-4 py-2.5 font-black text-emerald-700"><RotateCcw size={17} /> Try Again</button>}{survey.showAggregateResults && <Link href={`/community/${groupId}/surveys/${surveyId}/report`} className="inline-flex items-center gap-2 rounded-2xl bg-violet-500 px-4 py-2.5 font-black text-white"><BarChart3 size={17} /> View Results</Link>}</div>
+          </div>
         ) : survey.status === "closed" ? <div className="mt-5 rounded-3xl bg-amber-50 p-6 text-center font-bold text-amber-700">This survey is closed.</div> : (
           <div className="mt-5 space-y-4">
             {survey.questions.map((question, index) => {
