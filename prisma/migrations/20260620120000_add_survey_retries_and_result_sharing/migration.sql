@@ -1,6 +1,32 @@
-ALTER TABLE `CommunitySurvey`
-  ADD COLUMN `allowMultipleSubmissions` BOOLEAN NOT NULL DEFAULT false,
-  ADD COLUMN `allowResultSharing` BOOLEAN NOT NULL DEFAULT false;
+-- These guards let the migration resume if the first ALTER succeeded before a
+-- later statement failed (for example, due to an index-name length limit).
+SET @survey_migration_sql = IF(
+  EXISTS(
+    SELECT 1 FROM `information_schema`.`COLUMNS`
+    WHERE `TABLE_SCHEMA` = DATABASE()
+      AND `TABLE_NAME` = 'CommunitySurvey'
+      AND `COLUMN_NAME` = 'allowMultipleSubmissions'
+  ),
+  'SELECT 1',
+  'ALTER TABLE `CommunitySurvey` ADD COLUMN `allowMultipleSubmissions` BOOLEAN NOT NULL DEFAULT false'
+);
+PREPARE survey_migration_stmt FROM @survey_migration_sql;
+EXECUTE survey_migration_stmt;
+DEALLOCATE PREPARE survey_migration_stmt;
+
+SET @survey_migration_sql = IF(
+  EXISTS(
+    SELECT 1 FROM `information_schema`.`COLUMNS`
+    WHERE `TABLE_SCHEMA` = DATABASE()
+      AND `TABLE_NAME` = 'CommunitySurvey'
+      AND `COLUMN_NAME` = 'allowResultSharing'
+  ),
+  'SELECT 1',
+  'ALTER TABLE `CommunitySurvey` ADD COLUMN `allowResultSharing` BOOLEAN NOT NULL DEFAULT false'
+);
+PREPARE survey_migration_stmt FROM @survey_migration_sql;
+EXECUTE survey_migration_stmt;
+DEALLOCATE PREPARE survey_migration_stmt;
 
 ALTER TABLE `CommunitySurveySubmission`
   DROP INDEX `CommunitySurveySubmission_surveyId_respondentKey_key`,
