@@ -1083,7 +1083,7 @@ model CommunitySurveySubmission {
   outcome     CommunitySurveyOutcome? @relation(fields: [outcomeId], references: [id], onDelete: SetNull)
   answers     CommunitySurveyAnswer[]
 
-  @@unique([surveyId, respondentKey, attemptNumber])
+  @@unique([surveyId, respondentKey, attemptNumber], map: "survey_submission_attempt_key")
   @@index([surveyId, respondentKey])
   @@index([surveyId, submittedAt])
   @@index([respondentParentId])
