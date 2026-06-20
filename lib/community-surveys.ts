@@ -65,6 +65,7 @@ function cleanText(value: unknown, max: number) {
 function cleanUrl(value: unknown) {
   const text = cleanText(value, 1024);
   if (!text) return "";
+  if (/^\/uploads\/community-surveys\/[a-zA-Z0-9/_-]+\.webp$/.test(text)) return text;
   try {
     const url = new URL(text);
     return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : "";

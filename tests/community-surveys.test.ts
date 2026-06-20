@@ -34,6 +34,21 @@ test("personality scoring selects the highest weighted outcome deterministically
   assert.equal(result.outcome?.id, "hero-id");
 });
 
+test("keeps uploaded personality result images and rejects unrelated local paths", () => {
+  const draft = normalizeSurveyDraft({
+    title: "Community style",
+    surveyType: "personality",
+    questions: [{ questionType: "yes_no", prompt: "Ready?" }],
+    outcomes: [
+      { outcomeKey: "helper", title: "Helper", imageUrl: "/uploads/community-surveys/parent-1/result.webp" },
+      { outcomeKey: "leader", title: "Leader", imageUrl: "/private/result.webp" },
+    ],
+  });
+
+  assert.equal(draft.outcomes[0].imageUrl, "/uploads/community-surveys/parent-1/result.webp");
+  assert.equal(draft.outcomes[1].imageUrl, "");
+});
+
 test("anonymous respondent keys are stable per survey and unlinkable across surveys", () => {
   const first = surveyRespondentKey("survey-a", "parent-1");
   assert.equal(first, surveyRespondentKey("survey-a", "parent-1"));

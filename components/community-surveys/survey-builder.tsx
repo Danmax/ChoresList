@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowDown, ArrowUp, Plus, Save, Sparkles, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowDown, ArrowUp, ImagePlus, Plus, Save, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,6 +21,48 @@ const BLANK_DRAFT: SurveyDraft = {
   closesAt: "",
   questions: [],
   outcomes: [],
+};
+
+type AiBrief = {
+  surveyType: SurveyDraft["surveyType"];
+  audience: string;
+  goal: string;
+  questionCount: number;
+  questionMix: string;
+  typeDetails: string;
+  tone: string;
+  responseMode: SurveyDraft["responseMode"];
+  additionalContext: string;
+};
+
+const BLANK_AI_BRIEF: AiBrief = {
+  surveyType: "survey",
+  audience: "",
+  goal: "",
+  questionCount: 8,
+  questionMix: "",
+  typeDetails: "",
+  tone: "Friendly, clear, and neutral",
+  responseMode: "recorded",
+  additionalContext: "",
+};
+
+const TYPE_DETAILS: Record<AiBrief["surveyType"], { label: string; placeholder: string; guidance: string }> = {
+  survey: {
+    label: "Topics and insights needed",
+    placeholder: "Satisfaction, communication, scheduling challenges, and one open feedback question",
+    guidance: "Include the topics to measure, rating scales, and feedback you need.",
+  },
+  poll: {
+    label: "Decision and choices",
+    placeholder: "Choose the July gathering date: July 11, July 18, or July 25; allow one choice",
+    guidance: "Include the decision being made, available choices, and whether people may select more than one.",
+  },
+  personality: {
+    label: "Result types and traits",
+    placeholder: "Results: The Organizer, The Encourager, The Problem Solver, and The Connector; describe each strength",
+    guidance: "List the result names, defining traits, desired result images or URLs, and what answers should map to each result.",
+  },
 };
 
 function blankQuestion(questionType: QuestionType = "single_choice"): SurveyQuestion {
@@ -64,8 +106,9 @@ export function SurveyBuilder({ groupId, surveyId }: { groupId: string; surveyId
   const [draft, setDraft] = useState<SurveyDraft>(BLANK_DRAFT);
   const [loading, setLoading] = useState(Boolean(surveyId));
   const [saving, setSaving] = useState(false);
-  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiBrief, setAiBrief] = useState<AiBrief>(BLANK_AI_BRIEF);
   const [generating, setGenerating] = useState(false);
+  const [uploadingOutcome, setUploadingOutcome] = useState<number | null>(null);
 
   useEffect(() => {
     if (!surveyId) return;
@@ -101,7 +144,7 @@ export function SurveyBuilder({ groupId, surveyId }: { groupId: string; surveyId
   async function generate() {
     setGenerating(true);
     try {
-      const res = await fetch("/api/community/surveys/ai", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ groupId, prompt: aiPrompt }) });
+      const res = await fetch("/api/community/surveys/ai", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ groupId, brief: aiBrief }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Could not generate survey");
       setDraft({ ...data.draft, opensAt: "", closesAt: "" });
@@ -110,6 +153,26 @@ export function SurveyBuilder({ groupId, surveyId }: { groupId: string; surveyId
       toast.error(error instanceof Error ? error.message : "Could not generate survey");
     } finally {
       setGenerating(false);
+    }
+  }
+
+  async function uploadOutcomeImage(index: number, file: File) {
+    setUploadingOutcome(index);
+    try {
+      const body = new FormData();
+      body.append("groupId", groupId);
+      body.append("file", file);
+      const res = await fetch("/api/community/surveys/image", { method: "POST", body });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Could not upload image");
+      setDraft((current) => ({
+        ...current,
+        outcomes: current.outcomes.map((outcome, outcomeIndex) => outcomeIndex === index ? { ...outcome, imageUrl: data.path } : outcome),
+      }));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not upload image");
+    } finally {
+      setUploadingOutcome(null);
     }
   }
 
@@ -144,9 +207,19 @@ export function SurveyBuilder({ groupId, surveyId }: { groupId: string; surveyId
 
         <section className="mb-5 rounded-3xl bg-violet-50 p-5 ring-1 ring-violet-100">
           <h2 className="flex items-center gap-2 font-black text-violet-900"><Sparkles size={18} /> Generate with AI</h2>
-          <p className="mt-1 text-sm font-semibold text-violet-700">Describe the audience, goal, question mix, anonymity, and whether takers should receive a result.</p>
-          <Textarea value={aiPrompt} onChange={(event) => setAiPrompt(event.target.value)} placeholder="Create an anonymous 8-question volunteer feedback survey with ratings and two long-answer questions." className="mt-3 min-h-24 rounded-2xl bg-white" />
-          <button onClick={generate} disabled={generating || aiPrompt.trim().length < 8} className="mt-3 rounded-xl bg-violet-600 px-4 py-2 text-sm font-black text-white disabled:opacity-50">{generating ? "Generating..." : "Generate Draft"}</button>
+          <p className="mt-1 text-sm font-semibold text-violet-700">Give the generator enough context to write useful questions, answer choices, and results.</p>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <label className="text-sm font-bold text-violet-900">Type<select value={aiBrief.surveyType} onChange={(event) => setAiBrief({ ...aiBrief, surveyType: event.target.value as AiBrief["surveyType"], typeDetails: "" })} className="mt-1 h-11 w-full rounded-2xl border border-violet-100 bg-white px-3"><option value="survey">Survey</option><option value="poll">Poll</option><option value="personality">Personality / result quiz</option></select></label>
+            <label className="text-sm font-bold text-violet-900">Audience<Input value={aiBrief.audience} onChange={(event) => setAiBrief({ ...aiBrief, audience: event.target.value })} placeholder="Community volunteers, parents, teens..." className="mt-1 h-11 rounded-2xl bg-white" /></label>
+            <label className="text-sm font-bold text-violet-900 md:col-span-2">Goal<Input value={aiBrief.goal} onChange={(event) => setAiBrief({ ...aiBrief, goal: event.target.value })} placeholder="What should this help you learn, decide, or reveal?" className="mt-1 h-11 rounded-2xl bg-white" /></label>
+            <label className="text-sm font-bold text-violet-900">Questions<Input type="number" min={1} max={30} value={aiBrief.questionCount} onChange={(event) => setAiBrief({ ...aiBrief, questionCount: Number(event.target.value) })} className="mt-1 h-11 rounded-2xl bg-white" /></label>
+            <label className="text-sm font-bold text-violet-900">Responses<select value={aiBrief.responseMode} onChange={(event) => setAiBrief({ ...aiBrief, responseMode: event.target.value as AiBrief["responseMode"] })} className="mt-1 h-11 w-full rounded-2xl border border-violet-100 bg-white px-3"><option value="recorded">Recorded</option><option value="anonymous">Anonymous</option></select></label>
+            <label className="text-sm font-bold text-violet-900 md:col-span-2">Question mix<Input value={aiBrief.questionMix} onChange={(event) => setAiBrief({ ...aiBrief, questionMix: event.target.value })} placeholder="Mostly multiple choice, two ratings, and one optional long answer" className="mt-1 h-11 rounded-2xl bg-white" /></label>
+            <label className="text-sm font-bold text-violet-900 md:col-span-2">{TYPE_DETAILS[aiBrief.surveyType].label}<span className="mt-0.5 block text-xs font-semibold text-violet-600">{TYPE_DETAILS[aiBrief.surveyType].guidance}</span><Textarea value={aiBrief.typeDetails} onChange={(event) => setAiBrief({ ...aiBrief, typeDetails: event.target.value })} placeholder={TYPE_DETAILS[aiBrief.surveyType].placeholder} className="mt-1 min-h-20 rounded-2xl bg-white" /></label>
+            <label className="text-sm font-bold text-violet-900">Tone<Input value={aiBrief.tone} onChange={(event) => setAiBrief({ ...aiBrief, tone: event.target.value })} className="mt-1 h-11 rounded-2xl bg-white" /></label>
+            <label className="text-sm font-bold text-violet-900">Additional context<Input value={aiBrief.additionalContext} onChange={(event) => setAiBrief({ ...aiBrief, additionalContext: event.target.value })} placeholder="Reading level, topics to avoid, required wording..." className="mt-1 h-11 rounded-2xl bg-white" /></label>
+          </div>
+          <button onClick={generate} disabled={generating || aiBrief.audience.trim().length < 2 || aiBrief.goal.trim().length < 4 || aiBrief.typeDetails.trim().length < 4} className="mt-4 rounded-xl bg-violet-600 px-4 py-2 text-sm font-black text-white disabled:opacity-50">{generating ? "Generating..." : "Generate Draft"}</button>
         </section>
 
         <section className="rounded-3xl bg-white p-5 shadow-sm">
@@ -164,7 +237,17 @@ export function SurveyBuilder({ groupId, surveyId }: { groupId: string; surveyId
         {draft.surveyType === "personality" && (
           <section className="mt-5 rounded-3xl bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between"><div><h2 className="font-black text-slate-800">Results</h2><p className="text-sm font-semibold text-slate-500">Each option can award points toward these outcomes.</p></div><button onClick={() => setDraft({ ...draft, outcomes: [...draft.outcomes, { outcomeKey: `result_${draft.outcomes.length + 1}`, title: "New result", description: "", imageUrl: "" }] })} className="rounded-xl bg-emerald-100 px-3 py-2 text-sm font-black text-emerald-700"><Plus size={15} className="inline" /> Result</button></div>
-            <div className="mt-4 grid gap-3 md:grid-cols-2">{draft.outcomes.map((outcome, index) => <div key={index} className="rounded-2xl bg-slate-50 p-3"><div className="flex gap-2"><Input value={outcome.title} onChange={(event) => setDraft({ ...draft, outcomes: draft.outcomes.map((item, itemIndex) => itemIndex === index ? { ...item, title: event.target.value } : item) })} placeholder="Result title" /><button onClick={() => setDraft({ ...draft, outcomes: draft.outcomes.filter((_, itemIndex) => itemIndex !== index) })} className="text-red-500"><Trash2 size={16} /></button></div><Input value={outcome.outcomeKey} onChange={(event) => setDraft({ ...draft, outcomes: draft.outcomes.map((item, itemIndex) => itemIndex === index ? { ...item, outcomeKey: event.target.value } : item) })} placeholder="result_key" className="mt-2" /><Textarea value={outcome.description} onChange={(event) => setDraft({ ...draft, outcomes: draft.outcomes.map((item, itemIndex) => itemIndex === index ? { ...item, description: event.target.value } : item) })} placeholder="Result description" className="mt-2" /></div>)}</div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">{draft.outcomes.map((outcome, index) => <div key={index} className="rounded-2xl bg-slate-50 p-3">
+              <div className="flex gap-2"><Input value={outcome.title} onChange={(event) => setDraft({ ...draft, outcomes: draft.outcomes.map((item, itemIndex) => itemIndex === index ? { ...item, title: event.target.value } : item) })} placeholder="Result title" /><button onClick={() => setDraft({ ...draft, outcomes: draft.outcomes.filter((_, itemIndex) => itemIndex !== index) })} className="text-red-500"><Trash2 size={16} /></button></div>
+              <Input value={outcome.outcomeKey} onChange={(event) => setDraft({ ...draft, outcomes: draft.outcomes.map((item, itemIndex) => itemIndex === index ? { ...item, outcomeKey: event.target.value } : item) })} placeholder="result_key" className="mt-2" />
+              <Textarea value={outcome.description} onChange={(event) => setDraft({ ...draft, outcomes: draft.outcomes.map((item, itemIndex) => itemIndex === index ? { ...item, description: event.target.value } : item) })} placeholder="Result description" className="mt-2" />
+              {outcome.imageUrl && <div className="relative mt-3 overflow-hidden rounded-2xl bg-slate-200"><img src={outcome.imageUrl} alt={`${outcome.title || "Result"} preview`} className="aspect-video w-full object-cover" /><button onClick={() => setDraft({ ...draft, outcomes: draft.outcomes.map((item, itemIndex) => itemIndex === index ? { ...item, imageUrl: "" } : item) })} className="absolute right-2 top-2 rounded-full bg-white/90 p-2 text-red-500 shadow"><Trash2 size={14} /></button></div>}
+              <div className="mt-2 flex items-center gap-2">
+                <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-violet-100 px-3 py-2 text-sm font-black text-violet-700"><ImagePlus size={16} /> {uploadingOutcome === index ? "Uploading..." : "Upload image"}<input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" disabled={uploadingOutcome !== null} onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadOutcomeImage(index, file); event.target.value = ""; }} className="sr-only" /></label>
+                <span className="text-xs font-semibold text-slate-400">or paste a URL below</span>
+              </div>
+              <Input value={outcome.imageUrl} onChange={(event) => setDraft({ ...draft, outcomes: draft.outcomes.map((item, itemIndex) => itemIndex === index ? { ...item, imageUrl: event.target.value } : item) })} placeholder="Image URL" className="mt-2" />
+            </div>)}</div>
           </section>
         )}
 
