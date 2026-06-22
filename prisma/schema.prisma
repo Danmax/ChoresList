@@ -995,6 +995,8 @@ model CommunitySurvey {
   showAggregateResults     Boolean   @default(false)
   allowMultipleSubmissions Boolean   @default(false)
   allowResultSharing       Boolean   @default(false)
+  allowPublicResponses     Boolean   @default(false)
+  publicToken              String?   @db.VarChar(64)
   opensAt                  DateTime?
   closesAt                 DateTime?
   publishedAt              DateTime?
@@ -1008,6 +1010,7 @@ model CommunitySurvey {
   outcomes    CommunitySurveyOutcome[]
   submissions CommunitySurveySubmission[]
 
+  @@unique([publicToken], map: "survey_public_token_key")
   @@index([groupId, status])
   @@index([createdByParentId])
 }

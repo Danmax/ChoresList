@@ -88,6 +88,7 @@ export default function TakeSurveyPage() {
   const shownResult = result ?? previousSubmission;
   const shareUrl = shownResult?.shareToken && shareOrigin ? `${shareOrigin}/survey-results/${shownResult.shareToken}` : "";
   const shareText = shownResult?.outcome ? `I got “${shownResult.outcome.title}” on ${survey.title}. Discover your result with ChoresList!` : "";
+  const publicSurveyUrl = survey.publicToken && shareOrigin ? `${shareOrigin}/surveys/${survey.publicToken}` : "";
 
   return (
     <div className="min-h-screen p-4 sm:p-6">
@@ -100,6 +101,8 @@ export default function TakeSurveyPage() {
           {survey.description && <p className="mt-2 font-semibold text-violet-100">{survey.description}</p>}
           <p className="mt-4 flex items-center gap-2 text-sm font-bold text-violet-100"><Lock size={15} /> {survey.responseMode === "anonymous" ? "Your identity is not stored with this response." : "Your response is recorded with your account."}</p>
         </header>
+
+        {canManage && survey.allowPublicResponses && publicSurveyUrl && survey.status !== "draft" && <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl bg-emerald-50 p-4 ring-1 ring-emerald-100"><div className="min-w-0 flex-1"><p className="font-black text-emerald-800">Public survey link is active</p><p className="truncate text-sm font-semibold text-emerald-600">{publicSurveyUrl}</p></div><button onClick={() => void copyShareLink(publicSurveyUrl)} className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-black text-emerald-700 shadow-sm"><Copy size={15} /> Copy public link</button></div>}
 
         {survey.status === "draft" ? <div className="mt-5 rounded-3xl bg-amber-50 p-6 text-center font-bold text-amber-700">This is a draft. Publish it when it is ready for members.</div> : hasSubmitted ? (
           <div className="mt-5 rounded-3xl bg-white p-8 text-center shadow-sm">

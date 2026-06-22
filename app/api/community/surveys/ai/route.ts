@@ -63,7 +63,7 @@ function generationRequest(body: Record<string, unknown>) {
 const surveySchema = {
   type: "object",
   additionalProperties: false,
-  required: ["title", "description", "surveyType", "responseMode", "resultMode", "showAggregateResults", "allowMultipleSubmissions", "allowResultSharing", "questions", "outcomes"],
+  required: ["title", "description", "surveyType", "responseMode", "resultMode", "showAggregateResults", "allowMultipleSubmissions", "allowResultSharing", "allowPublicResponses", "questions", "outcomes"],
   properties: {
     title: stringSchema,
     description: stringSchema,
@@ -73,6 +73,7 @@ const surveySchema = {
     showAggregateResults: { type: "boolean" },
     allowMultipleSubmissions: { type: "boolean" },
     allowResultSharing: { type: "boolean" },
+    allowPublicResponses: { type: "boolean" },
     questions: {
       type: "array",
       maxItems: 30,

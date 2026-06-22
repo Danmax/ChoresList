@@ -28,6 +28,7 @@ export type SurveyDraft = {
   showAggregateResults: boolean;
   allowMultipleSubmissions: boolean;
   allowResultSharing: boolean;
+  allowPublicResponses: boolean;
   opensAt: string;
   closesAt: string;
   questions: SurveyQuestion[];
@@ -40,6 +41,7 @@ export type StoredSurvey = Omit<SurveyDraft, "questions" | "outcomes"> & {
   status: "draft" | "published" | "closed";
   publishedAt: string | null;
   closedAt: string | null;
+  publicToken: string | null;
   questions: Array<Omit<SurveyQuestion, "id" | "options"> & { id: string; options: Array<Omit<SurveyOption, "id"> & { id: string }> }>;
   outcomes: Array<Omit<SurveyOutcome, "id"> & { id: string }>;
   _count: { submissions: number };

@@ -52,6 +52,7 @@ export type SurveyDraft = {
   showAggregateResults: boolean;
   allowMultipleSubmissions: boolean;
   allowResultSharing: boolean;
+  allowPublicResponses: boolean;
   opensAt: string | null;
   closesAt: string | null;
   questions: SurveyQuestionDraft[];
@@ -153,6 +154,7 @@ export function normalizeSurveyDraft(input: unknown): SurveyDraft {
     showAggregateResults: Boolean(raw.showAggregateResults),
     allowMultipleSubmissions: surveyType === "personality" && Boolean(raw.allowMultipleSubmissions),
     allowResultSharing: surveyType === "personality" && Boolean(raw.allowResultSharing),
+    allowPublicResponses: Boolean(raw.allowPublicResponses),
     opensAt: cleanDate(raw.opensAt),
     closesAt: cleanDate(raw.closesAt),
     questions,
@@ -179,6 +181,10 @@ function respondentSecret() {
 
 export function surveyRespondentKey(surveyId: string, parentId: string) {
   return createHmac("sha256", respondentSecret()).update(`community-survey:${surveyId}:${parentId}`).digest("hex");
+}
+
+export function publicSurveyRespondentKey(surveyId: string, visitorId: string) {
+  return createHmac("sha256", respondentSecret()).update(`public-survey:${surveyId}:${visitorId}`).digest("hex");
 }
 
 export function scoreSurvey(

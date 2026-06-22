@@ -57,7 +57,7 @@ export const GET = withErrors(async (req: NextRequest) => {
   const recordedResponses = canManage && survey.responseMode === "recorded" ? submissions.map((submission) => ({
     id: submission.id,
     submittedAt: submission.submittedAt,
-    respondent: submission.respondent ? submission.respondent.displayName || submission.respondent.email : "Former member",
+    respondent: submission.respondent ? submission.respondent.displayName || submission.respondent.email : "Public respondent",
     outcome: submission.outcome,
   })) : [];
 

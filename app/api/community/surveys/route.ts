@@ -1,3 +1,4 @@
+import { randomBytes } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSession, withErrors } from "@/lib/api";
@@ -106,6 +107,8 @@ export const POST = withErrors(async (req: NextRequest) => {
       showAggregateResults: draft.showAggregateResults,
       allowMultipleSubmissions: draft.allowMultipleSubmissions,
       allowResultSharing: draft.allowResultSharing,
+      allowPublicResponses: draft.allowPublicResponses,
+      publicToken: draft.allowPublicResponses ? randomBytes(24).toString("hex") : null,
       opensAt: draft.opensAt,
       closesAt: draft.closesAt,
       questions: { create: nestedQuestions(draft.questions) },
@@ -160,6 +163,8 @@ export const PUT = withErrors(async (req: NextRequest) => {
         showAggregateResults: draft.showAggregateResults,
         allowMultipleSubmissions: draft.allowMultipleSubmissions,
         allowResultSharing: draft.allowResultSharing,
+        allowPublicResponses: draft.allowPublicResponses,
+        publicToken: draft.allowPublicResponses ? existing.publicToken ?? randomBytes(24).toString("hex") : null,
         opensAt: draft.opensAt,
         closesAt: draft.closesAt,
         questions: { create: nestedQuestions(draft.questions) },

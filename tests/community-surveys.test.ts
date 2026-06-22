@@ -55,6 +55,7 @@ test("repeat attempts and public sharing are limited to personality quizzes", ()
     surveyType: "personality",
     allowMultipleSubmissions: true,
     allowResultSharing: true,
+    allowPublicResponses: true,
   });
   const survey = normalizeSurveyDraft({
     title: "Feedback",
@@ -65,6 +66,7 @@ test("repeat attempts and public sharing are limited to personality quizzes", ()
 
   assert.equal(personality.allowMultipleSubmissions, true);
   assert.equal(personality.allowResultSharing, true);
+  assert.equal(personality.allowPublicResponses, true);
   assert.equal(survey.allowMultipleSubmissions, false);
   assert.equal(survey.allowResultSharing, false);
 });
