@@ -58,6 +58,7 @@ const BLANK_GROUP = {
   groupType: "church",
   description: "",
   location: "",
+  locationGroupId: "",
   visibility: "private",
 };
 
@@ -128,6 +129,14 @@ export default function CommunityPage() {
     [discoverGroups]
   );
 
+  const managedLocationGroups = useMemo(
+    () => groups.filter((group) =>
+      group.location
+      && (group.currentMembership?.role === "owner" || group.currentMembership?.role === "manager")
+    ),
+    [groups]
+  );
+
   const currentEvents = useMemo(() => {
     const byId = new Map<string, CurrentEvent>();
     [...groups, ...discoverGroups].forEach((group) => {
@@ -157,7 +166,10 @@ export default function CommunityPage() {
     const res = await fetch("/api/community/groups", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({
+        ...form,
+        location: form.locationGroupId ? "" : form.location,
+      }),
     });
     const data = await res.json().catch(() => null);
     if (!res.ok) {
@@ -236,11 +248,37 @@ export default function CommunityPage() {
             </div>
             <div>
               <Label className="text-sm font-bold">Location</Label>
+              {managedLocationGroups.length > 0 && (
+                <Select
+                  value={form.locationGroupId || "custom"}
+                  onValueChange={(value) => {
+                    const nextLocationGroupId = value ?? "custom";
+                    if (nextLocationGroupId === "custom") {
+                      setForm((current) => ({ ...current, locationGroupId: "" }));
+                      return;
+                    }
+                    const locationGroup = managedLocationGroups.find((group) => group.id === nextLocationGroupId);
+                    setForm((current) => ({
+                      ...current,
+                      locationGroupId: nextLocationGroupId,
+                      location: locationGroup?.location || current.location,
+                    }));
+                  }}
+                >
+                  <SelectTrigger className="mt-1 rounded-2xl"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="custom">Custom location</SelectItem>
+                    {managedLocationGroups.map((group) => (
+                      <SelectItem key={group.id} value={group.id}>{group.name} · {group.location}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               <Input
                 value={form.location}
-                onChange={(event) => setForm((current) => ({ ...current, location: event.target.value }))}
+                onChange={(event) => setForm((current) => ({ ...current, location: event.target.value, locationGroupId: "" }))}
                 placeholder="Tampa, FL"
-                className="mt-1 rounded-2xl"
+                className={managedLocationGroups.length > 0 ? "mt-2 rounded-2xl" : "mt-1 rounded-2xl"}
               />
             </div>
             <div>

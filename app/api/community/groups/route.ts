@@ -27,6 +27,10 @@ function cleanVisibility(value: unknown) {
   return typeof value === "string" && VISIBILITIES.has(value) ? value : "private";
 }
 
+function cleanId(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
 const groupInclude = {
   creator: { select: { id: true, email: true, displayName: true, relationshipLabel: true } },
   members: {
@@ -291,6 +295,19 @@ export const POST = withErrors(async (req: NextRequest) => {
   const body = await req.json();
   const name = cleanRequiredText(body.name, 120);
   if (!name) return NextResponse.json({ error: "Group name is required" }, { status: 400 });
+  const locationGroupId = cleanId(body.locationGroupId);
+  let location = cleanText(body.location, 180);
+  if (locationGroupId) {
+    await requireCommunityRole(locationGroupId, parentId, "manager");
+    const locationGroup = await prisma.communityGroup.findUnique({
+      where: { id: locationGroupId },
+      select: { location: true },
+    });
+    if (!locationGroup?.location) {
+      return NextResponse.json({ error: "Selected organization location is unavailable" }, { status: 400 });
+    }
+    location = locationGroup.location;
+  }
 
   const group = await prisma.$transaction(async (tx) => {
     const created = await tx.communityGroup.create({
@@ -299,7 +316,7 @@ export const POST = withErrors(async (req: NextRequest) => {
         name,
         groupType: cleanType(body.groupType),
         description: cleanText(body.description, 1000),
-        location: cleanText(body.location, 180),
+        location,
         visibility: cleanVisibility(body.visibility),
       },
     });
