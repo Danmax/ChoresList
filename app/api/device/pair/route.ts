@@ -36,20 +36,36 @@ export const POST = withErrors(async (req: NextRequest) => {
   }
 
   const deviceSecret = generateDeviceSecret();
-  const device = await prisma.householdDevice.create({
-    data: {
-      householdId: pairingCode.householdId,
-      memberId: pairingCode.memberId,
-      mode: pairingCode.mode,
-      name: pairingCode.deviceName,
-      tokenHash: hashDeviceSecret(deviceSecret),
-      lastSeenAt: new Date(),
-    },
-  });
+  const device = await prisma.$transaction(async (tx) => {
+    const pairedDevice = pairingCode.deviceId
+      ? await tx.householdDevice.update({
+          where: { id: pairingCode.deviceId, householdId: pairingCode.householdId },
+          data: {
+            memberId: pairingCode.memberId,
+            mode: pairingCode.mode,
+            name: pairingCode.deviceName,
+            tokenHash: hashDeviceSecret(deviceSecret),
+            revokedAt: null,
+            lastSeenAt: new Date(),
+          },
+        })
+      : await tx.householdDevice.create({
+          data: {
+            householdId: pairingCode.householdId,
+            memberId: pairingCode.memberId,
+            mode: pairingCode.mode,
+            name: pairingCode.deviceName,
+            tokenHash: hashDeviceSecret(deviceSecret),
+            lastSeenAt: new Date(),
+          },
+        });
 
-  await prisma.devicePairingCode.update({
-    where: { id: pairingCode.id },
-    data: { usedAt: new Date() },
+    await tx.devicePairingCode.update({
+      where: { id: pairingCode.id },
+      data: { usedAt: new Date() },
+    });
+
+    return pairedDevice;
   });
 
   const token = createDeviceSessionToken({ ...device, secret: deviceSecret });
