@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, BookOpen, CheckCircle2, Gamepad2, Puzzle, RefreshCw, Trophy } from "lucide-react";
+import { ArrowLeft, BookOpen, CheckCircle2, Circle, FileText, Gamepad2, Puzzle, RefreshCw, Scissors, Swords, Trophy } from "lucide-react";
 import { toast } from "sonner";
 
 type Member = {
@@ -15,7 +15,7 @@ type Member = {
 };
 
 type Game = {
-  key: "memory-match" | "bible-trivia";
+  key: "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot";
   title: string;
   description: string;
   ageMin: number;
@@ -49,6 +49,11 @@ type Reward = {
 };
 
 const MEMORY_SYMBOLS = ["🧺", "🧹", "🧽", "🪴", "📚", "⭐"];
+const RPS_CHOICES = [
+  { key: "rock", label: "Rock", color: "text-slate-700", bg: "bg-slate-100", beats: "scissors" },
+  { key: "paper", label: "Paper", color: "text-blue-700", bg: "bg-blue-50", beats: "rock" },
+  { key: "scissors", label: "Scissors", color: "text-red-700", bg: "bg-red-50", beats: "paper" },
+] as const;
 const TRIVIA = [
   {
     question: "Who built the ark?",
@@ -82,6 +87,7 @@ function shuffle<T>(items: T[]) {
 }
 
 function iconForGame(key: string) {
+  if (key === "rock-paper-scissors-shoot") return Swords;
   if (key === "bible-trivia") return BookOpen;
   if (key === "memory-match") return Puzzle;
   return Gamepad2;
@@ -189,6 +195,8 @@ export default function KidGamesPage() {
         <MemoryMatch onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("memory-match", score, duration, metadata)} />
       ) : activeGame === "bible-trivia" ? (
         <BibleTrivia onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("bible-trivia", score, duration, metadata)} />
+      ) : activeGame === "rock-paper-scissors-shoot" ? (
+        <RockPaperScissorsShoot onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("rock-paper-scissors-shoot", score, duration, metadata)} />
       ) : (
         <section className="grid gap-4 sm:grid-cols-2">
           {games.map((game) => {
@@ -226,6 +234,139 @@ export default function KidGamesPage() {
           })}
         </section>
       )}
+    </div>
+  );
+}
+
+function choiceIcon(choice: string) {
+  if (choice === "paper") return FileText;
+  if (choice === "scissors") return Scissors;
+  return Circle;
+}
+
+function RockPaperScissorsShoot({
+  onExit,
+  onFinish,
+}: {
+  onExit: () => void;
+  onFinish: (score: number, durationSeconds: number, metadata: Record<string, unknown>) => void;
+}) {
+  type ChoiceKey = typeof RPS_CHOICES[number]["key"];
+  const [phase, setPhase] = useState<"player-one" | "player-two" | "result">("player-one");
+  const [playerOneChoice, setPlayerOneChoice] = useState<ChoiceKey | null>(null);
+  const [playerTwoChoice, setPlayerTwoChoice] = useState<ChoiceKey | null>(null);
+  const [round, setRound] = useState(1);
+  const [score, setScore] = useState({ playerOne: 0, playerTwo: 0, ties: 0 });
+  const [startedAt] = useState(() => Date.now());
+
+  const result = useMemo(() => {
+    if (!playerOneChoice || !playerTwoChoice) return null;
+    if (playerOneChoice === playerTwoChoice) return "tie";
+    const playerOne = RPS_CHOICES.find((choice) => choice.key === playerOneChoice);
+    return playerOne?.beats === playerTwoChoice ? "player-one" : "player-two";
+  }, [playerOneChoice, playerTwoChoice]);
+
+  function choose(choice: ChoiceKey) {
+    if (phase === "player-one") {
+      setPlayerOneChoice(choice);
+      setPhase("player-two");
+      return;
+    }
+    if (phase !== "player-two") return;
+    setPlayerTwoChoice(choice);
+    setScore((current) => {
+      if (!playerOneChoice || playerOneChoice === choice) return { ...current, ties: current.ties + 1 };
+      const playerOne = RPS_CHOICES.find((item) => item.key === playerOneChoice);
+      return playerOne?.beats === choice
+        ? { ...current, playerOne: current.playerOne + 1 }
+        : { ...current, playerTwo: current.playerTwo + 1 };
+    });
+    setPhase("result");
+  }
+
+  function nextRound() {
+    setPlayerOneChoice(null);
+    setPlayerTwoChoice(null);
+    setRound((value) => value + 1);
+    setPhase("player-one");
+  }
+
+  function saveGame() {
+    const duration = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
+    const sessionScore = score.playerOne * 100 + score.ties * 25;
+    onFinish(sessionScore, duration, { rounds: round, playerOneWins: score.playerOne, playerTwoWins: score.playerTwo, ties: score.ties });
+  }
+
+  const activePlayer = phase === "player-one" ? "Player 1" : "Player 2";
+  const canSave = phase === "result";
+
+  return (
+    <section className="rounded-3xl bg-white p-4 shadow-sm sm:p-6">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="flex items-center gap-2 text-2xl font-black text-slate-800"><Swords className="text-red-600" /> Rock Paper Scissors Shoot</h2>
+          <p className="text-sm font-bold text-slate-500">Round {round} · Player 1 {score.playerOne} · Player 2 {score.playerTwo} · Ties {score.ties}</p>
+        </div>
+        <button type="button" onClick={onExit} className="rounded-2xl bg-slate-100 px-4 py-2 text-sm font-black text-slate-600">Exit</button>
+      </div>
+
+      {phase === "result" && result ? (
+        <div className="rounded-3xl bg-red-50 p-5">
+          <p className="text-center text-sm font-black uppercase tracking-wide text-red-500">Shoot</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <ChoiceReveal label="Player 1" choice={playerOneChoice ?? "rock"} />
+            <ChoiceReveal label="Player 2" choice={playerTwoChoice ?? "rock"} />
+          </div>
+          <p className="mt-5 text-center text-2xl font-black text-slate-800">
+            {result === "tie" ? "Tie round" : result === "player-one" ? "Player 1 wins" : "Player 2 wins"}
+          </p>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <button type="button" onClick={nextRound} className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-black text-white">Next Round</button>
+            <button type="button" onClick={saveGame} disabled={!canSave} className="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white disabled:opacity-50">Save Game</button>
+          </div>
+        </div>
+      ) : (
+        <div>
+          <div className="rounded-3xl bg-red-50 p-5 text-center">
+            <p className="text-sm font-black uppercase tracking-wide text-red-500">{activePlayer}'s turn</p>
+            <p className="mt-2 text-xl font-black leading-8 text-slate-800">
+              {phase === "player-one" ? "Choose secretly, then pass the device." : "Player 1 is locked in. Choose your shot."}
+            </p>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            {RPS_CHOICES.map((choice) => {
+              const Icon = choiceIcon(choice.key);
+              return (
+                <button
+                  key={choice.key}
+                  type="button"
+                  onClick={() => choose(choice.key)}
+                  className={`min-h-36 rounded-3xl border-2 border-slate-100 ${choice.bg} p-4 text-center transition-all hover:-translate-y-0.5 hover:border-red-200`}
+                >
+                  <span className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-white">
+                    <Icon size={28} className={choice.color} />
+                  </span>
+                  <span className="mt-3 block text-lg font-black text-slate-800">{choice.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ChoiceReveal({ label, choice }: { label: string; choice: string }) {
+  const Icon = choiceIcon(choice);
+  const option = RPS_CHOICES.find((item) => item.key === choice) ?? RPS_CHOICES[0];
+  return (
+    <div className="rounded-3xl bg-white p-4 text-center">
+      <p className="text-xs font-black uppercase tracking-wide text-slate-400">{label}</p>
+      <span className={`mx-auto mt-3 flex size-16 items-center justify-center rounded-2xl ${option.bg}`}>
+        <Icon size={32} className={option.color} />
+      </span>
+      <p className="mt-3 text-lg font-black text-slate-800">{option.label}</p>
     </div>
   );
 }

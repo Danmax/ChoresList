@@ -1,4 +1,4 @@
-export type GameKey = "memory-match" | "bible-trivia";
+export type GameKey = "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot";
 export type GameRewardType = "none" | "points" | "tickets";
 
 export type GameDefinition = {
@@ -36,6 +36,17 @@ export const GAME_DEFINITIONS: GameDefinition[] = [
     color: "#0f766e",
     bg: "#ccfbf1",
   },
+  {
+    key: "rock-paper-scissors-shoot",
+    title: "Rock Paper Scissors Shoot",
+    description: "Two players choose rock, paper, or scissors, then reveal the winner.",
+    icon: "Swords",
+    ageMin: 5,
+    ageMax: 18,
+    playTime: "1-2 min",
+    color: "#dc2626",
+    bg: "#fee2e2",
+  },
 ];
 
 export const DEFAULT_GAME_SETTINGS: Record<GameKey, {
@@ -61,6 +72,14 @@ export const DEFAULT_GAME_SETTINGS: Record<GameKey, {
     rewardTickets: 0,
     requiresChoresComplete: false,
     dailyPlayLimit: 3,
+  },
+  "rock-paper-scissors-shoot": {
+    enabled: true,
+    rewardType: "points",
+    rewardPoints: 3,
+    rewardTickets: 0,
+    requiresChoresComplete: false,
+    dailyPlayLimit: 5,
   },
 };
 
