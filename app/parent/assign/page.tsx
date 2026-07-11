@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { ArrowLeft, Check, Plus, RefreshCw, Trash2 } from "lucide-react";
-import Link from "next/link";
+import { Check, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { ParentPageHeader } from "@/components/parent-management-shell";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
@@ -158,34 +158,34 @@ export default function AssignPage() {
   }
 
   return (
-    <div className="min-h-screen p-4 sm:p-6">
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-        <Link href="/parent" className="bg-white rounded-2xl p-2 shadow-sm hover:shadow-md transition-shadow">
-          <ArrowLeft size={20} className="text-slate-600" />
-        </Link>
-        <h1 className="text-2xl sm:text-3xl font-black text-slate-800 flex-1">📅 Assign Chores</h1>
-        <div className="grid grid-cols-2 gap-2 sm:flex sm:w-auto">
-        <button
-          type="button"
-          onClick={load}
-          className="flex items-center justify-center gap-2 bg-white text-slate-600 rounded-2xl px-3 sm:px-4 py-2.5 font-bold hover:bg-slate-50 transition-colors shadow-sm"
-        >
-          <RefreshCw size={18} /> Refresh
-        </button>
-        <button
-          onClick={() => { resetForm(); setOpen(true); }}
-          className="flex items-center justify-center gap-2 bg-emerald-500 text-white rounded-2xl px-3 sm:px-4 py-2.5 font-bold hover:bg-emerald-600 transition-colors"
-        >
-          <Plus size={18} /> Assign Chore
-        </button>
-        </div>
-      </div>
+    <>
+      <ParentPageHeader
+        title="Assignments"
+        description="Plan recurring and one-time chore work across the household."
+        actions={
+          <>
+            <button
+              type="button"
+              onClick={load}
+              className="flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50"
+            >
+              <RefreshCw size={18} /> Refresh
+            </button>
+            <button
+              onClick={() => { resetForm(); setOpen(true); }}
+              className="flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-bold text-white transition-colors hover:bg-slate-700"
+            >
+              <Plus size={18} /> Assign Chore
+            </button>
+          </>
+        }
+      />
 
       {/* Member filter */}
-      <div className="flex gap-2 flex-wrap mb-6">
+      <div className="mb-6 flex flex-wrap gap-2">
         <button
           onClick={() => setSelectedMember("")}
-          className={`px-4 py-2 rounded-full font-bold text-sm transition-colors ${!selectedMember ? "bg-slate-800 text-white" : "bg-white text-slate-600"}`}
+          className={`rounded-lg px-3 py-2 text-sm font-bold transition-colors ${!selectedMember ? "bg-slate-900 text-white" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}
         >
           Everyone
         </button>
@@ -193,7 +193,7 @@ export default function AssignPage() {
           <button
             key={m.id}
             onClick={() => setSelectedMember(String(m.id))}
-            className={`px-4 py-2 rounded-full font-bold text-sm transition-colors flex items-center gap-1 ${selectedMember === String(m.id) ? "bg-slate-800 text-white" : "bg-white text-slate-600"}`}
+            className={`flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-bold transition-colors ${selectedMember === String(m.id) ? "bg-slate-900 text-white" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}
           >
             {m.avatar} {m.name}
           </button>
@@ -209,7 +209,7 @@ export default function AssignPage() {
 
       <div className="space-y-3">
         {filteredAssignments.map((a) => (
-          <div key={a.id} className="bg-white rounded-2xl p-4 shadow-sm flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+          <div key={a.id} className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:gap-4">
             <div className="text-3xl">{a.chore.icon}</div>
             <div className="min-w-0 flex-1">
               <p className="font-black text-slate-800">{a.chore.name}</p>
@@ -394,6 +394,6 @@ export default function AssignPage() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }

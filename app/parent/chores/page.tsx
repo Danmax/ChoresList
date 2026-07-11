@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { ArrowLeft, Plus, Wand2, BookOpen, ChevronRight, Trash2, Pencil, Sparkles } from "lucide-react";
-import Link from "next/link";
+import { Plus, Wand2, BookOpen, ChevronRight, Trash2, Pencil, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { CHORE_CATEGORIES, CHORE_EMOJIS, CHORE_TEMPLATES_BY_AGE } from "@/types";
+import { ParentPageHeader } from "@/components/parent-management-shell";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -299,33 +299,33 @@ export default function ChoresPage() {
   }
 
   return (
-    <div className="min-h-screen p-4 sm:p-6">
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-        <Link href="/parent" className="bg-white rounded-2xl p-2 shadow-sm hover:shadow-md transition-shadow">
-          <ArrowLeft size={20} className="text-slate-600" />
-        </Link>
-        <h1 className="text-2xl sm:text-3xl font-black text-slate-800 flex-1">📋 Chore Library</h1>
-        <div className="grid grid-cols-2 gap-2 sm:flex sm:w-auto">
-        <button
-          onClick={() => setShowTemplates(true)}
-          className="flex items-center justify-center gap-2 bg-violet-500 text-white rounded-2xl px-3 sm:px-4 py-2.5 font-bold hover:bg-violet-600 transition-colors"
-        >
-          <Sparkles size={18} /> Quick Start
-        </button>
-        <button
-          onClick={() => setShowNewChore(true)}
-          className="flex items-center justify-center gap-2 bg-blue-500 text-white rounded-2xl px-3 sm:px-4 py-2.5 font-bold hover:bg-blue-600 transition-colors"
-        >
-          <Plus size={18} /> New Chore
-        </button>
-        </div>
-      </div>
+    <>
+      <ParentPageHeader
+        title="Chore Library"
+        description="Create, tune, and document reusable chores before assigning them to family members."
+        actions={
+          <>
+            <button
+              onClick={() => setShowTemplates(true)}
+              className="flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50"
+            >
+              <Sparkles size={18} /> Quick Start
+            </button>
+            <button
+              onClick={() => setShowNewChore(true)}
+              className="flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-bold text-white transition-colors hover:bg-slate-700"
+            >
+              <Plus size={18} /> New Chore
+            </button>
+          </>
+        }
+      />
 
       {/* Category filter */}
-      <div className="flex gap-2 flex-wrap mb-6">
+      <div className="mb-6 flex flex-wrap gap-2">
         <button
           onClick={() => setFilterCat("all")}
-          className={`px-4 py-2 rounded-full font-bold text-sm transition-colors ${filterCat === "all" ? "bg-slate-800 text-white" : "bg-white text-slate-600 hover:bg-slate-100"}`}
+          className={`rounded-lg px-3 py-2 text-sm font-bold transition-colors ${filterCat === "all" ? "bg-slate-900 text-white" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}
         >
           All
         </button>
@@ -333,7 +333,7 @@ export default function ChoresPage() {
           <button
             key={c.value}
             onClick={() => setFilterCat(c.value)}
-            className={`px-4 py-2 rounded-full font-bold text-sm transition-colors ${filterCat === c.value ? "bg-slate-800 text-white" : "bg-white text-slate-600 hover:bg-slate-100"}`}
+            className={`rounded-lg px-3 py-2 text-sm font-bold transition-colors ${filterCat === c.value ? "bg-slate-900 text-white" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}
           >
             {c.icon} {c.label}
           </button>
@@ -344,7 +344,7 @@ export default function ChoresPage() {
         {filtered.map((chore) => (
           <div
             key={chore.id}
-            className="rounded-2xl p-4 bg-white shadow-sm flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4"
+            className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:gap-4"
             style={{ borderLeft: `4px solid ${chore.color}` }}
           >
             <div className="text-3xl">{chore.icon}</div>
@@ -888,6 +888,6 @@ export default function ChoresPage() {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }

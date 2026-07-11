@@ -2,7 +2,8 @@
 
 import { type FormEvent, useState, useEffect } from "react";
 import Link from "next/link";
-import { Users, ListChecks, CalendarDays, DollarSign, Home, BarChart2, Gift, Wrench, Ticket, Mail, LockKeyhole, MonitorSmartphone, LogOut, Settings, CheckCircle2, ShoppingCart, Network, GraduationCap, ChefHat, HeartHandshake } from "lucide-react";
+import { Users, ListChecks, CalendarDays, DollarSign, BarChart2, Gift, Wrench, Ticket, Mail, LockKeyhole, MonitorSmartphone, Settings, CheckCircle2, ShoppingCart, Network, GraduationCap, ChefHat, HeartHandshake } from "lucide-react";
+import { ParentManagementShell, ParentPageHeader } from "@/components/parent-management-shell";
 
 type AccountRole = "owner" | "parent" | "grandparent";
 
@@ -547,53 +548,48 @@ export default function ParentPanel() {
   const roleLabel = accountRole === "grandparent" ? "Grandparent Access" : accountRole === "owner" ? "Owner Access" : "Parent Access";
 
   return (
-    <div className="min-h-screen p-4 sm:p-6">
-      <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-800">
-            {accountRole === "grandparent" ? "👵 Grandparent Access" : "🔧 Parent Panel"}
-          </h1>
-          <p className="text-slate-500 font-semibold">
-            {accountRole === "grandparent" ? "Stay connected with family progress and events" : "Manage your family's chore system"}
-          </p>
-          <p className="mt-1 text-xs font-black uppercase tracking-wide text-violet-500">{roleLabel}</p>
+    <ParentManagementShell accountRole={accountRole} plugins={plugins} onSignOut={lock}>
+      <ParentPageHeader
+        title={accountRole === "grandparent" ? "Family Access" : "Management Overview"}
+        description={accountRole === "grandparent" ? "Stay connected with family progress and events." : "Manage the family's chores, schedules, rewards, devices, and optional tools from one workspace."}
+        actions={<span className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-black uppercase tracking-wide text-slate-500">{roleLabel}</span>}
+      />
+
+      <div className="mb-6 grid gap-3 sm:grid-cols-3">
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <p className="text-xs font-black uppercase tracking-wide text-slate-400">Core tools</p>
+          <p className="mt-1 text-2xl font-black text-slate-950">{visibleSections.length}</p>
         </div>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:flex">
-          <Link
-            href="/dashboard"
-            className="flex items-center justify-center gap-2 bg-white rounded-2xl px-4 py-2.5 shadow-sm font-bold text-slate-600 hover:shadow-md transition-shadow"
-          >
-            <Home size={18} /> Dashboard
-          </Link>
-          <button
-            onClick={lock}
-            className="flex items-center justify-center gap-2 bg-white rounded-2xl px-4 py-2.5 shadow-sm font-bold text-red-500 hover:shadow-md transition-shadow"
-            title="Sign out of the parent account on this device"
-          >
-            <LogOut size={18} /> Sign out
-          </button>
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <p className="text-xs font-black uppercase tracking-wide text-slate-400">Active plugins</p>
+          <p className="mt-1 text-2xl font-black text-slate-950">{pluginSections.length}</p>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <p className="text-xs font-black uppercase tracking-wide text-slate-400">Access level</p>
+          <p className="mt-1 text-lg font-black text-slate-950">{roleLabel}</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {visibleSections.map((s) => (
           <Link key={s.href} href={s.href}>
             <div
-              className="rounded-3xl p-6 shadow-sm hover:shadow-lg transition-all hover:-translate-y-1 cursor-pointer"
-              style={{ backgroundColor: s.bg, border: `2px solid ${s.color}44` }}
+              className="group flex h-full gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50"
             >
               <div
-                className="w-12 h-12 rounded-2xl flex items-center justify-center mb-4"
-                style={{ backgroundColor: s.color + "33" }}
+                className="flex size-10 shrink-0 items-center justify-center rounded-lg"
+                style={{ backgroundColor: s.bg }}
               >
-                <s.icon size={24} style={{ color: s.color }} />
+                <s.icon size={20} style={{ color: s.color }} />
               </div>
-              <h2 className="text-lg font-black text-slate-800 mb-1">{s.label}</h2>
-              <p className="text-slate-500 font-semibold text-sm">{s.desc}</p>
+              <div className="min-w-0">
+                <h2 className="font-black text-slate-950">{s.label}</h2>
+                <p className="mt-1 text-sm font-semibold leading-5 text-slate-500">{s.desc}</p>
+              </div>
             </div>
           </Link>
         ))}
       </div>
-    </div>
+    </ParentManagementShell>
   );
 }

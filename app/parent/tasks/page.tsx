@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Camera, CheckCircle2, RefreshCw, Star, UserCheck } from "lucide-react";
+import { Camera, CheckCircle2, RefreshCw, Star, UserCheck } from "lucide-react";
 import { toast } from "sonner";
+import { ParentPageHeader } from "@/components/parent-management-shell";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { COMPLETION_EMOJIS } from "@/types";
 
@@ -137,26 +138,23 @@ export default function ParentTasksPage() {
   const doneCount = assignments.length - openCount;
 
   return (
-    <div className="min-h-screen p-4 sm:p-6">
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-        <Link href="/parent" className="bg-white rounded-2xl p-2 shadow-sm transition-shadow hover:shadow-md">
-          <ArrowLeft size={20} className="text-slate-600" />
-        </Link>
-        <div className="flex-1">
-          <h1 className="text-2xl font-black text-slate-800 sm:text-3xl">✅ Parent Tasks</h1>
-          <p className="text-sm font-semibold text-slate-500">Complete chores assigned to adult family members.</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => loadAssignments(selectedMemberId)}
-          className="flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-2.5 font-bold text-slate-600 shadow-sm transition-colors hover:bg-slate-50"
-        >
-          <RefreshCw size={18} /> Refresh
-        </button>
-      </div>
+    <>
+      <ParentPageHeader
+        title="Parent Tasks"
+        description="Complete chores assigned to adult family members."
+        actions={
+          <button
+            type="button"
+            onClick={() => loadAssignments(selectedMemberId)}
+            className="flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50"
+          >
+            <RefreshCw size={18} /> Refresh
+          </button>
+        }
+      />
 
       {adultMembers.length === 0 ? (
-        <div className="rounded-3xl bg-white p-8 text-center shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm">
           <UserCheck size={42} className="mx-auto mb-3 text-slate-300" />
           <h2 className="mb-2 text-xl font-black text-slate-700">No parent profiles yet</h2>
           <p className="mb-5 text-sm font-semibold text-slate-500">Add a Mom, Dad, or Parent family member before assigning parent chores.</p>
@@ -172,8 +170,8 @@ export default function ParentTasksPage() {
                 key={member.id}
                 type="button"
                 onClick={() => setSelectedMemberId(String(member.id))}
-                className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-black transition-colors ${
-                  selectedMemberId === String(member.id) ? "bg-slate-800 text-white" : "bg-white text-slate-600 hover:bg-slate-50"
+                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-black transition-colors ${
+                  selectedMemberId === String(member.id) ? "bg-slate-900 text-white" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                 }`}
               >
                 <span>{member.avatar}</span>
@@ -183,7 +181,7 @@ export default function ParentTasksPage() {
           </div>
 
           {selectedMember && (
-            <div className="mb-5 rounded-3xl bg-white p-4 shadow-sm">
+            <div className="mb-5 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-3">
                   <span className="text-4xl">{selectedMember.avatar}</span>
@@ -205,7 +203,7 @@ export default function ParentTasksPage() {
           {loading ? (
             <div className="py-16 text-center font-bold text-slate-400">Loading parent tasks...</div>
           ) : assignments.length === 0 ? (
-            <div className="rounded-3xl bg-white p-8 text-center shadow-sm">
+              <div className="rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm">
               <div className="mb-3 text-5xl">📭</div>
               <h2 className="mb-1 text-xl font-black text-slate-700">No parent chores due</h2>
               <p className="mb-5 text-sm font-semibold text-slate-500">Assign chores to this parent profile to complete them here.</p>
@@ -222,7 +220,7 @@ export default function ParentTasksPage() {
                 return (
                   <div
                     key={assignment.id}
-                    className={`rounded-3xl bg-white p-4 shadow-sm ${done ? "opacity-70" : ""}`}
+                    className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${done ? "opacity-70" : ""}`}
                   >
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
                       <div
@@ -304,6 +302,6 @@ export default function ParentTasksPage() {
           </button>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }
