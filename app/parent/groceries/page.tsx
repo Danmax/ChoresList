@@ -130,6 +130,8 @@ export default function ParentGroceriesPage() {
   const [completionNote, setCompletionNote] = useState("");
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiGenerating, setAiGenerating] = useState(false);
+  const [listTitleDraft, setListTitleDraft] = useState("");
+  const [titleSaving, setTitleSaving] = useState(false);
   const [receiptUploading, setReceiptUploading] = useState(false);
   const [receiptVersion, setReceiptVersion] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -169,6 +171,10 @@ export default function ParentGroceriesPage() {
     { value: "recurring" as Tab, Icon: CalendarClock, label: `Recurring (${templates.length})` },
     { value: "history" as Tab, Icon: History, label: `History (${completedLists.length})` },
   ];
+
+  useEffect(() => {
+    setListTitleDraft(selectedList?.title ?? "");
+  }, [selectedList?.id, selectedList?.title]);
 
   async function createList(title?: string) {
     const cleanTitle = (title ?? newListTitle).trim() || "Shopping List";
@@ -233,6 +239,33 @@ export default function ParentGroceriesPage() {
     await load();
     setSelectedListId(created.id);
     setTab("active");
+  }
+
+  async function renameSelectedList() {
+    if (!selectedList) return;
+    const title = listTitleDraft.trim();
+    if (!title) {
+      toast.error("List title is required");
+      return;
+    }
+    if (title === selectedList.title) return;
+
+    setTitleSaving(true);
+    try {
+      const res = await fetch("/api/groceries/lists", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: selectedList.id, title }),
+      });
+      if (!res.ok) {
+        toast.error("Could not rename list");
+        return;
+      }
+      toast.success("Shopping list renamed");
+      await load();
+    } finally {
+      setTitleSaving(false);
+    }
   }
 
   function openCompleteList(list: GroceryList) {
@@ -507,7 +540,27 @@ export default function ParentGroceriesPage() {
               <>
                 <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start">
                   <div className="flex-1">
-                    <h2 className="text-xl font-black text-slate-800">{selectedList.title}</h2>
+                    <Label className="sr-only" htmlFor="shopping-list-title">Shopping list title</Label>
+                    <div className="flex max-w-xl flex-col gap-2 sm:flex-row">
+                      <Input
+                        id="shopping-list-title"
+                        value={listTitleDraft}
+                        onChange={(event) => setListTitleDraft(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") renameSelectedList();
+                        }}
+                        className="rounded-2xl bg-slate-50 text-lg font-black text-slate-800"
+                      />
+                      <button
+                        type="button"
+                        onClick={renameSelectedList}
+                        disabled={titleSaving || listTitleDraft.trim() === selectedList.title}
+                        className="flex shrink-0 items-center justify-center gap-1.5 rounded-2xl bg-slate-800 px-3 py-2 text-sm font-black text-white hover:bg-slate-700 disabled:opacity-50"
+                      >
+                        {titleSaving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                        Save
+                      </button>
+                    </div>
                     <p className="text-sm font-bold text-slate-400">
                       {resolvedCount(selectedList.items)} of {selectedList.items.length} items purchased or on hand
                     </p>
