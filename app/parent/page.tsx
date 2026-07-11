@@ -2,7 +2,7 @@
 
 import { type FormEvent, useState, useEffect } from "react";
 import Link from "next/link";
-import { Users, ListChecks, CalendarDays, DollarSign, BarChart2, Gift, Wrench, Ticket, Mail, LockKeyhole, MonitorSmartphone, Settings, CheckCircle2, ShoppingCart, Network, GraduationCap, ChefHat, HeartHandshake } from "lucide-react";
+import { Users, ListChecks, CalendarDays, DollarSign, BarChart2, Gift, Wrench, Ticket, Mail, LockKeyhole, MonitorSmartphone, Settings, CheckCircle2, ShoppingCart, Network, GraduationCap, ChefHat, HeartHandshake, Gamepad2 } from "lucide-react";
 import { ParentManagementShell, ParentPageHeader } from "@/components/parent-management-shell";
 
 type AccountRole = "owner" | "parent" | "grandparent";
@@ -537,6 +537,7 @@ export default function ParentPanel() {
     { href: "/parent/chores", icon: ListChecks, label: "Chore Library", desc: "Browse, assign & AI instructions", color: "#60a5fa", bg: "#dbeafe", roles: ["owner", "parent"] },
     { href: "/parent/assign", icon: CalendarDays, label: "Assign & Complete Chores", desc: "Manage chores for children in your care", color: "#34d399", bg: "#d1fae5", roles: ["owner", "parent", "grandparent"] },
     { href: "/parent/tasks", icon: CheckCircle2, label: "Parent Tasks", desc: "Complete chores assigned to parents", color: "#14b8a6", bg: "#ccfbf1", roles: ["owner", "parent"] },
+    { href: "/parent/games", icon: Gamepad2, label: "Games", desc: "Manage kid games, limits, and rewards", color: "#7c3aed", bg: "#ede9fe", roles: ["owner", "parent", "grandparent"] },
     { href: "/parent/allowance", icon: DollarSign, label: "Allowance", desc: "Review points, pay out credits", color: "#fbbf24", bg: "#fef3c7", roles: ["owner", "parent"] },
     { href: "/parent/projects", icon: Wrench, label: "House Projects", desc: "Projects that earn reward tickets", color: "#f97316", bg: "#ffedd5", roles: ["owner", "parent", "grandparent"] },
     { href: "/parent/tickets", icon: Ticket, label: "Reward Tickets", desc: "Cash in earned rewards", color: "#eab308", bg: "#fefce8", roles: ["owner", "parent", "grandparent"] },

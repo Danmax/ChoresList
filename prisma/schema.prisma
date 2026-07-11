@@ -99,6 +99,8 @@ model Household {
   meritBadges              MeritBadge[]
   memberBadges             MemberBadge[]
   wellbeingCheckIns        WellbeingCheckIn[]
+  gameSettings             GameSetting[]
+  gameSessions             GameSession[]
 }
 
 model HouseholdPlugin {
@@ -212,8 +214,48 @@ model FamilyMember {
   educationAssignments  EducationAssignment[]
   educationAttempts     EducationAttempt[]
   educationProjects     EducationProject[]
+  gameSessions          GameSession[]
 
   @@index([householdId, role])
+}
+
+model GameSetting {
+  id                     String   @id @default(uuid()) @db.Char(36)
+  householdId            String   @db.Char(36)
+  gameKey                String   @db.VarChar(64)
+  enabled                Boolean  @default(true)
+  rewardType             String   @default("points") @db.VarChar(32)
+  rewardPoints           Int      @default(5)
+  rewardTickets          Int      @default(0)
+  requiresChoresComplete Boolean  @default(false)
+  dailyPlayLimit         Int      @default(3)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @default(now()) @updatedAt
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@unique([householdId, gameKey])
+  @@index([householdId, enabled])
+}
+
+model GameSession {
+  id              String   @id @default(uuid()) @db.Char(36)
+  householdId     String   @db.Char(36)
+  memberId        String   @db.Char(36)
+  gameKey         String   @db.VarChar(64)
+  score           Int      @default(0)
+  durationSeconds Int      @default(0)
+  rewardType      String   @default("none") @db.VarChar(32)
+  rewardPoints    Int      @default(0)
+  rewardTickets   Int      @default(0)
+  metadata        Json?
+  playedAt        DateTime @default(now())
+
+  household Household    @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  member    FamilyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([householdId, playedAt])
+  @@index([memberId, gameKey, playedAt])
 }
 
 model WellbeingCheckIn {

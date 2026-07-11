@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, ArrowRight, BookOpen, Camera, CheckCircle2, ChevronRight, Gift, GraduationCap, Lightbulb, ListChecks, Shield, Trophy, Wrench } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, Camera, CheckCircle2, ChevronRight, Gamepad2, Gift, GraduationCap, Lightbulb, ListChecks, Shield, Trophy, Wrench } from "lucide-react";
 import { getLevelFromPoints, getLevelTitle, getPointsForNextLevel } from "@/lib/points";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -236,6 +236,14 @@ export default function KidPage() {
       value: academyEnabled ? `${openEducationAssignments.length} open` : "Off",
       color: "#2563eb",
       bg: "#dbeafe",
+    },
+    {
+      href: `/kid/${id}/games`,
+      Icon: Gamepad2,
+      label: "Games",
+      value: "Play",
+      color: "#7c3aed",
+      bg: "#ede9fe",
     },
     {
       href: openHouseProjects > 0 ? "#house-projects" : openEducationProjects.length > 0 ? `/kid/${id}/academy` : `/kid/${id}`,
