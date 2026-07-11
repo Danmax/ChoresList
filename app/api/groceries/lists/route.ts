@@ -43,8 +43,40 @@ export const POST = withErrors(async (req: NextRequest) => {
   await requirePluginAccess(householdId, parentId, "grocery-pantry");
   const body = await req.json();
   const title = cleanText(body.title, 120);
+  const sourceListId = cleanText(body.sourceListId, 64);
 
   if (!title) return NextResponse.json({ error: "List title is required" }, { status: 400 });
+
+  if (sourceListId) {
+    const source = await prisma.groceryList.findFirst({
+      where: { id: sourceListId, householdId },
+      include: { items: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] } },
+    });
+    if (!source) return NextResponse.json({ error: "Shopping list not found" }, { status: 404 });
+
+    const list = await prisma.groceryList.create({
+      data: {
+        householdId,
+        title,
+        items: {
+          create: source.items.map((item) => ({
+            name: item.name,
+            category: item.category,
+            quantity: item.quantity,
+            unit: item.unit,
+            note: item.note,
+            sortOrder: item.sortOrder,
+          })),
+        },
+      },
+      include: {
+        items: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
+        sourceTemplate: { select: { id: true, title: true, cadence: true } },
+      },
+    });
+
+    return NextResponse.json(list, { status: 201 });
+  }
 
   const list = await prisma.groceryList.create({
     data: { householdId, title },

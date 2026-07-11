@@ -16,6 +16,7 @@ import {
   ShoppingCart,
   Trash2,
   Upload,
+  WandSparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
@@ -127,6 +128,8 @@ export default function ParentGroceriesPage() {
   const [templateItemForm, setTemplateItemForm] = useState(BLANK_ITEM);
   const [completingList, setCompletingList] = useState<GroceryList | null>(null);
   const [completionNote, setCompletionNote] = useState("");
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiGenerating, setAiGenerating] = useState(false);
   const [receiptUploading, setReceiptUploading] = useState(false);
   const [receiptVersion, setReceiptVersion] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -183,6 +186,52 @@ export default function ParentGroceriesPage() {
     setNewListTitle("");
     await load();
     setSelectedListId(list.id);
+    setTab("active");
+  }
+
+  async function generateListFromPrompt() {
+    const prompt = aiPrompt.trim();
+    if (prompt.length < 4) {
+      toast.error("Describe the meal or event first");
+      return;
+    }
+
+    setAiGenerating(true);
+    try {
+      const res = await fetch("/api/groceries/ai/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        toast.error(data?.error ?? "Could not generate shopping list");
+        return;
+      }
+      toast.success("Shopping list generated");
+      setAiPrompt("");
+      await load();
+      setSelectedListId(data.list.id);
+      setTab("active");
+    } finally {
+      setAiGenerating(false);
+    }
+  }
+
+  async function createListFromHistory(list: GroceryList) {
+    const res = await fetch("/api/groceries/lists", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: `${list.title} Copy`, sourceListId: list.id }),
+    });
+    if (!res.ok) {
+      toast.error("Could not reuse shopping list");
+      return;
+    }
+    const created = await res.json();
+    toast.success("Shopping list created from history");
+    await load();
+    setSelectedListId(created.id);
     setTab("active");
   }
 
@@ -364,6 +413,32 @@ export default function ParentGroceriesPage() {
         </div>
       </div>
 
+      <div className="mb-6 rounded-3xl bg-white p-4 shadow-sm">
+        <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
+          <div>
+            <Label className="flex items-center gap-2 text-sm font-black text-slate-700">
+              <WandSparkles size={16} className="text-emerald-500" /> Generate from a meal plan
+            </Label>
+            <Textarea
+              value={aiPrompt}
+              onChange={(event) => setAiPrompt(event.target.value)}
+              placeholder="I am planning Taco Tuesday for 6, or Sunday Mediterranean dinner for 10..."
+              maxLength={1600}
+              className="mt-2 min-h-20 rounded-2xl bg-slate-50"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={generateListFromPrompt}
+            disabled={aiGenerating}
+            className="flex items-center justify-center gap-2 rounded-2xl bg-slate-800 px-4 py-3 font-black text-white hover:bg-slate-700 disabled:opacity-60"
+          >
+            {aiGenerating ? <Loader2 size={18} className="animate-spin" /> : <WandSparkles size={18} />}
+            Generate List
+          </button>
+        </div>
+      </div>
+
       <div className="mb-6 grid grid-cols-3 gap-2 rounded-3xl bg-white p-2 shadow-sm">
         {tabs.map(({ value, Icon, label }) => (
           <button
@@ -404,6 +479,9 @@ export default function ParentGroceriesPage() {
                           From {list.sourceTemplate.title}
                         </p>
                       )}
+                      {list.completionNote && (
+                        <p className="mt-1 truncate text-xs font-bold text-slate-500">{list.completionNote}</p>
+                      )}
                     </div>
                   </div>
                 </button>
@@ -433,6 +511,9 @@ export default function ParentGroceriesPage() {
                     <p className="text-sm font-bold text-slate-400">
                       {resolvedCount(selectedList.items)} of {selectedList.items.length} items purchased or on hand
                     </p>
+                    {selectedList.completionNote && (
+                      <p className="mt-2 whitespace-pre-wrap text-sm font-semibold text-slate-600">{selectedList.completionNote}</p>
+                    )}
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <button
@@ -766,49 +847,75 @@ export default function ParentGroceriesPage() {
 
       {tab === "history" && (
         <div className="space-y-3">
-          {completedLists.map((list) => (
-            <div key={list.id} className="rounded-3xl bg-white p-4 shadow-sm">
-              <div className="flex items-start gap-4">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-2xl">✅</div>
-                <div className="min-w-0 flex-1">
-                  <p className="font-black text-slate-800">{list.title}</p>
-                  <p className="text-xs font-bold text-slate-400">
-                    Completed {list.completedAt ? new Date(list.completedAt).toLocaleDateString() : "recently"} · {list.items.length} items
-                  </p>
-                  {list.completionNote && (
-                    <p className="mt-2 whitespace-pre-wrap text-sm font-semibold text-slate-600">{list.completionNote}</p>
-                  )}
-                  {list.receiptPath && (
-                    <a href={`/api/groceries/lists/${list.id}/receipt`} target="_blank" rel="noopener noreferrer" className="mt-3 block w-fit overflow-hidden rounded-2xl border border-slate-100 bg-slate-50">
-                      <img src={`/api/groceries/lists/${list.id}/receipt`} alt={`Receipt for ${list.title}`} className="h-28 w-24 object-cover" />
-                    </a>
-                  )}
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {list.items.slice(0, 8).map((item) => {
-                      const meta = categoryMeta(item.category);
-                      return (
-                        <span key={item.id} className="rounded-full px-2 py-0.5 text-xs font-bold" style={{ color: meta.color, backgroundColor: meta.bg }}>
-                          {item.name}
-                        </span>
-                      );
-                    })}
-                    {list.items.length > 8 && (
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-400">
-                        +{list.items.length - 8} more
-                      </span>
+          {completedLists.map((list) => {
+            const groups = GROCERY_CATEGORIES.map((category) => ({
+              ...category,
+              items: list.items.filter((item) => item.category === category.value),
+            })).filter((group) => group.items.length > 0);
+
+            return (
+              <div key={list.id} className="rounded-3xl bg-white p-4 shadow-sm">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-2xl">✅</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-start">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-black text-slate-800">{list.title}</p>
+                        <p className="text-xs font-bold text-slate-400">
+                          Completed {list.completedAt ? new Date(list.completedAt).toLocaleDateString() : "recently"} · {list.items.length} items
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => createListFromHistory(list)}
+                          className="flex items-center gap-1.5 rounded-2xl bg-emerald-500 px-3 py-2 text-sm font-black text-white hover:bg-emerald-600"
+                        >
+                          <RotateCcw size={16} /> Reuse
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteList(list.id)}
+                          className="rounded-2xl bg-red-50 p-2 text-red-400 hover:text-red-600"
+                        >
+                          <Trash2 size={17} />
+                        </button>
+                      </div>
+                    </div>
+                    {list.completionNote && (
+                      <p className="mt-2 whitespace-pre-wrap text-sm font-semibold text-slate-600">{list.completionNote}</p>
                     )}
+                    {list.receiptPath && (
+                      <a href={`/api/groceries/lists/${list.id}/receipt`} target="_blank" rel="noopener noreferrer" className="mt-3 block w-fit overflow-hidden rounded-2xl border border-slate-100 bg-slate-50">
+                        <img src={`/api/groceries/lists/${list.id}/receipt`} alt={`Receipt for ${list.title}`} className="h-28 w-24 object-cover" />
+                      </a>
+                    )}
+                    <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                      {groups.map((group) => (
+                        <div key={group.value} className="rounded-2xl border border-slate-100 p-3">
+                          <h3 className="mb-2 flex items-center gap-2 text-xs font-black" style={{ color: group.color }}>
+                            <span>{group.emoji}</span> {group.label}
+                          </h3>
+                          <div className="space-y-2">
+                            {group.items.map((item) => (
+                              <div key={item.id} className="min-w-0">
+                                <p className="truncate text-sm font-black text-slate-800">{item.name}</p>
+                                {(itemAmount(item) || item.note || item.onHand || item.checked) && (
+                                  <p className="text-xs font-bold text-slate-400">
+                                    {[itemAmount(item), item.note, item.onHand ? "Was on hand" : "", item.checked ? "Purchased" : ""].filter(Boolean).join(" · ")}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => deleteList(list.id)}
-                  className="text-red-300 hover:text-red-500"
-                >
-                  <Trash2 size={17} />
-                </button>
               </div>
-            </div>
-          ))}
+            );
+          })}
           {completedLists.length === 0 && (
             <div className="py-20 text-center">
               <div className="text-6xl mb-4">🧾</div>
