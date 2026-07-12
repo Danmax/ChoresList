@@ -129,6 +129,7 @@ export default function TaskScreenPage() {
   const [activeCompletionId, setActiveCompletionId] = useState<string | null>(null);
   const [activeGuide, setActiveGuide] = useState<ChoreGuide | null>(null);
   const [reactionAssignment, setReactionAssignment] = useState<Assignment | null>(null);
+  const [proofPhoto, setProofPhoto] = useState<File | null>(null);
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [moodMemberId, setMoodMemberId] = useState("");
   const [mood, setMood] = useState("okay");
@@ -201,13 +202,17 @@ export default function TaskScreenPage() {
   }, [assignments]);
 
   async function markDone(assignment: Assignment, reactionEmoji: string) {
+    if (assignment.chore.requiresPhoto && !proofPhoto) {
+      toast.error("Add a proof photo before completing this task");
+      return;
+    }
+
     setCompletingId(assignment.id);
-    setReactionAssignment(null);
     try {
       const res = await fetch("/api/kid-device/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assignmentId: assignment.id, reactionEmoji }),
+        body: JSON.stringify({ assignmentId: assignment.id, reactionEmoji, withPhoto: assignment.chore.requiresPhoto && !!proofPhoto }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -215,19 +220,25 @@ export default function TaskScreenPage() {
         await load();
         return;
       }
-      toast.success(`+${data.pointsEarned} points`);
-      if (assignment.chore.requiresPhoto && data.completion?.id) {
-        setActiveCompletionId(data.completion.id);
-        setPhotoType("before");
-        setShowPhoto(true);
+      if (assignment.chore.requiresPhoto && proofPhoto && data.completion?.id) {
+        const uploaded = await uploadPhoto(proofPhoto, data.completion.id, "after", { keepDialogOpen: true });
+        if (!uploaded) {
+          setActiveCompletionId(data.completion.id);
+          setPhotoType("after");
+          setShowPhoto(true);
+          return;
+        }
       }
+      setReactionAssignment(null);
+      setProofPhoto(null);
+      toast.success(`+${data.pointsEarned} points`);
       await load();
     } finally {
       setCompletingId(null);
     }
   }
 
-  async function uploadPhoto(file: File, completionId: string, type: "before" | "after") {
+  async function uploadPhoto(file: File, completionId: string, type: "before" | "after", options?: { keepDialogOpen?: boolean }) {
     const form = new FormData();
     form.append("file", file);
     form.append("type", type);
@@ -242,10 +253,11 @@ export default function TaskScreenPage() {
     toast.success(`${type === "before" ? "Before" : "After"} photo saved`);
     if (type === "before") {
       setPhotoType("after");
-    } else {
+    } else if (!options?.keepDialogOpen) {
       setShowPhoto(false);
       setActiveCompletionId(null);
     }
+    return true;
   }
 
   function openWish() {
@@ -992,7 +1004,15 @@ export default function TaskScreenPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!reactionAssignment} onOpenChange={(open) => !open && setReactionAssignment(null)}>
+      <Dialog
+        open={!!reactionAssignment}
+        onOpenChange={(open) => {
+          if (!open) {
+            setReactionAssignment(null);
+            setProofPhoto(null);
+          }
+        }}
+      >
         <DialogContent className="max-w-sm rounded-3xl">
           <DialogHeader>
             <DialogTitle className="font-black">How did it go?</DialogTitle>
@@ -1000,12 +1020,30 @@ export default function TaskScreenPage() {
           <p className="text-sm font-semibold text-slate-500">
             Pick an emoji for {reactionAssignment?.chore.name}.
           </p>
+          {reactionAssignment?.chore.requiresPhoto && (
+            <div className="rounded-2xl border-2 border-blue-100 bg-blue-50 p-3">
+              <div className="mb-2 flex items-center gap-2 text-sm font-black text-blue-700">
+                <Camera size={16} /> Proof photo required
+              </div>
+              <label className="block cursor-pointer rounded-xl bg-white px-3 py-2 text-center text-sm font-black text-blue-700 shadow-sm">
+                {proofPhoto ? proofPhoto.name : "Choose or take photo"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="sr-only"
+                  onChange={(event) => setProofPhoto(event.target.files?.[0] ?? null)}
+                />
+              </label>
+              <p className="mt-2 text-xs font-bold text-blue-600">Add the photo, then tap an emoji to submit.</p>
+            </div>
+          )}
           <div className="grid grid-cols-4 gap-2">
             {COMPLETION_EMOJIS.map((emoji) => (
               <button
                 key={emoji}
                 type="button"
-                disabled={!reactionAssignment || completingId === reactionAssignment.id}
+                disabled={!reactionAssignment || completingId === reactionAssignment.id || (reactionAssignment.chore.requiresPhoto && !proofPhoto)}
                 onClick={() => reactionAssignment && markDone(reactionAssignment, emoji)}
                 className="rounded-2xl bg-slate-50 p-3 text-3xl transition-all hover:scale-105 hover:bg-emerald-50 disabled:opacity-50"
                 aria-label={`Complete with ${emoji}`}
