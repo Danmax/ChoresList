@@ -47,7 +47,7 @@ export const POST = withErrors(async (req: NextRequest) => {
     dailyAssignments.length > 0 &&
     dailyAssignments.every((a) => a.completions.length > 0 || a.id === assignmentId);
 
-  const pts = calcPointsEarned(assignment.chore.pointsValue, !!withPhoto, allDone);
+  const pts = calcPointsEarned(assignment.chore.pointsValue, assignment.chore.requiresPhoto && !!withPhoto, allDone);
   const weekStart = getWeekStart();
 
   try {

@@ -61,6 +61,7 @@ export default function ParentTasksPage() {
   const [completionAssignment, setCompletionAssignment] = useState<Assignment | null>(null);
   const [completionReaction, setCompletionReaction] = useState("");
   const [completionNote, setCompletionNote] = useState("");
+  const [completionProofPhoto, setCompletionProofPhoto] = useState<File | null>(null);
 
   const adultMembers = useMemo(() => members.filter((member) => ADULT_ROLES.has(member.role)), [members]);
   const selectedMember = adultMembers.find((member) => String(member.id) === selectedMemberId) ?? adultMembers[0] ?? null;
@@ -102,6 +103,11 @@ export default function ParentTasksPage() {
   }, [loadAssignments, selectedMemberId]);
 
   async function markDone(assignment: Assignment) {
+    if (assignment.chore.requiresPhoto && !completionProofPhoto) {
+      toast.error("Add a proof photo before completing this task");
+      return;
+    }
+
     setCompletingId(assignment.id);
     try {
       const res = await fetch("/api/completions", {
@@ -111,6 +117,7 @@ export default function ParentTasksPage() {
           assignmentId: assignment.id,
           reactionEmoji: completionReaction || null,
           completionNote,
+          withPhoto: assignment.chore.requiresPhoto && !!completionProofPhoto,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -120,18 +127,35 @@ export default function ParentTasksPage() {
         return;
       }
 
+      if (assignment.chore.requiresPhoto && completionProofPhoto && data.completion?.id) {
+        const uploaded = await uploadPhoto(completionProofPhoto, data.completion.id);
+        if (!uploaded) return;
+      }
+
       toast.success(`+${data.pointsEarned} points`);
       setCompletionAssignment(null);
       setCompletionReaction("");
       setCompletionNote("");
-      if (assignment.chore.requiresPhoto) {
-        toast.message("Photo proof can be added from the member task screen.");
-      }
+      setCompletionProofPhoto(null);
       await loadAssignments(selectedMemberId);
       await loadMembers();
     } finally {
       setCompletingId(null);
     }
+  }
+
+  async function uploadPhoto(file: File, completionId: string) {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("type", "after");
+    const res = await fetch(`/api/completions/${completionId}/photo`, { method: "POST", body: form });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      toast.error(data?.error ?? "Could not save photo");
+      return false;
+    }
+    toast.success("Proof photo saved");
+    return true;
   }
 
   const openCount = assignments.filter((assignment) => assignment.completions.length === 0).length;
@@ -251,6 +275,7 @@ export default function ParentTasksPage() {
                           setCompletionAssignment(assignment);
                           setCompletionReaction("");
                           setCompletionNote("");
+                          setCompletionProofPhoto(null);
                         }}
                         className="flex min-w-32 items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-5 py-3 font-black text-white transition-colors hover:bg-emerald-600 disabled:bg-slate-200 disabled:text-slate-400"
                       >
@@ -266,11 +291,36 @@ export default function ParentTasksPage() {
         </>
       )}
 
-      <Dialog open={!!completionAssignment} onOpenChange={(open) => !open && setCompletionAssignment(null)}>
+      <Dialog
+        open={!!completionAssignment}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCompletionAssignment(null);
+            setCompletionProofPhoto(null);
+          }
+        }}
+      >
         <DialogContent className="max-w-sm rounded-3xl">
           <DialogHeader>
             <DialogTitle className="font-black">Complete {completionAssignment?.chore.name}</DialogTitle>
           </DialogHeader>
+          {completionAssignment?.chore.requiresPhoto && (
+            <div className="rounded-2xl border-2 border-blue-100 bg-blue-50 p-3">
+              <div className="mb-2 flex items-center gap-2 text-sm font-black text-blue-700">
+                <Camera size={16} /> Proof photo required
+              </div>
+              <label className="block cursor-pointer rounded-xl bg-white px-3 py-2 text-center text-sm font-black text-blue-700 shadow-sm">
+                {completionProofPhoto ? completionProofPhoto.name : "Choose or take photo"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="sr-only"
+                  onChange={(event) => setCompletionProofPhoto(event.target.files?.[0] ?? null)}
+                />
+              </label>
+            </div>
+          )}
           <div className="grid grid-cols-6 gap-1.5">
             {COMPLETION_EMOJIS.map((emoji) => (
               <button
@@ -295,7 +345,7 @@ export default function ParentTasksPage() {
           <button
             type="button"
             onClick={() => completionAssignment && markDone(completionAssignment)}
-            disabled={!completionAssignment || completingId === completionAssignment.id}
+            disabled={!completionAssignment || completingId === completionAssignment.id || (completionAssignment.chore.requiresPhoto && !completionProofPhoto)}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 py-3 font-black text-white hover:bg-emerald-600 disabled:opacity-40"
           >
             <CheckCircle2 size={18} /> {completingId ? "Saving…" : "Complete chore"}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Check, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Camera, Check, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ParentPageHeader } from "@/components/parent-management-shell";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -18,7 +18,7 @@ const FREQUENCY_LABELS: Record<string, string> = {
 };
 
 interface Member { id: string; name: string; avatar: string; color: string; age: number; role: string }
-interface Chore { id: string; name: string; icon: string; ageMin: number; ageMax: number; pointsValue: number }
+interface Chore { id: string; name: string; icon: string; ageMin: number; ageMax: number; pointsValue: number; requiresPhoto: boolean }
 interface Assignment {
   id: string;
   choreId: string;
@@ -49,6 +49,9 @@ export default function AssignPage() {
   const [selectedMember, setSelectedMember] = useState<string>("");
   const [open, setOpen] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
+  const [completionAssignment, setCompletionAssignment] = useState<Assignment | null>(null);
+  const [completionProofPhoto, setCompletionProofPhoto] = useState<File | null>(null);
+  const [completingId, setCompletingId] = useState<string | null>(null);
   const [form, setForm] = useState({
     memberId: "", choreIds: [] as string[], frequency: "daily", dueDate: "", dayOfWeeks: ["1"],
   });
@@ -111,16 +114,49 @@ export default function AssignPage() {
     load();
   }
 
-  async function complete(assignment: Assignment) {
+  async function complete(assignment: Assignment, proofPhoto?: File | null) {
+    if (assignment.chore.requiresPhoto && !proofPhoto) {
+      toast.error("Add a proof photo before completing this chore");
+      return;
+    }
+
+    setCompletingId(assignment.id);
     const res = await fetch("/api/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ assignmentId: assignment.id }),
+      body: JSON.stringify({ assignmentId: assignment.id, withPhoto: assignment.chore.requiresPhoto && !!proofPhoto }),
     });
     const data = await res.json().catch(() => null);
-    if (!res.ok) return toast.error(data?.error ?? "Could not complete chore");
+    if (!res.ok) {
+      setCompletingId(null);
+      return toast.error(data?.error ?? "Could not complete chore");
+    }
+    if (assignment.chore.requiresPhoto && proofPhoto && data.completion?.id) {
+      const uploaded = await uploadPhoto(proofPhoto, data.completion.id);
+      if (!uploaded) {
+        setCompletingId(null);
+        return;
+      }
+    }
     toast.success(`${assignment.member.name} earned ${data.pointsEarned} points`);
+    setCompletionAssignment(null);
+    setCompletionProofPhoto(null);
+    setCompletingId(null);
     load();
+  }
+
+  async function uploadPhoto(file: File, completionId: string) {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("type", "after");
+    const res = await fetch(`/api/completions/${completionId}/photo`, { method: "POST", body: form });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      toast.error(data?.error ?? "Could not save photo");
+      return false;
+    }
+    toast.success("Proof photo saved");
+    return true;
   }
 
   const filteredAssignments = selectedMember
@@ -226,12 +262,25 @@ export default function AssignPage() {
                   <span>Due: {new Date(a.dueDate).toLocaleDateString()}</span>
                 )}
                 <span>⭐ {a.chore.pointsValue} pts</span>
+                {a.chore.requiresPhoto && <span className="inline-flex items-center gap-1 text-blue-600"><Camera size={12} /> Photo</span>}
               </div>
             </div>
             <div className="flex items-center gap-2 self-end sm:self-auto">
               {isDueToday(a) && (
-                <button type="button" disabled={(a.completions?.length ?? 0) > 0} onClick={() => complete(a)} className="rounded-xl bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700 disabled:bg-slate-100 disabled:text-slate-400">
-                  {(a.completions?.length ?? 0) > 0 ? "Completed" : "Complete Today"}
+                <button
+                  type="button"
+                  disabled={(a.completions?.length ?? 0) > 0 || completingId === a.id}
+                  onClick={() => {
+                    if (a.chore.requiresPhoto) {
+                      setCompletionAssignment(a);
+                      setCompletionProofPhoto(null);
+                    } else {
+                      complete(a);
+                    }
+                  }}
+                  className="rounded-xl bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700 disabled:bg-slate-100 disabled:text-slate-400"
+                >
+                  {(a.completions?.length ?? 0) > 0 ? "Completed" : completingId === a.id ? "Saving" : "Complete Today"}
                 </button>
               )}
               <button onClick={() => unassign(a.id)} className="p-1 text-red-400 transition-colors hover:text-red-600">
@@ -241,6 +290,45 @@ export default function AssignPage() {
           </div>
         ))}
       </div>
+
+      <Dialog
+        open={!!completionAssignment}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            setCompletionAssignment(null);
+            setCompletionProofPhoto(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-sm rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="font-black">Complete {completionAssignment?.chore.name}</DialogTitle>
+          </DialogHeader>
+          <div className="rounded-2xl border-2 border-blue-100 bg-blue-50 p-3">
+            <div className="mb-2 flex items-center gap-2 text-sm font-black text-blue-700">
+              <Camera size={16} /> Proof photo required
+            </div>
+            <label className="block cursor-pointer rounded-xl bg-white px-3 py-2 text-center text-sm font-black text-blue-700 shadow-sm">
+              {completionProofPhoto ? completionProofPhoto.name : "Choose or take photo"}
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="sr-only"
+                onChange={(event) => setCompletionProofPhoto(event.target.files?.[0] ?? null)}
+              />
+            </label>
+          </div>
+          <button
+            type="button"
+            onClick={() => completionAssignment && complete(completionAssignment, completionProofPhoto)}
+            disabled={!completionAssignment || !completionProofPhoto || completingId === completionAssignment.id}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 py-3 font-black text-white hover:bg-emerald-600 disabled:opacity-40"
+          >
+            <Check size={18} /> {completingId ? "Saving…" : "Complete chore"}
+          </button>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-md rounded-3xl max-h-[90vh] overflow-y-auto">
