@@ -462,6 +462,7 @@ export default function CommunityGroupPage() {
   const [starterItems, setStarterItems] = useState<StarterItem[]>([]);
   const [showCreateEvent, setShowCreateEvent] = useState(false);
   const [eventView, setEventView] = useState<"list" | "calendar">("list");
+  const [eventPeriod, setEventPeriod] = useState<"upcoming" | "past">("upcoming");
   const [calendarAnchor, setCalendarAnchor] = useState(() => new Date());
   const [locationSuggestions, setLocationSuggestions] = useState<LocationSuggestion[]>([]);
   const [locationStatus, setLocationStatus] = useState<"idle" | "loading" | "error">("idle");
@@ -542,6 +543,12 @@ export default function CommunityGroupPage() {
 
   useEffect(() => {
     if (!group || !selectedEventId) return;
+    const selectedEvent = group.events.find((event) => event.id === selectedEventId);
+    if (selectedEvent) {
+      const eventEndsAt = new Date(selectedEvent.endDate ?? selectedEvent.date).getTime();
+      setEventPeriod(eventEndsAt < Date.now() ? "past" : "upcoming");
+      setEventView("list");
+    }
     window.setTimeout(() => {
       document.getElementById(`event-${selectedEventId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 100);
@@ -629,10 +636,26 @@ export default function CommunityGroupPage() {
     });
   }
 
-  const upcomingEvents = useMemo(
-    () => [...(group?.events ?? [])].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
-    [group?.events]
-  );
+  const { upcomingEvents, pastEvents } = useMemo(() => {
+    const now = Date.now();
+    const events = group?.events ?? [];
+    return {
+      upcomingEvents: events
+        .filter((event) => new Date(event.endDate ?? event.date).getTime() >= now)
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+      pastEvents: events
+        .filter((event) => new Date(event.endDate ?? event.date).getTime() < now)
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+    };
+  }, [group?.events]);
+
+  const displayedEvents = eventPeriod === "upcoming" ? upcomingEvents : pastEvents;
+
+  function selectEventPeriod(period: "upcoming" | "past") {
+    setEventPeriod(period);
+    const firstEvent = period === "upcoming" ? upcomingEvents[0] : pastEvents[0];
+    if (firstEvent) setCalendarAnchor(new Date(firstEvent.date));
+  }
 
   function openEventFromCalendar(event: CommunityEvent) {
     setSelectedEventId(event.id);
@@ -1724,9 +1747,26 @@ export default function CommunityGroupPage() {
               </div>
             )}
 
+            <div className="flex rounded-2xl bg-slate-100 p-1">
+              <button
+                type="button"
+                onClick={() => selectEventPeriod("upcoming")}
+                className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-black ${eventPeriod === "upcoming" ? "bg-white text-violet-700 shadow-sm" : "text-slate-500"}`}
+              >
+                Upcoming <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs text-violet-700">{upcomingEvents.length}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => selectEventPeriod("past")}
+                className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-black ${eventPeriod === "past" ? "bg-white text-violet-700 shadow-sm" : "text-slate-500"}`}
+              >
+                Past <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs text-slate-600">{pastEvents.length}</span>
+              </button>
+            </div>
+
             {eventView === "calendar" && (
               <CommunityMonthCalendar
-                events={upcomingEvents}
+                events={displayedEvents}
                 anchor={calendarAnchor}
                 onAnchorChange={setCalendarAnchor}
                 onSelectEvent={openEventFromCalendar}
@@ -1734,7 +1774,7 @@ export default function CommunityGroupPage() {
               />
             )}
 
-            {eventView === "list" && upcomingEvents.map((event) => {
+            {eventView === "list" && displayedEvents.map((event) => {
               const counts = rsvpCounts(event);
               const myRsvp = event.rsvps.find((rsvpItem) => rsvpItem.parentId === group.currentParentId);
               const eMeta = eventMeta(event.eventType);
@@ -2475,11 +2515,15 @@ export default function CommunityGroupPage() {
                 </div>
               );
             })}
-            {upcomingEvents.length === 0 && (
+            {displayedEvents.length === 0 && (
               <div className="rounded-3xl bg-white p-10 text-center shadow-sm">
                 <div className="mb-3 text-6xl">📅</div>
-                <p className="font-black text-slate-700">No events yet</p>
-                <p className="text-sm font-semibold text-slate-400">{canManage ? "Create the first event for this group." : "A manager can add the first event."}</p>
+                <p className="font-black text-slate-700">No {eventPeriod} events</p>
+                <p className="text-sm font-semibold text-slate-400">
+                  {eventPeriod === "past"
+                    ? "Finished events will appear here."
+                    : canManage ? "Create the next event for this group." : "A manager can add the next event."}
+                </p>
               </div>
             )}
           </div>
