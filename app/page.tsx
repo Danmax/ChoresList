@@ -35,8 +35,8 @@ const features = [
   },
   {
     icon: "🎁",
-    title: "Wish List",
-    description: "Kids add items to their wish list and parents can track what they want.",
+    title: "Christmas Lists",
+    description: "Kids build Christmas lists, search Amazon for gift ideas, and share exact items with parents.",
   },
   {
     icon: "🛒",

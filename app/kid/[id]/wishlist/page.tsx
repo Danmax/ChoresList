@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Plus, Trash2, Sparkles } from "lucide-react";
+import { ArrowLeft, ExternalLink, Plus, Search, Trash2, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { WISH_CATEGORIES, WISH_EMOJIS } from "@/types";
 import { motion, AnimatePresence } from "framer-motion";
+import { amazonSearchUrl } from "@/lib/amazon";
 
 interface WishItem {
   id: string;
@@ -18,6 +19,7 @@ interface WishItem {
   category: string;
   emoji: string;
   note: string | null;
+  amazonUrl: string | null;
   status: string;
   createdAt: string;
 }
@@ -37,7 +39,7 @@ export default function KidWishlistPage() {
   const [items, setItems] = useState<WishItem[]>([]);
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<"category" | "details">("category");
-  const [form, setForm] = useState({ title: "", category: "toy", emoji: "🎮", note: "" });
+  const [form, setForm] = useState({ title: "", category: "toy", emoji: "🎮", note: "", amazonUrl: "" });
 
   const load = useCallback(async () => {
     const [mRes, wRes] = await Promise.all([
@@ -55,7 +57,7 @@ export default function KidWishlistPage() {
   useEffect(() => { load(); }, [load]);
 
   function openAdd() {
-    setForm({ title: "", category: "toy", emoji: "🎮", note: "" });
+    setForm({ title: "", category: "toy", emoji: "🎮", note: "", amazonUrl: "" });
     setStep("category");
     setOpen(true);
   }
@@ -67,14 +69,22 @@ export default function KidWishlistPage() {
 
   async function submit() {
     if (!form.title.trim()) { toast.error("Tell us what you want!"); return; }
-    await fetch("/api/wishlist", {
+    const res = await fetch("/api/wishlist", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ memberId, ...form }),
     });
-    toast.success("Added to your wish list! 🌟");
+    const data = await res.json().catch(() => null);
+    if (!res.ok) { toast.error(data?.error ?? "Could not add this gift"); return; }
+    toast.success("Added to your Christmas list! 🎄");
     setOpen(false);
     load();
+  }
+
+  function searchAmazon() {
+    const url = amazonSearchUrl(form.title);
+    if (!url) { toast.error("Type a gift idea first"); return; }
+    window.open(url, "_blank", "noopener,noreferrer");
   }
 
   async function remove(itemId: string) {
@@ -95,14 +105,14 @@ export default function KidWishlistPage() {
           <ArrowLeft size={20} className="text-slate-600" />
         </Link>
         <h1 className="text-2xl sm:text-3xl font-black text-slate-800 flex-1">
-          {member?.avatar} {member?.name}&apos;s Wish List
+          🎄 {member?.name}&apos;s Christmas List
         </h1>
         <button
           onClick={openAdd}
           className="flex items-center justify-center gap-2 text-white rounded-2xl px-4 py-2.5 font-bold shadow-sm hover:opacity-90 transition-opacity"
           style={{ backgroundColor: member?.color ?? "#a78bfa" }}
         >
-          <Plus size={18} /> Add Wish
+          <Plus size={18} /> Add a Gift
         </button>
       </div>
 
@@ -128,6 +138,14 @@ export default function KidWishlistPage() {
                         <p className="font-black text-slate-800 text-base leading-tight">{item.title}</p>
                         {item.note && <p className="text-slate-400 text-sm mt-1 leading-snug">{item.note}</p>}
                         <CategoryBadge category={item.category} />
+                        <a
+                          href={item.amazonUrl ?? amazonSearchUrl(item.title)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-2 flex w-fit items-center gap-1 text-xs font-black text-amber-600 hover:text-amber-700"
+                        >
+                          <Search size={12} /> {item.amazonUrl ? "View on Amazon" : "Find on Amazon"} <ExternalLink size={11} />
+                        </a>
                       </div>
                     </div>
                     <button
@@ -170,17 +188,17 @@ export default function KidWishlistPage() {
       {items.length === 0 && (
         <div className="text-center py-20">
           <div className="text-7xl mb-4">🌟</div>
-          <h2 className="text-2xl font-black text-slate-600">Your wish list is empty!</h2>
-          <p className="text-slate-400 mt-2 font-semibold">Tap &ldquo;Add Wish&rdquo; to add something you want.</p>
+          <h2 className="text-2xl font-black text-slate-600">Your Christmas list is empty!</h2>
+          <p className="text-slate-400 mt-2 font-semibold">Tap &ldquo;Add a Gift&rdquo; to share something you would love.</p>
         </div>
       )}
 
-      {/* Add Wish Dialog */}
+      {/* Add Christmas Gift Dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-sm rounded-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-black text-center text-xl">
-              {step === "category" ? "What do you want? 🤩" : "Tell us more! ✏️"}
+              {step === "category" ? "What would you love for Christmas? 🎄" : "Tell us more! ✏️"}
             </DialogTitle>
           </DialogHeader>
 
@@ -221,6 +239,24 @@ export default function KidWishlistPage() {
                   className="rounded-xl mt-1 text-lg font-bold"
                   autoFocus
                 />
+                <button
+                  type="button"
+                  onClick={searchAmazon}
+                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-amber-200 bg-amber-50 py-2.5 text-sm font-black text-amber-700 transition-colors hover:bg-amber-100"
+                >
+                  <Search size={16} /> Search Amazon for this gift <ExternalLink size={13} />
+                </button>
+              </div>
+              <div>
+                <Label className="font-bold text-slate-600">Amazon product link (optional)</Label>
+                <Input
+                  value={form.amazonUrl}
+                  onChange={(e) => setForm((p) => ({ ...p, amazonUrl: e.target.value }))}
+                  placeholder="Paste the Amazon item link here"
+                  inputMode="url"
+                  className="rounded-xl mt-1"
+                />
+                <p className="mt-1 text-xs font-semibold text-slate-400">Search Amazon, copy the product link, then paste it here so your parents see the exact one.</p>
               </div>
               <div>
                 <Label className="font-bold text-slate-600">Why? (optional)</Label>
@@ -243,7 +279,7 @@ export default function KidWishlistPage() {
                   className="flex-2 flex-grow-[2] flex items-center justify-center gap-2 text-white rounded-xl py-3 font-black hover:opacity-90 transition-opacity"
                   style={{ backgroundColor: getCategoryColor(form.category) }}
                 >
-                  <Sparkles size={16} /> Add to List!
+                  <Sparkles size={16} /> Add to Christmas List!
                 </button>
               </div>
             </div>

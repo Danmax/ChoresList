@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { ArrowLeft, CheckCircle2, Trash2, Gift } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ExternalLink, Search, Trash2, Gift } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { WISH_CATEGORIES } from "@/types";
+import { amazonSearchUrl } from "@/lib/amazon";
+import { Input } from "@/components/ui/input";
 
 interface Member { id: string; name: string; avatar: string; color: string }
 
@@ -15,6 +17,7 @@ interface WishItem {
   category: string;
   emoji: string;
   note: string | null;
+  amazonUrl: string | null;
   status: string;
   createdAt: string;
   member: Member;
@@ -25,6 +28,7 @@ export default function ParentWishlistPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [filter, setFilter] = useState<string>("");
   const [catFilter, setCatFilter] = useState<string>("");
+  const [amazonQuery, setAmazonQuery] = useState("");
 
   const load = useCallback(async () => {
     const [wRes, mRes] = await Promise.all([
@@ -66,6 +70,12 @@ export default function ParentWishlistPage() {
     load();
   }
 
+  function searchAmazon() {
+    const url = amazonSearchUrl(amazonQuery);
+    if (!url) { toast.error("Enter an item to search for"); return; }
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
   const filtered = items.filter((i) => {
     if (filter && i.memberId !== filter) return false;
     if (catFilter && i.category !== catFilter) return false;
@@ -81,9 +91,32 @@ export default function ParentWishlistPage() {
         <Link href="/parent" className="bg-white rounded-2xl p-2 shadow-sm hover:shadow-md transition-shadow">
           <ArrowLeft size={20} className="text-slate-600" />
         </Link>
-        <h1 className="text-2xl sm:text-3xl font-black text-slate-800 flex-1">🎁 Family Wish Lists</h1>
+        <h1 className="text-2xl sm:text-3xl font-black text-slate-800 flex-1">🎄 Kids&apos; Christmas Lists</h1>
         <div className="text-sm font-bold text-slate-400">{pending.length} pending</div>
       </div>
+
+      <form
+        onSubmit={(event) => { event.preventDefault(); searchAmazon(); }}
+        className="mb-6 flex flex-col gap-2 rounded-3xl border-2 border-amber-100 bg-white p-4 shadow-sm sm:flex-row sm:items-center"
+      >
+        <div className="flex-1">
+          <p className="font-black text-slate-700">Search Amazon</p>
+          <p className="text-xs font-semibold text-slate-400">Look up a gift idea in a new tab.</p>
+        </div>
+        <Input
+          value={amazonQuery}
+          onChange={(event) => setAmazonQuery(event.target.value)}
+          placeholder="LEGO set, headphones, books..."
+          aria-label="Amazon item search"
+          className="rounded-xl sm:max-w-xs"
+        />
+        <button
+          type="submit"
+          className="flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 font-black text-white transition-colors hover:bg-amber-600"
+        >
+          <Search size={16} /> Search <ExternalLink size={13} />
+        </button>
+      </form>
 
       {/* Filters */}
       <div className="flex gap-2 flex-wrap mb-4">
@@ -147,6 +180,14 @@ export default function ParentWishlistPage() {
                       >
                         {cat?.emoji} {cat?.label}
                       </span>
+                      <a
+                        href={item.amazonUrl ?? amazonSearchUrl(item.title)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 flex w-fit items-center gap-1 text-xs font-black text-amber-600 hover:text-amber-700"
+                      >
+                        <Search size={12} /> {item.amazonUrl ? "View exact item" : "Search this gift"} <ExternalLink size={11} />
+                      </a>
                     </div>
                   </div>
                   <div className="flex gap-2 mt-3">
@@ -203,8 +244,8 @@ export default function ParentWishlistPage() {
       {filtered.length === 0 && (
         <div className="text-center py-20">
           <div className="text-6xl mb-4">🎁</div>
-          <h2 className="text-xl font-bold text-slate-600">No wishes yet</h2>
-          <p className="text-slate-400 mt-1">Kids can add wishes from their chore page.</p>
+          <h2 className="text-xl font-bold text-slate-600">No Christmas wishes yet</h2>
+          <p className="text-slate-400 mt-1">Kids can build their Christmas list from their chore page.</p>
         </div>
       )}
     </div>

@@ -60,7 +60,7 @@ const BASE_NAV = [
   { href: "/parent/projects", icon: Wrench, label: "Projects", roles: ["owner", "parent", "grandparent"] },
   { href: "/parent/tickets", icon: Ticket, label: "Tickets", roles: ["owner", "parent", "grandparent"] },
   { href: "/parent/devices", icon: MonitorSmartphone, label: "Devices", roles: ["owner", "parent"] },
-  { href: "/parent/wishlist", icon: Gift, label: "Wish Lists", roles: ["owner", "parent", "grandparent"] },
+  { href: "/parent/wishlist", icon: Gift, label: "Christmas Lists", roles: ["owner", "parent", "grandparent"] },
   { href: "/parent/settings", icon: Settings, label: "Settings", roles: ["owner", "parent", "grandparent"] },
 ];
 

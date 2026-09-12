@@ -542,7 +542,7 @@ export default function ParentPanel() {
     { href: "/parent/projects", icon: Wrench, label: "House Projects", desc: "Projects that earn reward tickets", color: "#f97316", bg: "#ffedd5", roles: ["owner", "parent", "grandparent"] },
     { href: "/parent/tickets", icon: Ticket, label: "Reward Tickets", desc: "Cash in earned rewards", color: "#eab308", bg: "#fefce8", roles: ["owner", "parent", "grandparent"] },
     { href: "/parent/devices", icon: MonitorSmartphone, label: "Device Screens", desc: "Pair QR task boards for kids", color: "#6366f1", bg: "#e0e7ff", roles: ["owner", "parent"] },
-    { href: "/parent/wishlist", icon: Gift, label: "Wish Lists", desc: "View kids' wishes & requests", color: "#f472b6", bg: "#fce7f3", roles: ["owner", "parent", "grandparent"] },
+    { href: "/parent/wishlist", icon: Gift, label: "Christmas Lists", desc: "View kids' gift ideas", color: "#f472b6", bg: "#fce7f3", roles: ["owner", "parent", "grandparent"] },
     { href: "/parent/settings", icon: Settings, label: "Household Settings", desc: "Account, PIN, email & privacy", color: "#64748b", bg: "#f1f5f9", roles: ["owner", "parent", "grandparent"] },
   ];
   const visibleSections = sections.filter((section) => section.roles.includes(accountRole));

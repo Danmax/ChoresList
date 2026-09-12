@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Award, BookOpen, CalendarDays, Camera, CheckCircle2, Download, Gift, GraduationCap, Heart, ListPlus, LogOut, Plus, RefreshCw, Send, ShieldCheck, Sparkles, Star, Utensils } from "lucide-react";
+import { Award, BookOpen, CalendarDays, Camera, CheckCircle2, Download, ExternalLink, Gift, GraduationCap, Heart, ListPlus, LogOut, Plus, RefreshCw, Search, Send, ShieldCheck, Sparkles, Star, Utensils } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { COMPLETION_EMOJIS, WISH_CATEGORIES, WISH_EMOJIS } from "@/types";
 import { choicesForDisplay } from "@/lib/education";
+import { amazonSearchUrl } from "@/lib/amazon";
 
 type Device = {
   id: string;
@@ -116,7 +117,7 @@ export default function TaskScreenPage() {
   const [showInstallHelp, setShowInstallHelp] = useState(false);
   const [showWish, setShowWish] = useState(false);
   const [wishMemberId, setWishMemberId] = useState("");
-  const [wish, setWish] = useState({ title: "", category: "toy", emoji: "🎮", note: "" });
+  const [wish, setWish] = useState({ title: "", category: "toy", emoji: "🎮", note: "", amazonUrl: "" });
   const [showTaskPicker, setShowTaskPicker] = useState(false);
   const [catalogMembers, setCatalogMembers] = useState<CatalogMember[]>([]);
   const [catalogChores, setCatalogChores] = useState<CatalogChore[]>([]);
@@ -261,7 +262,7 @@ export default function TaskScreenPage() {
   }
 
   function openWish() {
-    setWish({ title: "", category: "toy", emoji: "🎮", note: "" });
+    setWish({ title: "", category: "toy", emoji: "🎮", note: "", amazonUrl: "" });
     setWishMemberId(device?.mode === "member" && device.member ? String(device.member.id) : "");
     setShowWish(true);
   }
@@ -322,8 +323,14 @@ export default function TaskScreenPage() {
       return;
     }
 
-    toast.success("Added to wish list");
+    toast.success("Added to Christmas list 🎄");
     setShowWish(false);
+  }
+
+  function searchAmazonForWish() {
+    const url = amazonSearchUrl(wish.title);
+    if (!url) { toast.error("Type a gift idea first"); return; }
+    window.open(url, "_blank", "noopener,noreferrer");
   }
 
   async function addOneTimeTask() {
@@ -742,7 +749,7 @@ export default function TaskScreenPage() {
       <Dialog open={showWish} onOpenChange={setShowWish}>
         <DialogContent className="max-w-md rounded-3xl">
           <DialogHeader>
-            <DialogTitle className="font-black">Add Wish</DialogTitle>
+            <DialogTitle className="font-black">🎄 Add to Christmas List</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -808,6 +815,24 @@ export default function TaskScreenPage() {
                 className="mt-1 rounded-xl font-bold"
                 placeholder="LEGO set, shoes, movie night..."
               />
+              <button
+                type="button"
+                onClick={searchAmazonForWish}
+                className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-amber-200 bg-amber-50 py-2.5 text-sm font-black text-amber-700 transition-colors hover:bg-amber-100"
+              >
+                <Search size={16} /> Search Amazon <ExternalLink size={13} />
+              </button>
+            </div>
+
+            <div>
+              <Label className="font-bold text-slate-600">Amazon product link (optional)</Label>
+              <Input
+                value={wish.amazonUrl}
+                onChange={(event) => setWish((previous) => ({ ...previous, amazonUrl: event.target.value }))}
+                className="mt-1 rounded-xl"
+                inputMode="url"
+                placeholder="Paste the Amazon item link here"
+              />
             </div>
 
             <div>
@@ -825,7 +850,7 @@ export default function TaskScreenPage() {
               onClick={addWish}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 py-3 font-black text-white transition-colors hover:bg-amber-600"
             >
-              <Plus size={18} /> Add Wish
+              <Plus size={18} /> Add to Christmas List
             </button>
           </div>
         </DialogContent>

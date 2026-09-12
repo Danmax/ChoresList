@@ -724,7 +724,7 @@ export default function ParentSettingsPage() {
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             <Toggle label="Show points on kid screens" checked={settings.privacyShowKidPoints} disabled={!canManage} onChange={(value) => update("privacyShowKidPoints", value)} />
-            <Toggle label="Allow kids to add wish list items" checked={settings.privacyAllowKidWishlist} disabled={!canManage} onChange={(value) => update("privacyAllowKidWishlist", value)} />
+            <Toggle label="Allow kids to add Christmas-list items" checked={settings.privacyAllowKidWishlist} disabled={!canManage} onChange={(value) => update("privacyAllowKidWishlist", value)} />
             <Toggle label="Store completion photos" checked={settings.privacyStoreCompletionPhotos} disabled={!canManage} onChange={(value) => update("privacyStoreCompletionPhotos", value)} />
             <Toggle label="Opt in to product analytics" checked={settings.privacyAnalyticsOptIn} disabled={!canManage} onChange={(value) => update("privacyAnalyticsOptIn", value)} />
           </div>

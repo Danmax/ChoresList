@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { withErrors } from "@/lib/api";
 import { hashDeviceSecret, requireDeviceSession } from "@/lib/device-session";
+import { cleanAmazonUrl } from "@/lib/amazon";
 
 async function verifyDevice(req: NextRequest) {
   const session = requireDeviceSession(req);
@@ -33,10 +34,24 @@ export const POST = withErrors(async (req: NextRequest) => {
   const title = typeof body.title === "string" ? body.title.trim() : "";
   if (!title) return NextResponse.json({ error: "Add a wish title" }, { status: 400 });
 
-  const member = await prisma.familyMember.findFirst({
-    where: { id: memberId, householdId: session.householdId, role: "child" },
-  });
+  const [member, household] = await Promise.all([
+    prisma.familyMember.findFirst({
+      where: { id: memberId, householdId: session.householdId, role: "child" },
+    }),
+    prisma.household.findUnique({
+      where: { id: session.householdId },
+      select: { privacyAllowKidWishlist: true },
+    }),
+  ]);
   if (!member) return NextResponse.json({ error: "Child not found" }, { status: 404 });
+  if (!household?.privacyAllowKidWishlist) {
+    return NextResponse.json({ error: "Christmas-list additions are turned off by a parent" }, { status: 403 });
+  }
+
+  const amazonUrl = cleanAmazonUrl(body.amazonUrl);
+  if (typeof body.amazonUrl === "string" && body.amazonUrl.trim() && !amazonUrl) {
+    return NextResponse.json({ error: "Use a secure Amazon.com product link" }, { status: 400 });
+  }
 
   const item = await prisma.wishListItem.create({
     data: {
@@ -46,6 +61,7 @@ export const POST = withErrors(async (req: NextRequest) => {
       category: typeof body.category === "string" ? body.category : "other",
       emoji: typeof body.emoji === "string" ? body.emoji : "🎁",
       note: typeof body.note === "string" && body.note.trim() ? body.note.trim() : null,
+      amazonUrl,
     },
   });
 

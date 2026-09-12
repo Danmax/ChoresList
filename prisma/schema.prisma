@@ -648,6 +648,7 @@ model WishListItem {
   category    String   @default("other") @db.VarChar(64)
   emoji       String   @default("🎁") @db.VarChar(32)
   note        String?  @db.Text
+  amazonUrl   String?  @db.Text
   status      String   @default("pending") @db.VarChar(64)
   createdAt   DateTime @default(now())
 
