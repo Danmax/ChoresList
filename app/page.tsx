@@ -35,8 +35,8 @@ const features = [
   },
   {
     icon: "🎁",
-    title: "Christmas Lists",
-    description: "Kids build Christmas lists, search Amazon for gift ideas, and share exact items with parents.",
+    title: "Shareable Gift Lists",
+    description: "Create birthday, Christmas, and anytime wish lists, search Amazon, and share lists with family.",
   },
   {
     icon: "🛒",

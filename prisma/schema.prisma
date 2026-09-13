@@ -664,18 +664,18 @@ model WishListItem {
 }
 
 model GiftList {
-  id                String   @id @default(uuid()) @db.Char(36)
-  householdId       String   @db.Char(36)
-  memberId          String   @db.Char(36)
-  title             String   @db.VarChar(120)
-  type              String   @default("general") @db.VarChar(32)
+  id                String    @id @default(uuid()) @db.Char(36)
+  householdId       String    @db.Char(36)
+  memberId          String    @db.Char(36)
+  title             String    @db.VarChar(120)
+  type              String    @default("general") @db.VarChar(32)
   eventYear         Int?
-  createdByType     String   @default("parent") @db.VarChar(32)
-  createdByParentId String?  @db.Char(36)
-  publicToken       String?  @unique @db.VarChar(64)
+  createdByType     String    @default("parent") @db.VarChar(32)
+  createdByParentId String?   @db.Char(36)
+  publicToken       String?   @unique @db.VarChar(64)
   publicSharedAt    DateTime?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @default(now()) @updatedAt
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @default(now()) @updatedAt
 
   household       Household      @relation(fields: [householdId], references: [id], onDelete: Cascade)
   member          FamilyMember   @relation(fields: [memberId], references: [id], onDelete: Cascade)
@@ -1287,8 +1287,8 @@ model HouseholdDevice {
   revokedAt   DateTime?
   createdAt   DateTime  @default(now())
 
-  household         Household          @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  member            FamilyMember?      @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  household         Household           @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  member            FamilyMember?       @relation(fields: [memberId], references: [id], onDelete: SetNull)
   wellbeingCheckIns WellbeingCheckIn[]
   pairingCodes      DevicePairingCode[]
 }
@@ -1305,7 +1305,7 @@ model DevicePairingCode {
   usedAt      DateTime?
   createdAt   DateTime  @default(now())
 
-  household Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  member    FamilyMember? @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  household Household        @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  member    FamilyMember?    @relation(fields: [memberId], references: [id], onDelete: SetNull)
   device    HouseholdDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
 }

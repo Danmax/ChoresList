@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { COMPLETION_EMOJIS, WISH_CATEGORIES, WISH_EMOJIS } from "@/types";
 import { choicesForDisplay } from "@/lib/education";
 import { amazonSearchUrl } from "@/lib/amazon";
+import { WISH_LIST_TYPE_META, type WishListType } from "@/lib/wishlists";
 
 type Device = {
   id: string;
@@ -65,6 +66,8 @@ type CatalogChore = {
   requiresPhoto: boolean;
 };
 
+type DeviceGiftList = { id: string; memberId: string; title: string; type: WishListType; _count: { items: number } };
+
 type DashboardData = {
   members: { id: string; name: string; avatar: string; totalPoints: number; level: number }[];
   education: { id: string; memberId: string; title: string; dueDate: string | null; status: string; pointsReward: number; member: { name: string; avatar: string }; set: { subject: string; mode: string; _count: { materials: number } }; attempts: { score: number; passed: boolean }[] }[];
@@ -118,6 +121,10 @@ export default function TaskScreenPage() {
   const [showWish, setShowWish] = useState(false);
   const [wishMemberId, setWishMemberId] = useState("");
   const [wish, setWish] = useState({ title: "", category: "toy", emoji: "🎮", note: "", amazonUrl: "" });
+  const [wishLists, setWishLists] = useState<DeviceGiftList[]>([]);
+  const [wishListId, setWishListId] = useState("");
+  const [showCreateWishList, setShowCreateWishList] = useState(false);
+  const [newWishList, setNewWishList] = useState<{ type: WishListType; title: string }>({ type: "general", title: "" });
   const [showTaskPicker, setShowTaskPicker] = useState(false);
   const [catalogMembers, setCatalogMembers] = useState<CatalogMember[]>([]);
   const [catalogChores, setCatalogChores] = useState<CatalogChore[]>([]);
@@ -267,6 +274,16 @@ export default function TaskScreenPage() {
     setShowWish(true);
   }
 
+  useEffect(() => {
+    if (!showWish || !wishMemberId) { setWishLists([]); setWishListId(""); return; }
+    fetch(`/api/kid-device/wishlists?memberId=${wishMemberId}`)
+      .then(async (res) => {
+        const data = res.ok ? await res.json() as DeviceGiftList[] : [];
+        setWishLists(data);
+        setWishListId((current) => data.some((list) => list.id === current) ? current : data[0]?.id ?? "");
+      });
+  }, [showWish, wishMemberId]);
+
   async function openTaskPicker() {
     setCatalogLoading(true);
     setShowTaskPicker(true);
@@ -311,11 +328,15 @@ export default function TaskScreenPage() {
       toast.error("Add what you want");
       return;
     }
+    if (!wishListId) {
+      toast.error("Choose or create a list first");
+      return;
+    }
 
     const res = await fetch("/api/kid-device/wishlist", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ memberId: wishMemberId, ...wish }),
+      body: JSON.stringify({ memberId: wishMemberId, listId: wishListId, ...wish }),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -325,6 +346,18 @@ export default function TaskScreenPage() {
 
     toast.success("Added to Christmas list 🎄");
     setShowWish(false);
+  }
+
+  async function createDeviceWishList() {
+    if (!wishMemberId) { toast.error("Choose a child first"); return; }
+    const res = await fetch("/api/kid-device/wishlists", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ memberId: wishMemberId, ...newWishList }) });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) { toast.error(data?.error ?? "Could not create list"); return; }
+    setWishLists((current) => [data, ...current]);
+    setWishListId(data.id);
+    setShowCreateWishList(false);
+    setNewWishList({ type: "general", title: "" });
+    toast.success(`${data.title} created`);
   }
 
   function searchAmazonForWish() {
@@ -749,7 +782,7 @@ export default function TaskScreenPage() {
       <Dialog open={showWish} onOpenChange={setShowWish}>
         <DialogContent className="max-w-md rounded-3xl">
           <DialogHeader>
-            <DialogTitle className="font-black">🎄 Add to Christmas List</DialogTitle>
+            <DialogTitle className="font-black">🎁 Add to a Gift List</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -770,6 +803,23 @@ export default function TaskScreenPage() {
                 </select>
               </div>
             )}
+
+            {wishMemberId && <div>
+              <Label className="font-bold text-slate-600">Gift list</Label>
+              <div className="mt-1 flex gap-2">
+                <select value={wishListId} onChange={(event) => setWishListId(event.target.value)} className="min-w-0 flex-1 rounded-xl border-2 border-slate-100 bg-slate-50 px-3 py-2 font-bold text-slate-700">
+                  <option value="">Choose a list</option>
+                  {wishLists.map((list) => <option key={list.id} value={list.id}>{WISH_LIST_TYPE_META[list.type].emoji} {list.title}</option>)}
+                </select>
+                <button type="button" onClick={() => setShowCreateWishList((value) => !value)} className="rounded-xl border-2 border-violet-100 px-3 font-black text-violet-600"><ListPlus size={17} /></button>
+              </div>
+            </div>}
+
+            {showCreateWishList && <div className="space-y-3 rounded-2xl bg-violet-50 p-3">
+              <div className="grid grid-cols-3 gap-2">{(Object.entries(WISH_LIST_TYPE_META) as [WishListType, typeof WISH_LIST_TYPE_META[WishListType]][]).map(([type, meta]) => <button key={type} type="button" onClick={() => setNewWishList((current) => ({ ...current, type }))} className={`rounded-xl p-2 text-xs font-black ${newWishList.type === type ? "bg-violet-500 text-white" : "bg-white text-slate-600"}`}>{meta.emoji} {meta.label}</button>)}</div>
+              <Input value={newWishList.title} onChange={(event) => setNewWishList((current) => ({ ...current, title: event.target.value }))} placeholder="Optional list name" className="rounded-xl bg-white" />
+              <button type="button" onClick={createDeviceWishList} className="w-full rounded-xl bg-violet-500 py-2 font-black text-white">Create List</button>
+            </div>}
 
             <div>
               <Label className="font-bold text-slate-600">Category</Label>
@@ -850,7 +900,7 @@ export default function TaskScreenPage() {
               onClick={addWish}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 py-3 font-black text-white transition-colors hover:bg-amber-600"
             >
-              <Plus size={18} /> Add to Christmas List
+              <Plus size={18} /> Add to Gift List
             </button>
           </div>
         </DialogContent>

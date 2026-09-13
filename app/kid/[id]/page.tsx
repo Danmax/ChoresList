@@ -279,7 +279,7 @@ export default function KidPage() {
     {
       href: `/kid/${id}/wishlist`,
       Icon: Gift,
-      label: "Christmas List",
+      label: "Gift Lists",
       value: "Open",
       color: "#f472b6",
       bg: "#fce7f3",
@@ -326,7 +326,7 @@ export default function KidPage() {
                   <Link href={`/kid/${id}/academy`} className="rounded-full bg-blue-100 p-2 text-blue-600" title="Academy">
                     <BookOpen size={18} />
                   </Link>
-                  <Link href={`/kid/${id}/wishlist`} className="text-xl" title="Christmas List">🎄</Link>
+                  <Link href={`/kid/${id}/wishlist`} className="text-xl" title="Gift Lists">🎁</Link>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -400,7 +400,7 @@ export default function KidPage() {
             {!nextLesson && !nextChore && (
               <div className="rounded-2xl border-2 border-emerald-100 bg-emerald-50 p-4 sm:col-span-2">
                 <p className="font-black text-emerald-700">Everything is clear.</p>
-                <p className="text-sm font-bold text-emerald-600">Check projects or your Christmas list when you are ready.</p>
+                <p className="text-sm font-bold text-emerald-600">Check projects or your gift lists when you are ready.</p>
               </div>
             )}
           </div>

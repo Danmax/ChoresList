@@ -32,6 +32,7 @@ const sections = [
     title: "Children and Parent Responsibility",
     body: [
       "ChoresList is designed for parent-managed household use. Parents and guardians are responsible for supervising children's use of kid devices and deciding what information is appropriate to enter.",
+      "Only parents or guardians should enable public gift-list sharing. They are responsible for reviewing the child's display name, gift notes, and links before publishing or embedding a list and for disabling sharing when it is no longer needed.",
       "The app's points, allowances, rewards, and tickets are household tools only. They do not create any financial obligation unless the parent or guardian separately chooses to honor them.",
     ],
   },

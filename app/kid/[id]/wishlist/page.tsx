@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { ArrowLeft, ExternalLink, Plus, Search, Trash2, Sparkles } from "lucide-react";
+import { ArrowLeft, ExternalLink, ListPlus, Plus, Search, Trash2, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { WISH_CATEGORIES, WISH_EMOJIS } from "@/types";
 import { motion, AnimatePresence } from "framer-motion";
 import { amazonSearchUrl } from "@/lib/amazon";
+import { canCreateBirthdayList, daysUntilBirthday, WISH_LIST_TYPE_META, type WishListType } from "@/lib/wishlists";
 
 interface WishItem {
   id: string;
@@ -29,6 +30,15 @@ interface Member {
   name: string;
   avatar: string;
   color: string;
+  birthdayMonth?: number | null;
+  birthdayDay?: number | null;
+}
+
+interface GiftList {
+  id: string;
+  title: string;
+  type: WishListType;
+  _count: { items: number };
 }
 
 export default function KidWishlistPage() {
@@ -37,24 +47,38 @@ export default function KidWishlistPage() {
 
   const [member, setMember] = useState<Member | null>(null);
   const [items, setItems] = useState<WishItem[]>([]);
+  const [lists, setLists] = useState<GiftList[]>([]);
+  const [activeListId, setActiveListId] = useState("");
   const [open, setOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [newList, setNewList] = useState<{ type: WishListType; title: string }>({ type: "general", title: "" });
   const [step, setStep] = useState<"category" | "details">("category");
   const [form, setForm] = useState({ title: "", category: "toy", emoji: "🎮", note: "", amazonUrl: "" });
 
   const load = useCallback(async () => {
-    const [mRes, wRes] = await Promise.all([
+    const [mRes, lRes] = await Promise.all([
       fetch("/api/members"),
-      fetch(`/api/wishlist?memberId=${memberId}`),
+      fetch(`/api/wishlists?memberId=${memberId}`),
     ]);
     if (mRes.ok) {
       const data = await mRes.json();
       const members: Member[] = Array.isArray(data) ? data : Array.isArray(data?.members) ? data.members : [];
       setMember(members.find((m) => m.id === memberId) ?? null);
     }
-    if (wRes.ok) setItems(await wRes.json());
+    if (lRes.ok) {
+      const nextLists: GiftList[] = await lRes.json();
+      setLists(nextLists);
+      setActiveListId((current) => nextLists.some((list) => list.id === current) ? current : nextLists[0]?.id ?? "");
+    }
   }, [memberId]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (!activeListId) { setItems([]); return; }
+    fetch(`/api/wishlist?memberId=${memberId}&listId=${activeListId}`)
+      .then(async (res) => res.ok ? setItems(await res.json()) : setItems([]));
+  }, [activeListId, memberId]);
 
   function openAdd() {
     setForm({ title: "", category: "toy", emoji: "🎮", note: "", amazonUrl: "" });
@@ -72,13 +96,28 @@ export default function KidWishlistPage() {
     const res = await fetch("/api/wishlist", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ memberId, ...form }),
+      body: JSON.stringify({ memberId, listId: activeListId, creatorType: "kid", ...form }),
     });
     const data = await res.json().catch(() => null);
     if (!res.ok) { toast.error(data?.error ?? "Could not add this gift"); return; }
-    toast.success("Added to your Christmas list! 🎄");
+    toast.success("Added to your list! 🎁");
     setOpen(false);
     load();
+  }
+
+  async function createList() {
+    const res = await fetch("/api/wishlists", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ memberId, creatorType: "kid", ...newList }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) { toast.error(data?.error ?? "Could not create this list"); return; }
+    setCreateOpen(false);
+    setNewList({ type: "general", title: "" });
+    await load();
+    setActiveListId(data.id);
+    toast.success(`${data.title} created!`);
   }
 
   function searchAmazon() {
@@ -94,6 +133,8 @@ export default function KidWishlistPage() {
 
   const pending = items.filter((i) => i.status === "pending");
   const granted = items.filter((i) => i.status === "granted");
+  const activeList = lists.find((list) => list.id === activeListId);
+  const birthdayDays = daysUntilBirthday(member?.birthdayMonth, member?.birthdayDay);
 
   return (
     <div className="min-h-screen p-4 sm:p-6" style={{ background: member ? `${member.color}15` : "#f8fafc" }}>
@@ -105,16 +146,29 @@ export default function KidWishlistPage() {
           <ArrowLeft size={20} className="text-slate-600" />
         </Link>
         <h1 className="text-2xl sm:text-3xl font-black text-slate-800 flex-1">
-          🎄 {member?.name}&apos;s Christmas List
+          {activeList ? WISH_LIST_TYPE_META[activeList.type].emoji : "🎁"} {activeList?.title ?? `${member?.name}'s Gift Lists`}
         </h1>
         <button
+          onClick={() => { setNewList({ type: "general", title: "" }); setCreateOpen(true); }}
+          className="flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-2.5 font-bold text-slate-600 shadow-sm hover:shadow-md"
+        >
+          <ListPlus size={18} /> New List
+        </button>
+        <button
           onClick={openAdd}
+          disabled={!activeList}
           className="flex items-center justify-center gap-2 text-white rounded-2xl px-4 py-2.5 font-bold shadow-sm hover:opacity-90 transition-opacity"
           style={{ backgroundColor: member?.color ?? "#a78bfa" }}
         >
-          <Plus size={18} /> Add a Gift
+          <Plus size={18} /> Add Gift
         </button>
       </div>
+
+      {lists.length > 0 && <div className="mb-6 flex gap-2 overflow-x-auto pb-2">
+        {lists.map((list) => <button key={list.id} onClick={() => setActiveListId(list.id)} className={`shrink-0 rounded-2xl px-4 py-2 text-sm font-black transition-colors ${activeListId === list.id ? "bg-slate-800 text-white" : "bg-white text-slate-600"}`}>
+          {WISH_LIST_TYPE_META[list.type].emoji} {list.title} <span className="opacity-60">({list._count.items})</span>
+        </button>)}
+      </div>}
 
       {/* Pending wishes */}
       {pending.length > 0 && (
@@ -185,20 +239,27 @@ export default function KidWishlistPage() {
         </div>
       )}
 
-      {items.length === 0 && (
+      {activeList && items.length === 0 && (
         <div className="text-center py-20">
           <div className="text-7xl mb-4">🌟</div>
-          <h2 className="text-2xl font-black text-slate-600">Your Christmas list is empty!</h2>
+          <h2 className="text-2xl font-black text-slate-600">This list is empty!</h2>
           <p className="text-slate-400 mt-2 font-semibold">Tap &ldquo;Add a Gift&rdquo; to share something you would love.</p>
         </div>
       )}
 
-      {/* Add Christmas Gift Dialog */}
+      {lists.length === 0 && <div className="py-20 text-center">
+        <div className="mb-4 text-7xl">🎁</div>
+        <h2 className="text-2xl font-black text-slate-600">Create your first gift list</h2>
+        <p className="mt-2 font-semibold text-slate-400">Make a wish list, Christmas list, or birthday list.</p>
+        <button onClick={() => setCreateOpen(true)} className="mt-5 rounded-2xl bg-violet-500 px-5 py-3 font-black text-white"><ListPlus className="mr-2 inline" size={18} /> Create a List</button>
+      </div>}
+
+      {/* Add Gift Dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-sm rounded-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-black text-center text-xl">
-              {step === "category" ? "What would you love for Christmas? 🎄" : "Tell us more! ✏️"}
+              {step === "category" ? `Add to ${activeList?.title ?? "your list"}` : "Tell us more! ✏️"}
             </DialogTitle>
           </DialogHeader>
 
@@ -279,11 +340,30 @@ export default function KidWishlistPage() {
                   className="flex-2 flex-grow-[2] flex items-center justify-center gap-2 text-white rounded-xl py-3 font-black hover:opacity-90 transition-opacity"
                   style={{ backgroundColor: getCategoryColor(form.category) }}
                 >
-                  <Sparkles size={16} /> Add to Christmas List!
+                  <Sparkles size={16} /> Add to List!
                 </button>
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="max-w-sm rounded-3xl">
+          <DialogHeader><DialogTitle className="font-black text-center text-xl">Create a Gift List</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="grid gap-2">
+              {(Object.entries(WISH_LIST_TYPE_META) as [WishListType, typeof WISH_LIST_TYPE_META[WishListType]][]).map(([type, meta]) => {
+                const birthdayLocked = type === "birthday" && !canCreateBirthdayList(member?.birthdayMonth, member?.birthdayDay);
+                return <button key={type} type="button" disabled={birthdayLocked} onClick={() => setNewList((current) => ({ ...current, type }))} className={`rounded-2xl border-2 p-3 text-left ${newList.type === type ? "border-violet-400 bg-violet-50" : "border-slate-100 bg-slate-50"} disabled:cursor-not-allowed disabled:opacity-45`}>
+                  <span className="font-black text-slate-700">{meta.emoji} {meta.label}</span>
+                  <span className="block text-xs font-semibold text-slate-400">{birthdayLocked ? (birthdayDays === null ? "Ask a parent to add your birthday" : `Opens in ${birthdayDays - 42} days`) : meta.description}</span>
+                </button>;
+              })}
+            </div>
+            <div><Label className="font-bold text-slate-600">List name (optional)</Label><Input value={newList.title} onChange={(event) => setNewList((current) => ({ ...current, title: event.target.value }))} placeholder={WISH_LIST_TYPE_META[newList.type].label} className="mt-1 rounded-xl" /></div>
+            <button type="button" onClick={createList} className="w-full rounded-xl bg-violet-500 py-3 font-black text-white hover:bg-violet-600"><ListPlus className="mr-2 inline" size={18} /> Create List</button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

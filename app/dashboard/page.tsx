@@ -124,7 +124,7 @@ const PARENT_ITEMS = [
   { href: "/parent/chores", Icon: ListChecks, label: "Chore Library", desc: "Edit chores and instructions", color: "#60a5fa", bg: "#dbeafe" },
   { href: "/parent/academy", Icon: GraduationCap, label: "Education Academy", desc: "AI lessons, drills, and projects", color: "#2563eb", bg: "#dbeafe" },
   { href: "/parent/projects", Icon: Wrench, label: "House Projects", desc: "Track bigger jobs", color: "#f97316", bg: "#ffedd5" },
-  { href: "/parent/wishlist", Icon: Gift, label: "Christmas Lists", desc: "Review kids' gift ideas", color: "#f472b6", bg: "#fce7f3" },
+  { href: "/parent/wishlist", Icon: Gift, label: "Gift Lists", desc: "Birthdays, Christmas, and wishes", color: "#f472b6", bg: "#fce7f3" },
 ];
 
 const GROUP_META: Record<string, { label: string; icon: string; color: string; bg: string }> = {

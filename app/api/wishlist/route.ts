@@ -27,6 +27,7 @@ export const POST = withErrors(async (req: NextRequest) => {
   const { householdId, parentId } = requireSession(req);
   const body = await req.json();
   const { memberId, listId, title, category, emoji, note, amazonUrl } = body;
+  const creatorType = body.creatorType === "parent" ? "parent" : "kid";
   const cleanMemberId = typeof memberId === "string" ? memberId : "";
   const cleanTitle = typeof title === "string" ? title.trim().slice(0, 120) : "";
   if (!cleanTitle) return NextResponse.json({ error: "Wish title is required" }, { status: 400 });
@@ -40,7 +41,7 @@ export const POST = withErrors(async (req: NextRequest) => {
   ]);
   if (!member) return NextResponse.json({ error: "Member not found" }, { status: 404 });
   if (!hasAccess) return NextResponse.json({ error: "You do not have access to this child" }, { status: 403 });
-  if (!household?.privacyAllowKidWishlist) {
+  if (creatorType === "kid" && !household?.privacyAllowKidWishlist) {
     return NextResponse.json({ error: "Christmas-list additions are turned off by a parent" }, { status: 403 });
   }
   let list = typeof listId === "string" && listId
