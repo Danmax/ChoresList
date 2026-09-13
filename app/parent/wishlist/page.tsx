@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { canCreateBirthdayList, daysUntilBirthday, WISH_LIST_TYPE_META, type WishListType } from "@/lib/wishlists";
+import { AmazonProductSearch } from "@/components/amazon-product-search";
 
 interface Member { id: string; name: string; avatar: string; color: string; birthdayMonth?: number | null; birthdayDay?: number | null }
 
@@ -27,6 +28,7 @@ interface WishItem {
   emoji: string;
   note: string | null;
   amazonUrl: string | null;
+  imageUrl: string | null;
   status: string;
   createdAt: string;
   member: Member;
@@ -43,11 +45,13 @@ export default function ParentWishlistPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [giftOpen, setGiftOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [editItemOpen, setEditItemOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [shareData, setShareData] = useState({ publicUrl: "", embedHtml: "" });
   const [newList, setNewList] = useState<{ memberId: string; type: WishListType; title: string }>({ memberId: "", type: "general", title: "" });
-  const [newGift, setNewGift] = useState({ title: "", amazonUrl: "", note: "" });
+  const [newGift, setNewGift] = useState({ title: "", amazonUrl: "", imageUrl: "", note: "" });
   const [editList, setEditList] = useState<{ title: string; type: WishListType }>({ title: "", type: "general" });
+  const [editItem, setEditItem] = useState({ id: "", title: "", category: "other", emoji: "🎁", note: "", amazonUrl: "", imageUrl: "" });
 
   const load = useCallback(async () => {
     const [wRes, mRes, lRes] = await Promise.all([
@@ -120,7 +124,7 @@ export default function ParentWishlistPage() {
     const data = await res.json().catch(() => null);
     if (!res.ok) { toast.error(data?.error ?? "Could not add gift"); return; }
     setGiftOpen(false);
-    setNewGift({ title: "", amazonUrl: "", note: "" });
+    setNewGift({ title: "", amazonUrl: "", imageUrl: "", note: "" });
     load();
     toast.success("Gift added");
   }
@@ -133,6 +137,15 @@ export default function ParentWishlistPage() {
     setEditOpen(false);
     await load();
     toast.success("List updated");
+  }
+
+  async function saveItemEdits() {
+    const res = await fetch("/api/wishlist", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...editItem, editorType: "parent" }) });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) { toast.error(data?.error ?? "Could not update gift"); return; }
+    setEditItemOpen(false);
+    await load();
+    toast.success("Gift updated");
   }
 
   async function setSharing(enable: boolean) {
@@ -234,7 +247,7 @@ export default function ParentWishlistPage() {
       {activeList && <div className="mb-6 flex flex-wrap items-center gap-2 rounded-3xl bg-white p-4 shadow-sm">
         <div className="mr-auto"><p className="font-black text-slate-800">{activeList.member.avatar} {activeList.title}</p><p className="text-xs font-semibold text-slate-400">{WISH_LIST_TYPE_META[activeList.type].label}</p></div>
         <button onClick={() => { setEditList({ title: activeList.title, type: activeList.type }); setEditOpen(true); }} className="flex items-center gap-1.5 rounded-xl bg-slate-100 px-3 py-2 text-sm font-black text-slate-600"><Pencil size={15} /> Edit List</button>
-        <button onClick={() => { setNewGift({ title: "", amazonUrl: "", note: "" }); setGiftOpen(true); }} className="flex items-center gap-1.5 rounded-xl bg-violet-500 px-3 py-2 text-sm font-black text-white"><Plus size={15} /> Add Gift</button>
+        <button onClick={() => { setNewGift({ title: "", amazonUrl: "", imageUrl: "", note: "" }); setGiftOpen(true); }} className="flex items-center gap-1.5 rounded-xl bg-violet-500 px-3 py-2 text-sm font-black text-white"><Plus size={15} /> Add Gift</button>
         <button onClick={() => activeList.publicToken ? setSharing(false) : setSharing(true)} className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-black ${activeList.publicToken ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-700"}`}><Share2 size={15} /> {activeList.publicToken ? "Stop Sharing" : "Share Publicly"}</button>
         {activeList.publicToken && <button onClick={() => setSharing(true)} className="rounded-xl bg-slate-100 px-3 py-2 text-sm font-black text-slate-600">Share Details</button>}
       </div>}
@@ -271,7 +284,7 @@ export default function ParentWishlistPage() {
                   style={{ border: `2px solid ${cat?.color ?? "#e2e8f0"}33` }}
                 >
                   <div className="flex items-start gap-3">
-                    <span className="text-4xl shrink-0">{item.emoji}</span>
+                    {item.imageUrl ? <img src={item.imageUrl} alt="" className="h-20 w-20 shrink-0 rounded-xl bg-slate-50 object-contain p-1" /> : <span className="text-4xl shrink-0">{item.emoji}</span>}
                     <div className="flex-1 min-w-0">
                       <p className="font-black text-slate-800 text-sm">{item.member.avatar} {item.member.name}</p>
                       <p className="font-bold text-slate-700 text-base mt-0.5">{item.title}</p>
@@ -293,6 +306,7 @@ export default function ParentWishlistPage() {
                     </div>
                   </div>
                   <div className="flex gap-2 mt-3">
+                    <button onClick={() => { setEditItem({ id: item.id, title: item.title, category: item.category, emoji: item.emoji, note: item.note ?? "", amazonUrl: item.amazonUrl ?? "", imageUrl: item.imageUrl ?? "" }); setEditItemOpen(true); }} className="flex items-center justify-center gap-1 rounded-xl bg-slate-100 px-3 py-2 text-sm font-black text-slate-600"><Pencil size={14} /> Edit</button>
                     <button
                       onClick={() => grant(item.id)}
                       className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-500 text-white rounded-xl py-2 font-black text-sm hover:bg-emerald-600 transition-colors"
@@ -320,7 +334,7 @@ export default function ParentWishlistPage() {
           <div className="space-y-2">
             {granted.map((item) => (
               <div key={item.id} className="bg-slate-50 rounded-2xl p-3 flex items-center gap-3 opacity-70">
-                <span className="text-2xl grayscale">{item.emoji}</span>
+                {item.imageUrl ? <img src={item.imageUrl} alt="" className="h-12 w-12 rounded-xl object-contain grayscale" /> : <span className="text-2xl grayscale">{item.emoji}</span>}
                 <div className="flex-1">
                   <p className="text-xs font-bold text-slate-400">{item.member.avatar} {item.member.name}</p>
                   <p className="font-bold text-slate-500 line-through text-sm">{item.title}</p>
@@ -360,10 +374,21 @@ export default function ParentWishlistPage() {
 
       <Dialog open={giftOpen} onOpenChange={setGiftOpen}><DialogContent className="max-w-md rounded-3xl"><DialogHeader><DialogTitle className="font-black">Add to {activeList?.title}</DialogTitle></DialogHeader><div className="space-y-4">
         <div><Label className="font-bold">Gift idea</Label><Input value={newGift.title} onChange={(event) => setNewGift((current) => ({ ...current, title: event.target.value }))} className="mt-1 rounded-xl" placeholder="Gift name" /></div>
-        <button onClick={() => { const url = amazonSearchUrl(newGift.title); if (url) window.open(url, "_blank", "noopener,noreferrer"); else toast.error("Add a gift name first"); }} className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-amber-200 bg-amber-50 py-2.5 font-black text-amber-700"><Search size={16} /> Search Amazon <ExternalLink size={13} /></button>
+        <AmazonProductSearch initialQuery={newGift.title} onSelect={(product) => setNewGift((current) => ({ ...current, title: product.title, amazonUrl: product.url, imageUrl: product.imageUrl ?? "" }))} />
         <div><Label className="font-bold">Amazon link (optional)</Label><Input value={newGift.amazonUrl} onChange={(event) => setNewGift((current) => ({ ...current, amazonUrl: event.target.value }))} className="mt-1 rounded-xl" inputMode="url" /></div>
+        <div><Label className="font-bold">Amazon image URL (optional)</Label><Input value={newGift.imageUrl} onChange={(event) => setNewGift((current) => ({ ...current, imageUrl: event.target.value }))} className="mt-1 rounded-xl" inputMode="url" />{newGift.imageUrl && <img src={newGift.imageUrl} alt="Gift preview" className="mt-2 h-20 w-20 rounded-xl object-contain" />}</div>
         <div><Label className="font-bold">Note (optional)</Label><Input value={newGift.note} onChange={(event) => setNewGift((current) => ({ ...current, note: event.target.value }))} className="mt-1 rounded-xl" /></div>
         <button onClick={addGift} className="w-full rounded-xl bg-violet-500 py-3 font-black text-white">Add Gift</button>
+      </div></DialogContent></Dialog>
+
+      <Dialog open={editItemOpen} onOpenChange={setEditItemOpen}><DialogContent className="max-h-[90vh] max-w-md overflow-y-auto rounded-3xl"><DialogHeader><DialogTitle className="font-black">Edit Gift</DialogTitle></DialogHeader><div className="space-y-4">
+        <div><Label className="font-bold">Gift name</Label><Input value={editItem.title} onChange={(event) => setEditItem((current) => ({ ...current, title: event.target.value }))} className="mt-1 rounded-xl" /></div>
+        <AmazonProductSearch initialQuery={editItem.title} onSelect={(product) => setEditItem((current) => ({ ...current, title: product.title, amazonUrl: product.url, imageUrl: product.imageUrl ?? "" }))} />
+        <div><Label className="font-bold">Category</Label><select value={editItem.category} onChange={(event) => { const category = WISH_CATEGORIES.find((entry) => entry.value === event.target.value); setEditItem((current) => ({ ...current, category: event.target.value, emoji: category?.emoji ?? current.emoji })); }} className="mt-1 w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-3 py-2 font-bold">{WISH_CATEGORIES.map((category) => <option key={category.value} value={category.value}>{category.emoji} {category.label}</option>)}</select></div>
+        <div><Label className="font-bold">Note</Label><Input value={editItem.note} onChange={(event) => setEditItem((current) => ({ ...current, note: event.target.value }))} className="mt-1 rounded-xl" /></div>
+        <div><Label className="font-bold">Amazon product link</Label><Input value={editItem.amazonUrl} onChange={(event) => setEditItem((current) => ({ ...current, amazonUrl: event.target.value }))} className="mt-1 rounded-xl" inputMode="url" /></div>
+        <div><Label className="font-bold">Amazon image URL</Label><Input value={editItem.imageUrl} onChange={(event) => setEditItem((current) => ({ ...current, imageUrl: event.target.value }))} className="mt-1 rounded-xl" inputMode="url" />{editItem.imageUrl && <img src={editItem.imageUrl} alt="Gift preview" className="mt-2 h-20 w-20 rounded-xl object-contain" />}</div>
+        <button onClick={saveItemEdits} className="w-full rounded-xl bg-violet-500 py-3 font-black text-white">Save Gift</button>
       </div></DialogContent></Dialog>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}><DialogContent className="max-w-md rounded-3xl"><DialogHeader><DialogTitle className="font-black">Edit Gift List</DialogTitle></DialogHeader><div className="space-y-4">

@@ -20,7 +20,7 @@ export function PublicWishList({ list, embedded = false }: { list: PublicList; e
             {list.items.map((item) => (
               <article key={item.id} className="rounded-3xl border-2 border-slate-100 bg-slate-50 p-4">
                 <div className="flex gap-3">
-                  <span className="text-4xl">{item.emoji}</span>
+                  {item.imageUrl ? <img src={item.imageUrl} alt="" className="h-20 w-20 shrink-0 rounded-xl bg-white object-contain p-1" /> : <span className="text-4xl">{item.emoji}</span>}
                   <div className="min-w-0 flex-1">
                     <h2 className="font-black text-slate-800">{item.title}</h2>
                     {item.note && <p className="mt-1 text-sm font-semibold text-slate-500">{item.note}</p>}

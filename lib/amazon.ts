@@ -24,3 +24,17 @@ export function cleanAmazonUrl(value: unknown) {
     return null;
   }
 }
+
+export function cleanAmazonImageUrl(value: unknown) {
+  if (typeof value !== "string" || !value.trim()) return null;
+  try {
+    const url = new URL(value.trim());
+    const hostname = url.hostname.toLowerCase();
+    const allowed = hostname === "m.media-amazon.com" || hostname.endsWith(".ssl-images-amazon.com");
+    if (url.protocol !== "https:" || !allowed) return null;
+    url.hash = "";
+    return url.toString().slice(0, 2048);
+  } catch {
+    return null;
+  }
+}

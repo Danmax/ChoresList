@@ -1,10 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { amazonSearchUrl, cleanAmazonUrl } from "../lib/amazon";
+import { amazonSearchUrl, cleanAmazonImageUrl, cleanAmazonUrl } from "../lib/amazon";
 
 test("amazon search URLs encode the item name", () => {
   assert.equal(amazonSearchUrl("LEGO Star Wars & ships"), "https://www.amazon.com/s?k=LEGO+Star+Wars+%26+ships");
   assert.equal(amazonSearchUrl("   "), "");
+});
+
+test("Amazon thumbnails only accept official media hosts", () => {
+  assert.equal(cleanAmazonImageUrl("https://m.media-amazon.com/images/I/item.jpg"), "https://m.media-amazon.com/images/I/item.jpg");
+  assert.equal(cleanAmazonImageUrl("https://images-na.ssl-images-amazon.com/images/I/item.jpg"), "https://images-na.ssl-images-amazon.com/images/I/item.jpg");
+  assert.equal(cleanAmazonImageUrl("https://example.com/item.jpg"), null);
 });
 
 test("only secure Amazon links can be attached to a Christmas-list item", () => {

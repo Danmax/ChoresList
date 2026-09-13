@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireParentSession, requireSession, withErrors } from "@/lib/api";
-import { cleanAmazonUrl } from "@/lib/amazon";
+import { cleanAmazonImageUrl, cleanAmazonUrl } from "@/lib/amazon";
 import { canAccessMember, childAccessWhere } from "@/lib/child-access";
 
 export const GET = withErrors(async (req: NextRequest) => {
@@ -26,7 +26,7 @@ export const GET = withErrors(async (req: NextRequest) => {
 export const POST = withErrors(async (req: NextRequest) => {
   const { householdId, parentId } = requireSession(req);
   const body = await req.json();
-  const { memberId, listId, title, category, emoji, note, amazonUrl } = body;
+  const { memberId, listId, title, category, emoji, note, amazonUrl, imageUrl } = body;
   const creatorType = body.creatorType === "parent" ? "parent" : "kid";
   if (creatorType === "parent") await requireParentSession(req);
   const cleanMemberId = typeof memberId === "string" ? memberId : "";
@@ -55,8 +55,12 @@ export const POST = withErrors(async (req: NextRequest) => {
   }
   if (!list) return NextResponse.json({ error: "List not found" }, { status: 404 });
   const cleanUrl = cleanAmazonUrl(amazonUrl);
+  const cleanImage = cleanAmazonImageUrl(imageUrl);
   if (typeof amazonUrl === "string" && amazonUrl.trim() && !cleanUrl) {
     return NextResponse.json({ error: "Use a secure Amazon.com product link" }, { status: 400 });
+  }
+  if (typeof imageUrl === "string" && imageUrl.trim() && !cleanImage) {
+    return NextResponse.json({ error: "Use an Amazon product image URL" }, { status: 400 });
   }
   const item = await prisma.wishListItem.create({
     data: {
@@ -68,9 +72,44 @@ export const POST = withErrors(async (req: NextRequest) => {
       emoji: typeof emoji === "string" && emoji.trim() ? emoji.trim().slice(0, 32) : "🎁",
       note: typeof note === "string" ? note.trim().slice(0, 500) : null,
       amazonUrl: cleanUrl,
+      imageUrl: cleanImage,
     },
   });
   return NextResponse.json(item, { status: 201 });
+});
+
+export const PATCH = withErrors(async (req: NextRequest) => {
+  const { householdId, parentId } = requireSession(req);
+  const body = await req.json();
+  const id = typeof body.id === "string" ? body.id : "";
+  const editorType = body.editorType === "parent" ? "parent" : "kid";
+  if (editorType === "parent") await requireParentSession(req);
+  const existing = await prisma.wishListItem.findFirst({ where: { id, householdId }, select: { memberId: true, status: true } });
+  if (!existing) return NextResponse.json({ error: "Wish not found" }, { status: 404 });
+  if (!(await canAccessMember(parentId, householdId, existing.memberId))) return NextResponse.json({ error: "You do not have access to this family member" }, { status: 403 });
+  if (editorType === "kid") {
+    const household = await prisma.household.findUnique({ where: { id: householdId }, select: { privacyAllowKidWishlist: true } });
+    if (!household?.privacyAllowKidWishlist) return NextResponse.json({ error: "Wish editing is turned off by a parent" }, { status: 403 });
+    if (existing.status !== "pending") return NextResponse.json({ error: "Only pending wishes can be edited" }, { status: 400 });
+  }
+  const title = typeof body.title === "string" ? body.title.trim().slice(0, 120) : "";
+  if (!title) return NextResponse.json({ error: "Wish title is required" }, { status: 400 });
+  const amazonUrl = cleanAmazonUrl(body.amazonUrl);
+  const imageUrl = cleanAmazonImageUrl(body.imageUrl);
+  if (typeof body.amazonUrl === "string" && body.amazonUrl.trim() && !amazonUrl) return NextResponse.json({ error: "Use a secure Amazon.com product link" }, { status: 400 });
+  if (typeof body.imageUrl === "string" && body.imageUrl.trim() && !imageUrl) return NextResponse.json({ error: "Use an Amazon product image URL" }, { status: 400 });
+  const item = await prisma.wishListItem.update({
+    where: { id, householdId },
+    data: {
+      title,
+      note: typeof body.note === "string" && body.note.trim() ? body.note.trim().slice(0, 500) : null,
+      category: typeof body.category === "string" ? body.category.slice(0, 64) : "other",
+      emoji: typeof body.emoji === "string" && body.emoji.trim() ? body.emoji.trim().slice(0, 32) : "🎁",
+      amazonUrl,
+      imageUrl,
+    },
+  });
+  return NextResponse.json(item);
 });
 
 export const PUT = withErrors(async (req: NextRequest) => {

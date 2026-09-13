@@ -2,15 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Award, BookOpen, CalendarDays, Camera, CheckCircle2, Download, ExternalLink, Gift, GraduationCap, Heart, ListPlus, LogOut, Pencil, Plus, RefreshCw, Search, Send, ShieldCheck, Sparkles, Star, Utensils } from "lucide-react";
+import { Award, BookOpen, CalendarDays, Camera, CheckCircle2, Download, Gift, GraduationCap, Heart, ListPlus, LogOut, Pencil, Plus, RefreshCw, Send, ShieldCheck, Sparkles, Star, Utensils } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { COMPLETION_EMOJIS, WISH_CATEGORIES, WISH_EMOJIS } from "@/types";
 import { choicesForDisplay } from "@/lib/education";
-import { amazonSearchUrl } from "@/lib/amazon";
 import { WISH_LIST_TYPE_META, type WishListType } from "@/lib/wishlists";
+import { AmazonProductSearch } from "@/components/amazon-product-search";
 
 type Device = {
   id: string;
@@ -120,7 +120,7 @@ export default function TaskScreenPage() {
   const [showInstallHelp, setShowInstallHelp] = useState(false);
   const [showWish, setShowWish] = useState(false);
   const [wishMemberId, setWishMemberId] = useState("");
-  const [wish, setWish] = useState({ title: "", category: "toy", emoji: "🎮", note: "", amazonUrl: "" });
+  const [wish, setWish] = useState({ title: "", category: "toy", emoji: "🎮", note: "", amazonUrl: "", imageUrl: "" });
   const [wishLists, setWishLists] = useState<DeviceGiftList[]>([]);
   const [wishListId, setWishListId] = useState("");
   const [showCreateWishList, setShowCreateWishList] = useState(false);
@@ -271,7 +271,7 @@ export default function TaskScreenPage() {
   }
 
   function openWish() {
-    setWish({ title: "", category: "toy", emoji: "🎮", note: "", amazonUrl: "" });
+    setWish({ title: "", category: "toy", emoji: "🎮", note: "", amazonUrl: "", imageUrl: "" });
     setWishMemberId(device?.mode === "member" && device.member ? String(device.member.id) : "");
     setShowWish(true);
   }
@@ -370,12 +370,6 @@ export default function TaskScreenPage() {
     setWishLists((current) => current.map((list) => list.id === data.id ? data : list));
     setShowEditWishList(false);
     toast.success("List updated");
-  }
-
-  function searchAmazonForWish() {
-    const url = amazonSearchUrl(wish.title);
-    if (!url) { toast.error("Type a gift idea first"); return; }
-    window.open(url, "_blank", "noopener,noreferrer");
   }
 
   async function addOneTimeTask() {
@@ -885,14 +879,9 @@ export default function TaskScreenPage() {
                 className="mt-1 rounded-xl font-bold"
                 placeholder="LEGO set, shoes, movie night..."
               />
-              <button
-                type="button"
-                onClick={searchAmazonForWish}
-                className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-amber-200 bg-amber-50 py-2.5 text-sm font-black text-amber-700 transition-colors hover:bg-amber-100"
-              >
-                <Search size={16} /> Search Amazon <ExternalLink size={13} />
-              </button>
             </div>
+
+            <AmazonProductSearch initialQuery={wish.title} onSelect={(product) => setWish((current) => ({ ...current, title: product.title, amazonUrl: product.url, imageUrl: product.imageUrl ?? "" }))} />
 
             <div>
               <Label className="font-bold text-slate-600">Amazon product link (optional)</Label>
@@ -904,6 +893,8 @@ export default function TaskScreenPage() {
                 placeholder="Paste the Amazon item link here"
               />
             </div>
+
+            <div><Label className="font-bold text-slate-600">Amazon image URL (optional)</Label><Input value={wish.imageUrl} onChange={(event) => setWish((current) => ({ ...current, imageUrl: event.target.value }))} className="mt-1 rounded-xl" inputMode="url" />{wish.imageUrl && <img src={wish.imageUrl} alt="Gift preview" className="mt-2 h-20 w-20 rounded-xl object-contain" />}</div>
 
             <div>
               <Label className="font-bold text-slate-600">Note</Label>

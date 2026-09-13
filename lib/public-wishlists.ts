@@ -12,7 +12,7 @@ export const getPublicWishList = cache(async (token: string) => {
       member: { select: { name: true, avatar: true, color: true } },
       items: {
         where: { status: "pending" },
-        select: { id: true, title: true, category: true, emoji: true, note: true, amazonUrl: true },
+        select: { id: true, title: true, category: true, emoji: true, note: true, amazonUrl: true, imageUrl: true },
         orderBy: { createdAt: "desc" },
       },
     },

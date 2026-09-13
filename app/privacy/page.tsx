@@ -42,6 +42,7 @@ const sections = [
     body: [
       "ChoresList does not sell household personal information.",
       "A parent can choose to publish a gift list. Anyone with its public link, or anyone viewing a website where its embed code was added, can see the list owner's display name, avatar, list title, gift ideas, notes, and Amazon links. Granted gifts are not shown. Parents can turn public sharing off at any time.",
+      "When Amazon catalog search is enabled, the gift search terms are sent to Amazon's Creators API. Selected product titles, links, and thumbnail URLs are stored with the gift-list item.",
       "Some features rely on service providers, such as hosting, database storage, email delivery, image processing, Google Calendar sync, AI-assisted chore instructions, and weather forecast data. These providers process information only as needed to support app functionality.",
     ],
   },
