@@ -4,6 +4,21 @@ import { withErrors } from "@/lib/api";
 import { hashDeviceSecret, requireDeviceSession } from "@/lib/device-session";
 import { cleanAmazonImageUrl, cleanAmazonUrl } from "@/lib/amazon";
 
+const kidWishItemSelect = {
+  id: true,
+  householdId: true,
+  memberId: true,
+  listId: true,
+  title: true,
+  category: true,
+  emoji: true,
+  note: true,
+  amazonUrl: true,
+  imageUrl: true,
+  status: true,
+  createdAt: true,
+} as const;
+
 async function verifyDevice(req: NextRequest) {
   const session = requireDeviceSession(req);
   const device = await prisma.householdDevice.findFirst({
@@ -80,6 +95,7 @@ export const POST = withErrors(async (req: NextRequest) => {
       amazonUrl,
       imageUrl,
     },
+    select: kidWishItemSelect,
   });
 
   await prisma.householdDevice.update({
@@ -108,6 +124,7 @@ export const PATCH = withErrors(async (req: NextRequest) => {
   const updated = await prisma.wishListItem.update({
     where: { id, householdId: session.householdId },
     data: { title, note: typeof body.note === "string" && body.note.trim() ? body.note.trim().slice(0, 500) : null, category: typeof body.category === "string" ? body.category.slice(0, 64) : "other", emoji: typeof body.emoji === "string" && body.emoji.trim() ? body.emoji.trim().slice(0, 32) : "🎁", amazonUrl, imageUrl },
+    select: kidWishItemSelect,
   });
   return NextResponse.json(updated);
 });
