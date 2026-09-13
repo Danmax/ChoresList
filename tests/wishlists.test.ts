@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canCreateBirthdayList, daysUntilBirthday, defaultWishListTitle, wishListEventYear } from "../lib/wishlists";
+import { canCreateBirthdayList, cleanGiftPurchaseStatus, daysUntilBirthday, defaultWishListTitle, parseEstimatedCostCents, wishListEventYear } from "../lib/wishlists";
 
 test("birthday lists unlock six weeks before the next birthday", () => {
   const now = new Date(2026, 8, 13);
@@ -21,4 +21,13 @@ test("default list titles match their occasion", () => {
   assert.equal(defaultWishListTitle("christmas", "Mia", new Date(2026, 8, 13)), "Christmas 2026");
   assert.equal(wishListEventYear("christmas", null, null, new Date(2026, 11, 26)), 2027);
   assert.equal(wishListEventYear("birthday", 1, 1, new Date(2026, 11, 20)), 2027);
+});
+
+test("parent gift tracking values are validated", () => {
+  assert.equal(cleanGiftPurchaseStatus("ordered"), "ordered");
+  assert.equal(cleanGiftPurchaseStatus("obtained"), "obtained");
+  assert.equal(cleanGiftPurchaseStatus("shipped"), null);
+  assert.deepEqual(parseEstimatedCostCents("19.99"), { valid: true, value: 1999 });
+  assert.deepEqual(parseEstimatedCostCents(""), { valid: true, value: null });
+  assert.deepEqual(parseEstimatedCostCents(-1), { valid: false });
 });

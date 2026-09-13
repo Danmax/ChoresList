@@ -3,12 +3,30 @@ import { prisma } from "@/lib/prisma";
 import { requireParentSession, requireSession, withErrors } from "@/lib/api";
 import { cleanAmazonImageUrl, cleanAmazonUrl } from "@/lib/amazon";
 import { canAccessMember, childAccessWhere } from "@/lib/child-access";
+import { cleanGiftPurchaseStatus, parseEstimatedCostCents } from "@/lib/wishlists";
+
+const wishItemSelect = {
+  id: true,
+  householdId: true,
+  memberId: true,
+  listId: true,
+  title: true,
+  category: true,
+  emoji: true,
+  note: true,
+  amazonUrl: true,
+  imageUrl: true,
+  status: true,
+  createdAt: true,
+} as const;
 
 export const GET = withErrors(async (req: NextRequest) => {
   const { householdId, parentId } = requireSession(req);
   const { searchParams } = new URL(req.url);
   const memberId = searchParams.get("memberId");
   const listId = searchParams.get("listId");
+  const includeParentTools = searchParams.get("parentTools") === "1";
+  if (includeParentTools) await requireParentSession(req);
   const accessWhere = await childAccessWhere(parentId, householdId);
   const items = await prisma.wishListItem.findMany({
     where: {
@@ -17,7 +35,11 @@ export const GET = withErrors(async (req: NextRequest) => {
       ...(listId && { listId }),
       member: accessWhere,
     },
-    include: { member: { select: { id: true, name: true, avatar: true, color: true } } },
+    select: {
+      ...wishItemSelect,
+      ...(includeParentTools && { purchaseStatus: true, estimatedCostCents: true }),
+      member: { select: { id: true, name: true, avatar: true, color: true } },
+    },
     orderBy: [{ status: "asc" }, { createdAt: "desc" }],
   });
   return NextResponse.json(items);
@@ -62,6 +84,8 @@ export const POST = withErrors(async (req: NextRequest) => {
   if (typeof imageUrl === "string" && imageUrl.trim() && !cleanImage) {
     return NextResponse.json({ error: "Use an Amazon product image URL" }, { status: 400 });
   }
+  const estimatedCost = parseEstimatedCostCents(creatorType === "parent" ? body.estimatedCost : undefined);
+  if (!estimatedCost.valid) return NextResponse.json({ error: "Enter a valid cost estimate" }, { status: 400 });
   const item = await prisma.wishListItem.create({
     data: {
       householdId,
@@ -73,7 +97,9 @@ export const POST = withErrors(async (req: NextRequest) => {
       note: typeof note === "string" ? note.trim().slice(0, 500) : null,
       amazonUrl: cleanUrl,
       imageUrl: cleanImage,
+      ...(estimatedCost.value !== undefined && { estimatedCostCents: estimatedCost.value }),
     },
+    select: wishItemSelect,
   });
   return NextResponse.json(item, { status: 201 });
 });
@@ -98,6 +124,8 @@ export const PATCH = withErrors(async (req: NextRequest) => {
   const imageUrl = cleanAmazonImageUrl(body.imageUrl);
   if (typeof body.amazonUrl === "string" && body.amazonUrl.trim() && !amazonUrl) return NextResponse.json({ error: "Use a secure Amazon.com product link" }, { status: 400 });
   if (typeof body.imageUrl === "string" && body.imageUrl.trim() && !imageUrl) return NextResponse.json({ error: "Use an Amazon product image URL" }, { status: 400 });
+  const estimatedCost = parseEstimatedCostCents(editorType === "parent" ? body.estimatedCost : undefined);
+  if (!estimatedCost.valid) return NextResponse.json({ error: "Enter a valid cost estimate" }, { status: 400 });
   const item = await prisma.wishListItem.update({
     where: { id, householdId },
     data: {
@@ -107,7 +135,9 @@ export const PATCH = withErrors(async (req: NextRequest) => {
       emoji: typeof body.emoji === "string" && body.emoji.trim() ? body.emoji.trim().slice(0, 32) : "🎁",
       amazonUrl,
       imageUrl,
+      ...(estimatedCost.value !== undefined && { estimatedCostCents: estimatedCost.value }),
     },
+    select: wishItemSelect,
   });
   return NextResponse.json(item);
 });
@@ -115,10 +145,16 @@ export const PATCH = withErrors(async (req: NextRequest) => {
 export const PUT = withErrors(async (req: NextRequest) => {
   const { householdId, parentId } = await requireParentSession(req);
   const body = await req.json();
-  const { id, status, title, note, emoji, amazonUrl } = body;
+  const { id, status, title, note, emoji, amazonUrl, purchaseStatus } = body;
   if (status !== undefined && status !== "pending" && status !== "granted") {
     return NextResponse.json({ error: "Invalid wish status" }, { status: 400 });
   }
+  const cleanPurchaseStatus = purchaseStatus === undefined ? undefined : cleanGiftPurchaseStatus(purchaseStatus);
+  if (purchaseStatus !== undefined && !cleanPurchaseStatus) {
+    return NextResponse.json({ error: "Invalid purchase status" }, { status: 400 });
+  }
+  const estimatedCost = parseEstimatedCostCents(body.estimatedCost);
+  if (!estimatedCost.valid) return NextResponse.json({ error: "Enter a valid cost estimate" }, { status: 400 });
   const existing = await prisma.wishListItem.findFirst({
     where: { id: typeof id === "string" ? id : "", householdId },
     select: { memberId: true },
@@ -139,6 +175,8 @@ export const PUT = withErrors(async (req: NextRequest) => {
       ...(typeof note === "string" && { note: note.trim().slice(0, 500) }),
       ...(typeof emoji === "string" && { emoji: emoji.trim().slice(0, 32) }),
       ...(amazonUrl !== undefined && { amazonUrl: cleanUrl }),
+      ...(cleanPurchaseStatus && { purchaseStatus: cleanPurchaseStatus }),
+      ...(estimatedCost.value !== undefined && { estimatedCostCents: estimatedCost.value }),
     },
   });
   return NextResponse.json(item);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { ArrowLeft, CheckCircle2, Copy, ExternalLink, ListPlus, Pencil, Plus, Search, Share2, Trash2, Gift } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Copy, DollarSign, ExternalLink, ListPlus, PackageCheck, Pencil, Plus, Search, Share2, ShoppingCart, Trash2, Gift } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { WISH_CATEGORIES } from "@/types";
@@ -9,7 +9,7 @@ import { amazonSearchUrl } from "@/lib/amazon";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { canCreateBirthdayList, daysUntilBirthday, WISH_LIST_TYPE_META, type WishListType } from "@/lib/wishlists";
+import { canCreateBirthdayList, daysUntilBirthday, GIFT_PURCHASE_STATUSES, GIFT_PURCHASE_STATUS_META, WISH_LIST_TYPE_META, type GiftPurchaseStatus, type WishListType } from "@/lib/wishlists";
 import { AmazonProductSearch } from "@/components/amazon-product-search";
 
 interface Member { id: string; name: string; avatar: string; color: string; birthdayMonth?: number | null; birthdayDay?: number | null }
@@ -30,6 +30,8 @@ interface WishItem {
   amazonUrl: string | null;
   imageUrl: string | null;
   status: string;
+  purchaseStatus: GiftPurchaseStatus;
+  estimatedCostCents: number | null;
   createdAt: string;
   member: Member;
 }
@@ -49,13 +51,13 @@ export default function ParentWishlistPage() {
   const [shareOpen, setShareOpen] = useState(false);
   const [shareData, setShareData] = useState({ publicUrl: "", embedHtml: "" });
   const [newList, setNewList] = useState<{ memberId: string; type: WishListType; title: string }>({ memberId: "", type: "general", title: "" });
-  const [newGift, setNewGift] = useState({ title: "", amazonUrl: "", imageUrl: "", note: "" });
+  const [newGift, setNewGift] = useState({ title: "", amazonUrl: "", imageUrl: "", note: "", estimatedCost: "" });
   const [editList, setEditList] = useState<{ title: string; type: WishListType }>({ title: "", type: "general" });
-  const [editItem, setEditItem] = useState({ id: "", title: "", category: "other", emoji: "🎁", note: "", amazonUrl: "", imageUrl: "" });
+  const [editItem, setEditItem] = useState({ id: "", title: "", category: "other", emoji: "🎁", note: "", amazonUrl: "", imageUrl: "", estimatedCost: "" });
 
   const load = useCallback(async () => {
     const [wRes, mRes, lRes] = await Promise.all([
-      fetch("/api/wishlist"),
+      fetch("/api/wishlist?parentTools=1"),
       fetch("/api/members"),
       fetch("/api/wishlists"),
     ]);
@@ -124,7 +126,7 @@ export default function ParentWishlistPage() {
     const data = await res.json().catch(() => null);
     if (!res.ok) { toast.error(data?.error ?? "Could not add gift"); return; }
     setGiftOpen(false);
-    setNewGift({ title: "", amazonUrl: "", imageUrl: "", note: "" });
+    setNewGift({ title: "", amazonUrl: "", imageUrl: "", note: "", estimatedCost: "" });
     load();
     toast.success("Gift added");
   }
@@ -146,6 +148,32 @@ export default function ParentWishlistPage() {
     setEditItemOpen(false);
     await load();
     toast.success("Gift updated");
+  }
+
+  async function updateParentTracking(id: string, purchaseStatus: GiftPurchaseStatus) {
+    const res = await fetch("/api/wishlist", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, purchaseStatus }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) { toast.error(data?.error ?? "Could not update gift tracking"); return; }
+    setItems((current) => current.map((item) => item.id === id ? { ...item, purchaseStatus } : item));
+    toast.success(GIFT_PURCHASE_STATUS_META[purchaseStatus].label);
+  }
+
+  function openGiftEditor(item: WishItem) {
+    setEditItem({
+      id: item.id,
+      title: item.title,
+      category: item.category,
+      emoji: item.emoji,
+      note: item.note ?? "",
+      amazonUrl: item.amazonUrl ?? "",
+      imageUrl: item.imageUrl ?? "",
+      estimatedCost: item.estimatedCostCents === null ? "" : (item.estimatedCostCents / 100).toFixed(2),
+    });
+    setEditItemOpen(true);
   }
 
   async function setSharing(enable: boolean) {
@@ -185,6 +213,10 @@ export default function ParentWishlistPage() {
   const activeList = lists.find((list) => list.id === activeListId);
   const selectedMember = members.find((member) => member.id === newList.memberId);
   const visibleLists = lists.filter((list) => !filter || list.memberId === filter);
+  const orderedCount = filtered.filter((item) => item.purchaseStatus === "ordered").length;
+  const obtainedCount = filtered.filter((item) => item.purchaseStatus === "obtained").length;
+  const estimatedTotal = filtered.reduce((total, item) => total + (item.estimatedCostCents ?? 0), 0);
+  const formatCost = (cents: number) => new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(cents / 100);
 
   return (
     <div className="min-h-screen p-4 sm:p-6">
@@ -247,9 +279,14 @@ export default function ParentWishlistPage() {
       {activeList && <div className="mb-6 flex flex-wrap items-center gap-2 rounded-3xl bg-white p-4 shadow-sm">
         <div className="mr-auto"><p className="font-black text-slate-800">{activeList.member.avatar} {activeList.title}</p><p className="text-xs font-semibold text-slate-400">{WISH_LIST_TYPE_META[activeList.type].label}</p></div>
         <button onClick={() => { setEditList({ title: activeList.title, type: activeList.type }); setEditOpen(true); }} className="flex items-center gap-1.5 rounded-xl bg-slate-100 px-3 py-2 text-sm font-black text-slate-600"><Pencil size={15} /> Edit List</button>
-        <button onClick={() => { setNewGift({ title: "", amazonUrl: "", imageUrl: "", note: "" }); setGiftOpen(true); }} className="flex items-center gap-1.5 rounded-xl bg-violet-500 px-3 py-2 text-sm font-black text-white"><Plus size={15} /> Add Gift</button>
+        <button onClick={() => { setNewGift({ title: "", amazonUrl: "", imageUrl: "", note: "", estimatedCost: "" }); setGiftOpen(true); }} className="flex items-center gap-1.5 rounded-xl bg-violet-500 px-3 py-2 text-sm font-black text-white"><Plus size={15} /> Add Gift</button>
         <button onClick={() => activeList.publicToken ? setSharing(false) : setSharing(true)} className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-black ${activeList.publicToken ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-700"}`}><Share2 size={15} /> {activeList.publicToken ? "Stop Sharing" : "Share Publicly"}</button>
         {activeList.publicToken && <button onClick={() => setSharing(true)} className="rounded-xl bg-slate-100 px-3 py-2 text-sm font-black text-slate-600">Share Details</button>}
+      </div>}
+      {activeList && <div className="mb-6 grid gap-3 sm:grid-cols-3">
+        <div className="rounded-2xl border border-violet-100 bg-white p-4 shadow-sm"><p className="flex items-center gap-2 text-xs font-black uppercase tracking-wide text-slate-400"><DollarSign size={15} className="text-violet-500" /> Estimated total</p><p className="mt-1 text-2xl font-black text-slate-800">{formatCost(estimatedTotal)}</p></div>
+        <div className="rounded-2xl border border-amber-100 bg-white p-4 shadow-sm"><p className="flex items-center gap-2 text-xs font-black uppercase tracking-wide text-slate-400"><ShoppingCart size={15} className="text-amber-500" /> Ordered</p><p className="mt-1 text-2xl font-black text-slate-800">{orderedCount}</p></div>
+        <div className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm"><p className="flex items-center gap-2 text-xs font-black uppercase tracking-wide text-slate-400"><PackageCheck size={15} className="text-emerald-500" /> Ready to give</p><p className="mt-1 text-2xl font-black text-slate-800">{obtainedCount}</p></div>
       </div>}
       <div className="flex gap-2 flex-wrap mb-6">
         <button
@@ -305,8 +342,21 @@ export default function ParentWishlistPage() {
                       </a>
                     </div>
                   </div>
+                  <div className="mt-3 rounded-2xl bg-slate-50 p-3">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <p className="text-[11px] font-black uppercase tracking-wide text-slate-400">Private parent tracking</p>
+                      <button onClick={() => openGiftEditor(item)} className="flex items-center gap-1 text-xs font-black text-violet-600"><DollarSign size={12} /> {item.estimatedCostCents === null ? "Add estimate" : formatCost(item.estimatedCostCents)}</button>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1" role="group" aria-label={`Purchase status for ${item.title}`}>
+                      {GIFT_PURCHASE_STATUSES.map((purchaseStatus) => {
+                        const meta = GIFT_PURCHASE_STATUS_META[purchaseStatus];
+                        const selected = item.purchaseStatus === purchaseStatus;
+                        return <button key={purchaseStatus} onClick={() => updateParentTracking(item.id, purchaseStatus)} aria-pressed={selected} className={`rounded-lg px-1.5 py-2 text-[11px] font-black transition-colors ${selected ? "bg-slate-800 text-white" : "bg-white text-slate-500 hover:bg-slate-100"}`}><span className="block text-sm" aria-hidden="true">{meta.emoji}</span>{meta.shortLabel}</button>;
+                      })}
+                    </div>
+                  </div>
                   <div className="flex gap-2 mt-3">
-                    <button onClick={() => { setEditItem({ id: item.id, title: item.title, category: item.category, emoji: item.emoji, note: item.note ?? "", amazonUrl: item.amazonUrl ?? "", imageUrl: item.imageUrl ?? "" }); setEditItemOpen(true); }} className="flex items-center justify-center gap-1 rounded-xl bg-slate-100 px-3 py-2 text-sm font-black text-slate-600"><Pencil size={14} /> Edit</button>
+                    <button onClick={() => openGiftEditor(item)} className="flex items-center justify-center gap-1 rounded-xl bg-slate-100 px-3 py-2 text-sm font-black text-slate-600"><Pencil size={14} /> Edit</button>
                     <button
                       onClick={() => grant(item.id)}
                       className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-500 text-white rounded-xl py-2 font-black text-sm hover:bg-emerald-600 transition-colors"
@@ -338,6 +388,7 @@ export default function ParentWishlistPage() {
                 <div className="flex-1">
                   <p className="text-xs font-bold text-slate-400">{item.member.avatar} {item.member.name}</p>
                   <p className="font-bold text-slate-500 line-through text-sm">{item.title}</p>
+                  <p className="mt-1 text-xs font-bold text-slate-400">{GIFT_PURCHASE_STATUS_META[item.purchaseStatus].emoji} {GIFT_PURCHASE_STATUS_META[item.purchaseStatus].label}{item.estimatedCostCents !== null ? ` · ${formatCost(item.estimatedCostCents)}` : ""}</p>
                 </div>
                 <button
                   onClick={() => ungrant(item.id)}
@@ -377,6 +428,7 @@ export default function ParentWishlistPage() {
         <AmazonProductSearch initialQuery={newGift.title} onSelect={(product) => setNewGift((current) => ({ ...current, title: product.title, amazonUrl: product.url, imageUrl: product.imageUrl ?? "" }))} />
         <div><Label className="font-bold">Amazon link (optional)</Label><Input value={newGift.amazonUrl} onChange={(event) => setNewGift((current) => ({ ...current, amazonUrl: event.target.value }))} className="mt-1 rounded-xl" inputMode="url" /></div>
         <div><Label className="font-bold">Amazon image URL (optional)</Label><Input value={newGift.imageUrl} onChange={(event) => setNewGift((current) => ({ ...current, imageUrl: event.target.value }))} className="mt-1 rounded-xl" inputMode="url" />{newGift.imageUrl && <img src={newGift.imageUrl} alt="Gift preview" className="mt-2 h-20 w-20 rounded-xl object-contain" />}</div>
+        <div><Label className="font-bold">Estimated cost (optional)</Label><div className="relative mt-1"><DollarSign size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><Input value={newGift.estimatedCost} onChange={(event) => setNewGift((current) => ({ ...current, estimatedCost: event.target.value }))} className="rounded-xl pl-8" type="number" inputMode="decimal" min="0" max="1000000" step="0.01" placeholder="0.00" /></div><p className="mt-1 text-xs font-semibold text-slate-400">Visible to parents only.</p></div>
         <div><Label className="font-bold">Note (optional)</Label><Input value={newGift.note} onChange={(event) => setNewGift((current) => ({ ...current, note: event.target.value }))} className="mt-1 rounded-xl" /></div>
         <button onClick={addGift} className="w-full rounded-xl bg-violet-500 py-3 font-black text-white">Add Gift</button>
       </div></DialogContent></Dialog>
@@ -385,6 +437,7 @@ export default function ParentWishlistPage() {
         <div><Label className="font-bold">Gift name</Label><Input value={editItem.title} onChange={(event) => setEditItem((current) => ({ ...current, title: event.target.value }))} className="mt-1 rounded-xl" /></div>
         <AmazonProductSearch initialQuery={editItem.title} onSelect={(product) => setEditItem((current) => ({ ...current, title: product.title, amazonUrl: product.url, imageUrl: product.imageUrl ?? "" }))} />
         <div><Label className="font-bold">Category</Label><select value={editItem.category} onChange={(event) => { const category = WISH_CATEGORIES.find((entry) => entry.value === event.target.value); setEditItem((current) => ({ ...current, category: event.target.value, emoji: category?.emoji ?? current.emoji })); }} className="mt-1 w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-3 py-2 font-bold">{WISH_CATEGORIES.map((category) => <option key={category.value} value={category.value}>{category.emoji} {category.label}</option>)}</select></div>
+        <div><Label className="font-bold">Estimated cost</Label><div className="relative mt-1"><DollarSign size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><Input value={editItem.estimatedCost} onChange={(event) => setEditItem((current) => ({ ...current, estimatedCost: event.target.value }))} className="rounded-xl pl-8" type="number" inputMode="decimal" min="0" max="1000000" step="0.01" placeholder="0.00" /></div><p className="mt-1 text-xs font-semibold text-slate-400">Clear the field to remove the estimate. Parents only.</p></div>
         <div><Label className="font-bold">Note</Label><Input value={editItem.note} onChange={(event) => setEditItem((current) => ({ ...current, note: event.target.value }))} className="mt-1 rounded-xl" /></div>
         <div><Label className="font-bold">Amazon product link</Label><Input value={editItem.amazonUrl} onChange={(event) => setEditItem((current) => ({ ...current, amazonUrl: event.target.value }))} className="mt-1 rounded-xl" inputMode="url" /></div>
         <div><Label className="font-bold">Amazon image URL</Label><Input value={editItem.imageUrl} onChange={(event) => setEditItem((current) => ({ ...current, imageUrl: event.target.value }))} className="mt-1 rounded-xl" inputMode="url" />{editItem.imageUrl && <img src={editItem.imageUrl} alt="Gift preview" className="mt-2 h-20 w-20 rounded-xl object-contain" />}</div>

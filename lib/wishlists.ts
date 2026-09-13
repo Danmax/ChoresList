@@ -1,6 +1,29 @@
 export const WISH_LIST_TYPES = ["general", "christmas", "birthday"] as const;
 export type WishListType = (typeof WISH_LIST_TYPES)[number];
 
+export const GIFT_PURCHASE_STATUSES = ["not_ordered", "ordered", "obtained"] as const;
+export type GiftPurchaseStatus = (typeof GIFT_PURCHASE_STATUSES)[number];
+
+export const GIFT_PURCHASE_STATUS_META: Record<GiftPurchaseStatus, { label: string; shortLabel: string; emoji: string }> = {
+  not_ordered: { label: "Not ordered", shortLabel: "Idea", emoji: "💭" },
+  ordered: { label: "Ordered", shortLabel: "Ordered", emoji: "📦" },
+  obtained: { label: "Obtained · ready to give", shortLabel: "Obtained", emoji: "🎁" },
+};
+
+export function cleanGiftPurchaseStatus(value: unknown): GiftPurchaseStatus | null {
+  return typeof value === "string" && GIFT_PURCHASE_STATUSES.includes(value as GiftPurchaseStatus)
+    ? value as GiftPurchaseStatus
+    : null;
+}
+
+export function parseEstimatedCostCents(value: unknown): { valid: boolean; value?: number | null } {
+  if (value === undefined) return { valid: true };
+  if (value === null || value === "") return { valid: true, value: null };
+  const amount = typeof value === "number" || typeof value === "string" ? Number(value) : Number.NaN;
+  if (!Number.isFinite(amount) || amount < 0 || amount > 1_000_000) return { valid: false };
+  return { valid: true, value: Math.round(amount * 100) };
+}
+
 export const WISH_LIST_TYPE_META: Record<WishListType, { label: string; emoji: string; description: string }> = {
   general: { label: "Wish List", emoji: "✨", description: "Gift ideas for any time of year" },
   christmas: { label: "Christmas List", emoji: "🎄", description: "Christmas gift ideas" },

@@ -644,18 +644,20 @@ model ChoreInstructions {
 }
 
 model WishListItem {
-  id          String   @id @default(uuid()) @db.Char(36)
-  householdId String   @db.Char(36)
-  memberId    String   @db.Char(36)
-  listId      String   @db.Char(36)
-  title       String   @db.VarChar(255)
-  category    String   @default("other") @db.VarChar(64)
-  emoji       String   @default("🎁") @db.VarChar(32)
-  note        String?  @db.Text
-  amazonUrl   String?  @db.Text
-  imageUrl    String?  @db.Text
-  status      String   @default("pending") @db.VarChar(64)
-  createdAt   DateTime @default(now())
+  id                 String   @id @default(uuid()) @db.Char(36)
+  householdId        String   @db.Char(36)
+  memberId           String   @db.Char(36)
+  listId             String   @db.Char(36)
+  title              String   @db.VarChar(255)
+  category           String   @default("other") @db.VarChar(64)
+  emoji              String   @default("🎁") @db.VarChar(32)
+  note               String?  @db.Text
+  amazonUrl          String?  @db.Text
+  imageUrl           String?  @db.Text
+  status             String   @default("pending") @db.VarChar(64)
+  purchaseStatus     String   @default("not_ordered") @db.VarChar(32)
+  estimatedCostCents Int?
+  createdAt          DateTime @default(now())
 
   member    FamilyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
   household Household    @relation(fields: [householdId], references: [id], onDelete: Cascade)
