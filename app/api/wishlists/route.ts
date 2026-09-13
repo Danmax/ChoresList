@@ -4,17 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { requireParentSession, requireSession, withErrors } from "@/lib/api";
 import { canAccessMember, childAccessWhere } from "@/lib/child-access";
 import { getBaseUrl } from "@/lib/base-url";
-import { canCreateBirthdayList, cleanWishListType, defaultWishListTitle } from "@/lib/wishlists";
+import { canCreateBirthdayList, cleanWishListType, defaultWishListTitle, wishListEventYear } from "@/lib/wishlists";
 
 export const runtime = "nodejs";
-
-function eventYear(type: string, birthdayMonth: number | null, birthdayDay: number | null) {
-  const now = new Date();
-  if (type === "christmas") return now.getMonth() === 11 && now.getDate() > 25 ? now.getFullYear() + 1 : now.getFullYear();
-  if (type !== "birthday" || !birthdayMonth || !birthdayDay) return null;
-  const thisBirthday = new Date(now.getFullYear(), birthdayMonth - 1, birthdayDay);
-  return thisBirthday < new Date(now.getFullYear(), now.getMonth(), now.getDate()) ? now.getFullYear() + 1 : now.getFullYear();
-}
 
 export const GET = withErrors(async (req: NextRequest) => {
   const { householdId, parentId } = requireSession(req);
@@ -66,7 +58,7 @@ export const POST = withErrors(async (req: NextRequest) => {
       memberId,
       title,
       type,
-      eventYear: eventYear(type, member.birthdayMonth, member.birthdayDay),
+      eventYear: wishListEventYear(type, member.birthdayMonth, member.birthdayDay),
       createdByType: creatorType,
       createdByParentId: parentId,
     },

@@ -34,3 +34,11 @@ export function defaultWishListTitle(type: WishListType, memberName: string, now
   }
   return `${memberName}'s Wish List`;
 }
+
+export function wishListEventYear(type: WishListType, birthdayMonth?: number | null, birthdayDay?: number | null, now = new Date()) {
+  if (type === "christmas") return now.getMonth() === 11 && now.getDate() > 25 ? now.getFullYear() + 1 : now.getFullYear();
+  if (type !== "birthday" || !birthdayMonth || !birthdayDay) return null;
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const birthday = new Date(now.getFullYear(), birthdayMonth - 1, birthdayDay);
+  return birthday < today ? now.getFullYear() + 1 : now.getFullYear();
+}

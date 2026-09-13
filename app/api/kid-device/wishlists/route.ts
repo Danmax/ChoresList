@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { withErrors } from "@/lib/api";
 import { hashDeviceSecret, requireDeviceSession } from "@/lib/device-session";
-import { canCreateBirthdayList, cleanWishListType, defaultWishListTitle } from "@/lib/wishlists";
+import { canCreateBirthdayList, cleanWishListType, defaultWishListTitle, wishListEventYear } from "@/lib/wishlists";
 
 async function verifyDevice(req: NextRequest) {
   const session = requireDeviceSession(req);
@@ -52,7 +52,7 @@ export const POST = withErrors(async (req: NextRequest) => {
   }
   const title = typeof body.title === "string" && body.title.trim() ? body.title.trim().slice(0, 120) : defaultWishListTitle(type, member.name);
   const list = await prisma.giftList.create({
-    data: { householdId: session.householdId, memberId, title, type, createdByType: "kid" },
+    data: { householdId: session.householdId, memberId, title, type, eventYear: wishListEventYear(type, member.birthdayMonth, member.birthdayDay), createdByType: "kid" },
     include: { member: { select: { id: true, name: true, avatar: true } }, _count: { select: { items: true } } },
   });
   return NextResponse.json(list, { status: 201 });

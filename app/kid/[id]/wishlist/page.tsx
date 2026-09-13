@@ -74,11 +74,13 @@ export default function KidWishlistPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  useEffect(() => {
+  const loadItems = useCallback(async () => {
     if (!activeListId) { setItems([]); return; }
-    fetch(`/api/wishlist?memberId=${memberId}&listId=${activeListId}`)
-      .then(async (res) => res.ok ? setItems(await res.json()) : setItems([]));
+    const res = await fetch(`/api/wishlist?memberId=${memberId}&listId=${activeListId}`);
+    setItems(res.ok ? await res.json() : []);
   }, [activeListId, memberId]);
+
+  useEffect(() => { loadItems(); }, [loadItems]);
 
   function openAdd() {
     setForm({ title: "", category: "toy", emoji: "🎮", note: "", amazonUrl: "" });
@@ -102,7 +104,7 @@ export default function KidWishlistPage() {
     if (!res.ok) { toast.error(data?.error ?? "Could not add this gift"); return; }
     toast.success("Added to your list! 🎁");
     setOpen(false);
-    load();
+    await Promise.all([load(), loadItems()]);
   }
 
   async function createList() {
@@ -128,7 +130,7 @@ export default function KidWishlistPage() {
 
   async function remove(itemId: string) {
     await fetch(`/api/wishlist?id=${itemId}`, { method: "DELETE" });
-    load();
+    await Promise.all([load(), loadItems()]);
   }
 
   const pending = items.filter((i) => i.status === "pending");
