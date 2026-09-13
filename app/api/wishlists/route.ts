@@ -29,6 +29,7 @@ export const POST = withErrors(async (req: NextRequest) => {
   const memberId = typeof body.memberId === "string" ? body.memberId : "";
   const type = cleanWishListType(body.type);
   const creatorType = body.creatorType === "kid" ? "kid" : "parent";
+  if (creatorType === "parent") await requireParentSession(req);
   if (!memberId || !type) return NextResponse.json({ error: "Choose a person and list type" }, { status: 400 });
   if (!(await canAccessMember(parentId, householdId, memberId))) {
     return NextResponse.json({ error: "You do not have access to this family member" }, { status: 403 });
@@ -93,4 +94,40 @@ export const PUT = withErrors(async (req: NextRequest) => {
     embedUrl: publicToken ? `${baseUrl}/embed/wishlists/${publicToken}` : null,
     embedHtml: publicToken ? `<iframe src="${baseUrl}/embed/wishlists/${publicToken}" title="Shared wish list" width="100%" height="600" style="border:0;border-radius:24px" loading="lazy"></iframe>` : null,
   });
+});
+
+export const PATCH = withErrors(async (req: NextRequest) => {
+  const { householdId, parentId } = requireSession(req);
+  const body = await req.json();
+  const id = typeof body.id === "string" ? body.id : "";
+  const type = cleanWishListType(body.type);
+  const title = typeof body.title === "string" ? body.title.trim().slice(0, 120) : "";
+  const editorType = body.editorType === "kid" ? "kid" : "parent";
+  if (editorType === "parent") await requireParentSession(req);
+  if (!type || !title) return NextResponse.json({ error: "List name and type are required" }, { status: 400 });
+
+  const [list, household] = await Promise.all([
+    prisma.giftList.findFirst({
+      where: { id, householdId },
+      select: { memberId: true, type: true, member: { select: { birthdayMonth: true, birthdayDay: true } } },
+    }),
+    prisma.household.findUnique({ where: { id: householdId }, select: { privacyAllowKidWishlist: true } }),
+  ]);
+  if (!list) return NextResponse.json({ error: "List not found" }, { status: 404 });
+  if (!(await canAccessMember(parentId, householdId, list.memberId))) {
+    return NextResponse.json({ error: "You do not have access to this family member" }, { status: 403 });
+  }
+  if (editorType === "kid" && !household?.privacyAllowKidWishlist) {
+    return NextResponse.json({ error: "List editing is turned off by a parent" }, { status: 403 });
+  }
+  if (type === "birthday" && list.type !== "birthday" && !canCreateBirthdayList(list.member.birthdayMonth, list.member.birthdayDay)) {
+    return NextResponse.json({ error: list.member.birthdayMonth ? "Birthday lists open six weeks before the birthday" : "Add a birthday to this profile first" }, { status: 400 });
+  }
+
+  const updated = await prisma.giftList.update({
+    where: { id, householdId },
+    data: { title, type, eventYear: wishListEventYear(type, list.member.birthdayMonth, list.member.birthdayDay) },
+    include: { member: { select: { id: true, name: true, avatar: true, color: true } }, _count: { select: { items: true } } },
+  });
+  return NextResponse.json(updated);
 });

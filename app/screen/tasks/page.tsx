@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Award, BookOpen, CalendarDays, Camera, CheckCircle2, Download, ExternalLink, Gift, GraduationCap, Heart, ListPlus, LogOut, Plus, RefreshCw, Search, Send, ShieldCheck, Sparkles, Star, Utensils } from "lucide-react";
+import { Award, BookOpen, CalendarDays, Camera, CheckCircle2, Download, ExternalLink, Gift, GraduationCap, Heart, ListPlus, LogOut, Pencil, Plus, RefreshCw, Search, Send, ShieldCheck, Sparkles, Star, Utensils } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -124,7 +124,9 @@ export default function TaskScreenPage() {
   const [wishLists, setWishLists] = useState<DeviceGiftList[]>([]);
   const [wishListId, setWishListId] = useState("");
   const [showCreateWishList, setShowCreateWishList] = useState(false);
+  const [showEditWishList, setShowEditWishList] = useState(false);
   const [newWishList, setNewWishList] = useState<{ type: WishListType; title: string }>({ type: "general", title: "" });
+  const [editWishList, setEditWishList] = useState<{ type: WishListType; title: string }>({ type: "general", title: "" });
   const [showTaskPicker, setShowTaskPicker] = useState(false);
   const [catalogMembers, setCatalogMembers] = useState<CatalogMember[]>([]);
   const [catalogChores, setCatalogChores] = useState<CatalogChore[]>([]);
@@ -344,7 +346,7 @@ export default function TaskScreenPage() {
       return;
     }
 
-    toast.success("Added to Christmas list 🎄");
+    toast.success("Added to gift list 🎁");
     setShowWish(false);
   }
 
@@ -358,6 +360,16 @@ export default function TaskScreenPage() {
     setShowCreateWishList(false);
     setNewWishList({ type: "general", title: "" });
     toast.success(`${data.title} created`);
+  }
+
+  async function saveDeviceWishList() {
+    if (!wishListId || !editWishList.title.trim()) { toast.error("Add a list name"); return; }
+    const res = await fetch("/api/kid-device/wishlists", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: wishListId, ...editWishList }) });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) { toast.error(data?.error ?? "Could not update list"); return; }
+    setWishLists((current) => current.map((list) => list.id === data.id ? data : list));
+    setShowEditWishList(false);
+    toast.success("List updated");
   }
 
   function searchAmazonForWish() {
@@ -780,7 +792,7 @@ export default function TaskScreenPage() {
       </div>
 
       <Dialog open={showWish} onOpenChange={setShowWish}>
-        <DialogContent className="max-w-md rounded-3xl">
+        <DialogContent className="max-h-[90vh] max-w-md overflow-y-auto rounded-3xl">
           <DialogHeader>
             <DialogTitle className="font-black">🎁 Add to a Gift List</DialogTitle>
           </DialogHeader>
@@ -812,6 +824,7 @@ export default function TaskScreenPage() {
                   {wishLists.map((list) => <option key={list.id} value={list.id}>{WISH_LIST_TYPE_META[list.type].emoji} {list.title}</option>)}
                 </select>
                 <button type="button" onClick={() => setShowCreateWishList((value) => !value)} className="rounded-xl border-2 border-violet-100 px-3 font-black text-violet-600"><ListPlus size={17} /></button>
+                <button type="button" disabled={!wishListId} onClick={() => { const list = wishLists.find((item) => item.id === wishListId); if (list) { setEditWishList({ title: list.title, type: list.type }); setShowEditWishList(true); setShowCreateWishList(false); } }} className="rounded-xl border-2 border-slate-100 px-3 font-black text-slate-600 disabled:opacity-40"><Pencil size={17} /></button>
               </div>
             </div>}
 
@@ -819,6 +832,13 @@ export default function TaskScreenPage() {
               <div className="grid grid-cols-3 gap-2">{(Object.entries(WISH_LIST_TYPE_META) as [WishListType, typeof WISH_LIST_TYPE_META[WishListType]][]).map(([type, meta]) => <button key={type} type="button" onClick={() => setNewWishList((current) => ({ ...current, type }))} className={`rounded-xl p-2 text-xs font-black ${newWishList.type === type ? "bg-violet-500 text-white" : "bg-white text-slate-600"}`}>{meta.emoji} {meta.label}</button>)}</div>
               <Input value={newWishList.title} onChange={(event) => setNewWishList((current) => ({ ...current, title: event.target.value }))} placeholder="Optional list name" className="rounded-xl bg-white" />
               <button type="button" onClick={createDeviceWishList} className="w-full rounded-xl bg-violet-500 py-2 font-black text-white">Create List</button>
+            </div>}
+
+            {showEditWishList && <div className="space-y-3 rounded-2xl bg-slate-50 p-3">
+              <p className="font-black text-slate-700">Edit list</p>
+              <div className="grid grid-cols-3 gap-2">{(Object.entries(WISH_LIST_TYPE_META) as [WishListType, typeof WISH_LIST_TYPE_META[WishListType]][]).map(([type, meta]) => <button key={type} type="button" onClick={() => setEditWishList((current) => ({ ...current, type }))} className={`rounded-xl p-2 text-xs font-black ${editWishList.type === type ? "bg-slate-700 text-white" : "bg-white text-slate-600"}`}>{meta.emoji} {meta.label}</button>)}</div>
+              <Input value={editWishList.title} onChange={(event) => setEditWishList((current) => ({ ...current, title: event.target.value }))} className="rounded-xl bg-white" />
+              <button type="button" onClick={saveDeviceWishList} className="w-full rounded-xl bg-slate-700 py-2 font-black text-white">Save Changes</button>
             </div>}
 
             <div>

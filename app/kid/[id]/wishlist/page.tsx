@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { ArrowLeft, ExternalLink, ListPlus, Plus, Search, Trash2, Sparkles } from "lucide-react";
+import { ArrowLeft, ExternalLink, ListPlus, Pencil, Plus, Search, Trash2, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -51,7 +51,9 @@ export default function KidWishlistPage() {
   const [activeListId, setActiveListId] = useState("");
   const [open, setOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [newList, setNewList] = useState<{ type: WishListType; title: string }>({ type: "general", title: "" });
+  const [editList, setEditList] = useState<{ type: WishListType; title: string }>({ type: "general", title: "" });
   const [step, setStep] = useState<"category" | "details">("category");
   const [form, setForm] = useState({ title: "", category: "toy", emoji: "🎮", note: "", amazonUrl: "" });
 
@@ -122,6 +124,20 @@ export default function KidWishlistPage() {
     toast.success(`${data.title} created!`);
   }
 
+  async function saveListEdits() {
+    if (!activeList || !editList.title.trim()) { toast.error("Add a list name"); return; }
+    const res = await fetch("/api/wishlists", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: activeList.id, editorType: "kid", ...editList }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) { toast.error(data?.error ?? "Could not update this list"); return; }
+    setEditOpen(false);
+    await load();
+    toast.success("List updated");
+  }
+
   function searchAmazon() {
     const url = amazonSearchUrl(form.title);
     if (!url) { toast.error("Type a gift idea first"); return; }
@@ -150,6 +166,13 @@ export default function KidWishlistPage() {
         <h1 className="text-2xl sm:text-3xl font-black text-slate-800 flex-1">
           {activeList ? WISH_LIST_TYPE_META[activeList.type].emoji : "🎁"} {activeList?.title ?? `${member?.name}'s Gift Lists`}
         </h1>
+        <button
+          onClick={() => { if (activeList) { setEditList({ title: activeList.title, type: activeList.type }); setEditOpen(true); } }}
+          disabled={!activeList}
+          className="flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-2.5 font-bold text-slate-600 shadow-sm hover:shadow-md disabled:opacity-40"
+        >
+          <Pencil size={17} /> Edit List
+        </button>
         <button
           onClick={() => { setNewList({ type: "general", title: "" }); setCreateOpen(true); }}
           className="flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-2.5 font-bold text-slate-600 shadow-sm hover:shadow-md"
@@ -365,6 +388,20 @@ export default function KidWishlistPage() {
             </div>
             <div><Label className="font-bold text-slate-600">List name (optional)</Label><Input value={newList.title} onChange={(event) => setNewList((current) => ({ ...current, title: event.target.value }))} placeholder={WISH_LIST_TYPE_META[newList.type].label} className="mt-1 rounded-xl" /></div>
             <button type="button" onClick={createList} className="w-full rounded-xl bg-violet-500 py-3 font-black text-white hover:bg-violet-600"><ListPlus className="mr-2 inline" size={18} /> Create List</button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-sm rounded-3xl">
+          <DialogHeader><DialogTitle className="text-center text-xl font-black">Edit Gift List</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div><Label className="font-bold text-slate-600">List name</Label><Input value={editList.title} onChange={(event) => setEditList((current) => ({ ...current, title: event.target.value }))} className="mt-1 rounded-xl" /></div>
+            <div className="grid gap-2">{(Object.entries(WISH_LIST_TYPE_META) as [WishListType, typeof WISH_LIST_TYPE_META[WishListType]][]).map(([type, meta]) => {
+              const locked = type === "birthday" && activeList?.type !== "birthday" && !canCreateBirthdayList(member?.birthdayMonth, member?.birthdayDay);
+              return <button key={type} type="button" disabled={locked} onClick={() => setEditList((current) => ({ ...current, type }))} className={`rounded-2xl border-2 p-3 text-left ${editList.type === type ? "border-violet-400 bg-violet-50" : "border-slate-100 bg-slate-50"} disabled:opacity-45`}><span className="font-black text-slate-700">{meta.emoji} {meta.label}</span><span className="block text-xs font-semibold text-slate-400">{locked ? "Available six weeks before your birthday" : meta.description}</span></button>;
+            })}</div>
+            <button type="button" onClick={saveListEdits} className="w-full rounded-xl bg-violet-500 py-3 font-black text-white">Save Changes</button>
           </div>
         </DialogContent>
       </Dialog>

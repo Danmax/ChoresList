@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { ArrowLeft, CheckCircle2, Copy, ExternalLink, ListPlus, Plus, Search, Share2, Trash2, Gift } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Copy, ExternalLink, ListPlus, Pencil, Plus, Search, Share2, Trash2, Gift } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { WISH_CATEGORIES } from "@/types";
@@ -42,10 +42,12 @@ export default function ParentWishlistPage() {
   const [amazonQuery, setAmazonQuery] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [giftOpen, setGiftOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [shareData, setShareData] = useState({ publicUrl: "", embedHtml: "" });
   const [newList, setNewList] = useState<{ memberId: string; type: WishListType; title: string }>({ memberId: "", type: "general", title: "" });
   const [newGift, setNewGift] = useState({ title: "", amazonUrl: "", note: "" });
+  const [editList, setEditList] = useState<{ title: string; type: WishListType }>({ title: "", type: "general" });
 
   const load = useCallback(async () => {
     const [wRes, mRes, lRes] = await Promise.all([
@@ -121,6 +123,16 @@ export default function ParentWishlistPage() {
     setNewGift({ title: "", amazonUrl: "", note: "" });
     load();
     toast.success("Gift added");
+  }
+
+  async function saveListEdits() {
+    if (!activeList || !editList.title.trim()) { toast.error("Add a list name"); return; }
+    const res = await fetch("/api/wishlists", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: activeList.id, editorType: "parent", ...editList }) });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) { toast.error(data?.error ?? "Could not update list"); return; }
+    setEditOpen(false);
+    await load();
+    toast.success("List updated");
   }
 
   async function setSharing(enable: boolean) {
@@ -200,7 +212,7 @@ export default function ParentWishlistPage() {
           onClick={() => { setFilter(""); setActiveListId(lists[0]?.id ?? ""); }}
           className={`px-4 py-2 rounded-full font-bold text-sm transition-colors ${!filter ? "bg-slate-800 text-white" : "bg-white text-slate-600"}`}
         >
-          All Kids
+          Everyone
         </button>
         {members.filter((m) => m).map((m) => (
           <button
@@ -221,6 +233,7 @@ export default function ParentWishlistPage() {
 
       {activeList && <div className="mb-6 flex flex-wrap items-center gap-2 rounded-3xl bg-white p-4 shadow-sm">
         <div className="mr-auto"><p className="font-black text-slate-800">{activeList.member.avatar} {activeList.title}</p><p className="text-xs font-semibold text-slate-400">{WISH_LIST_TYPE_META[activeList.type].label}</p></div>
+        <button onClick={() => { setEditList({ title: activeList.title, type: activeList.type }); setEditOpen(true); }} className="flex items-center gap-1.5 rounded-xl bg-slate-100 px-3 py-2 text-sm font-black text-slate-600"><Pencil size={15} /> Edit List</button>
         <button onClick={() => { setNewGift({ title: "", amazonUrl: "", note: "" }); setGiftOpen(true); }} className="flex items-center gap-1.5 rounded-xl bg-violet-500 px-3 py-2 text-sm font-black text-white"><Plus size={15} /> Add Gift</button>
         <button onClick={() => activeList.publicToken ? setSharing(false) : setSharing(true)} className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-black ${activeList.publicToken ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-700"}`}><Share2 size={15} /> {activeList.publicToken ? "Stop Sharing" : "Share Publicly"}</button>
         {activeList.publicToken && <button onClick={() => setSharing(true)} className="rounded-xl bg-slate-100 px-3 py-2 text-sm font-black text-slate-600">Share Details</button>}
@@ -351,6 +364,12 @@ export default function ParentWishlistPage() {
         <div><Label className="font-bold">Amazon link (optional)</Label><Input value={newGift.amazonUrl} onChange={(event) => setNewGift((current) => ({ ...current, amazonUrl: event.target.value }))} className="mt-1 rounded-xl" inputMode="url" /></div>
         <div><Label className="font-bold">Note (optional)</Label><Input value={newGift.note} onChange={(event) => setNewGift((current) => ({ ...current, note: event.target.value }))} className="mt-1 rounded-xl" /></div>
         <button onClick={addGift} className="w-full rounded-xl bg-violet-500 py-3 font-black text-white">Add Gift</button>
+      </div></DialogContent></Dialog>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}><DialogContent className="max-w-md rounded-3xl"><DialogHeader><DialogTitle className="font-black">Edit Gift List</DialogTitle></DialogHeader><div className="space-y-4">
+        <div><Label className="font-bold">List name</Label><Input value={editList.title} onChange={(event) => setEditList((current) => ({ ...current, title: event.target.value }))} className="mt-1 rounded-xl" /></div>
+        <div className="grid gap-2">{(Object.entries(WISH_LIST_TYPE_META) as [WishListType, typeof WISH_LIST_TYPE_META[WishListType]][]).map(([type, meta]) => { const locked = type === "birthday" && activeList?.type !== "birthday" && !canCreateBirthdayList(activeList?.member.birthdayMonth, activeList?.member.birthdayDay); return <button key={type} disabled={locked} onClick={() => setEditList((current) => ({ ...current, type }))} className={`rounded-2xl border-2 p-3 text-left ${editList.type === type ? "border-violet-400 bg-violet-50" : "border-slate-100 bg-slate-50"} disabled:opacity-45`}><span className="font-black">{meta.emoji} {meta.label}</span><span className="block text-xs font-semibold text-slate-400">{locked ? "Available six weeks before the birthday" : meta.description}</span></button>; })}</div>
+        <button onClick={saveListEdits} className="w-full rounded-xl bg-violet-500 py-3 font-black text-white">Save Changes</button>
       </div></DialogContent></Dialog>
 
       <Dialog open={shareOpen} onOpenChange={setShareOpen}><DialogContent className="max-w-lg rounded-3xl"><DialogHeader><DialogTitle className="font-black">Share This List</DialogTitle></DialogHeader><div className="space-y-4">

@@ -57,3 +57,36 @@ export const POST = withErrors(async (req: NextRequest) => {
   });
   return NextResponse.json(list, { status: 201 });
 });
+
+export const PATCH = withErrors(async (req: NextRequest) => {
+  const session = await verifyDevice(req);
+  if (!session) return NextResponse.json({ error: "Device access revoked" }, { status: 401 });
+  const body = await req.json();
+  const id = typeof body.id === "string" ? body.id : "";
+  const title = typeof body.title === "string" ? body.title.trim().slice(0, 120) : "";
+  const type = cleanWishListType(body.type);
+  if (!id || !title || !type) return NextResponse.json({ error: "List name and type are required" }, { status: 400 });
+
+  const [list, household] = await Promise.all([
+    prisma.giftList.findFirst({
+      where: {
+        id,
+        householdId: session.householdId,
+        ...(session.mode === "member" && session.memberId ? { memberId: session.memberId } : {}),
+      },
+      select: { memberId: true, type: true, member: { select: { birthdayMonth: true, birthdayDay: true } } },
+    }),
+    prisma.household.findUnique({ where: { id: session.householdId }, select: { privacyAllowKidWishlist: true } }),
+  ]);
+  if (!list) return NextResponse.json({ error: "List not found" }, { status: 404 });
+  if (!household?.privacyAllowKidWishlist) return NextResponse.json({ error: "List editing is turned off by a parent" }, { status: 403 });
+  if (type === "birthday" && list.type !== "birthday" && !canCreateBirthdayList(list.member.birthdayMonth, list.member.birthdayDay)) {
+    return NextResponse.json({ error: list.member.birthdayMonth ? "Birthday lists open six weeks before the birthday" : "Ask a parent to add your birthday first" }, { status: 400 });
+  }
+  const updated = await prisma.giftList.update({
+    where: { id, householdId: session.householdId },
+    data: { title, type, eventYear: wishListEventYear(type, list.member.birthdayMonth, list.member.birthdayDay) },
+    include: { member: { select: { id: true, name: true, avatar: true } }, _count: { select: { items: true } } },
+  });
+  return NextResponse.json(updated);
+});

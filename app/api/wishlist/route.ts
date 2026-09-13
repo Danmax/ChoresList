@@ -28,6 +28,7 @@ export const POST = withErrors(async (req: NextRequest) => {
   const body = await req.json();
   const { memberId, listId, title, category, emoji, note, amazonUrl } = body;
   const creatorType = body.creatorType === "parent" ? "parent" : "kid";
+  if (creatorType === "parent") await requireParentSession(req);
   const cleanMemberId = typeof memberId === "string" ? memberId : "";
   const cleanTitle = typeof title === "string" ? title.trim().slice(0, 120) : "";
   if (!cleanTitle) return NextResponse.json({ error: "Wish title is required" }, { status: 400 });
