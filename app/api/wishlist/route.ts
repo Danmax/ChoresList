@@ -8,11 +8,13 @@ export const GET = withErrors(async (req: NextRequest) => {
   const { householdId, parentId } = requireSession(req);
   const { searchParams } = new URL(req.url);
   const memberId = searchParams.get("memberId");
+  const listId = searchParams.get("listId");
   const accessWhere = await childAccessWhere(parentId, householdId);
   const items = await prisma.wishListItem.findMany({
     where: {
       householdId,
       ...(memberId && { memberId }),
+      ...(listId && { listId }),
       member: accessWhere,
     },
     include: { member: { select: { id: true, name: true, avatar: true, color: true } } },
@@ -24,7 +26,7 @@ export const GET = withErrors(async (req: NextRequest) => {
 export const POST = withErrors(async (req: NextRequest) => {
   const { householdId, parentId } = requireSession(req);
   const body = await req.json();
-  const { memberId, title, category, emoji, note, amazonUrl } = body;
+  const { memberId, listId, title, category, emoji, note, amazonUrl } = body;
   const cleanMemberId = typeof memberId === "string" ? memberId : "";
   const cleanTitle = typeof title === "string" ? title.trim().slice(0, 120) : "";
   if (!cleanTitle) return NextResponse.json({ error: "Wish title is required" }, { status: 400 });
@@ -32,7 +34,7 @@ export const POST = withErrors(async (req: NextRequest) => {
     return NextResponse.json({ error: "Member is required" }, { status: 400 });
   }
   const [member, household, hasAccess] = await Promise.all([
-    prisma.familyMember.findFirst({ where: { id: cleanMemberId, householdId, role: "child" } }),
+    prisma.familyMember.findFirst({ where: { id: cleanMemberId, householdId } }),
     prisma.household.findUnique({ where: { id: householdId }, select: { privacyAllowKidWishlist: true } }),
     canAccessMember(parentId, householdId, cleanMemberId),
   ]);
@@ -41,6 +43,15 @@ export const POST = withErrors(async (req: NextRequest) => {
   if (!household?.privacyAllowKidWishlist) {
     return NextResponse.json({ error: "Christmas-list additions are turned off by a parent" }, { status: 403 });
   }
+  let list = typeof listId === "string" && listId
+    ? await prisma.giftList.findFirst({ where: { id: listId, householdId, memberId: cleanMemberId } })
+    : await prisma.giftList.findFirst({ where: { householdId, memberId: cleanMemberId }, orderBy: { createdAt: "asc" } });
+  if (!list && !listId) {
+    list = await prisma.giftList.create({
+      data: { householdId, memberId: cleanMemberId, title: `${member.name}'s Wish List`, type: "general", createdByType: "legacy", createdByParentId: parentId },
+    });
+  }
+  if (!list) return NextResponse.json({ error: "List not found" }, { status: 404 });
   const cleanUrl = cleanAmazonUrl(amazonUrl);
   if (typeof amazonUrl === "string" && amazonUrl.trim() && !cleanUrl) {
     return NextResponse.json({ error: "Use a secure Amazon.com product link" }, { status: 400 });
@@ -49,6 +60,7 @@ export const POST = withErrors(async (req: NextRequest) => {
     data: {
       householdId,
       memberId: cleanMemberId,
+      listId: list.id,
       title: cleanTitle,
       category: typeof category === "string" ? category.slice(0, 64) : "other",
       emoji: typeof emoji === "string" && emoji.trim() ? emoji.trim().slice(0, 32) : "🎁",

@@ -53,10 +53,22 @@ export const POST = withErrors(async (req: NextRequest) => {
     return NextResponse.json({ error: "Use a secure Amazon.com product link" }, { status: 400 });
   }
 
+  const requestedListId = typeof body.listId === "string" ? body.listId : "";
+  let list = requestedListId
+    ? await prisma.giftList.findFirst({ where: { id: requestedListId, householdId: session.householdId, memberId } })
+    : await prisma.giftList.findFirst({ where: { householdId: session.householdId, memberId }, orderBy: { createdAt: "asc" } });
+  if (!list && !requestedListId) {
+    list = await prisma.giftList.create({
+      data: { householdId: session.householdId, memberId, title: `${member.name}'s Wish List`, type: "general", createdByType: "kid" },
+    });
+  }
+  if (!list) return NextResponse.json({ error: "List not found" }, { status: 404 });
+
   const item = await prisma.wishListItem.create({
     data: {
       householdId: session.householdId,
       memberId,
+      listId: list.id,
       title,
       category: typeof body.category === "string" ? body.category : "other",
       emoji: typeof body.emoji === "string" ? body.emoji : "🎁",

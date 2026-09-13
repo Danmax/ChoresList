@@ -43,6 +43,7 @@ model ParentAccount {
   awardedSkillXpEvents       SkillXpEvent[]              @relation("SkillXpAwarder")
   awardedBadges              MemberBadge[]               @relation("BadgeAwarder")
   activatedPlugins           HouseholdPlugin[]           @relation("PluginActivator")
+  createdGiftLists           GiftList[]                  @relation("GiftListCreator")
   familyTreeNodes            FamilyTreeNode[]
   createdRecipes             Recipe[]                    @relation("RecipeCreator")
   familyMemberProfile        FamilyMember?               @relation("ParentFamilyMember")
@@ -78,6 +79,7 @@ model Household {
   allowances               WeeklyAllowance[]
   allowanceSettings        AllowanceSettings[]
   wishList                 WishListItem[]
+  giftLists                GiftList[]
   houseProjects            HouseProject[]
   projectParticipants      HouseProjectParticipant[]
   rewardTickets            RewardTicket[]
@@ -203,6 +205,7 @@ model FamilyMember {
   skillTestAttempts     SkillTestAttempt[]
   allowanceSetting      AllowanceSettings?
   wishList              WishListItem[]
+  giftLists             GiftList[]
   houseProjects         HouseProject[]            @relation("ProjectAssignee")
   projectParticipations HouseProjectParticipant[]
   rewardTickets         RewardTicket[]
@@ -644,6 +647,7 @@ model WishListItem {
   id          String   @id @default(uuid()) @db.Char(36)
   householdId String   @db.Char(36)
   memberId    String   @db.Char(36)
+  listId      String   @db.Char(36)
   title       String   @db.VarChar(255)
   category    String   @default("other") @db.VarChar(64)
   emoji       String   @default("🎁") @db.VarChar(32)
@@ -654,6 +658,32 @@ model WishListItem {
 
   member    FamilyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
   household Household    @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  list      GiftList     @relation(fields: [listId], references: [id], onDelete: Cascade)
+
+  @@index([listId, status])
+}
+
+model GiftList {
+  id                String   @id @default(uuid()) @db.Char(36)
+  householdId       String   @db.Char(36)
+  memberId          String   @db.Char(36)
+  title             String   @db.VarChar(120)
+  type              String   @default("general") @db.VarChar(32)
+  eventYear         Int?
+  createdByType     String   @default("parent") @db.VarChar(32)
+  createdByParentId String?  @db.Char(36)
+  publicToken       String?  @unique @db.VarChar(64)
+  publicSharedAt    DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @default(now()) @updatedAt
+
+  household       Household      @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  member          FamilyMember   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  createdByParent ParentAccount? @relation("GiftListCreator", fields: [createdByParentId], references: [id], onDelete: SetNull)
+  items           WishListItem[]
+
+  @@index([householdId, memberId])
+  @@index([memberId, type, eventYear])
 }
 
 model HouseProject {
