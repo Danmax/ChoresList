@@ -11,8 +11,8 @@ const nunito = Nunito({
 });
 
 export const metadata: Metadata = {
-  title: "ChoresList — Family Chore Tracker",
-  description: "Fun family chore management with rewards, points, and skill tracking",
+  title: "ChoresList — One Place for Family Life",
+  description: "Organize chores, schedules, shopping, gifts, learning, rewards, and family wellbeing in one friendly family suite.",
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [

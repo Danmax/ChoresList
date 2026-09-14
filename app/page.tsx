@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, CalendarDays, Check, ClipboardList, Gift, GraduationCap, HeartHandshake, ListChecks, LockKeyhole, MonitorSmartphone, ShoppingCart, Sparkles, Users } from "lucide-react";
 import { LandingShareQr } from "@/components/landing-share-qr";
+import QRCode from "qrcode";
 
 const highlights = [
   { icon: Gift, accent: "bg-pink-100 text-pink-600", eyebrow: "New", title: "Private gift planning", description: "Build shareable wish lists while parents privately track what is ordered, obtained, ready to give, and the estimated cost." },
@@ -27,8 +28,14 @@ const gettingStarted = [
   { number: "03", title: "Choose your tools", description: "Start with chores, then turn on the planning tools that fit your family." },
 ];
 
-export default function LandingPage() {
+export default async function LandingPage() {
   const publicUrl = process.env.PUBLIC_BASE_URL?.replace(/\/$/, "") ?? "";
+  const qrDataUrl = publicUrl ? await QRCode.toDataURL(publicUrl, {
+    width: 208,
+    margin: 1,
+    errorCorrectionLevel: "M",
+    color: { dark: "#0f172a", light: "#ffffff" },
+  }) : "";
 
   return (
     <main className="min-h-screen text-slate-800">
@@ -103,7 +110,7 @@ export default function LandingPage() {
       <section className="px-5 pb-20 sm:px-8">
         <div className="mx-auto grid max-w-6xl items-center gap-10 overflow-hidden rounded-[2rem] bg-violet-600 px-7 py-10 text-white shadow-xl shadow-violet-200 sm:px-12 md:grid-cols-[1fr_auto] md:py-12">
           <div className="max-w-2xl"><div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-xs font-black uppercase tracking-widest"><MonitorSmartphone size={15} /> Share from any phone</div><h2 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">Bring someone into ChoresList</h2><p className="mt-3 text-lg font-semibold leading-relaxed text-violet-100">Open your camera and scan the code, or copy the link to send ChoresList to another parent, grandparent, or friend.</p><div className="mt-6 flex flex-wrap gap-3"><Link href="/parent?signup=1" className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 font-black text-violet-700 hover:bg-violet-50">Sign up and get started <ArrowRight size={18} /></Link><div className="inline-flex items-center gap-2 rounded-xl border border-white/25 px-4 py-3 text-sm font-bold text-violet-100"><Users size={17} /> Easy to share with family</div></div></div>
-          <LandingShareQr preferredUrl={publicUrl} />
+          <LandingShareQr preferredUrl={publicUrl} qrDataUrl={qrDataUrl} />
         </div>
       </section>
 
