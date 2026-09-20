@@ -26,30 +26,31 @@ model ParentAccount {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @default(now()) @updatedAt
 
-  household                  Household                   @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  confirmationTokens         EmailConfirmationToken[]
-  passwordResetTokens        PasswordResetToken[]
-  pinResetTokens             PinResetToken[]
-  createdCommunities         CommunityGroup[]            @relation("CommunityCreator")
-  communityMemberships       CommunityMember[]
-  createdCommunityEvents     CommunityEvent[]            @relation("CommunityEventCreator")
-  communityRsvps             CommunityRsvp[]
-  assignedCommunityItems     CommunityEventItem[]        @relation("CommunityItemAssignee")
-  claimedCommunityItems      CommunityEventItem[]        @relation("CommunityItemClaimer")
-  communityMessages          CommunityEventMessage[]
-  communityParticipants      CommunityParticipant[]
-  checkedCommunityAttendance CommunityEventAttendance[]  @relation("CommunityAttendanceChecker")
-  reviewedSkillTests         SkillTestAttempt[]          @relation("SkillTestReviewer")
-  awardedSkillXpEvents       SkillXpEvent[]              @relation("SkillXpAwarder")
-  awardedBadges              MemberBadge[]               @relation("BadgeAwarder")
-  activatedPlugins           HouseholdPlugin[]           @relation("PluginActivator")
-  createdGiftLists           GiftList[]                  @relation("GiftListCreator")
-  familyTreeNodes            FamilyTreeNode[]
-  createdRecipes             Recipe[]                    @relation("RecipeCreator")
-  familyMemberProfile        FamilyMember?               @relation("ParentFamilyMember")
-  wellbeingCheckIns          WellbeingCheckIn[]          @relation("WellbeingRecorder")
-  createdCommunitySurveys    CommunitySurvey[]           @relation("CommunitySurveyCreator")
-  communitySurveySubmissions CommunitySurveySubmission[] @relation("CommunitySurveyRespondent")
+  household                   Household                      @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  confirmationTokens          EmailConfirmationToken[]
+  passwordResetTokens         PasswordResetToken[]
+  pinResetTokens              PinResetToken[]
+  createdCommunities          CommunityGroup[]               @relation("CommunityCreator")
+  communityMemberships        CommunityMember[]
+  createdCommunityEvents      CommunityEvent[]               @relation("CommunityEventCreator")
+  communityRsvps              CommunityRsvp[]
+  assignedCommunityItems      CommunityEventItem[]           @relation("CommunityItemAssignee")
+  claimedCommunityItems       CommunityEventItem[]           @relation("CommunityItemClaimer")
+  communityMessages           CommunityEventMessage[]
+  communityParticipants       CommunityParticipant[]
+  checkedCommunityAttendance  CommunityEventAttendance[]     @relation("CommunityAttendanceChecker")
+  reviewedSkillTests          SkillTestAttempt[]             @relation("SkillTestReviewer")
+  awardedSkillXpEvents        SkillXpEvent[]                 @relation("SkillXpAwarder")
+  awardedBadges               MemberBadge[]                  @relation("BadgeAwarder")
+  activatedPlugins            HouseholdPlugin[]              @relation("PluginActivator")
+  createdGiftLists            GiftList[]                     @relation("GiftListCreator")
+  familyTreeNodes             FamilyTreeNode[]
+  createdRecipes              Recipe[]                       @relation("RecipeCreator")
+  familyMemberProfile         FamilyMember?                  @relation("ParentFamilyMember")
+  wellbeingCheckIns           WellbeingCheckIn[]             @relation("WellbeingRecorder")
+  createdCommunitySurveys     CommunitySurvey[]              @relation("CommunitySurveyCreator")
+  communitySurveySubmissions  CommunitySurveySubmission[]    @relation("CommunitySurveyRespondent")
+  createdSecretSantaExchanges CommunitySecretSantaExchange[] @relation("SecretSantaCreator")
 }
 
 model Household {
@@ -855,14 +856,15 @@ model CommunityGroup {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @default(now()) @updatedAt
 
-  creator      ParentAccount          @relation("CommunityCreator", fields: [creatorParentId], references: [id], onDelete: Cascade)
-  members      CommunityMember[]
-  participants CommunityParticipant[]
-  events       CommunityEvent[]
-  meritBadges  MeritBadge[]
-  memberBadges MemberBadge[]
-  skillTests   SkillTest[]
-  surveys      CommunitySurvey[]
+  creator              ParentAccount                  @relation("CommunityCreator", fields: [creatorParentId], references: [id], onDelete: Cascade)
+  members              CommunityMember[]
+  participants         CommunityParticipant[]
+  events               CommunityEvent[]
+  meritBadges          MeritBadge[]
+  memberBadges         MemberBadge[]
+  skillTests           SkillTest[]
+  surveys              CommunitySurvey[]
+  secretSantaExchanges CommunitySecretSantaExchange[]
 }
 
 model CommunityMember {
@@ -956,12 +958,13 @@ model CommunityParticipant {
   status      String   @default("active") @db.VarChar(64)
   joinedAt    DateTime @default(now())
 
-  group             CommunityGroup              @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  parent            ParentAccount               @relation(fields: [parentId], references: [id], onDelete: Cascade)
-  member            FamilyMember                @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  attendance        CommunityEventAttendance[]
-  testAttempts      SkillTestAttempt[]
-  surveySubmissions CommunitySurveySubmission[]
+  group              CommunityGroup                    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  parent             ParentAccount                     @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  member             FamilyMember                      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  attendance         CommunityEventAttendance[]
+  testAttempts       SkillTestAttempt[]
+  surveySubmissions  CommunitySurveySubmission[]
+  secretSantaEntries CommunitySecretSantaParticipant[]
 
   @@unique([groupId, parentId, memberId], map: "community_participant_uq")
   @@index([groupId, status], map: "community_participant_group_idx")
@@ -1248,6 +1251,47 @@ model CommunityEventMessage {
 
   @@index([eventId, createdAt])
   @@index([parentId])
+}
+
+model CommunitySecretSantaExchange {
+  id                   String    @id @default(uuid()) @db.Char(36)
+  groupId              String    @db.Char(36)
+  createdByParentId    String?   @db.Char(36)
+  title                String    @db.VarChar(255)
+  eventDate            DateTime?
+  signupDeadline       DateTime?
+  budgetCents          Int?
+  instructions         String?   @db.Text
+  status               String    @default("signup") @db.VarChar(32)
+  preventSameHousehold Boolean   @default(true)
+  drawnAt              DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @default(now()) @updatedAt
+
+  group        CommunityGroup                    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdBy    ParentAccount?                    @relation("SecretSantaCreator", fields: [createdByParentId], references: [id], onDelete: SetNull)
+  participants CommunitySecretSantaParticipant[]
+
+  @@index([groupId, status])
+}
+
+model CommunitySecretSantaParticipant {
+  id                     String   @id @default(uuid()) @db.Char(36)
+  exchangeId             String   @db.Char(36)
+  communityParticipantId String   @db.Char(36)
+  recipientId            String?  @unique @db.Char(36)
+  giftIdeas              String?  @db.Text
+  wishListUrl            String?  @db.VarChar(1024)
+  joinedAt               DateTime @default(now())
+
+  exchange             CommunitySecretSantaExchange     @relation(fields: [exchangeId], references: [id], onDelete: Cascade)
+  communityParticipant CommunityParticipant             @relation(fields: [communityParticipantId], references: [id], onDelete: Cascade)
+  recipient            CommunitySecretSantaParticipant? @relation("SecretSantaAssignments", fields: [recipientId], references: [id], onDelete: SetNull)
+  giver                CommunitySecretSantaParticipant? @relation("SecretSantaAssignments")
+
+  @@unique([exchangeId, communityParticipantId], map: "secret_santa_exchange_participant_uq")
+  @@index([exchangeId, joinedAt])
+  @@index([communityParticipantId])
 }
 
 model FamilyEvent {

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Award, BookOpen, CalendarDays, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ClipboardCheck, ClipboardList, Copy, ExternalLink, List, Mail, MapPin, MessageCircle, Pencil, Plus, QrCode, Save, Search, Send, Share2, SmilePlus, Trash2, UserPlus, Users, Video, X, Wand2 } from "lucide-react";
+import { ArrowLeft, Award, BookOpen, CalendarDays, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ClipboardCheck, ClipboardList, Copy, ExternalLink, Gift, List, Mail, MapPin, MessageCircle, Pencil, Plus, QrCode, Save, Search, Send, Share2, SmilePlus, Trash2, UserPlus, Users, Video, X, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1403,6 +1403,14 @@ export default function CommunityGroupPage() {
             )}
             {role && (
               <Link
+                href={`/community/${groupId}/secret-santa`}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-rose-500 px-4 py-3 font-black text-white shadow-sm hover:bg-rose-600"
+              >
+                <Gift size={17} /> Secret Santa
+              </Link>
+            )}
+            {role && (
+              <Link
                 href={`/community/${groupId}/surveys`}
                 className="inline-flex items-center justify-center gap-2 rounded-2xl bg-violet-500 px-4 py-3 font-black text-white shadow-sm hover:bg-violet-600"
               >
@@ -2578,7 +2586,7 @@ export default function CommunityGroupPage() {
             )}
 
             {canParticipate && (
-              <div className="rounded-3xl bg-white p-4 shadow-sm">
+              <div id="participants" className="rounded-3xl bg-white p-4 shadow-sm">
                 <h2 className="mb-3 flex items-center gap-2 font-black text-slate-800"><ClipboardCheck size={18} className="text-emerald-500" /> Group Participants</h2>
                 <div className="space-y-2">
                   {group.participants.map((participant) => (
