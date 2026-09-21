@@ -183,6 +183,7 @@ const GROUP_TYPE_META: Record<string, { label: string; icon: string; color: stri
 
 const EVENT_TYPES = [
   { value: "potluck", label: "Potluck", icon: "🍲" },
+  { value: "secret-santa", label: "Secret Santa", icon: "🎁" },
   { value: "service", label: "Service", icon: "🤝" },
   { value: "practice", label: "Practice", icon: "🏃" },
   { value: "meeting", label: "Meeting", icon: "🗣️" },
