@@ -477,6 +477,8 @@ export default function CommunityGroupPage() {
   const [badgeForm, setBadgeForm] = useState(BLANK_BADGE);
   const [editingBadgeId, setEditingBadgeId] = useState<string | null>(null);
   const [expandedEventSections, setExpandedEventSections] = useState<Record<string, boolean>>({});
+  const [showAllRecurringSessions, setShowAllRecurringSessions] = useState(false);
+  const [showNewItemForms, setShowNewItemForms] = useState<Record<string, boolean>>({});
   const [classPlanForms, setClassPlanForms] = useState<Record<string, typeof BLANK_CLASS_PLAN>>({});
   const [testForms, setTestForms] = useState<Record<string, typeof BLANK_TEST>>({});
   const [testScores, setTestScores] = useState<Record<string, Record<string, number>>>({});
@@ -549,6 +551,7 @@ export default function CommunityGroupPage() {
       const eventEndsAt = new Date(selectedEvent.endDate ?? selectedEvent.date).getTime();
       setEventPeriod(eventEndsAt < Date.now() ? "past" : "upcoming");
       setEventView("list");
+      if (selectedEvent.seriesId) setShowAllRecurringSessions(true);
     }
     window.setTimeout(() => {
       document.getElementById(`event-${selectedEventId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -617,11 +620,11 @@ export default function CommunityGroupPage() {
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
   }
 
-  function sectionExpanded(eventId: string, section: "share" | "items") {
+  function sectionExpanded(eventId: string, section: "share" | "items" | "messages") {
     return Boolean(expandedEventSections[`${eventId}:${section}`]);
   }
 
-  function toggleEventSection(eventId: string, section: "share" | "items") {
+  function toggleEventSection(eventId: string, section: "share" | "items" | "messages") {
     const key = `${eventId}:${section}`;
     setExpandedEventSections((current) => ({ ...current, [key]: !current[key] }));
   }
@@ -651,6 +654,25 @@ export default function CommunityGroupPage() {
   }, [group?.events]);
 
   const displayedEvents = eventPeriod === "upcoming" ? upcomingEvents : pastEvents;
+  const compactedRecurringSessionCount = useMemo(() => {
+    const seenSeries = new Set<string>();
+    return displayedEvents.filter((event) => {
+      if (!event.seriesId) return false;
+      if (seenSeries.has(event.seriesId)) return true;
+      seenSeries.add(event.seriesId);
+      return false;
+    }).length;
+  }, [displayedEvents]);
+  const visibleEvents = useMemo(() => {
+    if (showAllRecurringSessions) return displayedEvents;
+    const seenSeries = new Set<string>();
+    return displayedEvents.filter((event) => {
+      if (!event.seriesId) return true;
+      if (seenSeries.has(event.seriesId)) return false;
+      seenSeries.add(event.seriesId);
+      return true;
+    });
+  }, [displayedEvents, showAllRecurringSessions]);
 
   function selectEventPeriod(period: "upcoming" | "past") {
     setEventPeriod(period);
@@ -1260,6 +1282,8 @@ export default function CommunityGroupPage() {
       return;
     }
     setItemForms((current) => ({ ...current, [eventId]: BLANK_ITEM }));
+    setShowNewItemForms((current) => ({ ...current, [eventId]: false }));
+    toast.success("Item added");
     await load();
   }
 
@@ -1529,7 +1553,7 @@ export default function CommunityGroupPage() {
                       className="inline-flex items-center gap-2 rounded-2xl bg-violet-500 px-4 py-2.5 font-black text-white hover:bg-violet-600"
                     >
                       {showCreateEvent ? <X size={17} /> : <Plus size={17} />}
-                      {showCreateEvent ? "Close Form" : "Create Event"}
+                      {showCreateEvent ? "Close Form" : "New Event"}
                     </button>
                   </div>
                 </div>
@@ -1773,6 +1797,18 @@ export default function CommunityGroupPage() {
               </button>
             </div>
 
+            {compactedRecurringSessionCount > 0 && eventView === "list" && (
+              <button
+                type="button"
+                onClick={() => setShowAllRecurringSessions((current) => !current)}
+                className="flex w-full items-center justify-between rounded-2xl bg-violet-50 px-4 py-3 text-sm font-black text-violet-800 hover:bg-violet-100"
+                aria-expanded={showAllRecurringSessions}
+              >
+                <span>{showAllRecurringSessions ? "Hide recurring sessions" : "Show recurring sessions"}</span>
+                <span className="flex items-center gap-2">{!showAllRecurringSessions && <span className="rounded-full bg-white px-2 py-0.5 text-xs text-violet-700">{compactedRecurringSessionCount} more</span>}<ChevronDown size={18} className={`transition-transform ${showAllRecurringSessions ? "rotate-180" : ""}`} /></span>
+              </button>
+            )}
+
             {eventView === "calendar" && (
               <CommunityMonthCalendar
                 events={displayedEvents}
@@ -1783,7 +1819,7 @@ export default function CommunityGroupPage() {
               />
             )}
 
-            {eventView === "list" && displayedEvents.map((event) => {
+            {eventView === "list" && visibleEvents.map((event) => {
               const counts = rsvpCounts(event);
               const myRsvp = event.rsvps.find((rsvpItem) => rsvpItem.parentId === group.currentParentId);
               const eMeta = eventMeta(event.eventType);
@@ -2314,9 +2350,17 @@ export default function CommunityGroupPage() {
                   </div>
 
                   <div className="mb-4 rounded-2xl bg-slate-50 p-3">
-                    <h3 className="mb-3 flex items-center gap-2 font-black text-slate-800">
-                      <MessageCircle size={17} className="text-violet-500" /> Event Message Board
-                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => toggleEventSection(event.id, "messages")}
+                      className="flex w-full items-center justify-between gap-3 font-black text-slate-800"
+                      aria-expanded={sectionExpanded(event.id, "messages")}
+                    >
+                      <span className="flex items-center gap-2"><MessageCircle size={17} className="text-violet-500" /> Event Message Board <span className="rounded-full bg-white px-2 py-0.5 text-xs text-slate-500">{event.messages.length}</span></span>
+                      <ChevronDown size={18} className={`transition-transform ${sectionExpanded(event.id, "messages") ? "rotate-180" : ""}`} />
+                    </button>
+                    {sectionExpanded(event.id, "messages") && (
+                    <>
                     <div className="space-y-2">
                       {event.messages.map((message) => {
                         const canDeleteMessage = canManage || message.parentId === group.currentParentId;
@@ -2459,6 +2503,8 @@ export default function CommunityGroupPage() {
                     ) : (
                       <p className="mt-3 rounded-2xl bg-white p-3 text-sm font-bold text-slate-400">Join the group to post messages.</p>
                     )}
+                    </>
+                    )}
                   </div>
 
                   <div>
@@ -2468,6 +2514,18 @@ export default function CommunityGroupPage() {
                     </button>
                     {sectionExpanded(event.id, "items") && <div>
                     {canManage && (
+                      <div className="mb-3">
+                        <button
+                          type="button"
+                          onClick={() => setShowNewItemForms((current) => ({ ...current, [event.id]: !current[event.id] }))}
+                          className="inline-flex items-center gap-2 rounded-xl bg-slate-800 px-3 py-2 text-sm font-black text-white hover:bg-slate-700"
+                          aria-expanded={Boolean(showNewItemForms[event.id])}
+                        >
+                          {showNewItemForms[event.id] ? <X size={15} /> : <Plus size={15} />} {showNewItemForms[event.id] ? "Cancel New Item" : "New Item"}
+                        </button>
+                      </div>
+                    )}
+                    {canManage && showNewItemForms[event.id] && (
                       <div className="mb-3 grid gap-2 rounded-2xl bg-slate-50 p-3 md:grid-cols-[1fr_100px_1fr_160px_auto]">
                         <Input value={itemForm.title} onChange={(input) => setItemForms((current) => ({ ...current, [event.id]: { ...itemForm, title: input.target.value } }))} placeholder="Mac and cheese" className="rounded-xl bg-white" />
                         <Input value={itemForm.quantity} onChange={(input) => setItemForms((current) => ({ ...current, [event.id]: { ...itemForm, quantity: input.target.value } }))} placeholder="Qty" className="rounded-xl bg-white" />
@@ -2479,7 +2537,7 @@ export default function CommunityGroupPage() {
                             {group.members.map((member) => <SelectItem key={member.parentId} value={String(member.parentId)}>{parentLabel(member.parent)}</SelectItem>)}
                           </SelectContent>
                         </Select>
-                        <button type="button" onClick={() => addItem(event.id)} className="rounded-xl bg-slate-800 px-3 py-2 text-sm font-black text-white hover:bg-slate-700">Add</button>
+                        <button type="button" onClick={() => addItem(event.id)} className="rounded-xl bg-slate-800 px-3 py-2 text-sm font-black text-white hover:bg-slate-700">Add Item</button>
                       </div>
                     )}
 
