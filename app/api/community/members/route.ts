@@ -67,6 +67,15 @@ export const PUT = withErrors(async (req: NextRequest) => {
   await requireCommunityRole(groupId, parentId, "owner");
   const role = body.role !== undefined ? cleanCommunityRole(body.role) : undefined;
   const status = body.status === "inactive" ? "inactive" : body.status === "active" ? "active" : undefined;
+  const target = await prisma.communityMember.findUnique({
+    where: { groupId_parentId: { groupId, parentId: targetParentId } },
+    select: { role: true, status: true },
+  });
+  if (!target) return NextResponse.json({ error: "Group member not found" }, { status: 404 });
+  if (target.role === "owner" && target.status === "active" && ((role !== undefined && role !== "owner") || status === "inactive")) {
+    const ownerCount = await prisma.communityMember.count({ where: { groupId, role: "owner", status: "active" } });
+    if (ownerCount <= 1) return NextResponse.json({ error: "A group must keep at least one owner" }, { status: 400 });
+  }
 
   const member = await prisma.communityMember.update({
     where: { groupId_parentId: { groupId, parentId: targetParentId } },
@@ -91,6 +100,16 @@ export const DELETE = withErrors(async (req: NextRequest) => {
   }
 
   if (targetParentId !== parentId) await requireCommunityRole(groupId, parentId, "owner");
+
+  const target = await prisma.communityMember.findUnique({
+    where: { groupId_parentId: { groupId, parentId: targetParentId } },
+    select: { role: true, status: true },
+  });
+  if (!target) return NextResponse.json({ error: "Group member not found" }, { status: 404 });
+  if (target.role === "owner" && target.status === "active") {
+    const ownerCount = await prisma.communityMember.count({ where: { groupId, role: "owner", status: "active" } });
+    if (ownerCount <= 1) return NextResponse.json({ error: "A group must keep at least one owner" }, { status: 400 });
+  }
 
   await prisma.communityMember.delete({ where: { groupId_parentId: { groupId, parentId: targetParentId } } });
   return NextResponse.json({ ok: true });

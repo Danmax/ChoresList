@@ -979,6 +979,35 @@ export default function CommunityGroupPage() {
     await load();
   }
 
+  async function updateMemberRole(member: CommunityMember, nextRole: CommunityRole) {
+    if (member.role === nextRole) return;
+    const res = await fetch("/api/community/members", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ groupId, parentId: member.parentId, role: nextRole }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      toast.error(data?.error ?? "Could not update member role");
+      return;
+    }
+    toast.success("Member role updated");
+    await load();
+  }
+
+  async function removeMember(member: CommunityMember) {
+    if (!window.confirm(`Remove ${parentLabel(member.parent)} from this group?`)) return;
+    const query = new URLSearchParams({ groupId, parentId: member.parentId });
+    const res = await fetch(`/api/community/members?${query.toString()}`, { method: "DELETE" });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      toast.error(data?.error ?? "Could not remove member");
+      return;
+    }
+    toast.success("Member removed");
+    await load();
+  }
+
   async function emailGroupInvite() {
     if (!memberForm.email.trim()) {
       toast.error("Email is required");
@@ -2597,15 +2626,32 @@ export default function CommunityGroupPage() {
 
           <aside className="min-w-0 space-y-5">
             <div className="rounded-3xl bg-white p-4 shadow-sm">
-              <h2 className="mb-3 flex items-center gap-2 font-black text-slate-800"><Users size={18} className="text-violet-500" /> Members</h2>
+              <h2 className="mb-1 flex items-center gap-2 font-black text-slate-800"><Users size={18} className="text-violet-500" /> Members</h2>
+              {isOwner && <p className="mb-3 text-xs font-bold text-slate-400">Owner controls: manage member roles and access.</p>}
               <div className="space-y-2">
                 {group.members.map((member) => (
-                  <div key={member.id} className="flex items-center justify-between rounded-2xl bg-slate-50 px-3 py-2">
+                  <div key={member.id} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-slate-50 px-3 py-2">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-black text-slate-700">{parentLabel(member.parent)}</p>
                       {member.parent?.email && <p className="truncate text-xs font-bold text-slate-400">{member.parent.email}</p>}
                     </div>
-                    <span className="rounded-full bg-white px-2 py-0.5 text-xs font-black text-slate-500">{member.role}</span>
+                    {isOwner && member.parentId !== group.currentParentId ? (
+                      <div className="flex items-center gap-1">
+                        <Select value={member.role} onValueChange={(value) => void updateMemberRole(member, (value ?? "member") as CommunityRole)}>
+                          <SelectTrigger className="h-8 w-28 rounded-xl bg-white text-xs font-black"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="member">Member</SelectItem>
+                            <SelectItem value="manager">Manager</SelectItem>
+                            <SelectItem value="owner">Owner</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <button type="button" onClick={() => void removeMember(member)} className="rounded-xl bg-white p-2 text-red-400 hover:text-red-600" aria-label={`Remove ${parentLabel(member.parent)}`}>
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="rounded-full bg-white px-2 py-0.5 text-xs font-black text-slate-500">{member.role}</span>
+                    )}
                   </div>
                 ))}
               </div>
