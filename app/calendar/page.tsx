@@ -120,7 +120,7 @@ const DURATION_PRESETS: { label: string; minutes: number }[] = [
 const MAX_EXPAND = 520;
 const COMMUNITY_EVENT_META: Record<string, { label: string; icon: string; color: string }> = {
   potluck: { label: "Potluck", icon: "🍲", color: "#f97316" },
-  "secret-santa": { label: "Secret Santa", icon: "🎁", color: "#e11d48" },
+  "secret-santa": { label: "Gift Exchange", icon: "🎁", color: "#e11d48" },
   service: { label: "Service", icon: "🤝", color: "#10b981" },
   practice: { label: "Practice", icon: "🏃", color: "#0ea5e9" },
   meeting: { label: "Meeting", icon: "🗓️", color: "#6366f1" },

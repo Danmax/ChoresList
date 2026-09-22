@@ -33,7 +33,7 @@ export const EVENT_TYPE_META: Record<
 > = {
   "movie-night": { label: "Movie Night", icon: "🎬", color: "#6366f1" },
   "game-night": { label: "Game Night", icon: "🎮", color: "#8b5cf6" },
-  "secret-santa": { label: "Secret Santa", icon: "🎁", color: "#e11d48" },
+  "secret-santa": { label: "Gift Exchange", icon: "🎁", color: "#e11d48" },
   tech: { label: "Tech", icon: "💻", color: "#0ea5e9" },
   media: { label: "Media", icon: "🎥", color: "#ec4899" },
   church: { label: "Church", icon: "⛪", color: "#fbbf24" },

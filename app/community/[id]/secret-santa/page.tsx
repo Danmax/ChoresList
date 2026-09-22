@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, CalendarDays, Check, DollarSign, ExternalLink, Gift, Loader2, LockKeyhole, Plus, Snowflake, Sparkles, Trash2, Users } from "lucide-react";
+import { ArrowLeft, CalendarDays, Check, DollarSign, ExternalLink, Gift, Loader2, LockKeyhole, Plus, Sparkles, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,7 +38,7 @@ type Exchange = {
 };
 
 const EMPTY_FORM = {
-  title: "Holiday Secret Santa",
+  title: "Gift Exchange",
   eventDate: "",
   signupDeadline: "",
   budget: "25",
@@ -66,6 +66,7 @@ export default function SecretSantaPage() {
   const [exchanges, setExchanges] = useState<Exchange[]>([]);
   const [availableParticipants, setAvailableParticipants] = useState<AvailableParticipant[]>([]);
   const [canManage, setCanManage] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -85,12 +86,13 @@ export default function SecretSantaPage() {
       ]);
       const data = await exchangeRes.json().catch(() => null);
       if (!exchangeRes.ok) {
-        toast.error(data?.error ?? "Could not load Secret Santa");
+        toast.error(data?.error ?? "Could not load Gift Exchange");
         return;
       }
       setExchanges(data.exchanges ?? []);
       setAvailableParticipants(data.availableParticipants ?? []);
       setCanManage(Boolean(data.canManage));
+      setIsOwner(Boolean(data.isOwner));
       if (groupRes.ok) {
         const group = await groupRes.json().catch(() => null);
         if (group?.name) setGroupName(group.name);
@@ -118,7 +120,7 @@ export default function SecretSantaPage() {
       if (!res.ok) return toast.error(data?.error ?? "Could not create exchange");
       setForm(EMPTY_FORM);
       setShowCreate(false);
-      toast.success("Secret Santa sign-ups are open");
+      toast.success("Gift Exchange sign-ups are open");
       await load();
     } finally {
       setSaving(null);
@@ -135,7 +137,7 @@ export default function SecretSantaPage() {
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) return toast.error(data?.error ?? "Could not update the exchange");
-      const success = action === "draw" ? "Names drawn — assignments are now private" : action === "join" ? "Added to the exchange" : "Exchange updated";
+      const success = action === "draw" ? "Names drawn — assignments are now private" : action === "join" || action === "join-self" ? "Added to the exchange" : "Exchange updated";
       toast.success(success);
       await load();
     } finally {
@@ -154,6 +156,31 @@ export default function SecretSantaPage() {
     setJoinPeople((current) => ({ ...current, [exchange.id]: "" }));
     setJoinIdeas((current) => ({ ...current, [exchange.id]: "" }));
     setJoinUrls((current) => ({ ...current, [exchange.id]: "" }));
+  }
+
+  async function joinSelf(exchange: Exchange) {
+    await act(exchange.id, "join-self", {
+      giftIdeas: joinIdeas[exchange.id] ?? "",
+      wishListUrl: joinUrls[exchange.id] ?? "",
+    });
+    setJoinIdeas((current) => ({ ...current, [exchange.id]: "" }));
+    setJoinUrls((current) => ({ ...current, [exchange.id]: "" }));
+  }
+
+  async function emailConcealedMatches(exchange: Exchange) {
+    setSaving(`email-matches:${exchange.id}`);
+    try {
+      const res = await fetch("/api/community/secret-santa", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: exchange.id, action: "email-matches" }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) return toast.error(data?.error ?? "Could not email the concealed match list");
+      toast.success(data?.sent ? "Concealed match list emailed" : "Email is not configured yet");
+    } finally {
+      setSaving(null);
+    }
   }
 
   async function draw(exchange: Exchange) {
@@ -188,19 +215,19 @@ export default function SecretSantaPage() {
   }
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-gradient-to-b from-rose-50 via-white to-emerald-50 p-3 sm:p-6">
+    <main className="min-h-screen overflow-x-hidden bg-gradient-to-b from-violet-50 via-white to-amber-50 p-3 sm:p-6">
       <div className="mx-auto max-w-6xl">
-        <header className="mb-6 overflow-hidden rounded-[2rem] bg-gradient-to-br from-rose-600 via-red-500 to-emerald-700 p-5 text-white shadow-xl sm:p-8">
+        <header className="mb-6 overflow-hidden rounded-[2rem] bg-gradient-to-br from-violet-700 via-fuchsia-600 to-amber-500 p-5 text-white shadow-xl sm:p-8">
           <div className="flex items-start justify-between gap-4">
             <Link href={`/community/${groupId}`} className="rounded-2xl bg-white/15 p-2 backdrop-blur hover:bg-white/25" aria-label="Back to community">
               <ArrowLeft size={21} />
             </Link>
-            <Snowflake className="opacity-70" size={30} />
+            <Sparkles className="opacity-70" size={30} />
           </div>
           <div className="mt-8 max-w-2xl">
             <p className="mb-2 text-xs font-black uppercase tracking-[0.25em] text-rose-100">{groupName}</p>
-            <h1 className="flex items-center gap-3 text-3xl font-black sm:text-5xl"><Gift size={42} /> Secret Santa</h1>
-            <p className="mt-3 max-w-xl font-semibold text-white/85">Open sign-ups, draw fair matches, and keep every recipient a surprise until gift day.</p>
+            <h1 className="flex items-center gap-3 text-3xl font-black sm:text-5xl"><Gift size={42} /> Gift Exchange</h1>
+            <p className="mt-3 max-w-xl font-semibold text-white/85">Open sign-ups, draw fair matches, and keep every recipient a surprise until exchange day.</p>
           </div>
           {canManage && (
             <button type="button" onClick={() => setShowCreate((value) => !value)} className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-3 font-black text-rose-600 shadow-sm hover:bg-rose-50">
@@ -212,12 +239,12 @@ export default function SecretSantaPage() {
         {showCreate && (
           <section className="mb-6 rounded-3xl border border-rose-100 bg-white p-5 shadow-sm sm:p-6">
             <div className="mb-5">
-              <h2 className="text-xl font-black text-slate-800">Create a holiday exchange</h2>
+              <h2 className="text-xl font-black text-slate-800">Create a gift exchange</h2>
               <p className="text-sm font-semibold text-slate-500">Members can enroll their family participants until you draw names.</p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="sm:col-span-2"><Label htmlFor="ss-title">Exchange title</Label><Input id="ss-title" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></div>
-              <div><Label htmlFor="ss-date">Gift date</Label><Input id="ss-date" type="datetime-local" value={form.eventDate} onChange={(event) => setForm({ ...form, eventDate: event.target.value })} /></div>
+              <div><Label htmlFor="ss-date">Exchange date</Label><Input id="ss-date" type="datetime-local" value={form.eventDate} onChange={(event) => setForm({ ...form, eventDate: event.target.value })} /></div>
               <div><Label htmlFor="ss-deadline">Sign-up deadline</Label><Input id="ss-deadline" type="datetime-local" value={form.signupDeadline} onChange={(event) => setForm({ ...form, signupDeadline: event.target.value })} /></div>
               <div><Label htmlFor="ss-budget">Budget (USD)</Label><Input id="ss-budget" type="number" min="0" step="1" value={form.budget} onChange={(event) => setForm({ ...form, budget: event.target.value })} /></div>
               <label className="flex items-center gap-3 self-end rounded-2xl bg-emerald-50 p-3 text-sm font-black text-emerald-800">
@@ -239,9 +266,9 @@ export default function SecretSantaPage() {
           <div className="flex justify-center py-20"><Loader2 className="animate-spin text-rose-500" size={34} /></div>
         ) : activeExchanges.length === 0 ? (
           <section className="rounded-3xl border-2 border-dashed border-rose-200 bg-white/80 p-10 text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-rose-100 text-3xl">🎅</div>
-            <h2 className="text-xl font-black text-slate-800">No active Secret Santa yet</h2>
-            <p className="mx-auto mt-2 max-w-md text-sm font-semibold text-slate-500">{canManage ? "Create an exchange to invite your community into the holiday fun." : "A community manager can open the next exchange."}</p>
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-rose-100 text-3xl">🎁</div>
+            <h2 className="text-xl font-black text-slate-800">No active gift exchange yet</h2>
+            <p className="mx-auto mt-2 max-w-md text-sm font-semibold text-slate-500">{canManage ? "Create an exchange for any occasion." : "A community manager can open the next exchange."}</p>
           </section>
         ) : (
           <div className="space-y-6">
@@ -259,7 +286,7 @@ export default function SecretSantaPage() {
                         </div>
                         <h2 className="text-2xl font-black text-slate-800">{exchange.title}</h2>
                         <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm font-bold text-slate-500">
-                          {exchange.eventDate && <span className="flex items-center gap-1"><CalendarDays size={15} /> Gift day: {formatDate(exchange.eventDate)}</span>}
+                          {exchange.eventDate && <span className="flex items-center gap-1"><CalendarDays size={15} /> Exchange date: {formatDate(exchange.eventDate)}</span>}
                           {exchange.budgetCents !== null && <span className="flex items-center gap-1"><DollarSign size={15} /> {money(exchange.budgetCents)} budget</span>}
                           {exchange.preventSameHousehold && <span className="flex items-center gap-1"><LockKeyhole size={15} /> Different households</span>}
                         </div>
@@ -269,6 +296,7 @@ export default function SecretSantaPage() {
                         <div className="flex shrink-0 gap-2">
                           {exchange.status === "signup" && <button type="button" onClick={() => draw(exchange)} disabled={Boolean(saving) || exchange.participants.length < 3} className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-2.5 text-sm font-black text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40"><Sparkles size={16} /> Draw names</button>}
                           {exchange.status === "drawn" && <button type="button" onClick={() => act(exchange.id, "close")} disabled={Boolean(saving)} className="rounded-2xl bg-slate-700 px-4 py-2.5 text-sm font-black text-white">Close</button>}
+                          {isOwner && exchange.status === "drawn" && <button type="button" onClick={() => emailConcealedMatches(exchange)} disabled={Boolean(saving)} className="inline-flex items-center gap-2 rounded-2xl bg-violet-600 px-4 py-2.5 text-sm font-black text-white hover:bg-violet-700 disabled:opacity-50"><LockKeyhole size={16} /> Email matches</button>}
                           <button type="button" onClick={() => removeExchange(exchange)} disabled={Boolean(saving)} className="rounded-2xl bg-white p-2.5 text-slate-400 hover:text-rose-600" aria-label="Delete exchange"><Trash2 size={18} /></button>
                         </div>
                       )}
@@ -287,7 +315,7 @@ export default function SecretSantaPage() {
                               <div key={participant.id} className="rounded-2xl border border-slate-100 p-4">
                                 <div className="flex items-center gap-3">
                                   <span className="flex h-11 w-11 items-center justify-center rounded-2xl text-2xl" style={{ backgroundColor: `${participant.color}22` }}>{participant.avatar}</span>
-                                  <div className="min-w-0 flex-1"><p className="font-black text-slate-800">{participant.name}</p><p className="text-xs font-bold text-slate-400">{exchange.status === "drawn" ? "Secret Santa for…" : "Signed up"}</p></div>
+                                  <div className="min-w-0 flex-1"><p className="font-black text-slate-800">{participant.name}</p><p className="text-xs font-bold text-slate-400">{exchange.status === "drawn" ? "Giving to…" : "Signed up"}</p></div>
                                   {exchange.status === "signup" && <button type="button" onClick={() => act(exchange.id, "leave", { participantId: participant.id })} className="p-2 text-slate-300 hover:text-rose-500" aria-label={`Remove ${participant.name}`}><Trash2 size={17} /></button>}
                                 </div>
                                 {exchange.status === "drawn" && participant.assignment && (
@@ -312,9 +340,9 @@ export default function SecretSantaPage() {
                         </div>
                       )}
 
-                      {exchange.status === "signup" && eligible.length > 0 && (
+                      {exchange.status === "signup" && (
                         <div className="mt-4 rounded-2xl bg-rose-50 p-4">
-                          <h4 className="mb-3 text-sm font-black text-rose-900">Add someone from your household</h4>
+                          <h4 className="mb-3 text-sm font-black text-rose-900">Add yourself or someone from your household</h4>
                           <div className="grid gap-2">
                             <Select value={joinPeople[exchange.id] || "none"} onValueChange={(value) => setJoinPeople((current) => ({ ...current, [exchange.id]: !value || value === "none" ? "" : value }))}>
                               <SelectTrigger><SelectValue placeholder="Choose participant" /></SelectTrigger>
@@ -323,11 +351,12 @@ export default function SecretSantaPage() {
                             <Textarea rows={2} placeholder="Gift ideas, sizes, favorite colors…" value={joinIdeas[exchange.id] ?? ""} onChange={(event) => setJoinIdeas((current) => ({ ...current, [exchange.id]: event.target.value }))} />
                             <Input type="url" placeholder="Optional wish list URL" value={joinUrls[exchange.id] ?? ""} onChange={(event) => setJoinUrls((current) => ({ ...current, [exchange.id]: event.target.value }))} />
                             <button type="button" onClick={() => join(exchange)} disabled={Boolean(saving)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-rose-500 px-4 py-2.5 text-sm font-black text-white hover:bg-rose-600 disabled:opacity-50"><Plus size={16} /> Join exchange</button>
+                            <button type="button" onClick={() => joinSelf(exchange)} disabled={Boolean(saving)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-black text-rose-700 ring-1 ring-rose-200 hover:bg-rose-100 disabled:opacity-50"><Plus size={16} /> Add me</button>
                           </div>
                         </div>
                       )}
                       {exchange.status === "signup" && availableParticipants.length === 0 && (
-                        <p className="mt-4 rounded-2xl bg-amber-50 p-4 text-sm font-semibold text-amber-800">Add a family member under <Link href={`/community/${groupId}#participants`} className="font-black underline">Group Participants</Link> before signing up.</p>
+                        <p className="mt-4 rounded-2xl bg-amber-50 p-4 text-sm font-semibold text-amber-800">Use <strong>Add me</strong> to join yourself, or add family members under <Link href={`/community/${groupId}#participants`} className="font-black underline">Group Participants</Link>.</p>
                       )}
                     </div>
 

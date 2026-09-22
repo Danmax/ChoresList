@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { requireSession, withErrors } from "@/lib/api";
 import { requireCommunityRole } from "@/lib/community";
 import { drawSecretSanta } from "@/lib/secret-santa";
+import { ensureParentFamilyMember } from "@/lib/parent-member";
+import { sendNotificationEmail } from "@/lib/email";
 
 function cleanText(value: unknown, max: number) {
   return typeof value === "string" && value.trim() ? value.trim().slice(0, max) : null;
@@ -33,6 +35,10 @@ function cleanUrl(value: unknown) {
   } catch {
     return null;
   }
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
 const participantGraph = {
@@ -153,6 +159,7 @@ export const GET = withErrors(async (req: NextRequest) => {
       color: participant.member.color,
     })),
     canManage: membership.role === "owner" || membership.role === "manager",
+    isOwner: membership.role === "owner",
   });
 });
 
@@ -181,21 +188,31 @@ export const POST = withErrors(async (req: NextRequest) => {
 });
 
 export const PUT = withErrors(async (req: NextRequest) => {
-  const { parentId } = requireSession(req);
+  const { householdId, parentId } = requireSession(req);
   const body = await req.json();
   const id = typeof body.id === "string" ? body.id : "";
   const action = typeof body.action === "string" ? body.action : "";
   const exchange = id ? await getExchange(id) : null;
-  if (!exchange) return NextResponse.json({ error: "Secret Santa exchange not found" }, { status: 404 });
+  if (!exchange) return NextResponse.json({ error: "Gift exchange not found" }, { status: 404 });
   const membership = await requireCommunityRole(exchange.groupId, parentId, "member");
   const canManage = membership.role === "owner" || membership.role === "manager";
 
-  if (action === "join") {
+  if (action === "join" || action === "join-self") {
     if (exchange.status !== "signup") return NextResponse.json({ error: "Sign-ups are closed" }, { status: 409 });
     if (exchange.signupDeadline && exchange.signupDeadline.getTime() < Date.now()) {
       return NextResponse.json({ error: "The sign-up deadline has passed" }, { status: 409 });
     }
-    const communityParticipantId = typeof body.communityParticipantId === "string" ? body.communityParticipantId : "";
+    let communityParticipantId = typeof body.communityParticipantId === "string" ? body.communityParticipantId : "";
+    if (action === "join-self") {
+      const selfMember = await ensureParentFamilyMember(parentId, householdId);
+      if (!selfMember) return NextResponse.json({ error: "Could not prepare your profile for this exchange" }, { status: 404 });
+      const selfParticipant = await prisma.communityParticipant.upsert({
+        where: { groupId_parentId_memberId: { groupId: exchange.groupId, parentId, memberId: selfMember.id } },
+        create: { groupId: exchange.groupId, parentId, memberId: selfMember.id, displayName: selfMember.name },
+        update: { status: "active", displayName: selfMember.name },
+      });
+      communityParticipantId = selfParticipant.id;
+    }
     const participant = await prisma.communityParticipant.findFirst({
       where: { id: communityParticipantId, groupId: exchange.groupId, parentId, status: "active" },
     });
@@ -253,11 +270,33 @@ export const PUT = withErrors(async (req: NextRequest) => {
         await tx.communitySecretSantaParticipant.update({ where: { id: giverId }, data: { recipientId } });
       }
     });
+  } else if (action === "email-matches") {
+    if (membership.role !== "owner") return NextResponse.json({ error: "Only the group owner can receive the concealed match list" }, { status: 403 });
+    if (exchange.status !== "drawn") return NextResponse.json({ error: "Draw names before emailing the match list" }, { status: 409 });
+    const owner = await prisma.parentAccount.findUnique({ where: { id: parentId }, select: { email: true } });
+    const group = await prisma.communityGroup.findUnique({ where: { id: exchange.groupId }, select: { name: true } });
+    if (!owner || !group) return NextResponse.json({ error: "Could not prepare the concealed match list" }, { status: 404 });
+    const matches = exchange.participants.map((giver) => {
+      const recipient = giver.recipient;
+      if (!recipient) throw new Error("The draw is incomplete");
+      const giverName = giver.communityParticipant.displayName || giver.communityParticipant.member.name;
+      const recipientName = recipient.communityParticipant.displayName || recipient.communityParticipant.member.name;
+      return { giverName, recipientName };
+    });
+    const text = [
+      `Concealed match list for ${exchange.title} in ${group.name}.`,
+      "Keep this list private. Only use it to correct or administer the exchange.",
+      "",
+      ...matches.map(({ giverName, recipientName }) => `${giverName} → ${recipientName}`),
+    ].join("\n");
+    const html = `<div style="font-family:Arial,sans-serif;line-height:1.5;color:#0f172a"><h1 style="font-size:20px">Concealed match list</h1><p><strong>${escapeHtml(exchange.title)}</strong> · ${escapeHtml(group.name)}</p><p style="color:#b91c1c"><strong>Keep this private.</strong> Use this list only to administer or correct the exchange.</p><ul>${matches.map(({ giverName, recipientName }) => `<li><strong>${escapeHtml(giverName)}</strong> → ${escapeHtml(recipientName)}</li>`).join("")}</ul></div>`;
+    const result = await sendNotificationEmail({ to: owner.email, subject: `Concealed matches: ${exchange.title}`, text, html });
+    return NextResponse.json({ ok: true, sent: result.sent });
   } else if (action === "close") {
     if (!canManage) return NextResponse.json({ error: "Only a community manager can close an exchange" }, { status: 403 });
     await prisma.communitySecretSantaExchange.update({ where: { id: exchange.id }, data: { status: "closed" } });
   } else {
-    return NextResponse.json({ error: "Unknown Secret Santa action" }, { status: 400 });
+    return NextResponse.json({ error: "Unknown gift exchange action" }, { status: 400 });
   }
 
   const updated = await getExchange(exchange.id);
@@ -268,7 +307,7 @@ export const DELETE = withErrors(async (req: NextRequest) => {
   const { parentId } = requireSession(req);
   const id = req.nextUrl.searchParams.get("id") ?? "";
   const exchange = id ? await prisma.communitySecretSantaExchange.findUnique({ where: { id }, select: { groupId: true } }) : null;
-  if (!exchange) return NextResponse.json({ error: "Secret Santa exchange not found" }, { status: 404 });
+  if (!exchange) return NextResponse.json({ error: "Gift exchange not found" }, { status: 404 });
   await requireCommunityRole(exchange.groupId, parentId, "manager");
   await prisma.communitySecretSantaExchange.delete({ where: { id } });
   return NextResponse.json({ ok: true });
