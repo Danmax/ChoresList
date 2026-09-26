@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { canCreateBirthdayList, daysUntilBirthday, GIFT_PURCHASE_STATUSES, GIFT_PURCHASE_STATUS_META, WISH_LIST_TYPE_META, type GiftPurchaseStatus, type WishListType } from "@/lib/wishlists";
 import { AmazonProductSearch } from "@/components/amazon-product-search";
 import { ProductUrlInput } from "@/components/product-url-input";
+import type { AmazonProduct } from "@/lib/amazon-creators";
 
 interface Member { id: string; name: string; avatar: string; color: string; birthdayMonth?: number | null; birthdayDay?: number | null }
 
@@ -144,6 +145,24 @@ export default function ParentWishlistPage() {
     setNewGift({ title: "", amazonUrl: "", imageUrl: "", note: "", estimatedCost: "", priceAlert: "" });
     load();
     toast.success("Gift added");
+  }
+
+  async function addSearchResult(product: AmazonProduct) {
+    const active = lists.find((list) => list.id === activeListId);
+    if (!active) throw new Error("Choose a gift list first");
+    const res = await fetch("/api/wishlist", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...newGift, title: product.title, amazonUrl: product.url,
+        imageUrl: product.imageUrl ?? "", estimatedCost: estimateFromPrice(product.price),
+        memberId: active.memberId, listId: active.id, creatorType: "parent", category: "other", emoji: "🎁" }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(data?.error ?? "Could not add gift");
+    setGiftOpen(false);
+    setNewGift({ title: "", amazonUrl: "", imageUrl: "", note: "", estimatedCost: "", priceAlert: "" });
+    await load();
+    toast.success("Added to " + active.title);
   }
 
   async function saveListEdits() {
@@ -340,7 +359,7 @@ export default function ParentWishlistPage() {
                     {item.imageUrl ? <img src={item.imageUrl} alt="" className="h-20 w-20 shrink-0 rounded-xl bg-slate-50 object-contain p-1" /> : <span className="text-4xl shrink-0">{item.emoji}</span>}
                     <div className="flex-1 min-w-0">
                       <p className="font-black text-slate-800 text-sm">{item.member.avatar} {item.member.name}</p>
-                      <p className="font-bold text-slate-700 text-base mt-0.5">{item.title}</p>
+                      <a href={item.amazonUrl ?? amazonSearchUrl(item.title)} target="_blank" rel="noopener noreferrer" className="mt-0.5 block text-base font-bold text-slate-700 hover:text-violet-700 hover:underline">{item.title}</a>
                       {item.note && <p className="text-slate-400 text-sm mt-1 leading-snug">{item.note}</p>}
                       <span
                         className="inline-block mt-1.5 text-xs font-black px-2 py-0.5 rounded-full"
@@ -404,7 +423,7 @@ export default function ParentWishlistPage() {
                 {item.imageUrl ? <img src={item.imageUrl} alt="" className="h-12 w-12 rounded-xl object-contain grayscale" /> : <span className="text-2xl grayscale">{item.emoji}</span>}
                 <div className="flex-1">
                   <p className="text-xs font-bold text-slate-400">{item.member.avatar} {item.member.name}</p>
-                  <p className="font-bold text-slate-500 line-through text-sm">{item.title}</p>
+                  <a href={item.amazonUrl ?? amazonSearchUrl(item.title)} target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-slate-500 line-through hover:underline">{item.title}</a>
                   <p className="mt-1 text-xs font-bold text-slate-400">{GIFT_PURCHASE_STATUS_META[item.purchaseStatus].emoji} {GIFT_PURCHASE_STATUS_META[item.purchaseStatus].label}{item.estimatedCostCents !== null ? ` · ${formatCost(item.estimatedCostCents)}` : ""}</p>
                 </div>
                 <button
@@ -442,7 +461,7 @@ export default function ParentWishlistPage() {
 
       <Dialog open={giftOpen} onOpenChange={setGiftOpen}><DialogContent className="max-w-md rounded-3xl"><DialogHeader><DialogTitle className="font-black">Add to {activeList?.title}</DialogTitle></DialogHeader><div className="space-y-4">
         <div><Label className="font-bold">Gift idea</Label><Input value={newGift.title} onChange={(event) => setNewGift((current) => ({ ...current, title: event.target.value }))} className="mt-1 rounded-xl" placeholder="Gift name" /></div>
-        <AmazonProductSearch initialQuery={newGift.title} onSelect={(product) => setNewGift((current) => ({ ...current, title: product.title, amazonUrl: product.url, imageUrl: product.imageUrl ?? "", estimatedCost: estimateFromPrice(product.price) || current.estimatedCost }))} />
+        <AmazonProductSearch initialQuery={newGift.title} selectLabel="Add to list" onSelect={addSearchResult} />
         <div><Label className="font-bold">Amazon or Walmart link (optional)</Label><ProductUrlInput value={newGift.amazonUrl} onChange={(amazonUrl) => setNewGift((current) => ({ ...current, amazonUrl }))} onImage={(imageUrl) => setNewGift((current) => ({ ...current, imageUrl }))} className="mt-1 rounded-xl" /></div>
         <div><Label className="font-bold">Product image URL (optional)</Label><Input value={newGift.imageUrl} onChange={(event) => setNewGift((current) => ({ ...current, imageUrl: event.target.value }))} className="mt-1 rounded-xl" inputMode="url" />{newGift.imageUrl && <img src={newGift.imageUrl} alt="Gift preview" className="mt-2 h-20 w-20 rounded-xl object-contain" />}</div>
         <div><Label className="font-bold">Estimated cost (optional)</Label><div className="relative mt-1"><DollarSign size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><Input value={newGift.estimatedCost} onChange={(event) => setNewGift((current) => ({ ...current, estimatedCost: event.target.value }))} className="rounded-xl pl-8" type="number" inputMode="decimal" min="0" max="1000000" step="0.01" placeholder="0.00" /></div><p className="mt-1 text-xs font-semibold text-slate-400">Amazon selections fill this automatically; you can adjust it. Visible to parents only.</p></div>

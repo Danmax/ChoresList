@@ -1,13 +1,20 @@
 type CachedToken = { value: string; expiresAt: number };
 let cachedToken: CachedToken | null = null;
 
-export type AmazonProduct = { asin: string; title: string; url: string; imageUrl: string | null; price: string | null };
+export type AmazonProduct = { asin: string; title: string; url: string; imageUrl: string | null; price: string | null; description?: string | null; seller?: string | null };
 
 function productFromItem(item: any): AmazonProduct | null {
   const title = item?.itemInfo?.title?.displayValue;
   const url = item?.detailPageURL;
   if (typeof item?.asin !== "string" || typeof title !== "string" || typeof url !== "string") return null;
-  return { asin: item.asin, title, url, imageUrl: typeof item?.images?.primary?.small?.url === "string" ? item.images.primary.small.url : null, price: typeof item?.offersV2?.listings?.[0]?.price?.money?.displayAmount === "string" ? item.offersV2.listings[0].price.money.displayAmount : null };
+  const offer = item?.offersV2?.listings?.[0];
+  const features = item?.itemInfo?.features?.displayValues;
+  return { asin: item.asin, title, url,
+    imageUrl: item?.images?.primary?.medium?.url ?? item?.images?.primary?.small?.url ?? null,
+    price: typeof offer?.price?.money?.displayAmount === "string" ? offer.price.money.displayAmount : null,
+    description: Array.isArray(features) ? features.filter((value: unknown) => typeof value === "string").slice(0, 2).join(" ").slice(0, 400) || null : null,
+    seller: typeof offer?.merchantInfo?.name === "string" ? offer.merchantInfo.name : null,
+  };
 }
 
 function credentials() {
@@ -44,7 +51,7 @@ export async function searchAmazonProducts(query: string): Promise<AmazonProduct
       partnerTag: config.partnerTag,
       searchIndex: "All",
       itemCount: 8,
-      resources: ["images.primary.small", "itemInfo.title", "offersV2.listings.price"],
+      resources: ["images.primary.medium", "itemInfo.title", "itemInfo.features", "offersV2.listings.price", "offersV2.listings.merchantInfo"],
     }),
     cache: "no-store",
   });
