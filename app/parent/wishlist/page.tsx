@@ -5,7 +5,7 @@ import { ArrowLeft, CheckCircle2, Copy, DollarSign, ExternalLink, ListPlus, Pack
 import Link from "next/link";
 import { toast } from "sonner";
 import { WISH_CATEGORIES } from "@/types";
-import { amazonSearchUrl, retailerForUrl } from "@/lib/amazon";
+import { amazonSearchUrl, retailerForUrl, walmartSearchUrl } from "@/lib/amazon";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -33,6 +33,9 @@ interface WishItem {
   status: string;
   purchaseStatus: GiftPurchaseStatus;
   estimatedCostCents: number | null;
+  priceAlertCents: number | null;
+  lastPriceCents: number | null;
+  lastPriceCheckedAt: string | null;
   createdAt: string;
   member: Member;
 }
@@ -52,9 +55,9 @@ export default function ParentWishlistPage() {
   const [shareOpen, setShareOpen] = useState(false);
   const [shareData, setShareData] = useState({ publicUrl: "", embedHtml: "" });
   const [newList, setNewList] = useState<{ memberId: string; type: WishListType; title: string }>({ memberId: "", type: "general", title: "" });
-  const [newGift, setNewGift] = useState({ title: "", amazonUrl: "", imageUrl: "", note: "", estimatedCost: "" });
+  const [newGift, setNewGift] = useState({ title: "", amazonUrl: "", imageUrl: "", note: "", estimatedCost: "", priceAlert: "" });
   const [editList, setEditList] = useState<{ title: string; type: WishListType }>({ title: "", type: "general" });
-  const [editItem, setEditItem] = useState({ id: "", title: "", category: "other", emoji: "🎁", note: "", amazonUrl: "", imageUrl: "", estimatedCost: "" });
+  const [editItem, setEditItem] = useState({ id: "", title: "", category: "other", emoji: "🎁", note: "", amazonUrl: "", imageUrl: "", estimatedCost: "", priceAlert: "" });
 
   const load = useCallback(async () => {
     const [wRes, mRes, lRes] = await Promise.all([
@@ -108,6 +111,11 @@ export default function ParentWishlistPage() {
     window.open(url, "_blank", "noopener,noreferrer");
   }
 
+  function shopWalmart(query: string) {
+    const url = walmartSearchUrl(query);
+    if (url) window.open(url, "_blank", "noopener,noreferrer");
+  }
+
   function estimateFromPrice(price: string | null) {
     if (!price) return "";
     const amount = Number(price.replace(/[^0-9.]/g, ""));
@@ -133,7 +141,7 @@ export default function ParentWishlistPage() {
     const data = await res.json().catch(() => null);
     if (!res.ok) { toast.error(data?.error ?? "Could not add gift"); return; }
     setGiftOpen(false);
-    setNewGift({ title: "", amazonUrl: "", imageUrl: "", note: "", estimatedCost: "" });
+    setNewGift({ title: "", amazonUrl: "", imageUrl: "", note: "", estimatedCost: "", priceAlert: "" });
     load();
     toast.success("Gift added");
   }
@@ -179,6 +187,7 @@ export default function ParentWishlistPage() {
       amazonUrl: item.amazonUrl ?? "",
       imageUrl: item.imageUrl ?? "",
       estimatedCost: item.estimatedCostCents === null ? "" : (item.estimatedCostCents / 100).toFixed(2),
+      priceAlert: item.priceAlertCents === null ? "" : (item.priceAlertCents / 100).toFixed(2),
     });
     setEditItemOpen(true);
   }
@@ -286,7 +295,7 @@ export default function ParentWishlistPage() {
       {activeList && <div className="mb-6 flex flex-wrap items-center gap-2 rounded-3xl bg-white p-4 shadow-sm">
         <div className="mr-auto"><p className="font-black text-slate-800">{activeList.member.avatar} {activeList.title}</p><p className="text-xs font-semibold text-slate-400">{WISH_LIST_TYPE_META[activeList.type].label}</p></div>
         <button onClick={() => { setEditList({ title: activeList.title, type: activeList.type }); setEditOpen(true); }} className="flex items-center gap-1.5 rounded-xl bg-slate-100 px-3 py-2 text-sm font-black text-slate-600"><Pencil size={15} /> Edit List</button>
-        <button onClick={() => { setNewGift({ title: "", amazonUrl: "", imageUrl: "", note: "", estimatedCost: "" }); setGiftOpen(true); }} className="flex items-center gap-1.5 rounded-xl bg-violet-500 px-3 py-2 text-sm font-black text-white"><Plus size={15} /> Add Gift</button>
+        <button onClick={() => { setNewGift({ title: "", amazonUrl: "", imageUrl: "", note: "", estimatedCost: "", priceAlert: "" }); setGiftOpen(true); }} className="flex items-center gap-1.5 rounded-xl bg-violet-500 px-3 py-2 text-sm font-black text-white"><Plus size={15} /> Add Gift</button>
         <button onClick={() => activeList.publicToken ? setSharing(false) : setSharing(true)} className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-black ${activeList.publicToken ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-700"}`}><Share2 size={15} /> {activeList.publicToken ? "Stop Sharing" : "Share Publicly"}</button>
         {activeList.publicToken && <button onClick={() => setSharing(true)} className="rounded-xl bg-slate-100 px-3 py-2 text-sm font-black text-slate-600">Share Details</button>}
       </div>}
@@ -347,6 +356,7 @@ export default function ParentWishlistPage() {
                       >
                         <Search size={12} /> {item.amazonUrl ? `View on ${retailerForUrl(item.amazonUrl)}` : "Search this gift"} <ExternalLink size={11} />
                       </a>
+                      <div className="mt-2 flex flex-wrap gap-2"><a href={amazonSearchUrl(item.title)} target="_blank" rel="noreferrer" className="rounded-lg bg-amber-50 px-2 py-1 text-[11px] font-black text-amber-700">Shop Amazon</a><button onClick={() => shopWalmart(item.title)} className="rounded-lg bg-blue-50 px-2 py-1 text-[11px] font-black text-blue-700">Compare Walmart</button></div>
                     </div>
                   </div>
                   <div className="mt-3 rounded-2xl bg-slate-50 p-3">
@@ -436,6 +446,7 @@ export default function ParentWishlistPage() {
         <div><Label className="font-bold">Amazon or Walmart link (optional)</Label><ProductUrlInput value={newGift.amazonUrl} onChange={(amazonUrl) => setNewGift((current) => ({ ...current, amazonUrl }))} onImage={(imageUrl) => setNewGift((current) => ({ ...current, imageUrl }))} className="mt-1 rounded-xl" /></div>
         <div><Label className="font-bold">Product image URL (optional)</Label><Input value={newGift.imageUrl} onChange={(event) => setNewGift((current) => ({ ...current, imageUrl: event.target.value }))} className="mt-1 rounded-xl" inputMode="url" />{newGift.imageUrl && <img src={newGift.imageUrl} alt="Gift preview" className="mt-2 h-20 w-20 rounded-xl object-contain" />}</div>
         <div><Label className="font-bold">Estimated cost (optional)</Label><div className="relative mt-1"><DollarSign size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><Input value={newGift.estimatedCost} onChange={(event) => setNewGift((current) => ({ ...current, estimatedCost: event.target.value }))} className="rounded-xl pl-8" type="number" inputMode="decimal" min="0" max="1000000" step="0.01" placeholder="0.00" /></div><p className="mt-1 text-xs font-semibold text-slate-400">Amazon selections fill this automatically; you can adjust it. Visible to parents only.</p></div>
+        <div><Label className="font-bold">Amazon price alert (optional)</Label><div className="relative mt-1"><DollarSign size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><Input value={newGift.priceAlert} onChange={(event) => setNewGift((current) => ({ ...current, priceAlert: event.target.value }))} className="rounded-xl pl-8" type="number" inputMode="decimal" min="0" step="0.01" placeholder="Notify at this price" /></div><p className="mt-1 text-xs font-semibold text-slate-400">For exact Amazon items; email is sent once when the price meets your target.</p></div>
         <div><Label className="font-bold">Note (optional)</Label><Input value={newGift.note} onChange={(event) => setNewGift((current) => ({ ...current, note: event.target.value }))} className="mt-1 rounded-xl" /></div>
         <button onClick={addGift} className="w-full rounded-xl bg-violet-500 py-3 font-black text-white">Add Gift</button>
       </div></DialogContent></Dialog>
@@ -445,6 +456,7 @@ export default function ParentWishlistPage() {
         <AmazonProductSearch initialQuery={editItem.title} onSelect={(product) => setEditItem((current) => ({ ...current, title: product.title, amazonUrl: product.url, imageUrl: product.imageUrl ?? "", estimatedCost: estimateFromPrice(product.price) || current.estimatedCost }))} />
         <div><Label className="font-bold">Category</Label><select value={editItem.category} onChange={(event) => { const category = WISH_CATEGORIES.find((entry) => entry.value === event.target.value); setEditItem((current) => ({ ...current, category: event.target.value, emoji: category?.emoji ?? current.emoji })); }} className="mt-1 w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-3 py-2 font-bold">{WISH_CATEGORIES.map((category) => <option key={category.value} value={category.value}>{category.emoji} {category.label}</option>)}</select></div>
         <div><Label className="font-bold">Estimated cost</Label><div className="relative mt-1"><DollarSign size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><Input value={editItem.estimatedCost} onChange={(event) => setEditItem((current) => ({ ...current, estimatedCost: event.target.value }))} className="rounded-xl pl-8" type="number" inputMode="decimal" min="0" max="1000000" step="0.01" placeholder="0.00" /></div><p className="mt-1 text-xs font-semibold text-slate-400">Clear the field to remove the estimate. Parents only.</p></div>
+        <div><Label className="font-bold">Amazon price alert</Label><div className="relative mt-1"><DollarSign size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><Input value={editItem.priceAlert} onChange={(event) => setEditItem((current) => ({ ...current, priceAlert: event.target.value }))} className="rounded-xl pl-8" type="number" inputMode="decimal" min="0" step="0.01" placeholder="Notify at this price" /></div>{editItem.priceAlert && <p className="mt-1 text-xs font-semibold text-emerald-600">Price watch enabled.</p>}</div>
         <div><Label className="font-bold">Note</Label><Input value={editItem.note} onChange={(event) => setEditItem((current) => ({ ...current, note: event.target.value }))} className="mt-1 rounded-xl" /></div>
         <div><Label className="font-bold">Amazon or Walmart product link</Label><ProductUrlInput value={editItem.amazonUrl} onChange={(amazonUrl) => setEditItem((current) => ({ ...current, amazonUrl }))} onImage={(imageUrl) => setEditItem((current) => ({ ...current, imageUrl }))} className="mt-1 rounded-xl" /></div>
         <div><Label className="font-bold">Product image URL</Label><Input value={editItem.imageUrl} onChange={(event) => setEditItem((current) => ({ ...current, imageUrl: event.target.value }))} className="mt-1 rounded-xl" inputMode="url" />{editItem.imageUrl && <img src={editItem.imageUrl} alt="Gift preview" className="mt-2 h-20 w-20 rounded-xl object-contain" />}</div>

@@ -34,6 +34,7 @@ Community email notifications use a database-backed outbox. Run the processor on
 
 ```cron
 * * * * * cd /path/to/ChoresList && /usr/bin/npm run notifications:run
+0 * * * * cd /path/to/ChoresList && /usr/bin/npm run price-alerts:run
 ```
 
 The processor sends one-time event reminders at 8:00 AM in the event time zone 10 days before, 3 days before, and on the event date. It also sends item assignments, RSVP/registration confirmations, and Monday manager summaries. `PUBLIC_BASE_URL` and SMTP settings are required for delivery.
