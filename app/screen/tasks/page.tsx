@@ -11,6 +11,7 @@ import { COMPLETION_EMOJIS, WISH_CATEGORIES, WISH_EMOJIS } from "@/types";
 import { choicesForDisplay } from "@/lib/education";
 import { WISH_LIST_TYPE_META, type WishListType } from "@/lib/wishlists";
 import { AmazonProductSearch } from "@/components/amazon-product-search";
+import { ProductUrlInput } from "@/components/product-url-input";
 
 type Device = {
   id: string;
@@ -885,13 +886,7 @@ export default function TaskScreenPage() {
 
             <div>
               <Label className="font-bold text-slate-600">Amazon or Walmart product link (optional)</Label>
-              <Input
-                value={wish.amazonUrl}
-                onChange={(event) => setWish((previous) => ({ ...previous, amazonUrl: event.target.value }))}
-                className="mt-1 rounded-xl"
-                inputMode="url"
-                placeholder="Paste the exact product link here"
-              />
+              <ProductUrlInput value={wish.amazonUrl} onChange={(amazonUrl) => setWish((previous) => ({ ...previous, amazonUrl }))} onImage={(imageUrl) => setWish((previous) => ({ ...previous, imageUrl }))} className="mt-1 rounded-xl" placeholder="Paste the exact product link here" />
             </div>
 
             <div><Label className="font-bold text-slate-600">Product image URL (optional)</Label><Input value={wish.imageUrl} onChange={(event) => setWish((current) => ({ ...current, imageUrl: event.target.value }))} className="mt-1 rounded-xl" inputMode="url" />{wish.imageUrl && <img src={wish.imageUrl} alt="Gift preview" className="mt-2 h-20 w-20 rounded-xl object-contain" />}</div>
