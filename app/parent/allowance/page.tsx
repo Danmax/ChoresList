@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { ArrowLeft, DollarSign, CheckCircle } from "lucide-react";
+import { ArrowLeft, DollarSign, CheckCircle, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { formatCurrency, getWeekStart } from "@/lib/allowance";
@@ -12,7 +12,7 @@ interface Member {
   avatar: string;
   color: string;
   totalPoints: number;
-  allowanceSetting?: { weeklyBaseRate: number; pointsToDollar: number } | null;
+  allowanceSetting?: { weeklyBaseRate: number; pointsToDollar: number; cashAppTag?: string | null } | null;
 }
 
 interface Allowance {
@@ -28,7 +28,7 @@ interface Allowance {
 export default function AllowancePage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [allowances, setAllowances] = useState<Allowance[]>([]);
-  const [settingsForm, setSettingsForm] = useState<Record<number, { base: number; rate: number }>>({});
+  const [settingsForm, setSettingsForm] = useState<Record<number, { base: number; rate: number; cashAppTag: string }>>({});
 
   const load = useCallback(async () => {
     const [mRes, aRes] = await Promise.all([
@@ -41,11 +41,12 @@ export default function AllowancePage() {
     setMembers(mData.filter((m) => (m as unknown as { role: string }).role === "child"));
     setAllowances(await aRes.json());
 
-    const initialSettings: Record<number, { base: number; rate: number }> = {};
+    const initialSettings: Record<number, { base: number; rate: number; cashAppTag: string }> = {};
     mData.forEach((m) => {
       initialSettings[m.id] = {
         base: m.allowanceSetting?.weeklyBaseRate ?? 0,
         rate: m.allowanceSetting?.pointsToDollar ?? 0.10,
+        cashAppTag: m.allowanceSetting?.cashAppTag ?? "",
       };
     });
     setSettingsForm(initialSettings);
@@ -59,7 +60,7 @@ export default function AllowancePage() {
     await fetch("/api/allowance", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ memberId, weeklyBaseRate: s.base, pointsToDollar: s.rate }),
+      body: JSON.stringify({ memberId, weeklyBaseRate: s.base, pointsToDollar: s.rate, cashAppTag: s.cashAppTag }),
     });
     toast.success("Allowance settings saved!");
     load();
@@ -73,6 +74,13 @@ export default function AllowancePage() {
     });
     toast.success("Marked as paid! 💸");
     load();
+  }
+
+  async function payWithCashApp(tag: string, amount: number, name: string) {
+    const details = `${tag} — ${formatCurrency(amount)} allowance for ${name}`;
+    try { await navigator.clipboard.writeText(details); } catch { /* Clipboard may be unavailable in embedded browsers. */ }
+    window.open("https://cash.app/", "_blank", "noopener,noreferrer");
+    toast.message("Cash App opened", { description: `Payment details copied: ${details}. Confirm the recipient and amount in Cash App, then mark this payout as paid.` });
   }
 
   const thisWeek = getWeekStart().toISOString().split("T")[0];
@@ -116,12 +124,10 @@ export default function AllowancePage() {
                 <div className="bg-emerald-50 rounded-2xl p-3 mb-3 flex items-center justify-between">
                   <span className="font-black text-emerald-700 text-lg">{formatCurrency(earned)}</span>
                   {wa && !wa.paidOut ? (
-                    <button
-                      onClick={() => markPaid(wa.id)}
-                      className="flex items-center gap-1 bg-emerald-500 text-white rounded-xl px-3 py-1.5 text-sm font-bold hover:bg-emerald-600 transition-colors"
-                    >
-                      <DollarSign size={14} /> Pay Out
-                    </button>
+                    <div className="flex flex-wrap justify-end gap-2">
+                      {settings?.cashAppTag && <button onClick={() => payWithCashApp(settings.cashAppTag ?? "", earned, member.name)} className="flex items-center gap-1 rounded-xl bg-emerald-600 px-3 py-1.5 text-sm font-bold text-white hover:bg-emerald-700"><ExternalLink size={14} /> Cash App</button>}
+                      <button onClick={() => markPaid(wa.id)} className="flex items-center gap-1 bg-emerald-500 text-white rounded-xl px-3 py-1.5 text-sm font-bold hover:bg-emerald-600 transition-colors"><DollarSign size={14} /> Mark paid</button>
+                    </div>
                   ) : wa?.paidOut ? (
                     <span className="flex items-center gap-1 text-emerald-600 font-bold text-sm">
                       <CheckCircle size={14} /> Paid ✓
@@ -145,7 +151,7 @@ export default function AllowancePage() {
         <h2 className="text-lg font-black text-slate-700 mb-3">Allowance Settings</h2>
         <div className="space-y-3">
           {members.map((member) => {
-            const s = settingsForm[member.id] ?? { base: 0, rate: 0.10 };
+            const s = settingsForm[member.id] ?? { base: 0, rate: 0.10, cashAppTag: "" };
             return (
               <div key={member.id} className="bg-white rounded-2xl p-4 shadow-sm flex items-center gap-4">
                 <span className="text-3xl">{member.avatar}</span>
@@ -164,6 +170,7 @@ export default function AllowancePage() {
                       className="w-20 rounded-xl border border-slate-200 px-2 py-1 text-sm font-bold text-center focus:outline-none focus:ring-2 focus:ring-emerald-300"
                     />
                   </div>
+                  <div className="flex items-center gap-1"><span className="text-xs font-bold text-slate-500">Cash App</span><input value={s.cashAppTag} onChange={(e) => setSettingsForm((p) => ({ ...p, [member.id]: { ...s, cashAppTag: e.target.value } }))} placeholder="$cashtag" className="w-28 rounded-xl border border-slate-200 px-2 py-1 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-emerald-300" /></div>
                   <div className="flex items-center gap-1">
                     <span className="text-xs font-bold text-slate-500">$/10 pts</span>
                     <input

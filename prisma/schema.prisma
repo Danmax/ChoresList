@@ -627,6 +627,7 @@ model AllowanceSettings {
   memberId       String @unique @db.Char(36)
   weeklyBaseRate Float  @default(0)
   pointsToDollar Float  @default(0.10)
+  cashAppTag     String? @db.VarChar(21)
 
   member    FamilyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
   household Household    @relation(fields: [householdId], references: [id], onDelete: Cascade)

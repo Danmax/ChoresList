@@ -47,12 +47,15 @@ export const PATCH = withErrors(async (req: NextRequest) => {
   const { householdId } = await requireParentSession(req);
   const body = await req.json();
   const { memberId, weeklyBaseRate, pointsToDollar } = body;
+  const rawCashAppTag = typeof body.cashAppTag === "string" ? body.cashAppTag.trim() : "";
+  const cashAppTag = rawCashAppTag ? (rawCashAppTag.startsWith("$") ? rawCashAppTag : `$${rawCashAppTag}`) : null;
+  if (cashAppTag && !/^\$[A-Za-z0-9_]{1,20}$/.test(cashAppTag)) return NextResponse.json({ error: "Enter a valid Cash App $cashtag" }, { status: 400 });
   const member = await prisma.familyMember.findFirst({ where: { id: memberId, householdId } });
   if (!member) return NextResponse.json({ error: "Member not found" }, { status: 404 });
   const settings = await prisma.allowanceSettings.upsert({
     where: { memberId },
-    create: { householdId, memberId, weeklyBaseRate, pointsToDollar },
-    update: { weeklyBaseRate, pointsToDollar },
+    create: { householdId, memberId, weeklyBaseRate, pointsToDollar, cashAppTag },
+    update: { weeklyBaseRate, pointsToDollar, cashAppTag },
   });
   return NextResponse.json(settings);
 });
