@@ -39,6 +39,9 @@ export default async function LandingPage() {
 
   return (
     <main className="min-h-screen text-slate-800">
+      <Link href="/holiday" className="flex items-center justify-center gap-2 bg-zinc-950 px-4 py-3 text-center text-sm font-black text-lime-300 hover:text-white">
+        <Gift size={16} /> Holiday gift lists: wish big, shop smart <ArrowRight size={15} />
+      </Link>
       <header className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5 sm:px-8">
         <Link href="/" className="flex items-center gap-3" aria-label="ChoresList home">
           <Image src="/logo.png" alt="" width={48} height={48} priority className="h-11 w-11 rounded-xl object-contain" />
