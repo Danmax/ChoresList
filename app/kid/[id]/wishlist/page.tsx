@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { WISH_CATEGORIES, WISH_EMOJIS } from "@/types";
 import { motion, AnimatePresence } from "framer-motion";
-import { amazonSearchUrl } from "@/lib/amazon";
+import { amazonSearchUrl, retailerForUrl } from "@/lib/amazon";
 import { canCreateBirthdayList, daysUntilBirthday, WISH_LIST_TYPE_META, type WishListType } from "@/lib/wishlists";
 import { AmazonProductSearch } from "@/components/amazon-product-search";
 
@@ -230,7 +230,7 @@ export default function KidWishlistPage() {
                           rel="noreferrer"
                           className="mt-2 flex w-fit items-center gap-1 text-xs font-black text-amber-600 hover:text-amber-700"
                         >
-                          <Search size={12} /> {item.amazonUrl ? "View on Amazon" : "Find on Amazon"} <ExternalLink size={11} />
+                          <Search size={12} /> {item.amazonUrl ? `View on ${retailerForUrl(item.amazonUrl)}` : "Find on Amazon"} <ExternalLink size={11} />
                         </a>
                       </div>
                     </div>
@@ -330,17 +330,17 @@ export default function KidWishlistPage() {
               </div>
               <AmazonProductSearch initialQuery={form.title} onSelect={(product) => setForm((current) => ({ ...current, title: product.title, amazonUrl: product.url, imageUrl: product.imageUrl ?? "" }))} />
               <div>
-                <Label className="font-bold text-slate-600">Amazon product link (optional)</Label>
+                <Label className="font-bold text-slate-600">Amazon or Walmart product link (optional)</Label>
                 <Input
                   value={form.amazonUrl}
                   onChange={(e) => setForm((p) => ({ ...p, amazonUrl: e.target.value }))}
-                  placeholder="Paste the Amazon item link here"
+                  placeholder="Paste the exact product link here"
                   inputMode="url"
                   className="rounded-xl mt-1"
                 />
-                <p className="mt-1 text-xs font-semibold text-slate-400">Search Amazon, copy the product link, then paste it here so your parents see the exact one.</p>
+                <p className="mt-1 text-xs font-semibold text-slate-400">Search Amazon or Walmart, then paste the exact product link so your parents see the right one.</p>
               </div>
-              <div><Label className="font-bold text-slate-600">Amazon image URL (optional)</Label><Input value={form.imageUrl} onChange={(event) => setForm((current) => ({ ...current, imageUrl: event.target.value }))} className="mt-1 rounded-xl" inputMode="url" />{form.imageUrl && <img src={form.imageUrl} alt="Gift preview" className="mt-2 h-20 w-20 rounded-xl object-contain" />}</div>
+              <div><Label className="font-bold text-slate-600">Product image URL (optional)</Label><Input value={form.imageUrl} onChange={(event) => setForm((current) => ({ ...current, imageUrl: event.target.value }))} className="mt-1 rounded-xl" inputMode="url" />{form.imageUrl && <img src={form.imageUrl} alt="Gift preview" className="mt-2 h-20 w-20 rounded-xl object-contain" />}</div>
               <div>
                 <Label className="font-bold text-slate-600">Why? (optional)</Label>
                 <Input
@@ -408,8 +408,8 @@ export default function KidWishlistPage() {
         <AmazonProductSearch initialQuery={editItem.title} onSelect={(product) => setEditItem((current) => ({ ...current, title: product.title, amazonUrl: product.url, imageUrl: product.imageUrl ?? "" }))} />
         <div><Label className="font-bold">Category</Label><select value={editItem.category} onChange={(event) => { const category = WISH_CATEGORIES.find((entry) => entry.value === event.target.value); setEditItem((current) => ({ ...current, category: event.target.value, emoji: category?.emoji ?? current.emoji })); }} className="mt-1 w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-3 py-2 font-bold">{WISH_CATEGORIES.map((category) => <option key={category.value} value={category.value}>{category.emoji} {category.label}</option>)}</select></div>
         <div><Label className="font-bold">Note</Label><Input value={editItem.note} onChange={(event) => setEditItem((current) => ({ ...current, note: event.target.value }))} className="mt-1 rounded-xl" /></div>
-        <div><Label className="font-bold">Amazon product link</Label><Input value={editItem.amazonUrl} onChange={(event) => setEditItem((current) => ({ ...current, amazonUrl: event.target.value }))} className="mt-1 rounded-xl" inputMode="url" /></div>
-        <div><Label className="font-bold">Amazon image URL</Label><Input value={editItem.imageUrl} onChange={(event) => setEditItem((current) => ({ ...current, imageUrl: event.target.value }))} className="mt-1 rounded-xl" inputMode="url" />{editItem.imageUrl && <img src={editItem.imageUrl} alt="Gift preview" className="mt-2 h-20 w-20 rounded-xl object-contain" />}</div>
+        <div><Label className="font-bold">Amazon or Walmart product link</Label><Input value={editItem.amazonUrl} onChange={(event) => setEditItem((current) => ({ ...current, amazonUrl: event.target.value }))} className="mt-1 rounded-xl" inputMode="url" /></div>
+        <div><Label className="font-bold">Product image URL</Label><Input value={editItem.imageUrl} onChange={(event) => setEditItem((current) => ({ ...current, imageUrl: event.target.value }))} className="mt-1 rounded-xl" inputMode="url" />{editItem.imageUrl && <img src={editItem.imageUrl} alt="Gift preview" className="mt-2 h-20 w-20 rounded-xl object-contain" />}</div>
         <button onClick={saveItemEdits} className="w-full rounded-xl bg-violet-500 py-3 font-black text-white">Save Gift</button>
       </div></DialogContent></Dialog>
     </div>

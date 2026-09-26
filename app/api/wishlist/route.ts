@@ -79,10 +79,10 @@ export const POST = withErrors(async (req: NextRequest) => {
   const cleanUrl = cleanAmazonUrl(amazonUrl);
   const cleanImage = cleanAmazonImageUrl(imageUrl);
   if (typeof amazonUrl === "string" && amazonUrl.trim() && !cleanUrl) {
-    return NextResponse.json({ error: "Use a secure Amazon.com product link" }, { status: 400 });
+    return NextResponse.json({ error: "Use a secure Amazon or Walmart product link" }, { status: 400 });
   }
   if (typeof imageUrl === "string" && imageUrl.trim() && !cleanImage) {
-    return NextResponse.json({ error: "Use an Amazon product image URL" }, { status: 400 });
+    return NextResponse.json({ error: "Use an Amazon or Walmart product image URL" }, { status: 400 });
   }
   const estimatedCost = parseEstimatedCostCents(creatorType === "parent" ? body.estimatedCost : undefined);
   if (!estimatedCost.valid) return NextResponse.json({ error: "Enter a valid cost estimate" }, { status: 400 });
@@ -122,8 +122,8 @@ export const PATCH = withErrors(async (req: NextRequest) => {
   if (!title) return NextResponse.json({ error: "Wish title is required" }, { status: 400 });
   const amazonUrl = cleanAmazonUrl(body.amazonUrl);
   const imageUrl = cleanAmazonImageUrl(body.imageUrl);
-  if (typeof body.amazonUrl === "string" && body.amazonUrl.trim() && !amazonUrl) return NextResponse.json({ error: "Use a secure Amazon.com product link" }, { status: 400 });
-  if (typeof body.imageUrl === "string" && body.imageUrl.trim() && !imageUrl) return NextResponse.json({ error: "Use an Amazon product image URL" }, { status: 400 });
+  if (typeof body.amazonUrl === "string" && body.amazonUrl.trim() && !amazonUrl) return NextResponse.json({ error: "Use a secure Amazon or Walmart product link" }, { status: 400 });
+  if (typeof body.imageUrl === "string" && body.imageUrl.trim() && !imageUrl) return NextResponse.json({ error: "Use an Amazon or Walmart product image URL" }, { status: 400 });
   const estimatedCost = parseEstimatedCostCents(editorType === "parent" ? body.estimatedCost : undefined);
   if (!estimatedCost.valid) return NextResponse.json({ error: "Enter a valid cost estimate" }, { status: 400 });
   const item = await prisma.wishListItem.update({
@@ -165,7 +165,7 @@ export const PUT = withErrors(async (req: NextRequest) => {
   }
   const cleanUrl = amazonUrl !== undefined ? cleanAmazonUrl(amazonUrl) : undefined;
   if (typeof amazonUrl === "string" && amazonUrl.trim() && !cleanUrl) {
-    return NextResponse.json({ error: "Use a secure Amazon.com product link" }, { status: 400 });
+    return NextResponse.json({ error: "Use a secure Amazon or Walmart product link" }, { status: 400 });
   }
   const item = await prisma.wishListItem.update({
     where: { id, householdId },

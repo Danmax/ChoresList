@@ -5,7 +5,7 @@ import { ArrowLeft, CheckCircle2, Copy, DollarSign, ExternalLink, ListPlus, Pack
 import Link from "next/link";
 import { toast } from "sonner";
 import { WISH_CATEGORIES } from "@/types";
-import { amazonSearchUrl } from "@/lib/amazon";
+import { amazonSearchUrl, retailerForUrl } from "@/lib/amazon";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -105,6 +105,12 @@ export default function ParentWishlistPage() {
     const url = amazonSearchUrl(amazonQuery);
     if (!url) { toast.error("Enter an item to search for"); return; }
     window.open(url, "_blank", "noopener,noreferrer");
+  }
+
+  function estimateFromPrice(price: string | null) {
+    if (!price) return "";
+    const amount = Number(price.replace(/[^0-9.]/g, ""));
+    return Number.isFinite(amount) ? amount.toFixed(2) : "";
   }
 
   async function createList() {
@@ -338,7 +344,7 @@ export default function ParentWishlistPage() {
                         rel="noreferrer"
                         className="mt-2 flex w-fit items-center gap-1 text-xs font-black text-amber-600 hover:text-amber-700"
                       >
-                        <Search size={12} /> {item.amazonUrl ? "View exact item" : "Search this gift"} <ExternalLink size={11} />
+                        <Search size={12} /> {item.amazonUrl ? `View on ${retailerForUrl(item.amazonUrl)}` : "Search this gift"} <ExternalLink size={11} />
                       </a>
                     </div>
                   </div>
@@ -425,22 +431,22 @@ export default function ParentWishlistPage() {
 
       <Dialog open={giftOpen} onOpenChange={setGiftOpen}><DialogContent className="max-w-md rounded-3xl"><DialogHeader><DialogTitle className="font-black">Add to {activeList?.title}</DialogTitle></DialogHeader><div className="space-y-4">
         <div><Label className="font-bold">Gift idea</Label><Input value={newGift.title} onChange={(event) => setNewGift((current) => ({ ...current, title: event.target.value }))} className="mt-1 rounded-xl" placeholder="Gift name" /></div>
-        <AmazonProductSearch initialQuery={newGift.title} onSelect={(product) => setNewGift((current) => ({ ...current, title: product.title, amazonUrl: product.url, imageUrl: product.imageUrl ?? "" }))} />
-        <div><Label className="font-bold">Amazon link (optional)</Label><Input value={newGift.amazonUrl} onChange={(event) => setNewGift((current) => ({ ...current, amazonUrl: event.target.value }))} className="mt-1 rounded-xl" inputMode="url" /></div>
-        <div><Label className="font-bold">Amazon image URL (optional)</Label><Input value={newGift.imageUrl} onChange={(event) => setNewGift((current) => ({ ...current, imageUrl: event.target.value }))} className="mt-1 rounded-xl" inputMode="url" />{newGift.imageUrl && <img src={newGift.imageUrl} alt="Gift preview" className="mt-2 h-20 w-20 rounded-xl object-contain" />}</div>
-        <div><Label className="font-bold">Estimated cost (optional)</Label><div className="relative mt-1"><DollarSign size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><Input value={newGift.estimatedCost} onChange={(event) => setNewGift((current) => ({ ...current, estimatedCost: event.target.value }))} className="rounded-xl pl-8" type="number" inputMode="decimal" min="0" max="1000000" step="0.01" placeholder="0.00" /></div><p className="mt-1 text-xs font-semibold text-slate-400">Visible to parents only.</p></div>
+        <AmazonProductSearch initialQuery={newGift.title} onSelect={(product) => setNewGift((current) => ({ ...current, title: product.title, amazonUrl: product.url, imageUrl: product.imageUrl ?? "", estimatedCost: estimateFromPrice(product.price) || current.estimatedCost }))} />
+        <div><Label className="font-bold">Amazon or Walmart link (optional)</Label><Input value={newGift.amazonUrl} onChange={(event) => setNewGift((current) => ({ ...current, amazonUrl: event.target.value }))} className="mt-1 rounded-xl" inputMode="url" /></div>
+        <div><Label className="font-bold">Product image URL (optional)</Label><Input value={newGift.imageUrl} onChange={(event) => setNewGift((current) => ({ ...current, imageUrl: event.target.value }))} className="mt-1 rounded-xl" inputMode="url" />{newGift.imageUrl && <img src={newGift.imageUrl} alt="Gift preview" className="mt-2 h-20 w-20 rounded-xl object-contain" />}</div>
+        <div><Label className="font-bold">Estimated cost (optional)</Label><div className="relative mt-1"><DollarSign size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><Input value={newGift.estimatedCost} onChange={(event) => setNewGift((current) => ({ ...current, estimatedCost: event.target.value }))} className="rounded-xl pl-8" type="number" inputMode="decimal" min="0" max="1000000" step="0.01" placeholder="0.00" /></div><p className="mt-1 text-xs font-semibold text-slate-400">Amazon selections fill this automatically; you can adjust it. Visible to parents only.</p></div>
         <div><Label className="font-bold">Note (optional)</Label><Input value={newGift.note} onChange={(event) => setNewGift((current) => ({ ...current, note: event.target.value }))} className="mt-1 rounded-xl" /></div>
         <button onClick={addGift} className="w-full rounded-xl bg-violet-500 py-3 font-black text-white">Add Gift</button>
       </div></DialogContent></Dialog>
 
       <Dialog open={editItemOpen} onOpenChange={setEditItemOpen}><DialogContent className="max-h-[90vh] max-w-md overflow-y-auto rounded-3xl"><DialogHeader><DialogTitle className="font-black">Edit Gift</DialogTitle></DialogHeader><div className="space-y-4">
         <div><Label className="font-bold">Gift name</Label><Input value={editItem.title} onChange={(event) => setEditItem((current) => ({ ...current, title: event.target.value }))} className="mt-1 rounded-xl" /></div>
-        <AmazonProductSearch initialQuery={editItem.title} onSelect={(product) => setEditItem((current) => ({ ...current, title: product.title, amazonUrl: product.url, imageUrl: product.imageUrl ?? "" }))} />
+        <AmazonProductSearch initialQuery={editItem.title} onSelect={(product) => setEditItem((current) => ({ ...current, title: product.title, amazonUrl: product.url, imageUrl: product.imageUrl ?? "", estimatedCost: estimateFromPrice(product.price) || current.estimatedCost }))} />
         <div><Label className="font-bold">Category</Label><select value={editItem.category} onChange={(event) => { const category = WISH_CATEGORIES.find((entry) => entry.value === event.target.value); setEditItem((current) => ({ ...current, category: event.target.value, emoji: category?.emoji ?? current.emoji })); }} className="mt-1 w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-3 py-2 font-bold">{WISH_CATEGORIES.map((category) => <option key={category.value} value={category.value}>{category.emoji} {category.label}</option>)}</select></div>
         <div><Label className="font-bold">Estimated cost</Label><div className="relative mt-1"><DollarSign size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><Input value={editItem.estimatedCost} onChange={(event) => setEditItem((current) => ({ ...current, estimatedCost: event.target.value }))} className="rounded-xl pl-8" type="number" inputMode="decimal" min="0" max="1000000" step="0.01" placeholder="0.00" /></div><p className="mt-1 text-xs font-semibold text-slate-400">Clear the field to remove the estimate. Parents only.</p></div>
         <div><Label className="font-bold">Note</Label><Input value={editItem.note} onChange={(event) => setEditItem((current) => ({ ...current, note: event.target.value }))} className="mt-1 rounded-xl" /></div>
-        <div><Label className="font-bold">Amazon product link</Label><Input value={editItem.amazonUrl} onChange={(event) => setEditItem((current) => ({ ...current, amazonUrl: event.target.value }))} className="mt-1 rounded-xl" inputMode="url" /></div>
-        <div><Label className="font-bold">Amazon image URL</Label><Input value={editItem.imageUrl} onChange={(event) => setEditItem((current) => ({ ...current, imageUrl: event.target.value }))} className="mt-1 rounded-xl" inputMode="url" />{editItem.imageUrl && <img src={editItem.imageUrl} alt="Gift preview" className="mt-2 h-20 w-20 rounded-xl object-contain" />}</div>
+        <div><Label className="font-bold">Amazon or Walmart product link</Label><Input value={editItem.amazonUrl} onChange={(event) => setEditItem((current) => ({ ...current, amazonUrl: event.target.value }))} className="mt-1 rounded-xl" inputMode="url" /></div>
+        <div><Label className="font-bold">Product image URL</Label><Input value={editItem.imageUrl} onChange={(event) => setEditItem((current) => ({ ...current, imageUrl: event.target.value }))} className="mt-1 rounded-xl" inputMode="url" />{editItem.imageUrl && <img src={editItem.imageUrl} alt="Gift preview" className="mt-2 h-20 w-20 rounded-xl object-contain" />}</div>
         <button onClick={saveItemEdits} className="w-full rounded-xl bg-violet-500 py-3 font-black text-white">Save Gift</button>
       </div></DialogContent></Dialog>
 

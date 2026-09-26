@@ -1,5 +1,5 @@
 import { ExternalLink, Gift, Search } from "lucide-react";
-import { amazonSearchUrl } from "@/lib/amazon";
+import { amazonSearchUrl, retailerForUrl } from "@/lib/amazon";
 import { WISH_LIST_TYPE_META, type WishListType } from "@/lib/wishlists";
 
 type PublicList = NonNullable<Awaited<ReturnType<typeof import("@/lib/public-wishlists").getPublicWishList>>>;
@@ -26,7 +26,7 @@ export function PublicWishList({ list, embedded = false }: { list: PublicList; e
                     {item.note && <p className="mt-1 text-sm font-semibold text-slate-500">{item.note}</p>}
                     <a href={item.amazonUrl ?? amazonSearchUrl(item.title)} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-amber-500 px-3 py-2 text-xs font-black text-white hover:bg-amber-600">
                       {item.amazonUrl ? <ExternalLink size={14} /> : <Search size={14} />}
-                      {item.amazonUrl ? "View on Amazon" : "Find on Amazon"}
+                      {item.amazonUrl ? `View on ${retailerForUrl(item.amazonUrl)}` : "Find on Amazon"}
                     </a>
                   </div>
                 </div>

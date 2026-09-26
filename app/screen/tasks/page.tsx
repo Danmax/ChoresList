@@ -884,17 +884,17 @@ export default function TaskScreenPage() {
             <AmazonProductSearch initialQuery={wish.title} onSelect={(product) => setWish((current) => ({ ...current, title: product.title, amazonUrl: product.url, imageUrl: product.imageUrl ?? "" }))} />
 
             <div>
-              <Label className="font-bold text-slate-600">Amazon product link (optional)</Label>
+              <Label className="font-bold text-slate-600">Amazon or Walmart product link (optional)</Label>
               <Input
                 value={wish.amazonUrl}
                 onChange={(event) => setWish((previous) => ({ ...previous, amazonUrl: event.target.value }))}
                 className="mt-1 rounded-xl"
                 inputMode="url"
-                placeholder="Paste the Amazon item link here"
+                placeholder="Paste the exact product link here"
               />
             </div>
 
-            <div><Label className="font-bold text-slate-600">Amazon image URL (optional)</Label><Input value={wish.imageUrl} onChange={(event) => setWish((current) => ({ ...current, imageUrl: event.target.value }))} className="mt-1 rounded-xl" inputMode="url" />{wish.imageUrl && <img src={wish.imageUrl} alt="Gift preview" className="mt-2 h-20 w-20 rounded-xl object-contain" />}</div>
+            <div><Label className="font-bold text-slate-600">Product image URL (optional)</Label><Input value={wish.imageUrl} onChange={(event) => setWish((current) => ({ ...current, imageUrl: event.target.value }))} className="mt-1 rounded-xl" inputMode="url" />{wish.imageUrl && <img src={wish.imageUrl} alt="Gift preview" className="mt-2 h-20 w-20 rounded-xl object-contain" />}</div>
 
             <div>
               <Label className="font-bold text-slate-600">Note</Label>
