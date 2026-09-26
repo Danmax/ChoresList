@@ -3,6 +3,13 @@ let cachedToken: CachedToken | null = null;
 
 export type AmazonProduct = { asin: string; title: string; url: string; imageUrl: string | null; price: string | null };
 
+function productFromItem(item: any): AmazonProduct | null {
+  const title = item?.itemInfo?.title?.displayValue;
+  const url = item?.detailPageURL;
+  if (typeof item?.asin !== "string" || typeof title !== "string" || typeof url !== "string") return null;
+  return { asin: item.asin, title, url, imageUrl: typeof item?.images?.primary?.small?.url === "string" ? item.images.primary.small.url : null, price: typeof item?.offersV2?.listings?.[0]?.price?.money?.displayAmount === "string" ? item.offersV2.listings[0].price.money.displayAmount : null };
+}
+
 function credentials() {
   const clientId = process.env.AMAZON_CREATORS_CLIENT_ID?.trim();
   const clientSecret = process.env.AMAZON_CREATORS_CLIENT_SECRET?.trim();
@@ -44,16 +51,17 @@ export async function searchAmazonProducts(query: string): Promise<AmazonProduct
   const data = await res.json().catch(() => null);
   if (!res.ok) throw new Error(data?.errors?.[0]?.message ?? "Amazon product search failed");
   const items = Array.isArray(data?.searchResult?.items) ? data.searchResult.items : [];
-  return items.flatMap((item: any) => {
-    const title = item?.itemInfo?.title?.displayValue;
-    const url = item?.detailPageURL;
-    if (typeof item?.asin !== "string" || typeof title !== "string" || typeof url !== "string") return [];
-    return [{
-      asin: item.asin,
-      title,
-      url,
-      imageUrl: typeof item?.images?.primary?.small?.url === "string" ? item.images.primary.small.url : null,
-      price: typeof item?.offersV2?.listings?.[0]?.price?.money?.displayAmount === "string" ? item.offersV2.listings[0].price.money.displayAmount : null,
-    }];
-  });
+  return items.flatMap((item: any) => productFromItem(item) ?? []);
+}
+
+export async function getAmazonProduct(asin: string): Promise<AmazonProduct | null> {
+  if (!/^[A-Z0-9]{10}$/i.test(asin)) return null;
+  const config = credentials();
+  if (!config) return null;
+  const token = await accessToken(config.clientId, config.clientSecret);
+  const res = await fetch("https://creatorsapi.amazon/catalog/v1/getItems", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", "x-marketplace": "www.amazon.com" }, body: JSON.stringify({ itemIds: [asin], itemIdType: "ASIN", marketplace: "www.amazon.com", partnerTag: config.partnerTag, resources: ["images.primary.small", "itemInfo.title", "offersV2.listings.price"] }), cache: "no-store" });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.errors?.[0]?.message ?? "Amazon item lookup failed");
+  const item = Array.isArray(data?.itemsResult?.items) ? data.itemsResult.items[0] : null;
+  return productFromItem(item);
 }

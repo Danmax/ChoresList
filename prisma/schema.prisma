@@ -658,6 +658,10 @@ model WishListItem {
   status             String   @default("pending") @db.VarChar(64)
   purchaseStatus     String   @default("not_ordered") @db.VarChar(32)
   estimatedCostCents Int?
+  priceAlertCents    Int?
+  lastPriceCents     Int?
+  lastPriceCheckedAt DateTime?
+  priceAlertSentAt   DateTime?
   createdAt          DateTime @default(now())
 
   member    FamilyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)

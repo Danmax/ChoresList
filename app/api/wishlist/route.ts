@@ -37,7 +37,7 @@ export const GET = withErrors(async (req: NextRequest) => {
     },
     select: {
       ...wishItemSelect,
-      ...(includeParentTools && { purchaseStatus: true, estimatedCostCents: true }),
+      ...(includeParentTools && { purchaseStatus: true, estimatedCostCents: true, priceAlertCents: true, lastPriceCents: true, lastPriceCheckedAt: true }),
       member: { select: { id: true, name: true, avatar: true, color: true } },
     },
     orderBy: [{ status: "asc" }, { createdAt: "desc" }],
@@ -85,7 +85,8 @@ export const POST = withErrors(async (req: NextRequest) => {
     return NextResponse.json({ error: "Use an Amazon or Walmart product image URL" }, { status: 400 });
   }
   const estimatedCost = parseEstimatedCostCents(creatorType === "parent" ? body.estimatedCost : undefined);
-  if (!estimatedCost.valid) return NextResponse.json({ error: "Enter a valid cost estimate" }, { status: 400 });
+  const priceAlert = parseEstimatedCostCents(creatorType === "parent" ? body.priceAlert : undefined);
+  if (!estimatedCost.valid || !priceAlert.valid) return NextResponse.json({ error: "Enter a valid price" }, { status: 400 });
   const item = await prisma.wishListItem.create({
     data: {
       householdId,
@@ -98,6 +99,7 @@ export const POST = withErrors(async (req: NextRequest) => {
       amazonUrl: cleanUrl,
       imageUrl: cleanImage,
       ...(estimatedCost.value !== undefined && { estimatedCostCents: estimatedCost.value }),
+      ...(priceAlert.value !== undefined && { priceAlertCents: priceAlert.value, priceAlertSentAt: null }),
     },
     select: wishItemSelect,
   });
@@ -125,7 +127,8 @@ export const PATCH = withErrors(async (req: NextRequest) => {
   if (typeof body.amazonUrl === "string" && body.amazonUrl.trim() && !amazonUrl) return NextResponse.json({ error: "Use a secure Amazon or Walmart product link" }, { status: 400 });
   if (typeof body.imageUrl === "string" && body.imageUrl.trim() && !imageUrl) return NextResponse.json({ error: "Use an Amazon or Walmart product image URL" }, { status: 400 });
   const estimatedCost = parseEstimatedCostCents(editorType === "parent" ? body.estimatedCost : undefined);
-  if (!estimatedCost.valid) return NextResponse.json({ error: "Enter a valid cost estimate" }, { status: 400 });
+  const priceAlert = parseEstimatedCostCents(editorType === "parent" ? body.priceAlert : undefined);
+  if (!estimatedCost.valid || !priceAlert.valid) return NextResponse.json({ error: "Enter a valid price" }, { status: 400 });
   const item = await prisma.wishListItem.update({
     where: { id, householdId },
     data: {
@@ -136,6 +139,7 @@ export const PATCH = withErrors(async (req: NextRequest) => {
       amazonUrl,
       imageUrl,
       ...(estimatedCost.value !== undefined && { estimatedCostCents: estimatedCost.value }),
+      ...(priceAlert.value !== undefined && { priceAlertCents: priceAlert.value, priceAlertSentAt: null }),
     },
     select: wishItemSelect,
   });
