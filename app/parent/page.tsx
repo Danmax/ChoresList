@@ -61,6 +61,7 @@ export default function ParentPanel() {
   const [communityInvitePreview, setCommunityInvitePreview] = useState<CommunityInvitePreview | null>(null);
   const [pinResetToken, setPinResetToken] = useState("");
   const [plugins, setPlugins] = useState<Plugin[]>([]);
+  const [nextPath, setNextPath] = useState("");
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -68,6 +69,8 @@ export default function ParentPanel() {
       setMode("signup");
       setNotice("Create your free ChoresList account.");
     }
+    const next = params.get("next") ?? "";
+    if (next.startsWith("/") && !next.startsWith("//")) setNextPath(next);
     if (params.has("confirmed")) setNotice("Email confirmed. You can sign in now.");
     if (params.has("confirmError")) setError("Confirmation link is invalid or expired.");
     const token = params.get("reset");
@@ -158,7 +161,7 @@ export default function ParentPanel() {
       const res = await fetch("/api/parent/auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, mode, householdName, inviteToken, communityInviteToken, communityReturnTo }),
+        body: JSON.stringify({ email, password, mode, householdName, inviteToken, communityInviteToken, communityReturnTo, next: nextPath }),
       });
       const data = await res.json();
       if (data.ok && data.needsConfirmation) {
@@ -179,6 +182,7 @@ export default function ParentPanel() {
         setUnlocked(true);
         setError("");
         setNotice("");
+        if (nextPath) { window.location.assign(nextPath); return; }
       } else {
         setError(data.error ?? "Email or password is incorrect.");
         setCanResendConfirmation(Boolean(data.needsConfirmation));

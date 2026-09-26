@@ -82,6 +82,8 @@ export const GET = withErrors(async (req: NextRequest) => {
       req.nextUrl.searchParams.get("communityInvite"),
       req.nextUrl.searchParams.get("returnTo")
     );
+    const nextPath = cleanInternalPath(req.nextUrl.searchParams.get("next"));
+    if (nextPath) redirectUrl.searchParams.set("next", nextPath);
     return NextResponse.redirect(redirectUrl);
   }
 
@@ -100,7 +102,7 @@ export const POST = withErrors(async (req: NextRequest) => {
   const limited = rateLimit(req, { key: "parent-auth", limit: 10, windowMs: 60_000 });
   if (limited) return limited;
 
-  const { email, password, mode, householdName, inviteToken, communityInviteToken, communityReturnTo } = await req.json();
+  const { email, password, mode, householdName, inviteToken, communityInviteToken, communityReturnTo, next } = await req.json();
 
   if (typeof email !== "string" || typeof password !== "string") {
     return NextResponse.json({ ok: false }, { status: 400 });
@@ -200,6 +202,8 @@ export const POST = withErrors(async (req: NextRequest) => {
     const confirmUrl = new URL("/api/parent/auth", getBaseUrl(req));
     confirmUrl.searchParams.set("confirm", confirmationToken);
     appendCommunityInviteParams(confirmUrl, communityInviteToken, communityReturnTo);
+    const nextPath = cleanInternalPath(next);
+    if (nextPath) confirmUrl.searchParams.set("next", nextPath);
     const emailResult = await sendConfirmationEmail({ to: normalizedEmail, confirmUrl: confirmUrl.toString() });
 
     return NextResponse.json({
