@@ -78,6 +78,7 @@ model Household {
   completions              TaskCompletion[]
   skillCategories          SkillCategory[]
   allowances               WeeklyAllowance[]
+  allowancePayments         AllowancePayment[]
   allowanceSettings        AllowanceSettings[]
   wishList                 WishListItem[]
   giftLists                GiftList[]
@@ -198,6 +199,7 @@ model FamilyMember {
   assignments           ChoreAssignment[]
   completions           TaskCompletion[]
   allowances            WeeklyAllowance[]
+  allowancePayments     AllowancePayment[]
   skills                MemberSkill[]
   skillXpEvents         SkillXpEvent[]
   wellbeingCheckIns     WellbeingCheckIn[]
@@ -628,9 +630,28 @@ model AllowanceSettings {
   weeklyBaseRate Float  @default(0)
   pointsToDollar Float  @default(0.10)
   cashAppTag     String? @db.VarChar(21)
+  payoutSchedule String  @default("weekly") @db.VarChar(16)
 
   member    FamilyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
   household Household    @relation(fields: [householdId], references: [id], onDelete: Cascade)
+}
+
+model AllowancePayment {
+  id            String   @id @default(uuid()) @db.Char(36)
+  householdId   String   @db.Char(36)
+  memberId      String   @db.Char(36)
+  schedule      String   @db.VarChar(16)
+  periodStart   DateTime
+  periodEnd     DateTime
+  pointsEarned  Int
+  amountPaid    Float
+  paidAt        DateTime @default(now())
+
+  household Household    @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  member    FamilyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, schedule, periodStart])
+  @@index([householdId, memberId, periodStart])
 }
 
 model ChoreInstructions {

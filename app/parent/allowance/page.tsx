@@ -12,7 +12,7 @@ interface Member {
   avatar: string;
   color: string;
   totalPoints: number;
-  allowanceSetting?: { weeklyBaseRate: number; pointsToDollar: number; cashAppTag?: string | null } | null;
+  allowanceSetting?: { weeklyBaseRate: number; pointsToDollar: number; cashAppTag?: string | null; payoutSchedule?: "weekly" | "biweekly" | "monthly" } | null;
 }
 
 interface Allowance {
@@ -25,28 +25,34 @@ interface Allowance {
   member: Member;
 }
 
+interface AllowanceSummary { memberId: number; schedule: "weekly" | "biweekly" | "monthly"; periodStart: string; periodEnd: string; pointsEarned: number; amountEarned: number; paidOut: boolean; cashAppTag: string | null }
+
 export default function AllowancePage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [allowances, setAllowances] = useState<Allowance[]>([]);
-  const [settingsForm, setSettingsForm] = useState<Record<number, { base: number; rate: number; cashAppTag: string }>>({});
+  const [summaries, setSummaries] = useState<AllowanceSummary[]>([]);
+  const [settingsForm, setSettingsForm] = useState<Record<number, { base: number; rate: number; cashAppTag: string; schedule: "weekly" | "biweekly" | "monthly" }>>({});
 
   const load = useCallback(async () => {
-    const [mRes, aRes] = await Promise.all([
+    const [mRes, aRes, sRes] = await Promise.all([
       fetch("/api/members"),
       fetch("/api/allowance"),
+      fetch("/api/allowance?summary=1"),
     ]);
     const mDataRaw = await mRes.json().catch(() => []);
     const mData: Member[] = Array.isArray(mDataRaw) ? mDataRaw : Array.isArray(mDataRaw?.members) ? mDataRaw.members : [];
     if (!Array.isArray(mDataRaw) && !Array.isArray(mDataRaw?.members)) toast.error(mDataRaw.error ?? "Could not load members");
     setMembers(mData.filter((m) => (m as unknown as { role: string }).role === "child"));
     setAllowances(await aRes.json());
+    if (sRes.ok) setSummaries(await sRes.json());
 
-    const initialSettings: Record<number, { base: number; rate: number; cashAppTag: string }> = {};
+    const initialSettings: Record<number, { base: number; rate: number; cashAppTag: string; schedule: "weekly" | "biweekly" | "monthly" }> = {};
     mData.forEach((m) => {
       initialSettings[m.id] = {
         base: m.allowanceSetting?.weeklyBaseRate ?? 0,
         rate: m.allowanceSetting?.pointsToDollar ?? 0.10,
         cashAppTag: m.allowanceSetting?.cashAppTag ?? "",
+        schedule: m.allowanceSetting?.payoutSchedule ?? "weekly",
       };
     });
     setSettingsForm(initialSettings);
@@ -60,7 +66,7 @@ export default function AllowancePage() {
     await fetch("/api/allowance", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ memberId, weeklyBaseRate: s.base, pointsToDollar: s.rate, cashAppTag: s.cashAppTag }),
+      body: JSON.stringify({ memberId, weeklyBaseRate: s.base, pointsToDollar: s.rate, cashAppTag: s.cashAppTag, payoutSchedule: s.schedule }),
     });
     toast.success("Allowance settings saved!");
     load();
@@ -73,6 +79,14 @@ export default function AllowancePage() {
       body: JSON.stringify({ id, paidOut: true }),
     });
     toast.success("Marked as paid! 💸");
+    load();
+  }
+
+  async function markPeriodPaid(summary: AllowanceSummary) {
+    const res = await fetch("/api/allowance", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "payPeriod", memberId: summary.memberId, schedule: summary.schedule }) });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) { toast.error(data?.error ?? "Could not record payout"); return; }
+    toast.success("Payout recorded! 💸");
     load();
   }
 
@@ -103,9 +117,10 @@ export default function AllowancePage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {members.map((member) => {
             const wa = thisWeekAllowances.find((a) => a.memberId === member.id);
+            const summary = summaries.find((entry) => entry.memberId === member.id);
             const settings = member.allowanceSetting;
-            const earned = wa?.amountEarned ?? 0;
-            const points = wa?.pointsEarned ?? 0;
+            const earned = summary?.amountEarned ?? wa?.amountEarned ?? 0;
+            const points = summary?.pointsEarned ?? wa?.pointsEarned ?? 0;
 
             return (
               <div
@@ -123,12 +138,12 @@ export default function AllowancePage() {
 
                 <div className="bg-emerald-50 rounded-2xl p-3 mb-3 flex items-center justify-between">
                   <span className="font-black text-emerald-700 text-lg">{formatCurrency(earned)}</span>
-                  {wa && !wa.paidOut ? (
+                  {summary && !summary.paidOut ? (
                     <div className="flex flex-wrap justify-end gap-2">
-                      {settings?.cashAppTag && <button onClick={() => payWithCashApp(settings.cashAppTag ?? "", earned, member.name)} className="flex items-center gap-1 rounded-xl bg-emerald-600 px-3 py-1.5 text-sm font-bold text-white hover:bg-emerald-700"><ExternalLink size={14} /> Cash App</button>}
-                      <button onClick={() => markPaid(wa.id)} className="flex items-center gap-1 bg-emerald-500 text-white rounded-xl px-3 py-1.5 text-sm font-bold hover:bg-emerald-600 transition-colors"><DollarSign size={14} /> Mark paid</button>
+                      {summary.cashAppTag && <button onClick={() => payWithCashApp(summary.cashAppTag ?? "", earned, member.name)} className="flex items-center gap-1 rounded-xl bg-emerald-600 px-3 py-1.5 text-sm font-bold text-white hover:bg-emerald-700"><ExternalLink size={14} /> Cash App</button>}
+                      <button onClick={() => markPeriodPaid(summary)} className="flex items-center gap-1 bg-emerald-500 text-white rounded-xl px-3 py-1.5 text-sm font-bold hover:bg-emerald-600 transition-colors"><DollarSign size={14} /> Mark paid</button>
                     </div>
-                  ) : wa?.paidOut ? (
+                  ) : summary?.paidOut || wa?.paidOut ? (
                     <span className="flex items-center gap-1 text-emerald-600 font-bold text-sm">
                       <CheckCircle size={14} /> Paid ✓
                     </span>
@@ -137,7 +152,7 @@ export default function AllowancePage() {
 
                 {settings && (
                   <p className="text-xs text-slate-400 font-semibold">
-                    Base ${settings.weeklyBaseRate} + ${(settings.pointsToDollar * 100).toFixed(0)}¢/10pts
+                    {summary?.schedule === "monthly" ? `Calendar month: ${new Date(summary.periodStart).toLocaleDateString()}–${new Date(summary.periodEnd).toLocaleDateString()}` : summary?.schedule === "biweekly" ? "Biweekly payout" : "Weekly payout"} · Base ${settings.weeklyBaseRate}/week + ${(settings.pointsToDollar * 100).toFixed(0)}¢/10pts
                   </p>
                 )}
               </div>
@@ -151,7 +166,7 @@ export default function AllowancePage() {
         <h2 className="text-lg font-black text-slate-700 mb-3">Allowance Settings</h2>
         <div className="space-y-3">
           {members.map((member) => {
-            const s = settingsForm[member.id] ?? { base: 0, rate: 0.10, cashAppTag: "" };
+            const s = settingsForm[member.id] ?? { base: 0, rate: 0.10, cashAppTag: "", schedule: "weekly" };
             return (
               <div key={member.id} className="bg-white rounded-2xl p-4 shadow-sm flex items-center gap-4">
                 <span className="text-3xl">{member.avatar}</span>
@@ -171,6 +186,7 @@ export default function AllowancePage() {
                     />
                   </div>
                   <div className="flex items-center gap-1"><span className="text-xs font-bold text-slate-500">Cash App</span><input value={s.cashAppTag} onChange={(e) => setSettingsForm((p) => ({ ...p, [member.id]: { ...s, cashAppTag: e.target.value } }))} placeholder="$cashtag" className="w-28 rounded-xl border border-slate-200 px-2 py-1 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-emerald-300" /></div>
+                  <div className="flex items-center gap-1"><span className="text-xs font-bold text-slate-500">Payout</span><select value={s.schedule} onChange={(e) => setSettingsForm((p) => ({ ...p, [member.id]: { ...s, schedule: e.target.value as typeof s.schedule } }))} className="rounded-xl border border-slate-200 px-2 py-1 text-sm font-bold"><option value="weekly">Weekly</option><option value="biweekly">Biweekly</option><option value="monthly">Calendar month</option></select></div>
                   <div className="flex items-center gap-1">
                     <span className="text-xs font-bold text-slate-500">$/10 pts</span>
                     <input
