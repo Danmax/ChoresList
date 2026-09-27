@@ -93,7 +93,9 @@ function avatarGenerationError(error: unknown) {
     return NextResponse.json({ error: "Avatar generation is not enabled for this Gemini API key" }, { status: 502 });
   }
   if (error.status === 429) {
-    return NextResponse.json({ error: "Avatar generation is busy or has reached its limit. Please try again shortly." }, { status: 503 });
+    return NextResponse.json({
+      error: "Avatar generation is unavailable for this Gemini API key because its image-generation quota is exhausted or not enabled. Add billing or use a key with Gemini image-generation quota, then try again.",
+    }, { status: 503 });
   }
   if (error.status === 400) {
     return NextResponse.json({ error: "Gemini could not process this photo. Try a different clear photo." }, { status: 422 });
