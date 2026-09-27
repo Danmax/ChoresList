@@ -49,39 +49,59 @@ type Reward = {
   tickets: number;
 };
 
-const MEMORY_SYMBOLS = ["🧺", "🧹", "🧽", "🪴", "📚", "⭐"];
+const MEMORY_THEMES = [
+  { name: "Around the House", symbols: ["🧺", "🧹", "🧽", "🪴", "📚", "🛏️", "🧸", "🕯️"] },
+  { name: "Animal Friends", symbols: ["🐶", "🐱", "🦊", "🐼", "🦁", "🐸", "🐧", "🦋"] },
+  { name: "Tasty Treats", symbols: ["🍎", "🍕", "🍓", "🥨", "🧁", "🍉", "🥕", "🍪"] },
+  { name: "Space Trip", symbols: ["🚀", "🪐", "🌙", "⭐", "👽", "🛰️", "☄️", "🌍"] },
+  { name: "Great Outdoors", symbols: ["🌻", "🌈", "🌲", "🍄", "🌊", "⛰️", "🐚", "☀️"] },
+  { name: "Game Day", symbols: ["⚽", "🏀", "🏈", "⚾", "🎾", "🏐", "🥏", "🏓"] },
+];
 const RPS_CHOICES = [
   { key: "rock", label: "Rock", color: "text-slate-700", bg: "bg-slate-100", beats: "scissors" },
   { key: "paper", label: "Paper", color: "text-blue-700", bg: "bg-blue-50", beats: "rock" },
   { key: "scissors", label: "Scissors", color: "text-red-700", bg: "bg-red-50", beats: "paper" },
 ] as const;
-const TRIVIA = [
-  {
-    question: "Who built the ark?",
-    choices: ["Noah", "Moses", "David", "Peter"],
-    answer: "Noah",
-  },
-  {
-    question: "Where was Jesus born?",
-    choices: ["Bethlehem", "Jericho", "Nazareth", "Rome"],
-    answer: "Bethlehem",
-  },
-  {
-    question: "What did David use when he faced Goliath?",
-    choices: ["A sling and stone", "A net", "A trumpet", "A staff"],
-    answer: "A sling and stone",
-  },
-  {
-    question: "How many days did God use to create the world before resting?",
-    choices: ["Six", "Three", "Seven", "Forty"],
-    answer: "Six",
-  },
-  {
-    question: "Who was swallowed by a great fish?",
-    choices: ["Jonah", "Joseph", "Daniel", "Samuel"],
-    answer: "Jonah",
-  },
-];
+type TriviaLevel = "Explorer" | "Adventurer" | "Scholar";
+type TriviaQuestion = { question: string; choices: string[]; answer: string };
+const TRIVIA_BY_LEVEL: Record<TriviaLevel, TriviaQuestion[]> = {
+  Explorer: [
+    { question: "Who built the ark?", choices: ["Noah", "Moses", "David", "Peter"], answer: "Noah" },
+    { question: "Where was Jesus born?", choices: ["Bethlehem", "Jericho", "Nazareth", "Rome"], answer: "Bethlehem" },
+    { question: "What did David use against Goliath?", choices: ["A sling and stone", "A net", "A trumpet", "A staff"], answer: "A sling and stone" },
+    { question: "Who was swallowed by a great fish?", choices: ["Jonah", "Joseph", "Daniel", "Samuel"], answer: "Jonah" },
+    { question: "Who was protected in the lions’ den?", choices: ["Daniel", "Noah", "Peter", "Isaac"], answer: "Daniel" },
+    { question: "Who led God’s people through the Red Sea?", choices: ["Moses", "David", "Paul", "Abraham"], answer: "Moses" },
+    { question: "What is the first book of the Bible?", choices: ["Genesis", "Matthew", "Psalms", "Exodus"], answer: "Genesis" },
+    { question: "How many disciples did Jesus choose?", choices: ["12", "7", "10", "20"], answer: "12" },
+    { question: "What was the name of Jesus’ mother?", choices: ["Mary", "Ruth", "Esther", "Martha"], answer: "Mary" },
+    { question: "What did Jesus turn water into?", choices: ["Wine", "Milk", "Oil", "Juice"], answer: "Wine" },
+  ],
+  Adventurer: [
+    { question: "Which king was known for asking God for wisdom?", choices: ["Solomon", "Saul", "Ahab", "Herod"], answer: "Solomon" },
+    { question: "Whose walls fell after Israel marched around them?", choices: ["Jericho", "Bethlehem", "Nineveh", "Damascus"], answer: "Jericho" },
+    { question: "Who was Ruth’s mother-in-law?", choices: ["Naomi", "Hannah", "Miriam", "Deborah"], answer: "Naomi" },
+    { question: "Who received a special coat from his father?", choices: ["Joseph", "Joshua", "Jacob", "Jonathan"], answer: "Joseph" },
+    { question: "What was connected to Samson’s great strength?", choices: ["His uncut hair", "His sandals", "His shield", "His crown"], answer: "His uncut hair" },
+    { question: "Which disciple had been a tax collector?", choices: ["Matthew", "Andrew", "John", "Thomas"], answer: "Matthew" },
+    { question: "Where did Jesus teach the Beatitudes?", choices: ["On a mountainside", "In a palace", "On a ship", "In Rome"], answer: "On a mountainside" },
+    { question: "Who interpreted Pharaoh’s dreams in Egypt?", choices: ["Joseph", "Aaron", "Samuel", "Elijah"], answer: "Joseph" },
+    { question: "Which queen bravely spoke up for her people?", choices: ["Esther", "Jezebel", "Bathsheba", "Candace"], answer: "Esther" },
+    { question: "What happened when Paul and Silas sang in prison?", choices: ["An earthquake opened the doors", "It began to rain", "The lights went out", "A ship arrived"], answer: "An earthquake opened the doors" },
+  ],
+  Scholar: [
+    { question: "On what road did Saul encounter Jesus?", choices: ["The road to Damascus", "The road to Jericho", "The Emmaus road", "The Appian Way"], answer: "The road to Damascus" },
+    { question: "Which book lists the fruit of the Spirit?", choices: ["Galatians", "Genesis", "Hebrews", "Revelation"], answer: "Galatians" },
+    { question: "Who was chosen to replace Judas among the twelve?", choices: ["Matthias", "Barnabas", "Silas", "Timothy"], answer: "Matthias" },
+    { question: "On which island did John receive the Revelation?", choices: ["Patmos", "Crete", "Cyprus", "Malta"], answer: "Patmos" },
+    { question: "Who is remembered as the first Christian martyr?", choices: ["Stephen", "James", "Philip", "Mark"], answer: "Stephen" },
+    { question: "Lydia was a seller of what?", choices: ["Purple cloth", "Olive oil", "Spices", "Pottery"], answer: "Purple cloth" },
+    { question: "Who was Priscilla’s husband?", choices: ["Aquila", "Apollos", "Festus", "Titus"], answer: "Aquila" },
+    { question: "Which king ordered Daniel into the lions’ den?", choices: ["Darius", "Solomon", "Herod", "Josiah"], answer: "Darius" },
+    { question: "In which letter is the armor of God described?", choices: ["Ephesians", "Romans", "Philippians", "Colossians"], answer: "Ephesians" },
+    { question: "Who explained the Scriptures to the Ethiopian official?", choices: ["Philip", "Peter", "Luke", "Barnabas"], answer: "Philip" },
+  ],
+};
 
 function shuffle<T>(items: T[]) {
   return [...items].sort(() => Math.random() - 0.5);
@@ -198,7 +218,7 @@ export default function KidGamesPage() {
       {activeGame === "memory-match" ? (
         <MemoryMatch onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("memory-match", score, duration, metadata)} />
       ) : activeGame === "bible-trivia" ? (
-        <BibleTrivia onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("bible-trivia", score, duration, metadata)} />
+        <BibleTrivia age={member.age} onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("bible-trivia", score, duration, metadata)} />
       ) : activeGame === "rock-paper-scissors-shoot" ? (
         <RockPaperScissorsShoot onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("rock-paper-scissors-shoot", score, duration, metadata)} />
       ) : activeGame === "shape-safari" ? (
@@ -388,7 +408,8 @@ function MemoryMatch({
   onExit: () => void;
   onFinish: (score: number, durationSeconds: number, metadata: Record<string, unknown>) => void;
 }) {
-  const [cards, setCards] = useState(() => shuffle([...MEMORY_SYMBOLS, ...MEMORY_SYMBOLS]).map((symbol, index) => ({ id: index, symbol, matched: false })));
+  const [theme] = useState(() => MEMORY_THEMES[Math.floor(Math.random() * MEMORY_THEMES.length)]);
+  const [cards, setCards] = useState(() => shuffle([...theme.symbols, ...theme.symbols]).map((symbol, index) => ({ id: index, symbol, matched: false })));
   const [picked, setPicked] = useState<number[]>([]);
   const [moves, setMoves] = useState(0);
   const [startedAt] = useState(() => Date.now());
@@ -409,8 +430,8 @@ function MemoryMatch({
       if (nextCards.every((card) => card.matched)) {
         setFinished(true);
         const duration = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
-        const score = Math.max(10, 140 - (moves + 1) * 5 - duration);
-        setTimeout(() => onFinish(score, duration, { moves: moves + 1, pairs: MEMORY_SYMBOLS.length }), 500);
+        const score = Math.max(10, 220 - (moves + 1) * 5 - duration);
+        setTimeout(() => onFinish(score, duration, { moves: moves + 1, pairs: theme.symbols.length, theme: theme.name }), 500);
       }
     } else {
       setTimeout(() => setPicked([]), 650);
@@ -418,15 +439,15 @@ function MemoryMatch({
   }
 
   return (
-    <section className="rounded-3xl bg-white p-4 shadow-sm sm:p-6">
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <section className="mx-auto max-w-2xl rounded-3xl bg-white p-4 shadow-sm sm:p-5">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="flex items-center gap-2 text-2xl font-black text-slate-800"><Puzzle className="text-violet-600" /> Memory Match</h2>
-          <p className="text-sm font-bold text-slate-500">{moves} moves</p>
+          <p className="text-sm font-bold text-slate-500">{theme.name} · {moves} moves</p>
         </div>
         <button type="button" onClick={onExit} className="rounded-2xl bg-slate-100 px-4 py-2 text-sm font-black text-slate-600">Exit</button>
       </div>
-      <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+      <div className="mx-auto grid w-full max-w-lg grid-cols-4 gap-2 sm:gap-3">
         {cards.map((card, index) => {
           const visible = card.matched || picked.includes(index);
           return (
@@ -434,7 +455,7 @@ function MemoryMatch({
               key={card.id}
               type="button"
               onClick={() => choose(index)}
-              className={`aspect-square rounded-2xl text-4xl font-black shadow-sm transition-all ${visible ? "bg-violet-100 text-slate-800" : "bg-slate-800 text-white hover:bg-slate-700"}`}
+              className={`aspect-square rounded-xl text-3xl font-black shadow-sm transition-all sm:rounded-2xl sm:text-4xl ${visible ? "bg-violet-100 text-slate-800" : "bg-slate-800 text-white hover:bg-slate-700"}`}
             >
               {visible ? card.symbol : "?"}
             </button>
@@ -446,13 +467,16 @@ function MemoryMatch({
 }
 
 function BibleTrivia({
+  age,
   onExit,
   onFinish,
 }: {
+  age: number;
   onExit: () => void;
   onFinish: (score: number, durationSeconds: number, metadata: Record<string, unknown>) => void;
 }) {
-  const questions = useMemo(() => shuffle(TRIVIA).slice(0, 5), []);
+  const level: TriviaLevel = age <= 8 ? "Explorer" : age <= 12 ? "Adventurer" : "Scholar";
+  const questions = useMemo(() => shuffle(TRIVIA_BY_LEVEL[level]).slice(0, 8), [level]);
   const [index, setIndex] = useState(0);
   const [correct, setCorrect] = useState(0);
   const [selected, setSelected] = useState("");
@@ -467,7 +491,7 @@ function BibleTrivia({
     setTimeout(() => {
       if (index === questions.length - 1) {
         const duration = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
-        onFinish(nextCorrect * 100, duration, { correct: nextCorrect, total: questions.length });
+        onFinish(nextCorrect * 100, duration, { correct: nextCorrect, total: questions.length, level });
         return;
       }
       setSelected("");
@@ -480,7 +504,7 @@ function BibleTrivia({
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="flex items-center gap-2 text-2xl font-black text-slate-800"><BookOpen className="text-teal-700" /> Bible Trivia</h2>
-          <p className="text-sm font-bold text-slate-500">Question {index + 1}/{questions.length} · {correct} correct</p>
+          <p className="text-sm font-bold text-slate-500">{level} · Question {index + 1}/{questions.length} · {correct} correct</p>
         </div>
         <button type="button" onClick={onExit} className="rounded-2xl bg-slate-100 px-4 py-2 text-sm font-black text-slate-600">Exit</button>
       </div>

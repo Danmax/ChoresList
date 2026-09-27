@@ -17,7 +17,7 @@ export const GAME_DEFINITIONS: GameDefinition[] = [
   {
     key: "memory-match",
     title: "Memory Match",
-    description: "Flip cards and match household icons before the move count climbs.",
+    description: "Match eight pairs across rotating emoji themes for a fresh board every game.",
     icon: "Puzzle",
     ageMin: 4,
     ageMax: 12,
@@ -96,7 +96,7 @@ export const DEFAULT_GAME_SETTINGS: Record<GameKey, {
     rewardPoints: 5,
     rewardTickets: 0,
     requiresChoresComplete: false,
-    dailyPlayLimit: 3,
+    dailyPlayLimit: 8,
   },
   "bible-trivia": {
     enabled: true,
