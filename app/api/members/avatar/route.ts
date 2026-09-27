@@ -22,6 +22,28 @@ const STYLES: Record<string, string> = {
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY ?? process.env.CHATGPT_API_KEY ?? "" });
 
+function avatarGenerationError(error: unknown) {
+  if (!(error instanceof OpenAI.APIError)) return null;
+
+  console.error("[API member avatar] OpenAI request failed", {
+    status: error.status,
+    code: error.code,
+    requestId: error.requestID,
+    message: error.message,
+  });
+
+  if (error.status === 401 || error.status === 403) {
+    return NextResponse.json({ error: "Avatar generation is not enabled for this AI account" }, { status: 502 });
+  }
+  if (error.status === 429) {
+    return NextResponse.json({ error: "Avatar generation is busy or has reached its limit. Please try again shortly." }, { status: 503 });
+  }
+  if (error.code === "moderation_blocked" || error.status === 400 || error.status === 422) {
+    return NextResponse.json({ error: "That photo could not be used to create an avatar. Try a different clear photo." }, { status: 422 });
+  }
+  return NextResponse.json({ error: "The avatar service is temporarily unavailable. Please try again shortly." }, { status: 502 });
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { householdId, parentId } = await requireParentSession(req);
@@ -52,18 +74,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Could not read that photo" }, { status: 400 });
     }
 
-    const response = await client.images.edit({
-      model: process.env.OPENAI_IMAGE_MODEL ?? "gpt-image-2.5-sunburst",
-      image: await toFile(source, "avatar-source.png", { type: "image/png" }),
-      prompt: `Transform the person in this reference photo into an original ${STYLES[style]}. Preserve the person's recognizable facial features, skin tone, hair texture, hair color, approximate age, and joyful personality. Create a centered head-and-shoulders avatar facing the viewer, simple colorful background, balanced square composition, wholesome family-friendly mood. Keep the character cute and natural, not uncanny. No text, logos, watermark, extra people, duplicate features, or photorealism.`,
-      input_fidelity: "high",
-      n: 3,
-      size: "1024x1024",
-      quality: "medium",
-      output_format: "webp",
-      output_compression: 82,
-      user: String(parentId),
-    });
+    let response;
+    try {
+      response = await client.images.edit({
+        model: process.env.OPENAI_IMAGE_MODEL ?? "gpt-image-2.5-sunburst",
+        image: await toFile(source, "avatar-source.png", { type: "image/png" }),
+        prompt: `Transform the person in this reference photo into an original ${STYLES[style]}. Preserve the person's recognizable facial features, skin tone, hair texture, hair color, approximate age, and joyful personality. Create a centered head-and-shoulders avatar facing the viewer, simple colorful background, balanced square composition, wholesome family-friendly mood. Keep the character cute and natural, not uncanny. No text, logos, watermark, extra people, duplicate features, or photorealism.`,
+        input_fidelity: "high",
+        n: 3,
+        size: "1024x1024",
+        quality: "medium",
+        output_format: "webp",
+        output_compression: 82,
+        user: String(parentId),
+      });
+    } catch (error) {
+      return avatarGenerationError(error) ?? NextResponse.json({ error: "The avatar service is temporarily unavailable. Please try again shortly." }, { status: 502 });
+    }
 
     const avatarDir = uploadPath("avatars", String(householdId));
     if (!avatarDir) return NextResponse.json({ error: "Invalid upload destination" }, { status: 500 });
@@ -83,6 +110,6 @@ export async function POST(req: NextRequest) {
     const authResponse = authErrorResponse(error);
     if (authResponse) return authResponse;
     console.error("[API member avatar]", error instanceof Error ? error.message : String(error));
-    return NextResponse.json({ error: "Could not generate avatars right now" }, { status: 500 });
+    return NextResponse.json({ error: "Could not save the generated avatars. Please try again." }, { status: 500 });
   }
 }
