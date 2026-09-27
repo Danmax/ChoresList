@@ -489,7 +489,7 @@ export default function KidPage() {
                           )}
                           {assignment.dueDate && (
                             <span className="text-xs font-bold text-orange-500">
-                              Due: {new Date(assignment.dueDate).toLocaleDateString()}
+                              {assignment.frequency === "monthly" ? `Complete by day ${new Date(assignment.dueDate).getDate()}` : `Due: ${new Date(assignment.dueDate).toLocaleDateString()}`}
                             </span>
                           )}
                           {assignment.frequency === "monthly" && (

@@ -706,7 +706,7 @@ export default function TaskScreenPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {visibleAssignments.map((assignment) => {
-                  const done = assignment.completions.length > 0;
+                  const done = assignment.completions.length >= (assignment.frequency === "monthly" ? assignment.monthlyCompletionTarget : 1);
                   const reactionEmoji = assignment.completions[0]?.reactionEmoji;
                   return (
                     <tr key={assignment.id} className={done ? "bg-emerald-50/50 text-slate-400" : "text-slate-800"}>
@@ -748,9 +748,12 @@ export default function TaskScreenPage() {
                         </div>
                       </td>
                       <td className="px-4 py-4">
-                        <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-black capitalize text-slate-600">
-                          {assignment.frequency}
-                        </span>
+                        <div className="flex flex-wrap gap-2">
+                          <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-black capitalize text-slate-600">
+                            {assignment.frequency}
+                          </span>
+                          {assignment.frequency === "monthly" && <span className="rounded-full bg-violet-100 px-3 py-1 text-sm font-black text-violet-700">{assignment.completions.length}/{assignment.monthlyCompletionTarget}</span>}
+                        </div>
                       </td>
                       <td className="px-4 py-4 text-lg font-black">+{assignment.chore.pointsValue}</td>
                       <td className="px-4 py-4">

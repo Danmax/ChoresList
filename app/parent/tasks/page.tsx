@@ -49,6 +49,7 @@ function taskDateLabel(assignment: Assignment) {
   if (assignment.frequency === "weekly" && assignment.dayOfWeek !== null) {
     return ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][assignment.dayOfWeek];
   }
+  if (assignment.frequency === "monthly" && assignment.dueDate) return `By day ${new Date(assignment.dueDate).getDate()}`;
   if (assignment.dueDate) return new Date(assignment.dueDate).toLocaleDateString();
   return null;
 }
