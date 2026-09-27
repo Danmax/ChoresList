@@ -20,7 +20,7 @@ const STYLES: Record<string, string> = {
 };
 
 const GEMINI_IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL ?? "gemini-3.1-flash-image";
-const GEMINI_INTERACTIONS_URL = "https://generativelanguage.googleapis.com/v1beta2/interactions";
+const GEMINI_INTERACTIONS_URL = "https://generativelanguage.googleapis.com/v1beta/interactions";
 
 class GeminiAvatarError extends Error {
   constructor(readonly status: number, message: string) {
@@ -30,8 +30,13 @@ class GeminiAvatarError extends Error {
 
 function contentImageData(value: unknown): string[] {
   if (!value || typeof value !== "object") return [];
-  const response = value as { steps?: unknown[] };
-  return (response.steps ?? []).flatMap((step) => {
+  const response = value as {
+    output_image?: { data?: unknown };
+    outputImage?: { data?: unknown };
+    steps?: unknown[];
+  };
+  const outputImage = response.output_image?.data ?? response.outputImage?.data;
+  const stepImages = (response.steps ?? []).flatMap((step) => {
     if (!step || typeof step !== "object") return [];
     const content = (step as { content?: unknown }).content;
     if (!Array.isArray(content)) return [];
@@ -43,6 +48,7 @@ function contentImageData(value: unknown): string[] {
       return typeof data === "string" ? [data] : [];
     });
   });
+  return [...(typeof outputImage === "string" ? [outputImage] : []), ...stepImages];
 }
 
 async function generateGeminiAvatar(source: Buffer, style: string, variation: number) {
@@ -59,7 +65,12 @@ async function generateGeminiAvatar(source: Buffer, style: string, variation: nu
         { type: "text", text: `Transform the person in this reference photo into an original ${STYLES[style]}. Preserve the person's recognizable facial features, skin tone, hair texture, hair color, approximate age, and joyful personality. Create a centered head-and-shoulders avatar facing the viewer, simple colorful background, balanced square composition, wholesome family-friendly mood. Keep the character cute and natural, not uncanny. No text, logos, watermark, extra people, duplicate features, or photorealism. Create variation ${variation} with a distinct pose or background while preserving the person.` },
         { type: "image", mime_type: "image/jpeg", data: source.toString("base64") },
       ],
-      response_format: [{ type: "image" }],
+      response_format: {
+        type: "image",
+        mime_type: "image/jpeg",
+        aspect_ratio: "1:1",
+        image_size: "1K",
+      },
     }),
     signal: AbortSignal.timeout(110_000),
   });
@@ -121,11 +132,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Could not read that photo" }, { status: 400 });
     }
 
-    let generatedImages: string[];
-    try {
-      generatedImages = (await Promise.all([1, 2, 3].map((variation) => generateGeminiAvatar(source, style, variation)))).flat().slice(0, 3);
-    } catch (error) {
-      return avatarGenerationError(error) ?? NextResponse.json({ error: "The avatar service is temporarily unavailable. Please try again shortly." }, { status: 502 });
+    const results = await Promise.allSettled([1, 2, 3].map((variation) => generateGeminiAvatar(source, style, variation)));
+    const generatedImages = results
+      .filter((result): result is PromiseFulfilledResult<string[]> => result.status === "fulfilled")
+      .flatMap((result) => result.value)
+      .slice(0, 3);
+    if (!generatedImages.length) {
+      const failure = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
+      return avatarGenerationError(failure?.reason) ?? NextResponse.json({ error: "The avatar service is temporarily unavailable. Please try again shortly." }, { status: 502 });
     }
 
     const avatarDir = uploadPath("avatars", String(householdId));
