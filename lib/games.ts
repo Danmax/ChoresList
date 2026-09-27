@@ -1,4 +1,4 @@
-export type GameKey = "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot";
+export type GameKey = "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot" | "shape-safari";
 export type GameRewardType = "none" | "points" | "tickets";
 
 export type GameDefinition = {
@@ -47,6 +47,17 @@ export const GAME_DEFINITIONS: GameDefinition[] = [
     color: "#dc2626",
     bg: "#fee2e2",
   },
+  {
+    key: "shape-safari",
+    title: "Shape Safari",
+    description: "Spot cheerful shapes, colors, and patterns on a five-stop safari.",
+    icon: "Shapes",
+    ageMin: 3,
+    ageMax: 9,
+    playTime: "2-3 min",
+    color: "#ea580c",
+    bg: "#ffedd5",
+  },
 ];
 
 export const DEFAULT_GAME_SETTINGS: Record<GameKey, {
@@ -80,6 +91,14 @@ export const DEFAULT_GAME_SETTINGS: Record<GameKey, {
     rewardTickets: 0,
     requiresChoresComplete: false,
     dailyPlayLimit: 5,
+  },
+  "shape-safari": {
+    enabled: true,
+    rewardType: "points",
+    rewardPoints: 5,
+    rewardTickets: 0,
+    requiresChoresComplete: false,
+    dailyPlayLimit: 3,
   },
 };
 

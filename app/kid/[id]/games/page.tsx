@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, BookOpen, CheckCircle2, Circle, FileText, Gamepad2, Puzzle, RefreshCw, Scissors, Swords, Trophy } from "lucide-react";
+import { ArrowLeft, BookOpen, CheckCircle2, Circle, FileText, Gamepad2, Puzzle, RefreshCw, Scissors, Shapes, Swords, Trophy } from "lucide-react";
 import { toast } from "sonner";
 
 type Member = {
@@ -15,7 +15,7 @@ type Member = {
 };
 
 type Game = {
-  key: "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot";
+  key: "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot" | "shape-safari";
   title: string;
   description: string;
   ageMin: number;
@@ -90,6 +90,7 @@ function iconForGame(key: string) {
   if (key === "rock-paper-scissors-shoot") return Swords;
   if (key === "bible-trivia") return BookOpen;
   if (key === "memory-match") return Puzzle;
+  if (key === "shape-safari") return Shapes;
   return Gamepad2;
 }
 
@@ -197,6 +198,8 @@ export default function KidGamesPage() {
         <BibleTrivia onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("bible-trivia", score, duration, metadata)} />
       ) : activeGame === "rock-paper-scissors-shoot" ? (
         <RockPaperScissorsShoot onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("rock-paper-scissors-shoot", score, duration, metadata)} />
+      ) : activeGame === "shape-safari" ? (
+        <ShapeSafari onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("shape-safari", score, duration, metadata)} />
       ) : (
         <section className="grid gap-4 sm:grid-cols-2">
           {games.map((game) => {
@@ -507,6 +510,81 @@ function BibleTrivia({
       </div>
       <div className="mt-5 flex items-center gap-2 rounded-2xl bg-yellow-50 px-4 py-3 text-sm font-black text-yellow-700">
         <Trophy size={18} /> Score builds with every correct answer.
+      </div>
+    </section>
+  );
+}
+
+const SAFARI_ROUNDS = [
+  { prompt: "Find the sunny yellow circle!", answer: "🟡", choices: ["🟡", "🟦", "🔺", "🟩"] },
+  { prompt: "Which one is a triangle?", answer: "🔺", choices: ["🟣", "🔺", "🟨", "⚪"] },
+  { prompt: "Tap the green square!", answer: "🟩", choices: ["🟩", "🔴", "🔷", "⭐"] },
+  { prompt: "Can you spot the blue diamond?", answer: "🔷", choices: ["🟧", "🔷", "🟢", "🔺"] },
+  { prompt: "Find the twinkly star!", answer: "⭐", choices: ["🟦", "⭐", "🟠", "🟩"] },
+];
+
+function ShapeSafari({
+  onExit,
+  onFinish,
+}: {
+  onExit: () => void;
+  onFinish: (score: number, durationSeconds: number, metadata: Record<string, unknown>) => void;
+}) {
+  const rounds = useMemo(() => shuffle(SAFARI_ROUNDS), []);
+  const [index, setIndex] = useState(0);
+  const [correct, setCorrect] = useState(0);
+  const [selected, setSelected] = useState("");
+  const [startedAt] = useState(() => Date.now());
+  const current = rounds[index];
+
+  function choose(choice: string) {
+    if (selected) return;
+    setSelected(choice);
+    const nextCorrect = correct + (choice === current.answer ? 1 : 0);
+    setCorrect(nextCorrect);
+    setTimeout(() => {
+      if (index === rounds.length - 1) {
+        const duration = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
+        onFinish(nextCorrect * 100, duration, { correct: nextCorrect, total: rounds.length });
+        return;
+      }
+      setSelected("");
+      setIndex((value) => value + 1);
+    }, 700);
+  }
+
+  return (
+    <section className="rounded-3xl bg-white p-4 shadow-sm sm:p-6">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="flex items-center gap-2 text-2xl font-black text-slate-800"><Shapes className="text-orange-600" /> Shape Safari</h2>
+          <p className="text-sm font-bold text-slate-500">Stop {index + 1}/{rounds.length} · {correct} found</p>
+        </div>
+        <button type="button" onClick={onExit} className="rounded-2xl bg-slate-100 px-4 py-2 text-sm font-black text-slate-600">Exit</button>
+      </div>
+      <div className="rounded-3xl bg-orange-50 p-6 text-center">
+        <span className="text-5xl" aria-hidden="true">🦁</span>
+        <p className="mt-3 text-2xl font-black text-slate-800">{current.prompt}</p>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        {current.choices.map((choice) => {
+          const isCorrect = choice === current.answer;
+          const isSelected = choice === selected;
+          return (
+            <button
+              key={choice}
+              type="button"
+              onClick={() => choose(choice)}
+              className={`aspect-square rounded-3xl border-2 text-5xl shadow-sm transition-all ${selected ? isCorrect ? "border-emerald-300 bg-emerald-50" : isSelected ? "border-red-200 bg-red-50" : "border-slate-100 opacity-50" : "border-orange-100 bg-white hover:-translate-y-0.5 hover:border-orange-300"}`}
+              aria-label={`Choose ${choice}`}
+            >
+              {choice}
+            </button>
+          );
+        })}
+      </div>
+      <div className="mt-5 flex items-center gap-2 rounded-2xl bg-yellow-50 px-4 py-3 text-sm font-black text-yellow-700">
+        <Trophy size={18} /> Every answer is a safari discovery!
       </div>
     </section>
   );
