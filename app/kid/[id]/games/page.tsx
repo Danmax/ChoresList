@@ -593,3 +593,83 @@ function ShapeSafari({
     </section>
   );
 }
+
+const CODEBREAKER_PUZZLES = [
+  { lock: "Pattern lock", clue: "2, 6, 12, 20, ?", choices: ["28", "30", "32", "36"], answer: "30", hint: "The gaps grow by 2 each time." },
+  { lock: "Cipher lock", clue: "If A = 1, B = 2, and C = 3, what is CAB?", choices: ["123", "312", "321", "213"], answer: "312", hint: "Turn each letter into its number." },
+  { lock: "Logic lock", clue: "Mia is taller than Jay. Jay is taller than Sol. Who is shortest?", choices: ["Mia", "Jay", "Sol", "Not enough clues"], answer: "Sol", hint: "Put the three people in height order." },
+  { lock: "Word lock", clue: "Unscramble: R T E S A U E R", choices: ["Treasure", "Restaurant", "Rescuer", "Eraser"], answer: "Treasure", hint: "It is what you hope to find at the end of a quest." },
+  { lock: "Number lock", clue: "A key costs 7 coins. You have 25 coins. How many are left after buying 3 keys?", choices: ["4", "5", "6", "7"], answer: "4", hint: "Find the cost of 3 keys, then subtract." },
+  { lock: "Symbol lock", clue: "▲ ● ▲ ● ▲ ?", choices: ["▲", "●", "■", "★"], answer: "●", hint: "The symbols take turns." },
+  { lock: "Code lock", clue: "Move each letter forward one: DPEF becomes…", choices: ["CODE", "COLD", "DOOR", "COVE"], answer: "CODE", hint: "D becomes C when you move back one." },
+  { lock: "Logic lock", clue: "The blue box is not first. The red box is after the green box. Which can be first?", choices: ["Blue", "Red", "Green", "None"], answer: "Green", hint: "Use both clues to eliminate choices." },
+];
+
+function CodebreakerQuest({
+  onExit,
+  onFinish,
+}: {
+  onExit: () => void;
+  onFinish: (score: number, durationSeconds: number, metadata: Record<string, unknown>) => void;
+}) {
+  const puzzles = useMemo(() => shuffle(CODEBREAKER_PUZZLES).slice(0, 5), []);
+  const [index, setIndex] = useState(0);
+  const [correct, setCorrect] = useState(0);
+  const [selected, setSelected] = useState("");
+  const [showHint, setShowHint] = useState(false);
+  const [startedAt] = useState(() => Date.now());
+  const current = puzzles[index];
+
+  function choose(choice: string) {
+    if (selected) return;
+    setSelected(choice);
+    const nextCorrect = correct + (choice === current.answer ? 1 : 0);
+    setCorrect(nextCorrect);
+    setTimeout(() => {
+      if (index === puzzles.length - 1) {
+        const duration = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
+        onFinish(nextCorrect * 100 + Math.max(0, 90 - duration), duration, { correct: nextCorrect, total: puzzles.length });
+        return;
+      }
+      setSelected("");
+      setShowHint(false);
+      setIndex((value) => value + 1);
+    }, 900);
+  }
+
+  return (
+    <section className="rounded-3xl bg-white p-4 shadow-sm sm:p-6">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="flex items-center gap-2 text-2xl font-black text-slate-800"><KeyRound className="text-blue-600" /> Codebreaker Quest</h2>
+          <p className="text-sm font-bold text-slate-500">Lock {index + 1}/{puzzles.length} · {correct} cracked</p>
+        </div>
+        <button type="button" onClick={onExit} className="rounded-2xl bg-slate-100 px-4 py-2 text-sm font-black text-slate-600">Exit</button>
+      </div>
+      <div className="rounded-3xl bg-blue-950 p-6 text-center text-white">
+        <p className="text-xs font-black uppercase tracking-[0.2em] text-blue-200">{current.lock}</p>
+        <p className="mt-3 text-xl font-black leading-8 sm:text-2xl">{current.clue}</p>
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        {current.choices.map((choice) => {
+          const isCorrect = choice === current.answer;
+          const isSelected = choice === selected;
+          return (
+            <button
+              key={choice}
+              type="button"
+              onClick={() => choose(choice)}
+              className={`rounded-2xl border-2 p-4 text-left font-black transition-all ${selected ? isCorrect ? "border-emerald-300 bg-emerald-50 text-emerald-700" : isSelected ? "border-red-200 bg-red-50 text-red-600" : "border-slate-100 text-slate-400" : "border-slate-100 bg-white text-slate-700 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50"}`}
+            >
+              {choice}
+            </button>
+          );
+        })}
+      </div>
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-amber-50 px-4 py-3">
+        <span className="text-sm font-bold text-amber-800">{showHint ? current.hint : "Need a clue? Hints are free."}</span>
+        <button type="button" onClick={() => setShowHint(true)} disabled={showHint || Boolean(selected)} className="rounded-xl bg-amber-200 px-3 py-1.5 text-xs font-black text-amber-900 disabled:opacity-50">Reveal hint</button>
+      </div>
+    </section>
+  );
+}
