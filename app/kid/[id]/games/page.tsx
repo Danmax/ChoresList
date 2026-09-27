@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { type DragEvent, type MouseEvent as ReactMouseEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft, BookOpen, CheckCircle2, ChefHat, Circle, FileText, Gamepad2, Grid3X3, KeyRound, Puzzle, RefreshCw, Scissors, Shapes, Swords, Trophy } from "lucide-react";
@@ -791,6 +791,7 @@ const BURGER_INGREDIENTS = [
 
 type BurgerIngredient = typeof BURGER_INGREDIENTS[number]["key"];
 type BurgerOrder = { id: string; customer: string; name: string; ingredients: BurgerIngredient[]; special?: boolean };
+type PlacedIngredient = { ingredient: BurgerIngredient; offset: number };
 
 const BURGER_ORDERS: BurgerOrder[] = [
   { id: "classic", customer: "Mia", name: "Classic Cheeseburger", ingredients: ["bottom-bun", "sauce", "patty", "cheese", "top-bun"] },
@@ -804,6 +805,10 @@ const BURGER_ORDERS: BurgerOrder[] = [
 
 function burgerIngredient(key: BurgerIngredient) {
   return BURGER_INGREDIENTS.find((ingredient) => ingredient.key === key) ?? BURGER_INGREDIENTS[0];
+}
+
+function burgerOrderSeconds(order: BurgerOrder) {
+  return 14 + order.ingredients.length * 2;
 }
 
 function BurgerRush({
@@ -820,15 +825,54 @@ function BurgerRush({
     return shuffle([bacon, chili, ...shuffle(rest).slice(0, 3)]);
   }, []);
   const [orderIndex, setOrderIndex] = useState(0);
-  const [built, setBuilt] = useState<BurgerIngredient[]>([]);
+  const [built, setBuilt] = useState<PlacedIngredient[]>([]);
   const [completed, setCompleted] = useState(0);
   const [mistakes, setMistakes] = useState(0);
-  const [feedback, setFeedback] = useState("Start with the bottom bun!");
+  const [feedback, setFeedback] = useState("Drag the bottom bun onto the work canvas!");
   const [serving, setServing] = useState(false);
+  const [tipped, setTipped] = useState(false);
+  const [selectedIngredient, setSelectedIngredient] = useState<BurgerIngredient | null>(null);
   const [startedAt] = useState(() => Date.now());
   const current = orders[orderIndex];
+  const [timeLeft, setTimeLeft] = useState(() => burgerOrderSeconds(current));
+  const sendingBurger = serving && !tipped && built.length === current.ingredients.length;
 
-  function addIngredient(ingredient: BurgerIngredient) {
+  function finishShift(customersServed: number, mistakeCount: number) {
+    const duration = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
+    const score = Math.max(25, customersServed * 120 + Math.max(0, 180 - duration) - mistakeCount * 20);
+    onFinish(score, duration, { customersServed, mistakes: mistakeCount, orders: orders.map((order) => order.id) });
+  }
+
+  function moveToNextOrder(customersServed: number, mistakeCount: number) {
+    if (orderIndex === orders.length - 1) {
+      finishShift(customersServed, mistakeCount);
+      return;
+    }
+    const nextIndex = orderIndex + 1;
+    setOrderIndex(nextIndex);
+    setBuilt([]);
+    setSelectedIngredient(null);
+    setFeedback("New ticket! Drag the bottom bun onto the canvas.");
+    setTimeLeft(burgerOrderSeconds(orders[nextIndex]));
+    setServing(false);
+    setTipped(false);
+  }
+
+  useEffect(() => {
+    if (serving) return;
+    if (timeLeft <= 0) {
+      const nextMistakes = mistakes + 1;
+      setMistakes(nextMistakes);
+      setServing(true);
+      setFeedback(`${current.customer}'s order timed out. Next customer!`);
+      const timeout = window.setTimeout(() => moveToNextOrder(completed, nextMistakes), 800);
+      return () => window.clearTimeout(timeout);
+    }
+    const timer = window.setTimeout(() => setTimeLeft((value) => value - 1), 1000);
+    return () => window.clearTimeout(timer);
+  }, [timeLeft, serving]);
+
+  function placeIngredient(ingredient: BurgerIngredient, offset: number) {
     if (serving) return;
     const expected = current.ingredients[built.length];
     if (ingredient !== expected) {
@@ -837,26 +881,50 @@ function BurgerRush({
       return;
     }
 
-    const nextBuilt = [...built, ingredient];
+    const nextBuilt = [...built, { ingredient, offset }];
+    const previous = built[built.length - 1];
+    const offsets = nextBuilt.map((item) => item.offset);
+    const unstable = Boolean(previous && Math.abs(previous.offset - offset) > 58)
+      || Math.max(...offsets) - Math.min(...offsets) > 105;
+    setSelectedIngredient(null);
     setBuilt(nextBuilt);
+    if (unstable) {
+      const nextMistakes = mistakes + 1;
+      setMistakes(nextMistakes);
+      setServing(true);
+      setTipped(true);
+      setFeedback("The burger tipped over! Keep each layer closer to the center.");
+      window.setTimeout(() => {
+        setBuilt([]);
+        setTipped(false);
+        setServing(false);
+        setFeedback("Rebuild it before the timer runs out!");
+      }, 900);
+      return;
+    }
     setFeedback(nextBuilt.length === current.ingredients.length ? "Perfect order! Serving now…" : "Great—keep stacking!");
     if (nextBuilt.length !== current.ingredients.length) return;
 
     setServing(true);
     const nextCompleted = completed + 1;
     setCompleted(nextCompleted);
-    setTimeout(() => {
-      if (orderIndex === orders.length - 1) {
-        const duration = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
-        const score = Math.max(50, nextCompleted * 100 + Math.max(0, 120 - duration) - mistakes * 15);
-        onFinish(score, duration, { customersServed: nextCompleted, mistakes, orders: orders.map((order) => order.id) });
-        return;
-      }
-      setOrderIndex((value) => value + 1);
-      setBuilt([]);
-      setFeedback("New ticket! Start with the bottom bun.");
-      setServing(false);
-    }, 750);
+    window.setTimeout(() => moveToNextOrder(nextCompleted, mistakes), 750);
+  }
+
+  function dropIngredient(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    const ingredient = event.dataTransfer.getData("text/plain") as BurgerIngredient;
+    if (!BURGER_INGREDIENTS.some((item) => item.key === ingredient)) return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const offset = Math.max(-90, Math.min(90, event.clientX - bounds.left - bounds.width / 2));
+    placeIngredient(ingredient, Math.round(offset));
+  }
+
+  function placeSelected(event: ReactMouseEvent<HTMLDivElement>) {
+    if (!selectedIngredient || serving) return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const offset = Math.max(-90, Math.min(90, event.clientX - bounds.left - bounds.width / 2));
+    placeIngredient(selectedIngredient, Math.round(offset));
   }
 
   return (
@@ -869,37 +937,75 @@ function BurgerRush({
         <button type="button" onClick={onExit} className="rounded-2xl bg-slate-100 px-4 py-2 text-sm font-black text-slate-600">Exit</button>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+      <div className="mb-5 overflow-hidden rounded-3xl border-2 border-slate-200 bg-slate-100 p-3">
+        <div className="flex min-w-max items-stretch gap-3">
+          {orders.slice(orderIndex, orderIndex + 3).map((order, queueIndex) => (
+            <div key={order.id} className={`w-64 rounded-2xl border-2 p-3 transition-all ${queueIndex === 0 ? "border-amber-400 bg-white shadow-md" : "border-slate-200 bg-slate-50 opacity-70"}`}>
+              <div className="flex items-center justify-between gap-2"><span className="text-xs font-black uppercase text-slate-400">{queueIndex === 0 ? "Now serving" : `Up next ${queueIndex}`}</span>{order.special && <span className="text-xs">⭐</span>}</div>
+              <p className="mt-1 font-black text-slate-800">{order.customer} · {order.name}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-300"><div className="h-full rounded-full bg-amber-500 transition-all duration-1000" style={{ width: `${Math.max(0, (timeLeft / burgerOrderSeconds(current)) * 100)}%` }} /></div>
+        <p className={`mt-1 text-right text-xs font-black ${timeLeft <= 7 ? "text-red-600" : "text-slate-500"}`}>{timeLeft}s left on this order</p>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
         <div className="space-y-4">
-          <div className="rounded-3xl bg-amber-50 p-5">
-            <div className="flex items-start justify-between gap-3">
+          <div className="rounded-3xl bg-amber-50 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <div><p className="text-xs font-black uppercase tracking-widest text-amber-700">Order ticket · {current.customer}</p><h3 className="mt-1 text-xl font-black text-slate-800">{current.name}</h3></div>
               {current.special && <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-black text-red-700">Special order</span>}
             </div>
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-3 flex flex-wrap gap-1.5">
               {current.ingredients.map((ingredient, index) => {
                 const item = burgerIngredient(ingredient);
-                return <span key={`${ingredient}-${index}`} className={`rounded-xl border px-2.5 py-2 text-sm font-black ${index < built.length ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-white text-slate-600"}`}>{item.emoji} {item.label}</span>;
+                return <span key={`${ingredient}-${index}`} className={`rounded-lg border px-2 py-1.5 text-xs font-black ${index < built.length ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-white text-slate-600"}`}>{item.emoji} {item.label}</span>;
               })}
             </div>
           </div>
 
-          <div className="rounded-3xl bg-slate-900 p-5 text-center text-white">
-            <p className="text-xs font-black uppercase tracking-widest text-slate-400">Workline</p>
-            <div className="mt-3 flex min-h-44 flex-col items-center justify-end">
-              {built.length === 0 ? <span className="mb-12 text-sm font-bold text-slate-400">Your burger will stack here</span> : [...built].reverse().map((ingredient, index) => {
-                const item = burgerIngredient(ingredient);
-                return <span key={`${ingredient}-${built.length - index}`} className="-mb-1 flex min-w-48 items-center justify-center rounded-xl border border-white/10 bg-white/10 px-4 py-1 text-xl" title={item.label}>{item.emoji} <span className="ml-2 text-xs font-black text-slate-200">{item.label}</span></span>;
+          <div
+            role="application"
+            aria-label="Burger stacking canvas"
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={dropIngredient}
+            onClick={placeSelected}
+            className={`relative min-h-96 cursor-crosshair overflow-hidden rounded-3xl border-4 border-dashed p-5 text-center transition-colors ${selectedIngredient ? "border-amber-400 bg-amber-50" : "border-slate-600 bg-slate-900"}`}
+          >
+            <p className={`text-xs font-black uppercase tracking-widest ${selectedIngredient ? "text-amber-700" : "text-slate-400"}`}>Burger stacking canvas</p>
+            <p className={`mt-1 text-xs font-bold ${selectedIngredient ? "text-amber-700" : "text-slate-500"}`}>{selectedIngredient ? `Tap where you want to place ${burgerIngredient(selectedIngredient).label}` : "Drag ingredients here and keep the stack balanced"}</p>
+            <div className="pointer-events-none absolute inset-x-0 bottom-16 flex h-64 flex-col-reverse items-center justify-start">
+              {built.map((placed, index) => {
+                const item = burgerIngredient(placed.ingredient);
+                return <span
+                  key={`${placed.ingredient}-${index}`}
+                  className={`-mt-1 flex h-8 w-52 items-center justify-center rounded-xl border border-white/20 bg-white/90 px-4 text-lg shadow-md transition-all duration-500 ${tipped ? "rotate-12 opacity-30" : sendingBurger ? "opacity-0" : ""}`}
+                  style={{ transform: tipped ? "translateX(130px) rotate(12deg)" : sendingBurger ? "translateX(260px)" : `translateX(${placed.offset}px)` }}
+                  title={item.label}
+                >{item.emoji}<span className="ml-2 text-[10px] font-black text-slate-700">{item.label}</span></span>;
               })}
+            </div>
+            <div className="absolute inset-x-0 bottom-0 h-16 overflow-hidden border-t-4 border-slate-500 bg-slate-700">
+              <div className="flex h-full items-center justify-around text-2xl text-slate-400"><span>●</span><span>●</span><span>●</span><span>●</span><span>●</span><span>●</span></div>
             </div>
           </div>
         </div>
 
         <div>
-          <p className={`mb-3 rounded-2xl px-4 py-3 text-sm font-black ${feedback.startsWith("Not yet") ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>{feedback}</p>
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+          <p className={`mb-3 rounded-2xl px-4 py-3 text-sm font-black ${feedback.includes("Not yet") || feedback.includes("tipped") || feedback.includes("timed out") ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>{feedback}</p>
+          <p className="mb-2 text-xs font-black uppercase tracking-widest text-slate-400">Ingredient station · drag to canvas</p>
+          <div className="grid grid-cols-3 gap-2">
             {BURGER_INGREDIENTS.map((ingredient) => (
-              <button key={ingredient.key} type="button" onClick={() => addIngredient(ingredient.key)} disabled={serving} className="min-h-24 rounded-2xl border-2 border-amber-100 bg-amber-50 p-2 text-center transition-all hover:-translate-y-0.5 hover:border-amber-300 disabled:opacity-50">
+              <button
+                key={ingredient.key}
+                type="button"
+                draggable={!serving}
+                onDragStart={(event) => { event.dataTransfer.setData("text/plain", ingredient.key); event.dataTransfer.effectAllowed = "move"; }}
+                onClick={(event) => { event.stopPropagation(); setSelectedIngredient((currentValue) => currentValue === ingredient.key ? null : ingredient.key); }}
+                disabled={serving}
+                className={`min-h-24 cursor-grab rounded-2xl border-2 p-2 text-center transition-all active:cursor-grabbing disabled:opacity-50 ${selectedIngredient === ingredient.key ? "border-amber-500 bg-amber-100 ring-2 ring-amber-200" : "border-amber-100 bg-amber-50 hover:-translate-y-0.5 hover:border-amber-300"}`}
+              >
                 <span className="block text-3xl">{ingredient.emoji}</span><span className="mt-1 block text-xs font-black text-slate-700">{ingredient.label}</span>
               </button>
             ))}
