@@ -2,21 +2,10 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
-Configure MySQL before running the app:
+Configure the app before running it. Copy the environment template and add your own local values; never commit `.env` files or credentials.
 
 ```bash
-DATABASE_URL="mysql://u130206374_parent:PASSWORD@srv2104.hstgr.io:3306/u130206374_chores"
-PARENT_EMAIL="parent@example.com"
-PARENT_PASSWORD="ChangeMe123!"
-AUTH_SECRET="replace-with-a-long-random-string"
-PUBLIC_BASE_URL="https://chores.example.com"
-SMTP_HOST="smtp.gmail.com"
-SMTP_PORT="587"
-SMTP_SECURE="false"
-SMTP_USER="chores@frowear.com"
-SMTP_PASSWORD="your-gmail-app-password"
-SMTP_FROM="ChoresList <chores@frowear.com>"
-GIPHY_API_KEY=""
+cp .env.example .env
 ```
 
 Then create the schema and seed the default chores plus the parent login:
@@ -28,7 +17,7 @@ npm run db:seed
 
 Parent accounts are household-scoped. New households can sign up from `/parent`; if SMTP is configured the app sends a confirmation email, otherwise it returns a development confirmation link.
 
-For Gmail SMTP, `SMTP_PASSWORD` must be a Google app password for `chores@frowear.com`, not the normal Gmail password. In the Google account, enable 2-Step Verification, then create an app password for Mail and paste that 16-character password into `.env` and the production host environment variables.
+Use the environment template for the supported database, email, AI, and optional integration settings. Store production secrets in your deployment platform’s secret manager.
 
 Community email notifications use a database-backed outbox. Run the processor once per minute in production so reminders are delivered on schedule:
 

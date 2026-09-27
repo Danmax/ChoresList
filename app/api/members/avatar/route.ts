@@ -38,8 +38,11 @@ function avatarGenerationError(error: unknown) {
   if (error.status === 429) {
     return NextResponse.json({ error: "Avatar generation is busy or has reached its limit. Please try again shortly." }, { status: 503 });
   }
-  if (error.code === "moderation_blocked" || error.status === 400 || error.status === 422) {
+  if (error.code === "moderation_blocked") {
     return NextResponse.json({ error: "That photo could not be used to create an avatar. Try a different clear photo." }, { status: 422 });
+  }
+  if (error.status === 400 || error.status === 422) {
+    return NextResponse.json({ error: "The avatar generator could not process this request. Please try again shortly." }, { status: 502 });
   }
   return NextResponse.json({ error: "The avatar service is temporarily unavailable. Please try again shortly." }, { status: 502 });
 }
@@ -67,8 +70,9 @@ export async function POST(req: NextRequest) {
     try {
       source = await sharp(Buffer.from(await file.arrayBuffer()), { failOn: "error" })
         .rotate()
-        .resize(1024, 1024, { fit: "cover", position: "attention" })
-        .png()
+        .resize(1024, 1024, { fit: "cover", position: "attention", withoutEnlargement: true })
+        .flatten({ background: "#ffffff" })
+        .jpeg({ quality: 88, chromaSubsampling: "4:2:0", mozjpeg: true })
         .toBuffer();
     } catch {
       return NextResponse.json({ error: "Could not read that photo" }, { status: 400 });
@@ -78,7 +82,7 @@ export async function POST(req: NextRequest) {
     try {
       response = await client.images.edit({
         model: process.env.OPENAI_IMAGE_MODEL ?? "gpt-image-2.5-sunburst",
-        image: await toFile(source, "avatar-source.png", { type: "image/png" }),
+        image: await toFile(source, "avatar-source.jpg", { type: "image/jpeg" }),
         prompt: `Transform the person in this reference photo into an original ${STYLES[style]}. Preserve the person's recognizable facial features, skin tone, hair texture, hair color, approximate age, and joyful personality. Create a centered head-and-shoulders avatar facing the viewer, simple colorful background, balanced square composition, wholesome family-friendly mood. Keep the character cute and natural, not uncanny. No text, logos, watermark, extra people, duplicate features, or photorealism.`,
         input_fidelity: "high",
         n: 3,
