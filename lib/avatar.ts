@@ -3,6 +3,12 @@ export const HAIR_COLORS = ["#201713", "#4A2A1A", "#754326", "#B66A2C", "#E0B15B
 export const EYE_COLORS = ["#3B2418", "#704329", "#A36B35", "#55805B", "#3E78A8", "#69717A"] as const;
 export const SHIRT_COLORS = ["#7C3AED", "#2563EB", "#0891B2", "#059669", "#65A30D", "#EAB308", "#EA580C", "#E11D48", "#DB2777", "#475569"] as const;
 export const BACKGROUND_COLORS = ["#CFFAFE", "#DBEAFE", "#EDE9FE", "#FCE7F3", "#FFE4E6", "#FEF3C7", "#DCFCE7", "#F1F5F9"] as const;
+export const GENDER_STYLES = [{ value: "boy", label: "Boy" }, { value: "girl", label: "Girl" }] as const;
+export const AGE_GROUPS = [
+  { value: "toddler", label: "Toddler" }, { value: "kid", label: "Kid" },
+  { value: "tween", label: "Tween" }, { value: "teen", label: "Teen" },
+  { value: "adult", label: "Adult" },
+] as const;
 
 export const HAIR_STYLES = [
   { value: "short", label: "Short" }, { value: "swoop", label: "Swoop" },
@@ -34,6 +40,8 @@ export const ACCESSORIES = [
 
 export type AvatarConfig = {
   version: 1;
+  genderStyle: typeof GENDER_STYLES[number]["value"];
+  ageGroup: typeof AGE_GROUPS[number]["value"];
   skinTone: string;
   hairStyle: typeof HAIR_STYLES[number]["value"];
   hairColor: string;
@@ -48,6 +56,8 @@ export type AvatarConfig = {
 
 export const DEFAULT_AVATAR_CONFIG: AvatarConfig = {
   version: 1,
+  genderStyle: "boy",
+  ageGroup: "kid",
   skinTone: SKIN_TONES[1],
   hairStyle: "swoop",
   hairColor: HAIR_COLORS[1],
@@ -66,6 +76,8 @@ const eyeStyles = values(EYE_STYLES);
 const mouthStyles = values(MOUTH_STYLES);
 const noseStyles = values(NOSE_STYLES);
 const accessories = values(ACCESSORIES);
+const genderStyles = values(GENDER_STYLES);
+const ageGroups = values(AGE_GROUPS);
 
 function allowedColor(value: unknown, allowed: readonly string[], fallback: string) {
   return typeof value === "string" && allowed.includes(value) ? value : fallback;
@@ -77,6 +89,8 @@ export function cleanAvatarConfig(value: unknown): AvatarConfig | null {
   const pick = (candidate: unknown, allowed: Set<string>, fallback: string) => typeof candidate === "string" && allowed.has(candidate) ? candidate : fallback;
   return {
     version: 1,
+    genderStyle: pick(input.genderStyle, genderStyles, DEFAULT_AVATAR_CONFIG.genderStyle) as AvatarConfig["genderStyle"],
+    ageGroup: pick(input.ageGroup, ageGroups, DEFAULT_AVATAR_CONFIG.ageGroup) as AvatarConfig["ageGroup"],
     skinTone: allowedColor(input.skinTone, SKIN_TONES, DEFAULT_AVATAR_CONFIG.skinTone),
     hairStyle: pick(input.hairStyle, hairStyles, DEFAULT_AVATAR_CONFIG.hairStyle) as AvatarConfig["hairStyle"],
     hairColor: allowedColor(input.hairColor, HAIR_COLORS, DEFAULT_AVATAR_CONFIG.hairColor),
@@ -93,7 +107,8 @@ export function cleanAvatarConfig(value: unknown): AvatarConfig | null {
 export function randomAvatarConfig(): AvatarConfig {
   const one = <T,>(items: readonly T[]) => items[Math.floor(Math.random() * items.length)];
   return {
-    version: 1, skinTone: one(SKIN_TONES), hairStyle: one(HAIR_STYLES).value,
+    version: 1, genderStyle: one(GENDER_STYLES).value, ageGroup: one(AGE_GROUPS).value,
+    skinTone: one(SKIN_TONES), hairStyle: one(HAIR_STYLES).value,
     hairColor: one(HAIR_COLORS), eyeStyle: one(EYE_STYLES).value, eyeColor: one(EYE_COLORS),
     mouthStyle: one(MOUTH_STYLES).value, noseStyle: one(NOSE_STYLES).value,
     accessory: one(ACCESSORIES).value, shirtColor: one(SHIRT_COLORS), backgroundColor: one(BACKGROUND_COLORS),

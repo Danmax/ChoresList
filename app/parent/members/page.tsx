@@ -184,6 +184,14 @@ function placeholderForRole(role?: string | null) {
   return "Child's name";
 }
 
+function avatarAgeGroup(age: number): AvatarConfig["ageGroup"] {
+  if (age <= 4) return "toddler";
+  if (age <= 9) return "kid";
+  if (age <= 12) return "tween";
+  if (age <= 17) return "teen";
+  return "adult";
+}
+
 function nextDateForMonthly() {
   const next = new Date();
   next.setDate(1);
@@ -267,7 +275,11 @@ export default function MembersPage() {
   }
 
   function updateAge(age: number) {
-    setEditing((p) => ({ ...p!, age }));
+    setEditing((p) => ({
+      ...p!,
+      age,
+      avatarConfig: p?.avatarConfig ? { ...p.avatarConfig, ageGroup: avatarAgeGroup(age) } : p?.avatarConfig,
+    }));
     if (!editing?.id) {
       setStarterSelection(defaultStarterSelection(age));
     }
@@ -700,6 +712,11 @@ export default function MembersPage() {
                         role: r.value,
                         relationshipToHousehold: relationshipForRole(r.value, p?.relationshipToHousehold),
                         age: isChildRole(r.value) ? p?.age ?? 8 : p?.age && p.age >= 18 ? p.age : 18,
+                        avatarConfig: p?.avatarConfig ? {
+                          ...p.avatarConfig,
+                          ageGroup: isChildRole(r.value) ? avatarAgeGroup(p?.age ?? 8) : "adult",
+                          genderStyle: r.value === "mom" ? "girl" : r.value === "dad" ? "boy" : p.avatarConfig.genderStyle,
+                        } : p?.avatarConfig,
                         avatar: usesAdultAvatars(r.value)
                           ? (AVATAR_OPTIONS.includes(p?.avatar ?? "") ? (r.value === "mom" ? "👩" : r.value === "dad" ? "👨" : "🧑") : p?.avatar)
                           : (PARENT_AVATARS.includes(p?.avatar ?? "") ? "🧒" : p?.avatar),

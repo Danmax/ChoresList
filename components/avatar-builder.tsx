@@ -3,14 +3,14 @@
 import { useState } from "react";
 import { MemberAvatar } from "@/components/member-avatar";
 import {
-  ACCESSORIES, BACKGROUND_COLORS, DEFAULT_AVATAR_CONFIG, EYE_COLORS, EYE_STYLES,
+  ACCESSORIES, AGE_GROUPS, BACKGROUND_COLORS, DEFAULT_AVATAR_CONFIG, EYE_COLORS, EYE_STYLES, GENDER_STYLES,
   HAIR_COLORS, HAIR_STYLES, MOUTH_STYLES, NOSE_STYLES, SHIRT_COLORS, SKIN_TONES,
   randomAvatarConfig, type AvatarConfig,
 } from "@/lib/avatar";
 
-type Category = "skin" | "hair" | "eyes" | "face" | "extras" | "colors";
+type Category = "basics" | "hair" | "eyes" | "face" | "extras" | "colors";
 const CATEGORIES: { key: Category; label: string; icon: string }[] = [
-  { key: "skin", label: "Skin", icon: "😊" }, { key: "hair", label: "Hair", icon: "💇" },
+  { key: "basics", label: "Basics", icon: "😊" }, { key: "hair", label: "Hair", icon: "💇" },
   { key: "eyes", label: "Eyes", icon: "👀" }, { key: "face", label: "Face", icon: "🙂" },
   { key: "extras", label: "Extras", icon: "👓" }, { key: "colors", label: "Colors", icon: "🎨" },
 ];
@@ -24,7 +24,7 @@ function Swatches({ colors, selected, label, onSelect }: { colors: readonly stri
 }
 
 export function AvatarBuilder({ value, name, onChange }: { value: AvatarConfig | null | undefined; name?: string; onChange: (value: AvatarConfig | null) => void }) {
-  const [category, setCategory] = useState<Category>("skin");
+  const [category, setCategory] = useState<Category>("basics");
   const config = value ?? DEFAULT_AVATAR_CONFIG;
   const update = <K extends keyof AvatarConfig>(key: K, next: AvatarConfig[K]) => onChange({ ...config, [key]: next });
 
@@ -43,7 +43,7 @@ export function AvatarBuilder({ value, name, onChange }: { value: AvatarConfig |
             {CATEGORIES.map((item) => <button key={item.key} type="button" onClick={() => setCategory(item.key)} className={`rounded-xl px-1 py-2 text-[11px] font-black ${category === item.key ? "bg-white text-violet-700 shadow-sm" : "text-slate-500"}`}><span className="block text-lg">{item.icon}</span>{item.label}</button>)}
           </div>
           <div className="min-h-36 rounded-2xl bg-white p-3">
-            {category === "skin" && <Swatches colors={SKIN_TONES} selected={config.skinTone} label="Skin tone" onSelect={(color) => update("skinTone", color)} />}
+            {category === "basics" && <div className="space-y-4"><div><p className="mb-2 text-xs font-black uppercase tracking-wide text-slate-400">Character</p><ChoiceGrid items={GENDER_STYLES} selected={config.genderStyle} onSelect={(next) => update("genderStyle", next)} /></div><div><p className="mb-2 text-xs font-black uppercase tracking-wide text-slate-400">Age group</p><ChoiceGrid items={AGE_GROUPS} selected={config.ageGroup} onSelect={(next) => update("ageGroup", next)} /></div><Swatches colors={SKIN_TONES} selected={config.skinTone} label="Skin tone" onSelect={(color) => update("skinTone", color)} /></div>}
             {category === "hair" && <div className="space-y-4"><ChoiceGrid items={HAIR_STYLES} selected={config.hairStyle} onSelect={(next) => update("hairStyle", next)} /><Swatches colors={HAIR_COLORS} selected={config.hairColor} label="Hair color" onSelect={(color) => update("hairColor", color)} /></div>}
             {category === "eyes" && <div className="space-y-4"><ChoiceGrid items={EYE_STYLES} selected={config.eyeStyle} onSelect={(next) => update("eyeStyle", next)} /><Swatches colors={EYE_COLORS} selected={config.eyeColor} label="Eye color" onSelect={(color) => update("eyeColor", color)} /></div>}
             {category === "face" && <div className="space-y-4"><div><p className="mb-2 text-xs font-black uppercase tracking-wide text-slate-400">Mouth</p><ChoiceGrid items={MOUTH_STYLES} selected={config.mouthStyle} onSelect={(next) => update("mouthStyle", next)} /></div><div><p className="mb-2 text-xs font-black uppercase tracking-wide text-slate-400">Nose</p><ChoiceGrid items={NOSE_STYLES} selected={config.noseStyle} onSelect={(next) => update("noseStyle", next)} /></div></div>}
