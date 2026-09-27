@@ -7,6 +7,7 @@ import { requireParentSession, requireSession, withErrors } from "@/lib/api";
 import { canAccessMember, childAccessWhere } from "@/lib/child-access";
 import { awardChoreSkillXp } from "@/lib/skills";
 import { COMPLETION_EMOJIS } from "@/types";
+import { isMonthlyChoreOpen, startOfDay, startOfMonth } from "@/lib/chore-schedule";
 
 export const POST = withErrors(async (req: NextRequest) => {
   const { householdId, parentId } = requireSession(req);
@@ -29,8 +30,19 @@ export const POST = withErrors(async (req: NextRequest) => {
   if (!(await canAccessMember(parentId, householdId, memberId))) {
     return NextResponse.json({ error: "You do not have access to this family member" }, { status: 403 });
   }
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
+  const todayStart = startOfDay();
+  const monthStart = startOfMonth(todayStart);
+  if (assignment.frequency === "monthly") {
+    if (!isMonthlyChoreOpen(assignment.dueDate, todayStart)) {
+      return NextResponse.json({ error: "This monthly chore is no longer available for this month" }, { status: 409 });
+    }
+    const monthlyCompletions = await prisma.taskCompletion.count({
+      where: { assignmentId, householdId, completedAt: { gte: monthStart } },
+    });
+    if (monthlyCompletions >= assignment.monthlyCompletionTarget) {
+      return NextResponse.json({ error: "Monthly completion goal already reached" }, { status: 409 });
+    }
+  }
   const existingCompletion = await prisma.taskCompletion.findFirst({
     where: { assignmentId, householdId, completedAt: { gte: todayStart } },
     select: { id: true },

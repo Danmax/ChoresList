@@ -67,6 +67,7 @@ export default function ChoresPage() {
     frequency: "daily",
     dueDate: "",
     dayOfWeeks: ["1"],
+    monthlyCompletionTarget: 1,
   });
 
   const load = useCallback(async () => {
@@ -190,6 +191,7 @@ export default function ChoresPage() {
           frequency: newAssignment.frequency,
           dueDate: newAssignment.dueDate || null,
           dayOfWeeks: newAssignment.frequency === "weekly" ? newAssignment.dayOfWeeks.map(Number) : [],
+          monthlyCompletionTarget: newAssignment.monthlyCompletionTarget,
         }),
       });
       const assignData = await assignRes.json().catch(() => null);
@@ -294,7 +296,7 @@ export default function ChoresPage() {
     setShowNewChore(false);
     setNewChore({ name: "", description: "", icon: "✅", color: "#e0e7ff", ageMin: 6, ageMax: 18, pointsValue: 10, category: "other", requiresPhoto: false });
     setAssignOnCreate(false);
-    setNewAssignment({ memberId: "", frequency: "daily", dueDate: "", dayOfWeeks: ["1"] });
+    setNewAssignment({ memberId: "", frequency: "daily", dueDate: "", dayOfWeeks: ["1"], monthlyCompletionTarget: 1 });
     setChorePrompt("");
   }
 
@@ -717,7 +719,8 @@ export default function ChoresPage() {
                     </div>
                   )}
                   {(newAssignment.frequency === "monthly" || newAssignment.frequency === "one-time") && (
-                    <div>
+                    <div className={newAssignment.frequency === "monthly" ? "grid gap-3 sm:grid-cols-2" : ""}>
+                      <div>
                       <Label className="font-bold">{newAssignment.frequency === "monthly" ? "Monthly Date" : "Due Date"}</Label>
                       <Input
                         type="date"
@@ -725,6 +728,15 @@ export default function ChoresPage() {
                         onChange={(e) => setNewAssignment((p) => ({ ...p, dueDate: e.target.value }))}
                         className="mt-1 rounded-xl bg-white"
                       />
+                      </div>
+                      {newAssignment.frequency === "monthly" && (
+                        <div>
+                          <Label className="font-bold">Times per month</Label>
+                          <Input type="number" min={1} max={31} value={newAssignment.monthlyCompletionTarget}
+                            onChange={(e) => setNewAssignment((p) => ({ ...p, monthlyCompletionTarget: Math.max(1, Number(e.target.value) || 1) }))}
+                            className="mt-1 rounded-xl bg-white" />
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

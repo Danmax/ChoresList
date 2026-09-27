@@ -465,6 +465,7 @@ model ChoreAssignment {
   frequency   String    @default("daily") @db.VarChar(64)
   dueDate     DateTime?
   dayOfWeek   Int?
+  monthlyCompletionTarget Int @default(1)
   isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
 

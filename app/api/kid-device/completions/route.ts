@@ -7,6 +7,7 @@ import { calcPointsEarned, getLevelFromPoints } from "@/lib/points";
 import { hashDeviceSecret, requireDeviceSession } from "@/lib/device-session";
 import { awardChoreSkillXp } from "@/lib/skills";
 import { COMPLETION_EMOJIS } from "@/types";
+import { isMonthlyChoreOpen, startOfDay, startOfMonth } from "@/lib/chore-schedule";
 
 async function verifyDevice(req: NextRequest) {
   const session = requireDeviceSession(req);
@@ -34,8 +35,8 @@ export const POST = withErrors(async (req: NextRequest) => {
   const completionNote = typeof body.completionNote === "string" && body.completionNote.trim()
     ? body.completionNote.trim().slice(0, 2000)
     : null;
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
+  const todayStart = startOfDay();
+  const monthStart = startOfMonth(todayStart);
 
   const assignment = await prisma.choreAssignment.findFirst({
     where: {
@@ -52,6 +53,17 @@ export const POST = withErrors(async (req: NextRequest) => {
   });
 
   if (!assignment) return NextResponse.json({ error: "Task not found" }, { status: 404 });
+  if (assignment.frequency === "monthly") {
+    if (!isMonthlyChoreOpen(assignment.dueDate, todayStart)) {
+      return NextResponse.json({ error: "This monthly chore is no longer available for this month" }, { status: 409 });
+    }
+    const monthlyCompletions = await prisma.taskCompletion.count({
+      where: { assignmentId: assignment.id, householdId: session.householdId, completedAt: { gte: monthStart } },
+    });
+    if (monthlyCompletions >= assignment.monthlyCompletionTarget) {
+      return NextResponse.json({ error: "Monthly completion goal already reached" }, { status: 409 });
+    }
+  }
   if (assignment.completions.length > 0) {
     return NextResponse.json({ error: "Task already completed today" }, { status: 409 });
   }

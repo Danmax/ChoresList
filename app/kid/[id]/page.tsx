@@ -31,6 +31,7 @@ interface Assignment {
   choreId: string;
   frequency: string;
   dueDate: string | null;
+  monthlyCompletionTarget: number;
   chore: Chore;
   completions: { id: string; completedAt: string; reactionEmoji?: string | null }[];
 }
@@ -236,13 +237,14 @@ export default function KidPage() {
   const weeklyChores = assignments.filter((a) => a.frequency === "weekly");
   const monthlyChores = assignments.filter((a) => a.frequency === "monthly");
   const specialChores = assignments.filter((a) => a.frequency === "one-time");
-  const choreDoneCount = assignments.filter((a) => a.completions.length > 0).length;
+  const isComplete = (assignment: Assignment) => assignment.completions.length >= (assignment.frequency === "monthly" ? assignment.monthlyCompletionTarget : 1);
+  const choreDoneCount = assignments.filter(isComplete).length;
   const openEducationAssignments = educationAssignments.filter((assignment) => assignment.status !== "completed" && assignment.status !== "archived");
   const completedEducationAssignments = educationAssignments.filter((assignment) => assignment.status === "completed");
   const openEducationProjects = educationProjects.filter((project) => project.status === "open");
   const openHouseProjects = projects.length;
   const nextLesson = openEducationAssignments[0];
-  const nextChore = assignments.find((assignment) => assignment.completions.length === 0);
+  const nextChore = assignments.find((assignment) => !isComplete(assignment));
   const portalItems = [
     {
       href: nextChore ? `#chore-${nextChore.id}` : `/kid/${id}`,
@@ -456,7 +458,7 @@ export default function KidPage() {
             <h2 className="text-lg font-black text-slate-700 mb-3">{label}</h2>
             <div className="space-y-3">
               {chores.map((assignment) => {
-                const done = assignment.completions.length > 0;
+                const done = isComplete(assignment);
                 const reactionEmoji = assignment.completions[0]?.reactionEmoji;
                 const hasInstructions = !!assignment.chore.instructions;
 
@@ -488,6 +490,11 @@ export default function KidPage() {
                           {assignment.dueDate && (
                             <span className="text-xs font-bold text-orange-500">
                               Due: {new Date(assignment.dueDate).toLocaleDateString()}
+                            </span>
+                          )}
+                          {assignment.frequency === "monthly" && (
+                            <span className="text-xs font-bold text-violet-600">
+                              {assignment.completions.length}/{assignment.monthlyCompletionTarget} this month
                             </span>
                           )}
                         </div>

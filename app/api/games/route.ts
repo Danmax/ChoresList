@@ -5,6 +5,7 @@ import { requireParentSession, requireSession, withErrors } from "@/lib/api";
 import { canAccessMember } from "@/lib/child-access";
 import { getLevelFromPoints } from "@/lib/points";
 import { DEFAULT_GAME_SETTINGS, GAME_DEFINITIONS, gameByKey, type GameRewardType } from "@/lib/games";
+import { isMonthlyChoreOpen, startOfMonth } from "@/lib/chore-schedule";
 
 const REWARD_TYPES = new Set<GameRewardType>(["none", "points", "tickets"]);
 
@@ -40,7 +41,7 @@ function isDueToday(assignment: {
   if (assignment.frequency === "daily") return true;
   if (assignment.frequency === "weekly") return assignment.dayOfWeek === today.getDay();
   if (!assignment.dueDate) return false;
-  if (assignment.frequency === "monthly") return assignment.dueDate.getDate() === today.getDate();
+  if (assignment.frequency === "monthly") return isMonthlyChoreOpen(assignment.dueDate, today);
   return assignment.frequency === "one-time" && assignment.dueDate >= today;
 }
 
@@ -72,14 +73,21 @@ async function openChoreCount(householdId: string, memberId: string) {
       frequency: true,
       dayOfWeek: true,
       dueDate: true,
+      monthlyCompletionTarget: true,
       completions: {
-        where: { completedAt: { gte: todayStart() } },
-        select: { id: true },
-        take: 1,
+        where: { completedAt: { gte: startOfMonth() } },
+        select: { completedAt: true },
       },
     },
   });
-  return assignments.filter((assignment) => isDueToday(assignment) && assignment.completions.length === 0).length;
+  const today = todayStart();
+  return assignments.filter((assignment) => {
+    if (!isDueToday(assignment)) return false;
+    const completions = assignment.frequency === "monthly"
+      ? assignment.completions.length
+      : assignment.completions.filter((completion) => completion.completedAt >= today).length;
+    return completions < (assignment.frequency === "monthly" ? assignment.monthlyCompletionTarget : 1);
+  }).length;
 }
 
 export const GET = withErrors(async (req: NextRequest) => {

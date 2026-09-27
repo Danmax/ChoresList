@@ -24,6 +24,7 @@ type Assignment = {
   id: string;
   frequency: string;
   dueDate: string | null;
+  monthlyCompletionTarget: number;
   member: {
     id: string;
     name: string;
@@ -200,7 +201,7 @@ export default function TaskScreenPage() {
 
   const visibleAssignments = useMemo(() => {
     return assignments.filter((assignment) => {
-      const done = assignment.completions.length > 0;
+      const done = assignment.completions.length >= (assignment.frequency === "monthly" ? assignment.monthlyCompletionTarget : 1);
       if (filter === "open") return !done;
       if (filter === "done") return done;
       return true;
@@ -208,7 +209,7 @@ export default function TaskScreenPage() {
   }, [assignments, filter]);
 
   const stats = useMemo(() => {
-    const done = assignments.filter((assignment) => assignment.completions.length > 0).length;
+    const done = assignments.filter((assignment) => assignment.completions.length >= (assignment.frequency === "monthly" ? assignment.monthlyCompletionTarget : 1)).length;
     return { done, total: assignments.length, open: assignments.length - done };
   }, [assignments]);
 
@@ -632,7 +633,7 @@ export default function TaskScreenPage() {
         <div className="order-1 mb-5 overflow-hidden rounded-3xl bg-white shadow-sm">
           <div className="divide-y divide-slate-100 md:hidden">
             {visibleAssignments.map((assignment) => {
-              const done = assignment.completions.length > 0;
+              const done = assignment.completions.length >= (assignment.frequency === "monthly" ? assignment.monthlyCompletionTarget : 1);
               const reactionEmoji = assignment.completions[0]?.reactionEmoji;
               return (
                 <div key={assignment.id} className={`p-4 ${done ? "bg-emerald-50/50 text-slate-400" : "text-slate-800"}`}>
@@ -654,6 +655,7 @@ export default function TaskScreenPage() {
                       <div className="mt-2 flex flex-wrap gap-2 text-xs font-black">
                         <span className="rounded-full bg-slate-100 px-2.5 py-1 capitalize text-slate-600">{assignment.frequency}</span>
                         <span className="rounded-full bg-amber-100 px-2.5 py-1 text-amber-700">+{assignment.chore.pointsValue} pts</span>
+                        {assignment.frequency === "monthly" && <span className="rounded-full bg-violet-100 px-2.5 py-1 text-violet-700">{assignment.completions.length}/{assignment.monthlyCompletionTarget} this month</span>}
                         <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ${done ? "bg-emerald-100 text-emerald-600" : "bg-orange-100 text-orange-700"}`}>
                           {done && (reactionEmoji ? <span>{reactionEmoji}</span> : <CheckCircle2 size={14} />)} {done ? "Done" : "Open"}
                         </span>

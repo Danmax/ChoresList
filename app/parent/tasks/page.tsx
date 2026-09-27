@@ -24,6 +24,7 @@ type Assignment = {
   frequency: string;
   dueDate: string | null;
   dayOfWeek: number | null;
+  monthlyCompletionTarget: number;
   member: Member;
   chore: {
     id: string;
@@ -158,7 +159,8 @@ export default function ParentTasksPage() {
     return true;
   }
 
-  const openCount = assignments.filter((assignment) => assignment.completions.length === 0).length;
+  const isComplete = (assignment: Assignment) => assignment.completions.length >= (assignment.frequency === "monthly" ? assignment.monthlyCompletionTarget : 1);
+  const openCount = assignments.filter((assignment) => !isComplete(assignment)).length;
   const doneCount = assignments.length - openCount;
 
   return (
@@ -238,7 +240,7 @@ export default function ParentTasksPage() {
           ) : (
             <div className="space-y-3">
               {assignments.map((assignment) => {
-                const done = assignment.completions.length > 0;
+                const done = isComplete(assignment);
                 const dateLabel = taskDateLabel(assignment);
 
                 return (
@@ -260,6 +262,7 @@ export default function ParentTasksPage() {
                         <div className="mt-1 flex flex-wrap gap-2 text-xs font-black">
                           <span className="rounded-lg bg-slate-100 px-2 py-1 capitalize text-slate-600">{assignment.frequency}</span>
                           {dateLabel && <span className="rounded-lg bg-orange-50 px-2 py-1 text-orange-600">{dateLabel}</span>}
+                          {assignment.frequency === "monthly" && <span className="rounded-lg bg-violet-50 px-2 py-1 text-violet-600">{assignment.completions.length}/{assignment.monthlyCompletionTarget} this month</span>}
                           <span className="rounded-lg bg-violet-50 px-2 py-1 text-violet-600">+{assignment.chore.pointsValue} pts</span>
                           {assignment.chore.requiresPhoto && (
                             <span className="flex items-center gap-1 rounded-lg bg-blue-50 px-2 py-1 text-blue-600">

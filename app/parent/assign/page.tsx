@@ -26,6 +26,7 @@ interface Assignment {
   frequency: string;
   dueDate: string | null;
   dayOfWeek: number | null;
+  monthlyCompletionTarget: number;
   chore: Chore;
   member: Member;
   completions?: { id: string }[];
@@ -38,7 +39,7 @@ function isDueToday(assignment: Assignment) {
   if (assignment.frequency === "weekly") return assignment.dayOfWeek === today.getDay();
   if (!assignment.dueDate) return false;
   const due = new Date(assignment.dueDate);
-  if (assignment.frequency === "monthly") return due.getDate() === today.getDate();
+  if (assignment.frequency === "monthly") return today.getDate() <= due.getDate();
   return assignment.frequency === "one-time" && due >= today;
 }
 
@@ -53,7 +54,7 @@ export default function AssignPage() {
   const [completionProofPhoto, setCompletionProofPhoto] = useState<File | null>(null);
   const [completingId, setCompletingId] = useState<string | null>(null);
   const [form, setForm] = useState({
-    memberId: "", choreIds: [] as string[], frequency: "daily", dueDate: "", dayOfWeeks: ["1"],
+    memberId: "", choreIds: [] as string[], frequency: "daily", dueDate: "", dayOfWeeks: ["1"], monthlyCompletionTarget: 1,
   });
 
   const load = useCallback(async () => {
@@ -93,6 +94,7 @@ export default function AssignPage() {
           frequency: form.frequency,
           dueDate: form.dueDate || null,
           dayOfWeeks: form.frequency === "weekly" ? form.dayOfWeeks.map(Number) : [],
+          monthlyCompletionTarget: form.monthlyCompletionTarget,
         }),
       });
       const data = await res.json();
@@ -172,7 +174,7 @@ export default function AssignPage() {
     : chores;
 
   function resetForm() {
-    setForm({ memberId: "", choreIds: [], frequency: "daily", dueDate: "", dayOfWeeks: ["1"] });
+    setForm({ memberId: "", choreIds: [], frequency: "daily", dueDate: "", dayOfWeeks: ["1"], monthlyCompletionTarget: 1 });
   }
 
   function toggleChore(choreId: string) {
@@ -256,7 +258,7 @@ export default function AssignPage() {
                   <span>{DAYS[a.dayOfWeek]}</span>
                 )}
                 {a.frequency === "monthly" && a.dueDate && (
-                  <span>Day {new Date(a.dueDate).getDate()}</span>
+                  <span>By day {new Date(a.dueDate).getDate()} · {a.completions?.length ?? 0}/{a.monthlyCompletionTarget} this month</span>
                 )}
                 {a.frequency === "one-time" && a.dueDate && (
                   <span>Due: {new Date(a.dueDate).toLocaleDateString()}</span>
@@ -269,7 +271,7 @@ export default function AssignPage() {
               {isDueToday(a) && (
                 <button
                   type="button"
-                  disabled={(a.completions?.length ?? 0) > 0 || completingId === a.id}
+                  disabled={(a.completions?.length ?? 0) >= (a.frequency === "monthly" ? a.monthlyCompletionTarget : 1) || completingId === a.id}
                   onClick={() => {
                     if (a.chore.requiresPhoto) {
                       setCompletionAssignment(a);
@@ -280,7 +282,7 @@ export default function AssignPage() {
                   }}
                   className="rounded-xl bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700 disabled:bg-slate-100 disabled:text-slate-400"
                 >
-                  {(a.completions?.length ?? 0) > 0 ? "Completed" : completingId === a.id ? "Saving" : "Complete Today"}
+                  {(a.completions?.length ?? 0) >= (a.frequency === "monthly" ? a.monthlyCompletionTarget : 1) ? "Completed" : completingId === a.id ? "Saving" : a.frequency === "monthly" ? "Complete" : "Complete Today"}
                 </button>
               )}
               <button onClick={() => unassign(a.id)} className="p-1 text-red-400 transition-colors hover:text-red-600">
@@ -452,12 +454,20 @@ export default function AssignPage() {
               </div>
             )}
             {form.frequency === "monthly" && (
-              <div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
                 <Label className="font-bold">Monthly Date</Label>
                 <Input type="date" value={form.dueDate}
                   onChange={(e) => setForm((p) => ({ ...p, dueDate: e.target.value }))}
                   className="rounded-xl mt-1" />
-                <p className="mt-1 text-xs font-semibold text-slate-400">This repeats every month on the selected day number.</p>
+                </div>
+                <div>
+                  <Label className="font-bold">Times per month</Label>
+                  <Input type="number" min={1} max={31} value={form.monthlyCompletionTarget}
+                    onChange={(e) => setForm((p) => ({ ...p, monthlyCompletionTarget: Math.max(1, Number(e.target.value) || 1) }))}
+                    className="rounded-xl mt-1" />
+                </div>
+                <p className="sm:col-span-2 text-xs font-semibold text-slate-400">Available from the 1st through the selected day each month.</p>
               </div>
             )}
             {form.frequency === "one-time" && (

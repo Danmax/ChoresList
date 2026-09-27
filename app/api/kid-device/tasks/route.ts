@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { withErrors } from "@/lib/api";
 import { hashDeviceSecret, requireDeviceSession } from "@/lib/device-session";
+import { isMonthlyChoreOpen, startOfDay, startOfMonth } from "@/lib/chore-schedule";
 
 async function verifyDevice(req: NextRequest) {
   const session = requireDeviceSession(req);
@@ -56,8 +57,8 @@ export const GET = withErrors(async (req: NextRequest) => {
     return NextResponse.json({ members, chores });
   }
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = startOfDay();
+  const monthStart = startOfMonth(today);
   const dayOfWeek = today.getDay();
 
   const assignments = await prisma.choreAssignment.findMany({
@@ -77,7 +78,7 @@ export const GET = withErrors(async (req: NextRequest) => {
       chore: { include: { instructions: true } },
       member: { select: { id: true, name: true, avatar: true, color: true, totalPoints: true, level: true } },
       completions: {
-        where: { completedAt: { gte: today } },
+        where: { completedAt: { gte: monthStart } },
         orderBy: { completedAt: "desc" },
         take: 1,
       },
@@ -87,8 +88,13 @@ export const GET = withErrors(async (req: NextRequest) => {
 
   const visibleAssignments = assignments.filter((assignment) => {
     if (assignment.frequency !== "monthly") return true;
-    return assignment.dueDate?.getDate() === today.getDate();
-  });
+    return isMonthlyChoreOpen(assignment.dueDate, today);
+  }).map((assignment) => ({
+    ...assignment,
+    completions: assignment.frequency === "monthly"
+      ? assignment.completions
+      : assignment.completions.filter((completion) => completion.completedAt >= today),
+  }));
 
   await prisma.householdDevice.update({
     where: { id: session.deviceId },

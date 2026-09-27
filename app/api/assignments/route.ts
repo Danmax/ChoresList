@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireParentSession, requireSession, withErrors } from "@/lib/api";
 import { canAccessMember, childAccessWhere } from "@/lib/child-access";
+import { isMonthlyChoreOpen, startOfDay, startOfMonth } from "@/lib/chore-schedule";
 
 function dateFromInput(value: unknown) {
   if (typeof value !== "string" || !value) return null;
@@ -15,8 +16,8 @@ export const GET = withErrors(async (req: NextRequest) => {
   const { searchParams } = new URL(req.url);
   const memberId = searchParams.get("memberId");
   const scope = searchParams.get("scope");
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = startOfDay();
+  const monthStart = startOfMonth(today);
   const dayOfWeek = today.getDay();
   const assignments = await prisma.choreAssignment.findMany({
     where: {
@@ -39,19 +40,22 @@ export const GET = withErrors(async (req: NextRequest) => {
       chore: { include: { instructions: true } },
       member: true,
       completions: {
-        where: { completedAt: { gte: today } },
+        where: { completedAt: { gte: monthStart } },
         orderBy: { completedAt: "desc" },
         take: 1,
       },
     },
     orderBy: { createdAt: "asc" },
   });
-  const visibleAssignments = scope === "all"
-    ? assignments
-    : assignments.filter((assignment) => {
-        if (assignment.frequency !== "monthly") return true;
-        return assignment.dueDate?.getDate() === today.getDate();
-      });
+  const visibleAssignments = (scope === "all" ? assignments : assignments.filter((assignment) => {
+    if (assignment.frequency !== "monthly") return true;
+    return isMonthlyChoreOpen(assignment.dueDate, today);
+  })).map((assignment) => ({
+    ...assignment,
+    completions: assignment.frequency === "monthly"
+      ? assignment.completions
+      : assignment.completions.filter((completion) => completion.completedAt >= today),
+  }));
   return NextResponse.json(visibleAssignments);
 });
 
@@ -90,6 +94,7 @@ export const POST = withErrors(async (req: NextRequest) => {
   }
 
   const dueDate = dateFromInput(body.dueDate);
+  const monthlyCompletionTarget = Math.min(31, Math.max(1, Math.round(Number(body.monthlyCompletionTarget) || 1)));
 
   if ((frequency === "monthly" || frequency === "one-time") && !dueDate) {
     return NextResponse.json({ error: "Choose a date" }, { status: 400 });
@@ -103,6 +108,7 @@ export const POST = withErrors(async (req: NextRequest) => {
       frequency,
       dueDate,
       dayOfWeek,
+      monthlyCompletionTarget,
     }))
   );
 
