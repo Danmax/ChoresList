@@ -1,5 +1,6 @@
 import { randomBytes } from "crypto";
 import { mkdir, writeFile } from "fs/promises";
+import OpenAI from "openai";
 import sharp from "sharp";
 import { NextRequest, NextResponse } from "next/server";
 import { authErrorResponse, requireParentSession } from "@/lib/api";
@@ -21,6 +22,8 @@ const STYLES: Record<string, string> = {
 
 const GEMINI_IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL ?? "gemini-3.1-flash-image";
 const GEMINI_INTERACTIONS_URL = "https://generativelanguage.googleapis.com/v1beta/interactions";
+const OPENAI_AVATAR_IMAGE_MODEL = process.env.OPENAI_AVATAR_IMAGE_MODEL ?? "gpt-image-1";
+const openai = new OpenAI({ apiKey: process.env.CHATGPT_API_KEY ?? "" });
 
 class GeminiAvatarError extends Error {
   constructor(readonly status: number, message: string) {
@@ -86,6 +89,23 @@ async function generateGeminiAvatar(source: Buffer, style: string, variation: nu
   return images;
 }
 
+async function generateOpenAiAvatars(source: Buffer, style: string, parentId: string) {
+  const response = await openai.images.edit({
+    model: OPENAI_AVATAR_IMAGE_MODEL,
+    image: new File([new Uint8Array(source)], "avatar-source.jpg", { type: "image/jpeg" }),
+    prompt: `Transform the person in this reference photo into an original ${STYLES[style]}. Preserve their recognizable facial features, skin tone, hair texture, hair color, approximate age, and joyful personality. Create three distinct centered head-and-shoulders avatar choices facing the viewer, each with a simple colorful background and a wholesome family-friendly mood. Keep the character cute and natural, not uncanny. No text, logos, watermarks, extra people, duplicate features, or photorealism.`,
+    n: 3,
+    size: "1024x1024",
+    quality: "low",
+    background: "opaque",
+    output_format: "webp",
+    output_compression: 82,
+    input_fidelity: "high",
+    user: parentId,
+  });
+  return (response.data ?? []).flatMap((image) => typeof image.b64_json === "string" ? [image.b64_json] : []);
+}
+
 function avatarGenerationError(error: unknown) {
   if (!(error instanceof GeminiAvatarError)) return null;
   console.error("[API member avatar] Gemini request failed", { status: error.status, message: error.message });
@@ -103,13 +123,31 @@ function avatarGenerationError(error: unknown) {
   return NextResponse.json({ error: "The avatar service is temporarily unavailable. Please try again shortly." }, { status: 502 });
 }
 
+function openAiAvatarError(error: unknown) {
+  const status = typeof error === "object" && error !== null && "status" in error
+    ? Number((error as { status?: unknown }).status)
+    : 0;
+  const message = error instanceof Error ? error.message : String(error);
+  console.error("[API member avatar] OpenAI request failed", { status, message });
+  if (status === 401 || status === 403) {
+    return NextResponse.json({ error: "Avatar generation is not enabled for this OpenAI API key" }, { status: 502 });
+  }
+  if (status === 429) {
+    return NextResponse.json({ error: "Avatar generation has reached its OpenAI account limit. Please try again later." }, { status: 503 });
+  }
+  if (status === 400 || status === 422) {
+    return NextResponse.json({ error: "OpenAI could not process this photo. Try a different clear JPG, PNG, or WebP photo." }, { status: 422 });
+  }
+  return null;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { householdId, parentId } = await requireParentSession(req);
     const limited = rateLimit(req, { key: "member-avatar-generate", bucket: String(parentId), limit: 6, windowMs: 60 * 60 * 1000 });
     if (limited) return limited;
-    if (!process.env.GEMINI_API_KEY) {
-      return NextResponse.json({ error: "Gemini image generation is not configured" }, { status: 503 });
+    if (!process.env.CHATGPT_API_KEY && !process.env.GEMINI_API_KEY) {
+      return NextResponse.json({ error: "Avatar generation is not configured" }, { status: 503 });
     }
 
     const formData = await req.formData();
@@ -134,14 +172,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Could not read that photo" }, { status: 400 });
     }
 
-    const results = await Promise.allSettled([1, 2, 3].map((variation) => generateGeminiAvatar(source, style, variation)));
-    const generatedImages = results
-      .filter((result): result is PromiseFulfilledResult<string[]> => result.status === "fulfilled")
-      .flatMap((result) => result.value)
-      .slice(0, 3);
+    let generatedImages: string[] = [];
+    let openAiError: unknown;
+    if (process.env.CHATGPT_API_KEY) {
+      try {
+        generatedImages = await generateOpenAiAvatars(source, style, parentId);
+      } catch (error) {
+        openAiError = error;
+      }
+    }
     if (!generatedImages.length) {
-      const failure = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
-      return avatarGenerationError(failure?.reason) ?? NextResponse.json({ error: "The avatar service is temporarily unavailable. Please try again shortly." }, { status: 502 });
+      const results = await Promise.allSettled([1, 2, 3].map((variation) => generateGeminiAvatar(source, style, variation)));
+      generatedImages = results
+        .filter((result): result is PromiseFulfilledResult<string[]> => result.status === "fulfilled")
+        .flatMap((result) => result.value)
+        .slice(0, 3);
+      if (!generatedImages.length) {
+        const failure = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
+        return openAiAvatarError(openAiError) ?? avatarGenerationError(failure?.reason) ?? NextResponse.json({ error: "The avatar service is temporarily unavailable. Please try again shortly." }, { status: 502 });
+      }
     }
 
     const avatarDir = uploadPath("avatars", String(householdId));
