@@ -49,6 +49,12 @@ function cleanShortText(value: unknown, fallback: string, max = 32) {
   return typeof value === "string" && value.trim() ? value.trim().slice(0, max) : fallback;
 }
 
+function cleanAvatarImageUrl(value: unknown) {
+  if (value === null || value === "") return null;
+  if (typeof value !== "string" || !/^\/uploads\/avatars\/[a-zA-Z0-9-]+\/[a-zA-Z0-9-]+\.webp$/.test(value)) return undefined;
+  return value.slice(0, 512);
+}
+
 function cleanOptionalText(value: unknown, max = 255) {
   return typeof value === "string" && value.trim() ? value.trim().slice(0, max) : null;
 }
@@ -194,6 +200,7 @@ export const POST = withErrors(async (req: NextRequest) => {
       familyNotes: cleanOptionalText(body.familyNotes, 255),
       avatar: cleanShortText(body.avatar, "🧒"),
       avatarConfig: cleanAvatarConfig(body.avatarConfig) as Prisma.InputJsonValue | null ?? undefined,
+      avatarImageUrl: cleanAvatarImageUrl(body.avatarImageUrl),
       color: cleanShortText(body.color, "#a78bfa"),
     },
   });
@@ -239,6 +246,7 @@ export const PUT = withErrors(async (req: NextRequest) => {
       ...(anniversary !== undefined && anniversary),
       ...(body.avatar !== undefined && { avatar: cleanShortText(body.avatar, "🧒") }),
       ...(body.avatarConfig !== undefined && { avatarConfig: cleanAvatarConfig(body.avatarConfig) as Prisma.InputJsonValue | null ?? Prisma.DbNull }),
+      ...(body.avatarImageUrl !== undefined && { avatarImageUrl: cleanAvatarImageUrl(body.avatarImageUrl) }),
       ...(body.color !== undefined && { color: cleanShortText(body.color, "#a78bfa") }),
     },
   });

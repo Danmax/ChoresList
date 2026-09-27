@@ -55,6 +55,7 @@ type Member = {
   name: string;
   avatar: string;
   avatarConfig?: unknown;
+  avatarImageUrl?: string | null;
   color: string;
   totalPoints: number;
 };
@@ -221,7 +222,7 @@ export default function KidAcademyPage() {
         </button>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-3">
-            <MemberAvatar avatar={member.avatar} avatarConfig={member.avatarConfig} name={member.name} className="h-14 w-14 shrink-0" />
+            <MemberAvatar avatar={member.avatar} avatarConfig={member.avatarConfig} avatarImageUrl={member.avatarImageUrl} name={member.name} className="h-14 w-14 shrink-0 rounded-2xl" />
             <div className="min-w-0">
               <h1 className="flex items-center gap-2 text-xl font-black text-slate-800 sm:text-2xl">
                 <GraduationCap className="text-blue-600" /> {member.name}&apos;s Academy

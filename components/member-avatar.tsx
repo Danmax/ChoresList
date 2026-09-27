@@ -1,7 +1,7 @@
 import { cleanAvatarConfig, type AvatarConfig } from "@/lib/avatar";
 import { useId } from "react";
 
-type Props = { avatar?: string | null; avatarConfig?: AvatarConfig | unknown; name?: string; className?: string };
+type Props = { avatar?: string | null; avatarConfig?: AvatarConfig | unknown; avatarImageUrl?: string | null; name?: string; className?: string };
 
 function Hair({ style, color }: { style: AvatarConfig["hairStyle"]; color: string }) {
   if (style === "bald") return null;
@@ -18,11 +18,12 @@ function Hair({ style, color }: { style: AvatarConfig["hairStyle"]; color: strin
   return <path {...common} d="M65 75C63 39 88 24 116 26c29 2 47 18 47 48-17-2-27-12-35-30-13 18-36 29-63 31z" />;
 }
 
-export function MemberAvatar({ avatar = "🧒", avatarConfig, name = "Family member", className = "h-12 w-12" }: Props) {
+export function MemberAvatar({ avatar = "🧒", avatarConfig, avatarImageUrl, name = "Family member", className = "h-12 w-12" }: Props) {
   const config = cleanAvatarConfig(avatarConfig);
   const instanceId = useId().replaceAll(":", "");
   const glowId = `avatar-glow-${instanceId}`;
   const shirtId = `avatar-shirt-${instanceId}`;
+  if (avatarImageUrl) return <img src={avatarImageUrl} alt={`${name}'s avatar`} className={`object-cover ${className}`} />;
   if (!config) return <span role="img" aria-label={`${name}'s avatar`} className={`grid place-items-center leading-none ${className}`}>{avatar}</span>;
   const isYoung = config.ageGroup === "toddler" || config.ageGroup === "kid";
   const isToddler = config.ageGroup === "toddler";

@@ -42,6 +42,7 @@ interface Member {
   name: string;
   avatar: string;
   avatarConfig?: unknown;
+  avatarImageUrl?: string | null;
   color: string;
   totalPoints: number;
   level: number;
@@ -322,7 +323,7 @@ export default function KidPage() {
         </button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3">
-            <MemberAvatar avatar={member.avatar} avatarConfig={member.avatarConfig} name={member.name} className="h-14 w-14 shrink-0" />
+            <MemberAvatar avatar={member.avatar} avatarConfig={member.avatarConfig} avatarImageUrl={member.avatarImageUrl} name={member.name} className="h-14 w-14 shrink-0 rounded-2xl" />
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-2">
                 <h1 className="text-xl sm:text-2xl font-black text-slate-800 truncate">{member.name}&apos;s Student Portal</h1>

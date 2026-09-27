@@ -40,6 +40,7 @@ interface Member {
   role: string;
   avatar: string;
   avatarConfig?: unknown;
+  avatarImageUrl?: string | null;
   color: string;
   totalPoints: number;
   level: number;
@@ -454,7 +455,7 @@ export default function FamilyDashboard() {
                       href={`/kid/${member.id}/academy`}
                       className="flex items-center gap-3 rounded-2xl border border-blue-100 bg-blue-50/70 p-3 transition-colors hover:bg-blue-50"
                     >
-                      <MemberAvatar avatar={member.avatar} avatarConfig={member.avatarConfig} name={member.name} className="h-10 w-10 shrink-0" />
+                      <MemberAvatar avatar={member.avatar} avatarConfig={member.avatarConfig} avatarImageUrl={member.avatarImageUrl} name={member.name} className="h-10 w-10 shrink-0 rounded-xl" />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-black text-slate-800">{member.name}</span>
                         <span className="block truncate text-xs font-bold text-blue-500">
@@ -675,7 +676,7 @@ export default function FamilyDashboard() {
             {sorted.map((m, i) => (
               <div key={m.id} className="flex items-center gap-2 shrink-0">
                 <span className="text-lg font-black text-slate-400">#{i + 1}</span>
-                <MemberAvatar avatar={m.avatar} avatarConfig={m.avatarConfig} name={m.name} className="h-10 w-10 shrink-0" />
+                <MemberAvatar avatar={m.avatar} avatarConfig={m.avatarConfig} avatarImageUrl={m.avatarImageUrl} name={m.name} className="h-10 w-10 shrink-0 rounded-xl" />
                 <div>
                   <p className="font-bold text-slate-700 text-sm">{m.name}</p>
                   <p className="text-xs text-slate-500">{m.totalPoints} pts</p>
@@ -722,7 +723,7 @@ export default function FamilyDashboard() {
                       <Badge className="bg-emerald-400 text-white font-bold text-xs">All Done! ✓</Badge>
                     </div>
                   )}
-                  <MemberAvatar avatar={member.avatar} avatarConfig={member.avatarConfig} name={member.name} className={`mx-auto mb-4 ${tvMode ? "h-36 w-36" : "h-24 w-24"}`} />
+                  <MemberAvatar avatar={member.avatar} avatarConfig={member.avatarConfig} avatarImageUrl={member.avatarImageUrl} name={member.name} className={`mx-auto mb-4 rounded-3xl ${tvMode ? "h-36 w-36" : "h-24 w-24"}`} />
                   <h2 className={`font-black text-slate-800 text-center mb-1 ${tvMode ? "text-4xl" : "text-2xl"}`}>
                     {member.name}
                   </h2>

@@ -12,6 +12,7 @@ type Member = {
   name: string;
   avatar: string;
   avatarConfig?: unknown;
+  avatarImageUrl?: string | null;
   color: string;
   totalPoints: number;
   age: number;
@@ -193,7 +194,7 @@ export default function KidGamesPage() {
         </Link>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-3">
-            <MemberAvatar avatar={member.avatar} avatarConfig={member.avatarConfig} name={member.name} className="h-14 w-14 shrink-0" />
+            <MemberAvatar avatar={member.avatar} avatarConfig={member.avatarConfig} avatarImageUrl={member.avatarImageUrl} name={member.name} className="h-14 w-14 shrink-0 rounded-2xl" />
             <div className="min-w-0">
               <h1 className="truncate text-2xl font-black text-slate-800 sm:text-3xl">Games</h1>
               <p className="text-sm font-bold text-slate-500">⭐ {member.totalPoints} pts</p>

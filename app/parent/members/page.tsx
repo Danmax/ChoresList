@@ -8,9 +8,9 @@ import { AVATAR_OPTIONS, KID_COLORS, PARENT_AVATARS, STARTER_CHORE_TEMPLATES_BY_
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AvatarBuilder } from "@/components/avatar-builder";
 import { MemberAvatar } from "@/components/member-avatar";
-import { DEFAULT_AVATAR_CONFIG, type AvatarConfig } from "@/lib/avatar";
+import { PhotoAvatarGenerator } from "@/components/photo-avatar-generator";
+import { type AvatarConfig } from "@/lib/avatar";
 
 const ROLE_OPTIONS = [
   { value: "child", label: "👦 Child" },
@@ -69,6 +69,7 @@ interface Member {
   familyNotes?: string | null;
   avatar: string;
   avatarConfig?: AvatarConfig | null;
+  avatarImageUrl?: string | null;
   color: string;
   totalPoints: number;
   level: number;
@@ -260,7 +261,8 @@ export default function MembersPage() {
       custodySchedule: "",
       familyNotes: "",
       avatar: "🧒",
-      avatarConfig: DEFAULT_AVATAR_CONFIG,
+      avatarConfig: null,
+      avatarImageUrl: null,
       color: KID_COLORS[0],
     });
     setAssignStarter(true);
@@ -613,7 +615,7 @@ export default function MembersPage() {
             style={{ border: `2px solid ${m.color}44` }}
             onClick={() => openEdit(m)}
           >
-            <MemberAvatar avatar={m.avatar} avatarConfig={m.avatarConfig} name={m.name} className="h-16 w-16 shrink-0" />
+            <MemberAvatar avatar={m.avatar} avatarConfig={m.avatarConfig} avatarImageUrl={m.avatarImageUrl} name={m.name} className="h-16 w-16 shrink-0 rounded-2xl" />
             <div className="flex-1">
               <p className="font-black text-slate-800 text-lg">{m.name}</p>
               <p className="text-slate-400 font-semibold text-sm capitalize">
@@ -910,19 +912,9 @@ export default function MembersPage() {
               )}
 
               <div>
-                <Label className="font-bold mb-2 block">Character Avatar</Label>
-                {editing.avatarConfig ? (
-                  <AvatarBuilder value={editing.avatarConfig} name={editing.name} onChange={(avatarConfig) => setEditing((previous) => ({ ...previous!, avatarConfig }))} />
-                ) : (
-                  <div className="space-y-3 rounded-2xl border border-slate-100 bg-slate-50 p-3">
-                    <button type="button" onClick={() => setEditing((previous) => ({ ...previous!, avatarConfig: DEFAULT_AVATAR_CONFIG }))} className="w-full rounded-xl bg-violet-500 px-4 py-3 text-sm font-black text-white hover:bg-violet-600">✨ Create a custom character</button>
-                    <div className="flex max-h-32 flex-wrap gap-2 overflow-y-auto p-1">
-                      {(usesAdultAvatars(editing.role) ? PARENT_AVATARS : AVATAR_OPTIONS).map((a) => (
-                        <button type="button" key={a} onClick={() => setEditing((p) => ({ ...p!, avatar: a }))} className={`rounded-xl p-1.5 text-2xl transition-all ${editing.avatar === a ? "scale-110 bg-violet-100 ring-2 ring-violet-400" : "hover:bg-white"}`}>{a}</button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                <Label className="font-bold mb-2 block">Photo Avatar</Label>
+                <PhotoAvatarGenerator value={editing.avatarImageUrl} name={editing.name} onChange={(avatarImageUrl) => setEditing((previous) => ({ ...previous!, avatarImageUrl }))} />
+                <details className="mt-3 rounded-xl bg-slate-50 p-3"><summary className="cursor-pointer text-xs font-black text-slate-500">Use a classic emoji instead</summary><div className="mt-3 flex max-h-32 flex-wrap gap-2 overflow-y-auto">{(usesAdultAvatars(editing.role) ? PARENT_AVATARS : AVATAR_OPTIONS).map((a) => <button type="button" key={a} onClick={() => setEditing((p) => ({ ...p!, avatar: a, avatarImageUrl: null, avatarConfig: null }))} className={`rounded-xl p-1.5 text-2xl ${editing.avatar === a && !editing.avatarImageUrl ? "bg-violet-100 ring-2 ring-violet-400" : "hover:bg-white"}`}>{a}</button>)}</div></details>
               </div>
 
               <div>
