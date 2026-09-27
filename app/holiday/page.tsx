@@ -2,12 +2,13 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Check, Gift, ShoppingBag, Sparkles } from "lucide-react";
+import { HolidayListBuilder } from "@/components/holiday-list-builder";
 
 export const metadata: Metadata = {
   title: "Black Friday Gift Lists | ChoresList",
   description: "Build holiday wish lists, compare retailers, and plan Christmas surprises with ChoresList.",
 };
-const startUrl = "/parent?signup=1&next=%2Fparent%2Fwishlist%3Fholiday%3D1";
+const startUrl = "#build-list";
 const signInUrl = "/parent?next=%2Fparent%2Fwishlist%3Fholiday%3D1";
 const ideas = [
   { emoji: "🧸", label: "LITTLE WISHES", title: "Small hands. Big smiles.", detail: "Pretend play, plush friends, and building adventures.", color: "bg-[#f2e6d6]" },
@@ -40,13 +41,14 @@ export default function HolidayLandingPage() {
       </div>
     </section>
     <div className="border-y border-zinc-800 bg-[#191919] px-5 py-5"><div className="mx-auto flex max-w-7xl flex-wrap justify-center gap-x-10 gap-y-3 text-xs font-black uppercase tracking-widest text-zinc-300"><span>Save the wish</span><span className="text-[#dbff00]" aria-hidden="true">✦</span><span>Compare the options</span><span className="text-[#dbff00]" aria-hidden="true">✦</span><span>Keep the surprise</span></div></div>
+    <HolidayListBuilder />
     <section id="ideas" className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20">
       <p className="text-xs font-black uppercase tracking-[0.2em] text-[#dbff00]">The inspiration aisle</p><h2 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">Every age. Every kind of joy.</h2><p className="mt-4 max-w-xl leading-relaxed text-zinc-400">Ideas for boys, girls, and grown-ups. Follow their interests and make the list their own.</p>
       <div className="mt-9 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{ideas.map((idea) => <article key={idea.label} className={`group flex flex-col p-6 text-black ${idea.color}`}><p className="text-[10px] font-black tracking-[0.2em]">{idea.label}</p><div className="flex h-32 items-center justify-center text-7xl transition-transform group-hover:-rotate-6 motion-reduce:transform-none" aria-hidden="true">{idea.emoji}</div><h3 className="text-2xl font-black leading-tight tracking-tight">{idea.title}</h3><p className="mb-6 mt-3 text-sm leading-relaxed text-black/70">{idea.detail}</p><Link href={startUrl} className="mt-auto flex items-center justify-between border-t border-black/20 pt-4 text-sm font-black hover:underline">Make a wish list <ArrowRight size={17} /></Link></article>)}</div>
       <p className="mt-4 text-xs text-zinc-400">Gift inspiration. Check retailers for current prices and availability.</p>
     </section>
     <section id="how-it-works" className="bg-[#f5f3ed] px-5 py-16 text-black sm:px-8 sm:py-20"><div className="mx-auto max-w-7xl"><p className="text-xs font-black uppercase tracking-widest text-zinc-500">Less scrolling. More celebrating.</p><h2 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">Your holiday game plan.</h2><div className="mt-10 grid gap-8 md:grid-cols-3">{[
-      { title: "01 / Build their list", detail: "Create your free account, choose who you’re shopping for, and save gift ideas with photos and product links." },
+      { title: "01 / Build their list", detail: "Name a list and try two gift ideas without signing up. Your draft stays in this browser until you’re ready to create an account." },
       { title: "02 / Compare & plan", detail: "Look up items on Amazon and compare on Walmart. Keep estimates and purchase progress together." },
       { title: "03 / Share the magic", detail: "Choose when to share a list with family. Parent purchase tracking stays private." },
     ].map(({ title, detail }) => <div key={title} className="border-t-2 border-black pt-5"><ShoppingBag size={26} /><h3 className="mt-5 text-xl font-black">{title}</h3><p className="mt-3 leading-relaxed text-zinc-600">{detail}</p></div>)}</div></div></section>

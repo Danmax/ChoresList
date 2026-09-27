@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import type { AmazonProduct } from "@/lib/amazon-creators";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
-export function AmazonProductSearch({ initialQuery = "", onSelect, selectLabel = "Choose item" }: { initialQuery?: string; onSelect: (product: AmazonProduct) => void | Promise<void>; selectLabel?: string }) {
+export function AmazonProductSearch({ initialQuery = "", onSelect, selectLabel = "Choose item", guest = false }: { initialQuery?: string; onSelect: (product: AmazonProduct) => void | Promise<void>; selectLabel?: string; guest?: boolean }) {
   const [query, setQuery] = useState(initialQuery);
   const [products, setProducts] = useState<AmazonProduct[]>([]);
   const [loading, setLoading] = useState(false);
@@ -28,7 +28,7 @@ export function AmazonProductSearch({ initialQuery = "", onSelect, selectLabel =
     setError("");
     setProducts([]);
     try {
-      const res = await fetch(`/api/amazon/search?q=${encodeURIComponent(query.trim())}`);
+      const res = await fetch(`${guest ? "/api/holiday/search" : "/api/amazon/search"}?q=${encodeURIComponent(query.trim())}`);
       const data = await res.json().catch(() => null);
       if (!res.ok) {
         setError(data?.configured === false ? "Product search is not available yet. Browse Amazon below or paste an item link." : data?.error ?? "Amazon search failed");

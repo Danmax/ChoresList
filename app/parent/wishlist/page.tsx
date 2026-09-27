@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { canCreateBirthdayList, daysUntilBirthday, GIFT_PURCHASE_STATUSES, GIFT_PURCHASE_STATUS_META, WISH_LIST_TYPE_META, type GiftPurchaseStatus, type WishListType } from "@/lib/wishlists";
 import { AmazonProductSearch } from "@/components/amazon-product-search";
 import { ProductUrlInput } from "@/components/product-url-input";
+import { HolidayDraftImport } from "@/components/holiday-draft-import";
 import type { AmazonProduct } from "@/lib/amazon-creators";
 
 interface Member { id: string; name: string; avatar: string; color: string; birthdayMonth?: number | null; birthdayDay?: number | null }
@@ -255,6 +256,7 @@ export default function ParentWishlistPage() {
 
   return (
     <div className="min-h-screen p-4 sm:p-6">
+      <HolidayDraftImport members={members} onImported={load} />
       <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center">
         <Link href="/parent" className="bg-white rounded-2xl p-2 shadow-sm hover:shadow-md transition-shadow">
           <ArrowLeft size={20} className="text-slate-600" />
