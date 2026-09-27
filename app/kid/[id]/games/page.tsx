@@ -5,11 +5,13 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft, BookOpen, CheckCircle2, ChefHat, Circle, FileText, Gamepad2, Grid3X3, KeyRound, Puzzle, RefreshCw, Scissors, Shapes, Swords, Trophy } from "lucide-react";
 import { toast } from "sonner";
+import { MemberAvatar } from "@/components/member-avatar";
 
 type Member = {
   id: string;
   name: string;
   avatar: string;
+  avatarConfig?: unknown;
   color: string;
   totalPoints: number;
   age: number;
@@ -191,7 +193,7 @@ export default function KidGamesPage() {
         </Link>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-3">
-            <span className="text-4xl">{member.avatar}</span>
+            <MemberAvatar avatar={member.avatar} avatarConfig={member.avatarConfig} name={member.name} className="h-14 w-14 shrink-0" />
             <div className="min-w-0">
               <h1 className="truncate text-2xl font-black text-slate-800 sm:text-3xl">Games</h1>
               <p className="text-sm font-bold text-slate-500">⭐ {member.totalPoints} pts</p>

@@ -4,6 +4,8 @@ import { requireParentSession, requireSession, withErrors } from "@/lib/api";
 import { childAccessWhere } from "@/lib/child-access";
 import { syncFamilyTreeForMember } from "@/lib/family-tree";
 import { ensureParentFamilyMember } from "@/lib/parent-member";
+import { cleanAvatarConfig } from "@/lib/avatar";
+import { Prisma } from "@prisma/client";
 
 type BirthdayInput = {
   birthdayMonth?: unknown;
@@ -191,6 +193,7 @@ export const POST = withErrors(async (req: NextRequest) => {
       custodySchedule: cleanOptionalText(body.custodySchedule, 128),
       familyNotes: cleanOptionalText(body.familyNotes, 255),
       avatar: cleanShortText(body.avatar, "🧒"),
+      avatarConfig: cleanAvatarConfig(body.avatarConfig) as Prisma.InputJsonValue | null ?? undefined,
       color: cleanShortText(body.color, "#a78bfa"),
     },
   });
@@ -235,6 +238,7 @@ export const PUT = withErrors(async (req: NextRequest) => {
       }),
       ...(anniversary !== undefined && anniversary),
       ...(body.avatar !== undefined && { avatar: cleanShortText(body.avatar, "🧒") }),
+      ...(body.avatarConfig !== undefined && { avatarConfig: cleanAvatarConfig(body.avatarConfig) as Prisma.InputJsonValue | null ?? Prisma.DbNull }),
       ...(body.color !== undefined && { color: cleanShortText(body.color, "#a78bfa") }),
     },
   });

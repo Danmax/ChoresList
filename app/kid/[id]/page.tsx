@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { toast } from "sonner";
 import Link from "next/link";
 import { COMPLETION_EMOJIS } from "@/types";
+import { MemberAvatar } from "@/components/member-avatar";
 
 interface Chore {
   id: string;
@@ -40,6 +41,7 @@ interface Member {
   id: string;
   name: string;
   avatar: string;
+  avatarConfig?: unknown;
   color: string;
   totalPoints: number;
   level: number;
@@ -320,7 +322,7 @@ export default function KidPage() {
         </button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3">
-            <span className="text-4xl">{member.avatar}</span>
+            <MemberAvatar avatar={member.avatar} avatarConfig={member.avatarConfig} name={member.name} className="h-14 w-14 shrink-0" />
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-2">
                 <h1 className="text-xl sm:text-2xl font-black text-slate-800 truncate">{member.name}&apos;s Student Portal</h1>

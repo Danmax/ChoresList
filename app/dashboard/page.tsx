@@ -26,6 +26,7 @@ import { getLevelFromPoints, getLevelTitle, getPointsForNextLevel } from "@/lib/
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { TinyWeather } from "@/components/tiny-weather";
+import { MemberAvatar } from "@/components/member-avatar";
 
 interface Assignment {
   id: number;
@@ -38,6 +39,7 @@ interface Member {
   age: number;
   role: string;
   avatar: string;
+  avatarConfig?: unknown;
   color: string;
   totalPoints: number;
   level: number;
@@ -452,7 +454,7 @@ export default function FamilyDashboard() {
                       href={`/kid/${member.id}/academy`}
                       className="flex items-center gap-3 rounded-2xl border border-blue-100 bg-blue-50/70 p-3 transition-colors hover:bg-blue-50"
                     >
-                      <span className="text-2xl">{member.avatar}</span>
+                      <MemberAvatar avatar={member.avatar} avatarConfig={member.avatarConfig} name={member.name} className="h-10 w-10 shrink-0" />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-black text-slate-800">{member.name}</span>
                         <span className="block truncate text-xs font-bold text-blue-500">
@@ -673,7 +675,7 @@ export default function FamilyDashboard() {
             {sorted.map((m, i) => (
               <div key={m.id} className="flex items-center gap-2 shrink-0">
                 <span className="text-lg font-black text-slate-400">#{i + 1}</span>
-                <span className="text-2xl">{m.avatar}</span>
+                <MemberAvatar avatar={m.avatar} avatarConfig={m.avatarConfig} name={m.name} className="h-10 w-10 shrink-0" />
                 <div>
                   <p className="font-bold text-slate-700 text-sm">{m.name}</p>
                   <p className="text-xs text-slate-500">{m.totalPoints} pts</p>
@@ -720,9 +722,7 @@ export default function FamilyDashboard() {
                       <Badge className="bg-emerald-400 text-white font-bold text-xs">All Done! ✓</Badge>
                     </div>
                   )}
-                  <div className={`text-center mb-4 ${tvMode ? "text-8xl" : "text-6xl"}`}>
-                    {member.avatar}
-                  </div>
+                  <MemberAvatar avatar={member.avatar} avatarConfig={member.avatarConfig} name={member.name} className={`mx-auto mb-4 ${tvMode ? "h-36 w-36" : "h-24 w-24"}`} />
                   <h2 className={`font-black text-slate-800 text-center mb-1 ${tvMode ? "text-4xl" : "text-2xl"}`}>
                     {member.name}
                   </h2>

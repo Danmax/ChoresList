@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, CheckCircle2, FileText, GraduationCap, Send, Upload, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { choicesForDisplay } from "@/lib/education";
+import { MemberAvatar } from "@/components/member-avatar";
 
 type Material = {
   id: string;
@@ -53,6 +54,7 @@ type Member = {
   id: string;
   name: string;
   avatar: string;
+  avatarConfig?: unknown;
   color: string;
   totalPoints: number;
 };
@@ -219,7 +221,7 @@ export default function KidAcademyPage() {
         </button>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-3">
-            <span className="text-4xl">{member.avatar}</span>
+            <MemberAvatar avatar={member.avatar} avatarConfig={member.avatarConfig} name={member.name} className="h-14 w-14 shrink-0" />
             <div className="min-w-0">
               <h1 className="flex items-center gap-2 text-xl font-black text-slate-800 sm:text-2xl">
                 <GraduationCap className="text-blue-600" /> {member.name}&apos;s Academy

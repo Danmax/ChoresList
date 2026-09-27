@@ -191,6 +191,7 @@ model FamilyMember {
   custodySchedule           String?  @db.VarChar(128)
   familyNotes               String?  @db.VarChar(255)
   avatar                    String   @default("🧒") @db.VarChar(32)
+  avatarConfig              Json?
   color                     String   @default("#a78bfa") @db.VarChar(32)
   totalPoints               Int      @default(0)
   level                     Int      @default(1)

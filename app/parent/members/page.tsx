@@ -8,6 +8,9 @@ import { AVATAR_OPTIONS, KID_COLORS, PARENT_AVATARS, STARTER_CHORE_TEMPLATES_BY_
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AvatarBuilder } from "@/components/avatar-builder";
+import { MemberAvatar } from "@/components/member-avatar";
+import { DEFAULT_AVATAR_CONFIG, type AvatarConfig } from "@/lib/avatar";
 
 const ROLE_OPTIONS = [
   { value: "child", label: "👦 Child" },
@@ -65,6 +68,7 @@ interface Member {
   custodySchedule?: string | null;
   familyNotes?: string | null;
   avatar: string;
+  avatarConfig?: AvatarConfig | null;
   color: string;
   totalPoints: number;
   level: number;
@@ -248,6 +252,7 @@ export default function MembersPage() {
       custodySchedule: "",
       familyNotes: "",
       avatar: "🧒",
+      avatarConfig: DEFAULT_AVATAR_CONFIG,
       color: KID_COLORS[0],
     });
     setAssignStarter(true);
@@ -596,7 +601,7 @@ export default function MembersPage() {
             style={{ border: `2px solid ${m.color}44` }}
             onClick={() => openEdit(m)}
           >
-            <div className="text-5xl">{m.avatar}</div>
+            <MemberAvatar avatar={m.avatar} avatarConfig={m.avatarConfig} name={m.name} className="h-16 w-16 shrink-0" />
             <div className="flex-1">
               <p className="font-black text-slate-800 text-lg">{m.name}</p>
               <p className="text-slate-400 font-semibold text-sm capitalize">
@@ -677,7 +682,7 @@ export default function MembersPage() {
       )}
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-md rounded-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl rounded-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-black">{editing?.id ? "Edit Member" : "Add Family Member"}</DialogTitle>
           </DialogHeader>
@@ -888,22 +893,19 @@ export default function MembersPage() {
               )}
 
               <div>
-                <Label className="font-bold mb-2 block">Avatar</Label>
-                <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-1 rounded-xl border border-slate-100 bg-slate-50">
-                  {(usesAdultAvatars(editing.role) ? PARENT_AVATARS : AVATAR_OPTIONS).map((a) => (
-                    <button
-                      key={a}
-                      onClick={() => setEditing((p) => ({ ...p!, avatar: a }))}
-                      className={`text-2xl p-1.5 rounded-xl transition-all ${
-                        editing.avatar === a
-                          ? "bg-violet-100 ring-2 ring-violet-400 scale-110"
-                          : "hover:bg-white"
-                      }`}
-                    >
-                      {a}
-                    </button>
-                  ))}
-                </div>
+                <Label className="font-bold mb-2 block">Character Avatar</Label>
+                {editing.avatarConfig ? (
+                  <AvatarBuilder value={editing.avatarConfig} name={editing.name} onChange={(avatarConfig) => setEditing((previous) => ({ ...previous!, avatarConfig }))} />
+                ) : (
+                  <div className="space-y-3 rounded-2xl border border-slate-100 bg-slate-50 p-3">
+                    <button type="button" onClick={() => setEditing((previous) => ({ ...previous!, avatarConfig: DEFAULT_AVATAR_CONFIG }))} className="w-full rounded-xl bg-violet-500 px-4 py-3 text-sm font-black text-white hover:bg-violet-600">✨ Create a custom character</button>
+                    <div className="flex max-h-32 flex-wrap gap-2 overflow-y-auto p-1">
+                      {(usesAdultAvatars(editing.role) ? PARENT_AVATARS : AVATAR_OPTIONS).map((a) => (
+                        <button type="button" key={a} onClick={() => setEditing((p) => ({ ...p!, avatar: a }))} className={`rounded-xl p-1.5 text-2xl transition-all ${editing.avatar === a ? "scale-110 bg-violet-100 ring-2 ring-violet-400" : "hover:bg-white"}`}>{a}</button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>
