@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, BookOpen, CheckCircle2, Circle, FileText, Gamepad2, Puzzle, RefreshCw, Scissors, Shapes, Swords, Trophy } from "lucide-react";
+import { ArrowLeft, BookOpen, CheckCircle2, Circle, FileText, Gamepad2, KeyRound, Puzzle, RefreshCw, Scissors, Shapes, Swords, Trophy } from "lucide-react";
 import { toast } from "sonner";
 
 type Member = {
@@ -12,10 +12,11 @@ type Member = {
   avatar: string;
   color: string;
   totalPoints: number;
+  age: number;
 };
 
 type Game = {
-  key: "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot" | "shape-safari";
+  key: "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot" | "shape-safari" | "codebreaker-quest";
   title: string;
   description: string;
   ageMin: number;
@@ -91,6 +92,7 @@ function iconForGame(key: string) {
   if (key === "bible-trivia") return BookOpen;
   if (key === "memory-match") return Puzzle;
   if (key === "shape-safari") return Shapes;
+  if (key === "codebreaker-quest") return KeyRound;
   return Gamepad2;
 }
 
@@ -200,6 +202,8 @@ export default function KidGamesPage() {
         <RockPaperScissorsShoot onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("rock-paper-scissors-shoot", score, duration, metadata)} />
       ) : activeGame === "shape-safari" ? (
         <ShapeSafari onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("shape-safari", score, duration, metadata)} />
+      ) : activeGame === "codebreaker-quest" ? (
+        <CodebreakerQuest onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("codebreaker-quest", score, duration, metadata)} />
       ) : (
         <section className="grid gap-4 sm:grid-cols-2">
           {games.map((game) => {

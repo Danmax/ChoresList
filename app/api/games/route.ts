@@ -109,6 +109,8 @@ export const GET = withErrors(async (req: NextRequest) => {
   const today = todayStart();
   let availability: Record<string, { playsToday: number; openChores: number; available: boolean; reason: string | null }> = {};
   if (memberId && await canAccessMember(parentId, householdId, memberId)) {
+    const member = await prisma.familyMember.findFirst({ where: { id: memberId, householdId }, select: { age: true } });
+    if (!member) return NextResponse.json({ error: "Family member not found" }, { status: 404 });
     const openChores = await openChoreCount(householdId, memberId);
     const plays = await prisma.gameSession.groupBy({
       by: ["gameKey"],
@@ -117,16 +119,20 @@ export const GET = withErrors(async (req: NextRequest) => {
     });
     const playsByKey = new Map(plays.map((play) => [play.gameKey, play._count._all]));
     availability = Object.fromEntries(settings.map((setting) => {
+      const game = gameByKey(setting.gameKey);
       const playsToday = playsByKey.get(setting.gameKey) ?? 0;
       const limitReached = setting.dailyPlayLimit > 0 && playsToday >= setting.dailyPlayLimit;
       const choresBlocked = setting.requiresChoresComplete && openChores > 0;
-      const available = setting.enabled && !limitReached && !choresBlocked;
+      const ageBlocked = game?.key === "codebreaker-quest" && (member.age < game.ageMin || member.age > game.ageMax);
+      const available = setting.enabled && !limitReached && !choresBlocked && !ageBlocked;
       return [setting.gameKey, {
         playsToday,
         openChores,
         available,
         reason: !setting.enabled
           ? "This game is turned off"
+          : ageBlocked
+            ? `For ages ${game?.ageMin}-${game?.ageMax}`
           : limitReached
             ? "Daily play limit reached"
             : choresBlocked
@@ -182,8 +188,11 @@ export const POST = withErrors(async (req: NextRequest) => {
     return NextResponse.json({ error: "You do not have access to this family member" }, { status: 403 });
   }
 
-  const member = await prisma.familyMember.findFirst({ where: { id: memberId, householdId }, select: { id: true, totalPoints: true } });
+  const member = await prisma.familyMember.findFirst({ where: { id: memberId, householdId }, select: { id: true, totalPoints: true, age: true } });
   if (!member) return NextResponse.json({ error: "Family member not found" }, { status: 404 });
+  if (game.key === "codebreaker-quest" && (member.age < game.ageMin || member.age > game.ageMax)) {
+    return NextResponse.json({ error: `Codebreaker Quest is for ages ${game.ageMin}-${game.ageMax}` }, { status: 403 });
+  }
 
   const defaults = DEFAULT_GAME_SETTINGS[game.key];
   const setting = await prisma.gameSetting.upsert({

@@ -1,4 +1,4 @@
-export type GameKey = "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot" | "shape-safari";
+export type GameKey = "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot" | "shape-safari" | "codebreaker-quest";
 export type GameRewardType = "none" | "points" | "tickets";
 
 export type GameDefinition = {
@@ -58,6 +58,17 @@ export const GAME_DEFINITIONS: GameDefinition[] = [
     color: "#ea580c",
     bg: "#ffedd5",
   },
+  {
+    key: "codebreaker-quest",
+    title: "Codebreaker Quest",
+    description: "Crack patterns, ciphers, word clues, and logic locks to open the treasure vault.",
+    icon: "KeyRound",
+    ageMin: 8,
+    ageMax: 13,
+    playTime: "4-6 min",
+    color: "#2563eb",
+    bg: "#dbeafe",
+  },
 ];
 
 export const DEFAULT_GAME_SETTINGS: Record<GameKey, {
@@ -99,6 +110,14 @@ export const DEFAULT_GAME_SETTINGS: Record<GameKey, {
     rewardTickets: 0,
     requiresChoresComplete: false,
     dailyPlayLimit: 3,
+  },
+  "codebreaker-quest": {
+    enabled: true,
+    rewardType: "points",
+    rewardPoints: 10,
+    rewardTickets: 0,
+    requiresChoresComplete: false,
+    dailyPlayLimit: 2,
   },
 };
 
