@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BookOpen, Gamepad2, KeyRound, Puzzle, RefreshCw, Save, Shapes, Swords } from "lucide-react";
+import { BookOpen, Gamepad2, Grid3X3, KeyRound, Puzzle, RefreshCw, Save, Shapes, Swords } from "lucide-react";
 import { toast } from "sonner";
 import { ParentPageHeader } from "@/components/parent-management-shell";
 
@@ -45,6 +45,7 @@ function iconForGame(key: string) {
   if (key === "memory-match") return Puzzle;
   if (key === "shape-safari") return Shapes;
   if (key === "codebreaker-quest") return KeyRound;
+  if (key === "tic-tac-toe") return Grid3X3;
   return Gamepad2;
 }
 
@@ -54,6 +55,7 @@ function gameLabel(key: string) {
   if (key === "memory-match") return "Memory Match";
   if (key === "shape-safari") return "Shape Safari";
   if (key === "codebreaker-quest") return "Codebreaker Quest";
+  if (key === "tic-tac-toe") return "Tic-Tac-Toe";
   return key;
 }
 

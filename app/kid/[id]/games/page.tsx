@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, BookOpen, CheckCircle2, Circle, FileText, Gamepad2, KeyRound, Puzzle, RefreshCw, Scissors, Shapes, Swords, Trophy } from "lucide-react";
+import { ArrowLeft, BookOpen, CheckCircle2, Circle, FileText, Gamepad2, Grid3X3, KeyRound, Puzzle, RefreshCw, Scissors, Shapes, Swords, Trophy } from "lucide-react";
 import { toast } from "sonner";
 
 type Member = {
@@ -16,7 +16,7 @@ type Member = {
 };
 
 type Game = {
-  key: "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot" | "shape-safari" | "codebreaker-quest";
+  key: "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot" | "shape-safari" | "codebreaker-quest" | "tic-tac-toe";
   title: string;
   description: string;
   ageMin: number;
@@ -93,6 +93,7 @@ function iconForGame(key: string) {
   if (key === "memory-match") return Puzzle;
   if (key === "shape-safari") return Shapes;
   if (key === "codebreaker-quest") return KeyRound;
+  if (key === "tic-tac-toe") return Grid3X3;
   return Gamepad2;
 }
 
@@ -204,6 +205,8 @@ export default function KidGamesPage() {
         <ShapeSafari onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("shape-safari", score, duration, metadata)} />
       ) : activeGame === "codebreaker-quest" ? (
         <CodebreakerQuest onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("codebreaker-quest", score, duration, metadata)} />
+      ) : activeGame === "tic-tac-toe" ? (
+        <TicTacToe onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("tic-tac-toe", score, duration, metadata)} />
       ) : (
         <section className="grid gap-4 sm:grid-cols-2">
           {games.map((game) => {
@@ -669,6 +672,77 @@ function CodebreakerQuest({
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-amber-50 px-4 py-3">
         <span className="text-sm font-bold text-amber-800">{showHint ? current.hint : "Need a clue? Hints are free."}</span>
         <button type="button" onClick={() => setShowHint(true)} disabled={showHint || Boolean(selected)} className="rounded-xl bg-amber-200 px-3 py-1.5 text-xs font-black text-amber-900 disabled:opacity-50">Reveal hint</button>
+      </div>
+    </section>
+  );
+}
+
+const WINNING_LINES = [
+  [0, 1, 2], [3, 4, 5], [6, 7, 8],
+  [0, 3, 6], [1, 4, 7], [2, 5, 8],
+  [0, 4, 8], [2, 4, 6],
+];
+
+function TicTacToe({
+  onExit,
+  onFinish,
+}: {
+  onExit: () => void;
+  onFinish: (score: number, durationSeconds: number, metadata: Record<string, unknown>) => void;
+}) {
+  type Mark = "X" | "O";
+  const [board, setBoard] = useState<Array<Mark | null>>(() => Array(9).fill(null));
+  const [turn, setTurn] = useState<Mark>("X");
+  const [startedAt] = useState(() => Date.now());
+  const winner = useMemo(() => {
+    const line = WINNING_LINES.find(([a, b, c]) => board[a] && board[a] === board[b] && board[a] === board[c]);
+    return line ? board[line[0]] : null;
+  }, [board]);
+  const isDraw = !winner && board.every(Boolean);
+  const complete = Boolean(winner || isDraw);
+
+  function choose(index: number) {
+    if (board[index] || complete) return;
+    setBoard((current) => current.map((mark, markIndex) => markIndex === index ? turn : mark));
+    setTurn((current) => current === "X" ? "O" : "X");
+  }
+
+  function newRound() {
+    setBoard(Array(9).fill(null));
+    setTurn("X");
+  }
+
+  function saveGame() {
+    const duration = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
+    onFinish(winner === "X" ? 100 : isDraw ? 50 : 25, duration, { winner: winner ?? "draw", moves: board.filter(Boolean).length });
+  }
+
+  return (
+    <section className="rounded-3xl bg-white p-4 shadow-sm sm:p-6">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="flex items-center gap-2 text-2xl font-black text-slate-800"><Grid3X3 className="text-pink-700" /> Tic-Tac-Toe</h2>
+          <p className="text-sm font-bold text-slate-500">{complete ? winner ? `${winner} wins this round!` : "It’s a draw!" : `Player ${turn}'s turn`}</p>
+        </div>
+        <button type="button" onClick={onExit} className="rounded-2xl bg-slate-100 px-4 py-2 text-sm font-black text-slate-600">Exit</button>
+      </div>
+      <div className="mx-auto grid max-w-sm grid-cols-3 gap-2 rounded-3xl bg-pink-50 p-3">
+        {board.map((mark, index) => (
+          <button
+            key={index}
+            type="button"
+            onClick={() => choose(index)}
+            disabled={Boolean(mark) || complete}
+            className={`aspect-square rounded-2xl bg-white text-5xl font-black shadow-sm transition-all disabled:cursor-default ${!mark && !complete ? "hover:-translate-y-0.5 hover:bg-pink-100" : ""} ${mark === "X" ? "text-pink-600" : "text-blue-600"}`}
+            aria-label={mark ? `Square ${index + 1}: ${mark}` : `Choose square ${index + 1}`}
+          >
+            {mark}
+          </button>
+        ))}
+      </div>
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <button type="button" onClick={newRound} className="rounded-2xl bg-slate-100 px-4 py-3 text-sm font-black text-slate-700">New Round</button>
+        <button type="button" onClick={saveGame} disabled={!complete} className="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white disabled:opacity-50">Save Game</button>
       </div>
     </section>
   );

@@ -1,4 +1,4 @@
-export type GameKey = "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot" | "shape-safari" | "codebreaker-quest";
+export type GameKey = "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot" | "shape-safari" | "codebreaker-quest" | "tic-tac-toe";
 export type GameRewardType = "none" | "points" | "tickets";
 
 export type GameDefinition = {
@@ -69,6 +69,17 @@ export const GAME_DEFINITIONS: GameDefinition[] = [
     color: "#2563eb",
     bg: "#dbeafe",
   },
+  {
+    key: "tic-tac-toe",
+    title: "Tic-Tac-Toe",
+    description: "Challenge a friend to a quick three-in-a-row showdown.",
+    icon: "Grid3X3",
+    ageMin: 5,
+    ageMax: 18,
+    playTime: "1-2 min",
+    color: "#be185d",
+    bg: "#fce7f3",
+  },
 ];
 
 export const DEFAULT_GAME_SETTINGS: Record<GameKey, {
@@ -118,6 +129,14 @@ export const DEFAULT_GAME_SETTINGS: Record<GameKey, {
     rewardTickets: 0,
     requiresChoresComplete: false,
     dailyPlayLimit: 2,
+  },
+  "tic-tac-toe": {
+    enabled: true,
+    rewardType: "points",
+    rewardPoints: 3,
+    rewardTickets: 0,
+    requiresChoresComplete: false,
+    dailyPlayLimit: 5,
   },
 };
 
