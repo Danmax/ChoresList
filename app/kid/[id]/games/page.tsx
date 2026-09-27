@@ -963,10 +963,10 @@ function BurgerRush({
         <button type="button" onClick={onExit} className="rounded-2xl bg-slate-100 px-4 py-2 text-sm font-black text-slate-600">Exit</button>
       </div>
 
-      <div className="mb-5 overflow-hidden rounded-3xl border-2 border-slate-200 bg-slate-100 p-3">
+      <div className="mb-3 overflow-hidden rounded-3xl border-2 border-slate-200 bg-slate-100 p-2 sm:mb-5 sm:p-3">
         <div className="flex min-w-max items-stretch gap-3">
           {orders.slice(orderIndex, orderIndex + 3).map((order, queueIndex) => (
-            <div key={order.id} className={`w-64 rounded-2xl border-2 p-3 transition-all ${queueIndex === 0 ? "border-amber-400 bg-white shadow-md" : "border-slate-200 bg-slate-50 opacity-70"}`}>
+            <div key={order.id} className={`w-64 rounded-2xl border-2 p-3 transition-all ${queueIndex > 0 ? "hidden sm:block" : ""} ${queueIndex === 0 ? "border-amber-400 bg-white shadow-md" : "border-slate-200 bg-slate-50 opacity-70"}`}>
               <div className="flex items-center justify-between gap-2"><span className="text-xs font-black uppercase text-slate-400">{queueIndex === 0 ? "Now serving" : `Up next ${queueIndex}`}</span>{order.special && <span className="text-xs">⭐</span>}</div>
               <p className="mt-1 font-black text-slate-800">{order.customer} · {order.name}</p>
             </div>
@@ -976,9 +976,9 @@ function BurgerRush({
         <p className={`mt-1 text-right text-xs font-black ${timeLeft <= 7 ? "text-red-600" : "text-slate-500"}`}>{timeLeft}s left on this order</p>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
-        <div className="space-y-4">
-          <div className="rounded-3xl bg-amber-50 p-4">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:gap-5">
+        <div className="contents lg:block lg:space-y-4">
+          <div className="order-1 rounded-3xl bg-amber-50 p-3 sm:p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div><p className="text-xs font-black uppercase tracking-widest text-amber-700">Order ticket · {current.customer}</p><h3 className="mt-1 text-xl font-black text-slate-800">{current.name}</h3></div>
               {current.special && <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-black text-red-700">Special order</span>}
@@ -997,34 +997,35 @@ function BurgerRush({
             onDragOver={(event) => event.preventDefault()}
             onDrop={dropIngredient}
             onClick={placeSelected}
-            className={`relative min-h-[28rem] cursor-crosshair overflow-hidden rounded-3xl border-4 border-dashed p-5 text-center transition-colors ${selectedIngredient ? "border-amber-400 bg-amber-50" : "border-slate-600 bg-slate-900"}`}
+            className={`order-4 relative min-h-60 cursor-crosshair overflow-hidden rounded-3xl border-4 border-dashed p-3 text-center transition-colors sm:min-h-[28rem] sm:p-5 lg:min-h-[28rem] ${selectedIngredient ? "border-amber-400 bg-amber-50" : "border-slate-600 bg-slate-900"}`}
           >
             <p className={`text-xs font-black uppercase tracking-widest ${selectedIngredient ? "text-amber-700" : "text-slate-400"}`}>Burger stacking canvas</p>
             <p className={`mt-1 text-xs font-bold ${selectedIngredient ? "text-amber-700" : "text-slate-500"}`}>{selectedIngredient ? `Tap where you want to place ${burgerIngredient(selectedIngredient).label}` : "Drag ingredients here and keep the stack balanced"}</p>
-            <div className="pointer-events-none absolute inset-x-0 bottom-16 h-80">
+            <div className="pointer-events-none absolute inset-x-0 bottom-12 h-52 sm:bottom-16 sm:h-80">
               <div className="absolute bottom-3 left-1/2 h-12 w-64 -translate-x-1/2 rounded-[50%] border-4 border-slate-300 bg-white shadow-xl" />
               {built.map((placed, index) => {
                 const item = burgerIngredient(placed.ingredient);
                 return <span
                   key={`${placed.ingredient}-${index}`}
-                  className={`absolute bottom-0 left-1/2 -ml-28 flex h-40 w-56 items-center justify-center transition-all duration-500 ${celebrating ? "brightness-125 drop-shadow-[0_0_18px_rgba(250,204,21,0.95)]" : "drop-shadow-xl"} ${placed.ingredient === "top-bun" && celebrating ? "animate-bounce" : ""} ${sendingBurger ? "opacity-0" : ""}`}
-                  style={{ bottom: `${index * 27 + 5}px`, transform: tipped ? "translateX(155px) rotate(24deg)" : sendingBurger ? "translateX(360px)" : `translateX(${placed.offset}px)`, zIndex: index + 2 }}
+                  className={`absolute bottom-0 left-1/2 -ml-20 flex h-28 w-40 items-center justify-center transition-all duration-500 sm:-ml-28 sm:h-40 sm:w-56 ${celebrating ? "brightness-125 drop-shadow-[0_0_18px_rgba(250,204,21,0.95)]" : "drop-shadow-xl"} ${placed.ingredient === "top-bun" && celebrating ? "animate-bounce" : ""} ${sendingBurger ? "opacity-0" : ""}`}
+                  style={{ bottom: `${index * 18 + 5}px`, transform: tipped ? "translateX(155px) rotate(24deg)" : sendingBurger ? "translateX(360px)" : `translateX(${placed.offset}px)`, zIndex: index + 2 }}
                   title={item.label}
-                ><BurgerIngredientArt ingredient={placed.ingredient} className="h-40 w-40" /></span>;
+                ><BurgerIngredientArt ingredient={placed.ingredient} className="h-28 w-28 sm:h-40 sm:w-40" /></span>;
               })}
               {celebrating && <div className="absolute inset-0 z-30 flex items-center justify-center"><div className="absolute h-52 w-52 animate-ping rounded-full border-8 border-yellow-300/70" /><div className="animate-bounce rounded-3xl bg-yellow-300 px-6 py-3 text-3xl font-black text-amber-900 shadow-[0_0_35px_rgba(250,204,21,0.95)]">+1 ORDER! ✨</div></div>}
             </div>
-            <div className="absolute inset-x-0 bottom-0 h-16 overflow-hidden border-t-4 border-slate-500 bg-slate-700">
+            <div className="absolute inset-x-0 bottom-0 h-12 overflow-hidden border-t-4 border-slate-500 bg-slate-700 sm:h-16">
               <div className="flex h-full items-center justify-around text-2xl text-slate-400"><span>●</span><span>●</span><span>●</span><span>●</span><span>●</span><span>●</span></div>
             </div>
           </div>
-          <div className="mt-2 flex items-center gap-2 rounded-2xl bg-slate-100 px-3 py-2"><span className="text-xs font-black text-slate-600">Stack stability</span><div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-300"><div className={`h-full rounded-full transition-all ${stability > 55 ? "bg-emerald-500" : "bg-red-500"}`} style={{ width: `${stability}%` }} /></div><span className="w-9 text-right text-xs font-black text-slate-600">{stability}%</span></div>
+          <div className="order-5 mt-0 flex items-center gap-2 rounded-2xl bg-slate-100 px-3 py-2 lg:mt-2"><span className="text-xs font-black text-slate-600">Stack stability</span><div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-300"><div className={`h-full rounded-full transition-all ${stability > 55 ? "bg-emerald-500" : "bg-red-500"}`} style={{ width: `${stability}%` }} /></div><span className="w-9 text-right text-xs font-black text-slate-600">{stability}%</span></div>
         </div>
 
-        <div>
-          <p className={`mb-3 rounded-2xl px-4 py-3 text-sm font-black ${feedback.includes("Not yet") || feedback.includes("tipped") || feedback.includes("timed out") ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>{feedback}</p>
+        <div className="contents lg:block">
+          <p className={`order-2 mb-0 rounded-2xl px-4 py-2 text-sm font-black lg:mb-3 lg:py-3 ${feedback.includes("Not yet") || feedback.includes("tipped") || feedback.includes("timed out") ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>{feedback}</p>
+          <div className="order-3">
           <p className="mb-2 text-xs font-black uppercase tracking-widest text-slate-400">Ingredient station · drag to canvas</p>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-6 gap-1.5 sm:grid-cols-3 sm:gap-2">
             {BURGER_INGREDIENTS.map((ingredient) => (
               <button
                 key={ingredient.key}
@@ -1033,11 +1034,12 @@ function BurgerRush({
                 onDragStart={(event) => { event.dataTransfer.setData("text/plain", ingredient.key); event.dataTransfer.effectAllowed = "move"; }}
                 onClick={(event) => { event.stopPropagation(); setSelectedIngredient((currentValue) => currentValue === ingredient.key ? null : ingredient.key); }}
                 disabled={serving}
-                className={`group min-h-24 cursor-grab rounded-2xl border-2 p-2 text-center transition-all active:cursor-grabbing disabled:opacity-50 ${selectedIngredient === ingredient.key ? "border-amber-500 bg-amber-100 ring-2 ring-amber-200" : "border-amber-100 bg-amber-50 hover:-translate-y-0.5 hover:border-amber-300"}`}
+                className={`group min-h-16 cursor-grab rounded-xl border-2 p-1 text-center transition-all active:cursor-grabbing disabled:opacity-50 sm:min-h-24 sm:rounded-2xl sm:p-2 ${selectedIngredient === ingredient.key ? "border-amber-500 bg-amber-100 ring-2 ring-amber-200" : "border-amber-100 bg-amber-50 hover:-translate-y-0.5 hover:border-amber-300"}`}
               >
-                <BurgerIngredientArt ingredient={ingredient.key} className="mx-auto h-16 w-16 transition-transform group-hover:scale-105" /><span className="mt-1 block text-xs font-black text-slate-700">{ingredient.label}</span>
+                <BurgerIngredientArt ingredient={ingredient.key} className="mx-auto h-10 w-10 transition-transform group-hover:scale-105 sm:h-16 sm:w-16" /><span className="mt-0.5 hidden text-[10px] font-black text-slate-700 sm:mt-1 sm:block sm:text-xs">{ingredient.label}</span>
               </button>
             ))}
+          </div>
           </div>
         </div>
       </div>

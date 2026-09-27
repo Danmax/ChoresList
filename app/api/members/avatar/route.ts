@@ -25,6 +25,10 @@ const GEMINI_INTERACTIONS_URL = "https://generativelanguage.googleapis.com/v1bet
 const OPENAI_AVATAR_IMAGE_MODEL = process.env.OPENAI_AVATAR_IMAGE_MODEL ?? "gpt-image-1";
 const openai = new OpenAI({ apiKey: process.env.CHATGPT_API_KEY ?? "" });
 
+function avatarPrompt(style: string, variation: number) {
+  return `Transform the one person in this reference photo into an original ${STYLES[style]}. Preserve this person's recognizable facial features, skin tone, hair texture, hair color, approximate age, and joyful personality. Generate exactly ONE standalone centered head-and-shoulders avatar facing the viewer, with a simple colorful background and a wholesome family-friendly mood. This output must contain one person only: no group portrait, no side-by-side options, no collage, no split panels, no duplicate person, no extra faces, hands, or bodies. Keep the character cute and natural, not uncanny. No text, logos, watermarks, or photorealism. This is variation ${variation}; vary only the pose or background while keeping the same single person.`;
+}
+
 class GeminiAvatarError extends Error {
   constructor(readonly status: number, message: string) {
     super(message);
@@ -65,7 +69,7 @@ async function generateGeminiAvatar(source: Buffer, style: string, variation: nu
       model: GEMINI_IMAGE_MODEL,
       store: false,
       input: [
-        { type: "text", text: `Transform the person in this reference photo into an original ${STYLES[style]}. Preserve the person's recognizable facial features, skin tone, hair texture, hair color, approximate age, and joyful personality. Create a centered head-and-shoulders avatar facing the viewer, simple colorful background, balanced square composition, wholesome family-friendly mood. Keep the character cute and natural, not uncanny. No text, logos, watermark, extra people, duplicate features, or photorealism. Create variation ${variation} with a distinct pose or background while preserving the person.` },
+        { type: "text", text: avatarPrompt(style, variation) },
         { type: "image", mime_type: "image/jpeg", data: source.toString("base64") },
       ],
       response_format: {
@@ -93,7 +97,9 @@ async function generateOpenAiAvatars(source: Buffer, style: string, parentId: st
   const response = await openai.images.edit({
     model: OPENAI_AVATAR_IMAGE_MODEL,
     image: new File([new Uint8Array(source)], "avatar-source.jpg", { type: "image/jpeg" }),
-    prompt: `Transform the person in this reference photo into an original ${STYLES[style]}. Preserve their recognizable facial features, skin tone, hair texture, hair color, approximate age, and joyful personality. Create three distinct centered head-and-shoulders avatar choices facing the viewer, each with a simple colorful background and a wholesome family-friendly mood. Keep the character cute and natural, not uncanny. No text, logos, watermarks, extra people, duplicate features, or photorealism.`,
+    // `n: 3` returns three separate image files. The prompt deliberately describes
+    // one output so the model does not turn the requested choices into a group shot.
+    prompt: avatarPrompt(style, 1),
     n: 3,
     size: "1024x1024",
     quality: "low",
