@@ -407,7 +407,7 @@ export default function ParentPanel() {
                   onChange={(event) => setHouseholdName(event.target.value)}
                   autoComplete="organization"
                   className="mt-1 w-full rounded-2xl border-2 border-slate-200 bg-slate-50 px-3 py-2 font-semibold text-slate-800 outline-none focus:border-violet-400"
-                  placeholder={isCommunityInvite ? "Your family or name" : "The Maldonado Family"}
+                  placeholder={isCommunityInvite ? "Your family or name" : "The Johnson Family"}
                 />
               </label>
             )}

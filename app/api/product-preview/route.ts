@@ -19,8 +19,9 @@ export const GET = withErrors(async (req: NextRequest) => {
       householdId = "";
     }
   }
-  if (!householdId) return NextResponse.json({ error: "Sign in or pair this device first" }, { status: 401 });
-  const limited = rateLimit(req, { key: "product-preview", limit: 20, windowMs: 60_000, bucket: householdId });
+  const limited = householdId
+    ? rateLimit(req, { key: "product-preview", limit: 20, windowMs: 60_000, bucket: householdId })
+    : rateLimit(req, { key: "guest-product-preview", limit: 10, windowMs: 60_000 });
   if (limited) return limited;
   const preview = await fetchProductPreview(req.nextUrl.searchParams.get("url"));
   if (!preview) return NextResponse.json({ error: "We couldn't find an image for that item" }, { status: 404 });

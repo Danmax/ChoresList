@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Check, Gift, ShoppingBag, Sparkles } from "lucide-react";
+import { ArrowRight, Check, Gift, Heart, ShoppingBag, Sparkles } from "lucide-react";
 import { HolidayListBuilder } from "@/components/holiday-list-builder";
 
 export const metadata: Metadata = {
-  title: "Black Friday Gift Lists | ChoresList",
-  description: "Build holiday wish lists, compare retailers, and plan Christmas surprises with ChoresList.",
+  title: "Family Holiday Gift Lists | ChoresList",
+  description: "Build cheerful family wish lists, compare retailers, and plan thoughtful holiday surprises with ChoresList.",
 };
 const startUrl = "#build-list";
 const signInUrl = "/parent?next=%2Fparent%2Fwishlist%3Fholiday%3D1";
@@ -18,41 +18,41 @@ const ideas = [
 ];
 
 export default function HolidayLandingPage() {
-  return <main className="min-h-screen bg-[#101010] text-white selection:bg-[#dbff00] selection:text-black">
-    <div className="bg-[#dbff00] px-4 py-2.5 text-center text-xs font-black uppercase tracking-[0.16em] text-black">Big wish lists. Thoughtful gifts. Your holiday head start.</div>
+  return <main className="min-h-screen bg-[#fffaf5] text-slate-800 selection:bg-rose-200 selection:text-slate-900">
+    <div className="bg-rose-100 px-4 py-3 text-center text-xs font-black uppercase tracking-[0.14em] text-rose-800">A little less holiday juggling. A lot more joy.</div>
     <header className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-6 sm:px-8">
-      <Link href="/" className="flex items-center gap-2 font-black"><Gift size={23} className="text-[#dbff00]" /> ChoresList<span className="hidden border-l border-white/25 pl-3 text-xs text-zinc-400 sm:inline">THE GIFT EDIT</span></Link>
-      <nav aria-label="Holiday navigation" className="flex items-center gap-4 text-sm font-bold"><a href="#ideas" className="hidden text-zinc-300 hover:text-white sm:inline">Gift inspiration</a><Link href={signInUrl} className="underline underline-offset-4">Sign in</Link></nav>
+      <Link href="/" className="flex items-center gap-2 font-black"><Gift size={23} className="text-rose-500" /> ChoresList<span className="hidden border-l border-rose-200 pl-3 text-xs text-slate-500 sm:inline">FAMILY GIFT LISTS</span></Link>
+      <nav aria-label="Holiday navigation" className="flex items-center gap-4 text-sm font-bold"><a href="#ideas" className="hidden text-slate-500 hover:text-rose-600 sm:inline">Gift ideas</a><Link href={signInUrl} className="rounded-xl px-3 py-2 text-slate-600 hover:bg-white">Sign in</Link></nav>
     </header>
     <section className="mx-auto grid max-w-7xl items-center gap-10 px-5 pb-16 pt-8 sm:px-8 lg:grid-cols-2 lg:py-16">
       <div>
-        <p className="mb-6 inline-flex items-center gap-2 border border-white/25 px-3 py-2 text-xs font-black uppercase tracking-widest"><Sparkles size={14} className="text-[#dbff00]" /> Black Friday mindset. Christmas magic.</p>
-        <h1 className="text-6xl font-black uppercase leading-[0.92] tracking-tighter sm:text-8xl">Wish big.<br /><span className="text-[#dbff00]">Shop smart.</span><br />Gift happy.</h1>
-        <p className="mt-7 max-w-lg text-lg leading-relaxed text-zinc-300">The best gifts start with a good list. Gather their wishes, save the exact items, and compare retailers before you buy.</p>
-        <div className="mt-8 flex flex-wrap gap-3"><Link href={startUrl} className="inline-flex items-center gap-3 bg-[#dbff00] px-6 py-4 font-black text-black hover:bg-white">Start my holiday list <ArrowRight size={19} /></Link><a href="#how-it-works" className="border border-zinc-600 px-5 py-4 font-bold hover:border-white">How it works</a></div>
-        <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs font-semibold text-zinc-400">{["Free to start", "Private by default", "Made for families"].map((text) => <span key={text} className="flex items-center gap-1.5"><Check size={13} className="text-[#dbff00]" />{text}</span>)}</div>
+        <p className="mb-6 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-black uppercase tracking-widest text-rose-600 shadow-sm"><Sparkles size={14} /> Make room for the fun part</p>
+        <h1 className="text-5xl font-black leading-[0.98] tracking-tight text-slate-900 sm:text-7xl">Wish together.<br /><span className="text-rose-500">Gift with heart.</span></h1>
+        <p className="mt-7 max-w-lg text-lg leading-relaxed text-slate-600">Gather everyone’s wishes, save the exact items, and keep your gift planning in one calm, happy place.</p>
+        <div className="mt-8 flex flex-wrap gap-3"><Link href={startUrl} className="inline-flex items-center gap-3 rounded-2xl bg-rose-500 px-6 py-4 font-black text-white shadow-lg shadow-rose-200 transition hover:-translate-y-0.5 hover:bg-rose-600">Start our family list <ArrowRight size={19} /></Link><a href="#how-it-works" className="rounded-2xl border border-rose-200 bg-white px-5 py-4 font-bold text-slate-700 hover:bg-rose-50">How it works</a></div>
+        <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs font-semibold text-slate-500">{["Free to start", "Private by default", "Made for families"].map((text) => <span key={text} className="flex items-center gap-1.5"><Check size={13} className="text-emerald-500" />{text}</span>)}</div>
       </div>
       <div className="relative pb-7 pl-3 sm:pl-8">
-        <div className="relative aspect-[4/5] overflow-hidden rounded-t-[7rem] bg-[#efe0cb] sm:aspect-square">
+        <div className="relative aspect-[4/5] overflow-hidden rounded-[3rem] bg-rose-100 shadow-xl shadow-rose-100 sm:aspect-square">
           <Image src="/holiday-gift-hero.png" alt="Holiday gift inspiration with a teddy bear, toy train, books, and headphones beside a Christmas tree" fill priority sizes="(max-width: 1024px) 100vw, 600px" className="object-cover object-right" />
-          <span className="absolute right-4 top-5 rotate-6 bg-[#dbff00] px-4 py-3 text-center text-sm font-black uppercase text-black">Good gifts.<br />Great plans.</span>
+          <span className="absolute right-4 top-5 rotate-3 rounded-2xl bg-amber-200 px-4 py-3 text-center text-sm font-black text-amber-950">Picked with<br />love.</span>
         </div>
-        <div className="absolute bottom-0 left-0 right-6 border border-zinc-700 bg-[#1b1b1b] p-5 shadow-xl"><p className="text-xs font-bold uppercase tracking-widest text-zinc-400">A little list inspiration</p><p className="mt-2 text-xl font-black">“The one they actually wanted.”</p><p className="mt-1 text-sm text-zinc-400">Photos. Exact links. Fewer guessing games.</p></div>
+        <div className="absolute bottom-0 left-0 right-6 rounded-2xl border border-rose-100 bg-white p-5 shadow-lg"><p className="text-xs font-bold uppercase tracking-widest text-rose-500">A happier kind of planning</p><p className="mt-2 text-xl font-black">“The one they actually wanted.”</p><p className="mt-1 text-sm text-slate-500">Photos. Exact links. Fewer guessing games.</p></div>
       </div>
     </section>
-    <div className="border-y border-zinc-800 bg-[#191919] px-5 py-5"><div className="mx-auto flex max-w-7xl flex-wrap justify-center gap-x-10 gap-y-3 text-xs font-black uppercase tracking-widest text-zinc-300"><span>Save the wish</span><span className="text-[#dbff00]" aria-hidden="true">✦</span><span>Compare the options</span><span className="text-[#dbff00]" aria-hidden="true">✦</span><span>Keep the surprise</span></div></div>
+    <div className="border-y border-rose-100 bg-white/80 px-5 py-5"><div className="mx-auto flex max-w-7xl flex-wrap justify-center gap-x-10 gap-y-3 text-xs font-black uppercase tracking-widest text-slate-600"><span>Save the wish</span><Heart size={14} className="fill-rose-400 text-rose-400" /><span>Compare options</span><Heart size={14} className="fill-rose-400 text-rose-400" /><span>Keep the surprise</span></div></div>
     <HolidayListBuilder />
     <section id="ideas" className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20">
-      <p className="text-xs font-black uppercase tracking-[0.2em] text-[#dbff00]">The inspiration aisle</p><h2 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">Every age. Every kind of joy.</h2><p className="mt-4 max-w-xl leading-relaxed text-zinc-400">Ideas for boys, girls, and grown-ups. Follow their interests and make the list their own.</p>
-      <div className="mt-9 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{ideas.map((idea) => <article key={idea.label} className={`group flex flex-col p-6 text-black ${idea.color}`}><p className="text-[10px] font-black tracking-[0.2em]">{idea.label}</p><div className="flex h-32 items-center justify-center text-7xl transition-transform group-hover:-rotate-6 motion-reduce:transform-none" aria-hidden="true">{idea.emoji}</div><h3 className="text-2xl font-black leading-tight tracking-tight">{idea.title}</h3><p className="mb-6 mt-3 text-sm leading-relaxed text-black/70">{idea.detail}</p><Link href={startUrl} className="mt-auto flex items-center justify-between border-t border-black/20 pt-4 text-sm font-black hover:underline">Make a wish list <ArrowRight size={17} /></Link></article>)}</div>
-      <p className="mt-4 text-xs text-zinc-400">Gift inspiration. Check retailers for current prices and availability.</p>
+      <p className="text-xs font-black uppercase tracking-[0.2em] text-rose-500">A little inspiration</p><h2 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">Every age. Every kind of joy.</h2><p className="mt-4 max-w-xl leading-relaxed text-slate-600">Follow their interests and make a list that feels like them.</p>
+      <div className="mt-9 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{ideas.map((idea) => <article key={idea.label} className={`group flex flex-col rounded-3xl p-6 shadow-sm ${idea.color}`}><p className="text-[10px] font-black tracking-[0.2em] text-slate-500">{idea.label}</p><div className="flex h-32 items-center justify-center text-7xl transition-transform group-hover:-rotate-6 motion-reduce:transform-none" aria-hidden="true">{idea.emoji}</div><h3 className="text-2xl font-black leading-tight tracking-tight">{idea.title}</h3><p className="mb-6 mt-3 text-sm leading-relaxed text-slate-600">{idea.detail}</p><Link href={startUrl} className="mt-auto flex items-center justify-between border-t border-slate-900/10 pt-4 text-sm font-black hover:text-rose-600">Make a wish list <ArrowRight size={17} /></Link></article>)}</div>
+      <p className="mt-4 text-xs text-slate-500">Gift inspiration only. Check retailers for current prices and availability.</p>
     </section>
-    <section id="how-it-works" className="bg-[#f5f3ed] px-5 py-16 text-black sm:px-8 sm:py-20"><div className="mx-auto max-w-7xl"><p className="text-xs font-black uppercase tracking-widest text-zinc-500">Less scrolling. More celebrating.</p><h2 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">Your holiday game plan.</h2><div className="mt-10 grid gap-8 md:grid-cols-3">{[
+    <section id="how-it-works" className="bg-rose-100/70 px-5 py-16 sm:px-8 sm:py-20"><div className="mx-auto max-w-7xl"><p className="text-xs font-black uppercase tracking-widest text-rose-500">Less scrolling. More celebrating.</p><h2 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">Your simple holiday game plan.</h2><div className="mt-10 grid gap-5 md:grid-cols-3">{[
       { title: "01 / Build their list", detail: "Name a list and try two gift ideas without signing up. Your draft stays in this browser until you’re ready to create an account." },
-      { title: "02 / Compare & plan", detail: "Look up items on Amazon and compare on Walmart. Keep estimates and purchase progress together." },
+      { title: "02 / Compare & plan", detail: "See Amazon previews, search Walmart, and keep exact item links together." },
       { title: "03 / Share the magic", detail: "Choose when to share a list with family. Parent purchase tracking stays private." },
-    ].map(({ title, detail }) => <div key={title} className="border-t-2 border-black pt-5"><ShoppingBag size={26} /><h3 className="mt-5 text-xl font-black">{title}</h3><p className="mt-3 leading-relaxed text-zinc-600">{detail}</p></div>)}</div></div></section>
-    <section className="px-5 py-16 sm:px-8 sm:py-24"><div className="mx-auto max-w-4xl text-center"><p className="text-xs font-black uppercase tracking-widest text-[#dbff00]">Start with the holidays. Stay for family life.</p><h2 className="mt-4 text-4xl font-black tracking-tight sm:text-6xl">All the wishes.<br />One happy place.</h2><p className="mx-auto mt-5 max-w-xl leading-relaxed text-zinc-400">Start with gift lists. Explore chores, allowance, and family planning whenever you’re ready.</p><Link href={startUrl} className="mt-8 inline-flex items-center gap-3 bg-[#dbff00] px-7 py-4 font-black text-black hover:bg-white">Create my free list <ArrowRight size={19} /></Link></div></section>
-    <footer className="border-t border-zinc-800 px-5 py-7 sm:px-8"><div className="mx-auto flex max-w-7xl flex-wrap justify-between gap-4 text-xs text-zinc-400"><Link href="/" className="font-bold text-white">ChoresList / More joy, less juggling.</Link><div className="flex gap-5"><Link href="/privacy" className="hover:text-white">Privacy</Link><Link href="/terms" className="hover:text-white">Terms</Link><Link href={signInUrl} className="hover:text-white">Sign in</Link></div></div></footer>
+    ].map(({ title, detail }) => <div key={title} className="rounded-3xl bg-white p-6 shadow-sm"><ShoppingBag size={26} className="text-rose-500" /><h3 className="mt-5 text-xl font-black">{title}</h3><p className="mt-3 leading-relaxed text-slate-600">{detail}</p></div>)}</div></div></section>
+    <section className="px-5 py-16 sm:px-8 sm:py-24"><div className="mx-auto max-w-4xl text-center"><p className="text-xs font-black uppercase tracking-widest text-rose-500">Start with the holidays. Stay for family life.</p><h2 className="mt-4 text-4xl font-black tracking-tight sm:text-6xl">All the wishes.<br />One happy place.</h2><p className="mx-auto mt-5 max-w-xl leading-relaxed text-slate-600">Start with gift lists. Explore chores, allowance, and family planning whenever you’re ready.</p><Link href={startUrl} className="mt-8 inline-flex items-center gap-3 rounded-2xl bg-rose-500 px-7 py-4 font-black text-white hover:bg-rose-600">Create our free list <ArrowRight size={19} /></Link></div></section>
+    <footer className="border-t border-rose-100 bg-white px-5 py-7 sm:px-8"><div className="mx-auto flex max-w-7xl flex-wrap justify-between gap-4 text-xs text-slate-500"><Link href="/" className="font-bold text-slate-700">ChoresList / More joy, less juggling.</Link><div className="flex gap-5"><Link href="/privacy" className="hover:text-rose-600">Privacy</Link><Link href="/terms" className="hover:text-rose-600">Terms</Link><Link href={signInUrl} className="hover:text-rose-600">Sign in</Link></div></div></footer>
   </main>;
 }
