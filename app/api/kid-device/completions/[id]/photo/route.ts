@@ -4,7 +4,7 @@ import path from "path";
 import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { authErrorResponse } from "@/lib/api";
-import { hashDeviceSecret, requireDeviceSession } from "@/lib/device-session";
+import { getActiveDeviceSession } from "@/lib/device-session";
 import { optimizeToWebp } from "@/lib/image";
 
 export const runtime = "nodejs";
@@ -15,23 +15,9 @@ const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
 const ACCEPTED_MIME = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
 const UPLOADS_ROOT = path.resolve(process.cwd(), "public", "uploads");
 
-async function verifyDevice(req: NextRequest) {
-  const session = requireDeviceSession(req);
-  const device = await prisma.householdDevice.findFirst({
-    where: {
-      id: session.deviceId,
-      householdId: session.householdId,
-      tokenHash: hashDeviceSecret(session.secret),
-      revokedAt: null,
-    },
-  });
-  if (!device) return null;
-  return session;
-}
-
 export async function POST(req: NextRequest, { params }: Params) {
   try {
-    const session = await verifyDevice(req);
+    const session = await getActiveDeviceSession(req);
     if (!session) return NextResponse.json({ error: "Device access revoked" }, { status: 401 });
 
     const { id } = await params;

@@ -1,16 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { withErrors } from "@/lib/api";
-import { hashDeviceSecret, requireDeviceSession } from "@/lib/device-session";
+import { getActiveDeviceSession } from "@/lib/device-session";
 
 const MOODS = new Set(["great", "awesome", "cool", "good", "okay", "low", "sad", "frustrated", "tired", "overwhelmed"]);
 
 async function verifiedDevice(req: NextRequest) {
-  const session = requireDeviceSession(req);
-  const device = await prisma.householdDevice.findFirst({
-    where: { id: session.deviceId, householdId: session.householdId, tokenHash: hashDeviceSecret(session.secret), revokedAt: null },
-  });
-  return device ? { session, device } : null;
+  const session = await getActiveDeviceSession(req);
+  return session ? { session } : null;
 }
 
 export const GET = withErrors(async (req: NextRequest) => {

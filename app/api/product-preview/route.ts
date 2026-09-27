@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { optionalSession, withErrors } from "@/lib/api";
-import { requireDeviceSession, hashDeviceSecret } from "@/lib/device-session";
+import { getActiveDeviceSession } from "@/lib/device-session";
 import { fetchProductPreview } from "@/lib/product-preview";
-import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -12,9 +11,8 @@ export const GET = withErrors(async (req: NextRequest) => {
   let householdId = parent?.householdId ?? "";
   if (!householdId) {
     try {
-      const deviceSession = requireDeviceSession(req);
-      const device = await prisma.householdDevice.findFirst({ where: { id: deviceSession.deviceId, householdId: deviceSession.householdId, tokenHash: hashDeviceSecret(deviceSession.secret), revokedAt: null }, select: { householdId: true } });
-      householdId = device?.householdId ?? "";
+      const deviceSession = await getActiveDeviceSession(req);
+      householdId = deviceSession?.householdId ?? "";
     } catch {
       householdId = "";
     }

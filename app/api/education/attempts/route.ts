@@ -23,7 +23,7 @@ export const POST = withErrors(async (req: NextRequest) => {
 
   const assignment = await prisma.educationAssignment.findFirst({
     where: { id: assignmentId, householdId, memberId },
-    include: { set: { include: { materials: true } }, attempts: { where: { passed: true }, take: 1 } },
+    include: { set: { include: { materials: true } } },
   });
   if (!assignment) return NextResponse.json({ error: "Assignment not found" }, { status: 404 });
   if (assignment.set.materials.length === 0) return NextResponse.json({ error: "This assignment has no questions" }, { status: 400 });
@@ -46,9 +46,7 @@ export const POST = withErrors(async (req: NextRequest) => {
   const totalCount = assignment.set.materials.length;
   const score = Math.round((correctCount / totalCount) * 100);
   const passed = score >= assignment.passingScore;
-  const alreadyPassed = assignment.attempts.length > 0 || assignment.status === "completed";
-
-  const attempt = await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const created = await tx.educationAttempt.create({
       data: {
         householdId,
@@ -62,12 +60,16 @@ export const POST = withErrors(async (req: NextRequest) => {
       },
     });
 
+    let pointsAwarded = 0;
     if (passed) {
-      await tx.educationAssignment.update({
-        where: { id: assignment.id },
+      // Only the first passing attempt may transition the assignment. Keeping
+      // this guard in the transaction prevents two concurrent submissions
+      // from granting the reward twice.
+      const completed = await tx.educationAssignment.updateMany({
+        where: { id: assignment.id, status: { not: "completed" } },
         data: { status: "completed", completedAt: new Date() },
       });
-      if (!alreadyPassed && assignment.pointsReward > 0) {
+      if (completed.count > 0 && assignment.pointsReward > 0) {
         await tx.familyMember.update({ where: { id: memberId }, data: { totalPoints: { increment: assignment.pointsReward } } });
         const skillId = await resolveSkillId(tx, {
           householdId,
@@ -85,20 +87,21 @@ export const POST = withErrors(async (req: NextRequest) => {
             note: "Education assignment passed",
           });
         }
+        pointsAwarded = assignment.pointsReward;
       }
     }
 
-    return created;
+    return { attempt: created, pointsAwarded };
   });
 
   return NextResponse.json({
-    attempt,
+    attempt: result.attempt,
     score,
     correctCount,
     totalCount,
     passed,
     passingScore: assignment.passingScore,
-    pointsAwarded: passed && !alreadyPassed ? assignment.pointsReward : 0,
+    pointsAwarded: result.pointsAwarded,
     answers: gradedAnswers,
   }, { status: 201 });
 });

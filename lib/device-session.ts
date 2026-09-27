@@ -1,6 +1,7 @@
 import { createHash, createHmac, randomBytes, randomInt, timingSafeEqual } from "crypto";
 import { NextRequest } from "next/server";
 import { AuthError } from "@/lib/auth-error";
+import { prisma } from "@/lib/prisma";
 
 const DEVICE_SESSION_TTL_SECONDS = 60 * 60 * 24 * 90;
 const DEVICE_SESSION_COOKIE = "kid-device-session";
@@ -124,6 +125,30 @@ export function requireDeviceSession(req: NextRequest) {
   const session = verifyDeviceSessionToken(req.cookies.get(deviceSession.name)?.value);
   if (!session) throw new AuthError("Device pairing required");
   return session;
+}
+
+/**
+ * Verifies both the signed browser token and the current device record.
+ *
+ * The device scope is deliberately checked against the database as well as
+ * the token. A parent can change a screen from household-wide to a single
+ * child (or reassign it); previously issued tokens must not retain the old
+ * broader scope.
+ */
+export async function getActiveDeviceSession(req: NextRequest) {
+  const session = requireDeviceSession(req);
+  const device = await prisma.householdDevice.findFirst({
+    where: {
+      id: session.deviceId,
+      householdId: session.householdId,
+      memberId: session.memberId,
+      mode: session.mode,
+      tokenHash: hashDeviceSecret(session.secret),
+      revokedAt: null,
+    },
+    select: { id: true },
+  });
+  return device ? session : null;
 }
 
 export const deviceSession = {

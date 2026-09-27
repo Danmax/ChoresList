@@ -1,25 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { withErrors } from "@/lib/api";
-import { hashDeviceSecret, requireDeviceSession } from "@/lib/device-session";
+import { getActiveDeviceSession } from "@/lib/device-session";
 import { isMonthlyChoreOpen, startOfDay, startOfMonth } from "@/lib/chore-schedule";
 
-async function verifyDevice(req: NextRequest) {
-  const session = requireDeviceSession(req);
-  const device = await prisma.householdDevice.findFirst({
-    where: {
-      id: session.deviceId,
-      householdId: session.householdId,
-      tokenHash: hashDeviceSecret(session.secret),
-      revokedAt: null,
-    },
-  });
-  if (!device) return null;
-  return session;
-}
-
 export const GET = withErrors(async (req: NextRequest) => {
-  const session = await verifyDevice(req);
+  const session = await getActiveDeviceSession(req);
   if (!session) return NextResponse.json({ error: "Device access revoked" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
@@ -105,7 +91,7 @@ export const GET = withErrors(async (req: NextRequest) => {
 });
 
 export const POST = withErrors(async (req: NextRequest) => {
-  const session = await verifyDevice(req);
+  const session = await getActiveDeviceSession(req);
   if (!session) return NextResponse.json({ error: "Device access revoked" }, { status: 401 });
 
   return NextResponse.json({ error: "Add tasks from the parent panel" }, { status: 403 });

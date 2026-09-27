@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { withErrors } from "@/lib/api";
-import { hashDeviceSecret, requireDeviceSession } from "@/lib/device-session";
+import { getActiveDeviceSession } from "@/lib/device-session";
 import { cleanProductImageUrl, cleanProductUrl } from "@/lib/amazon";
 
 const kidWishItemSelect = {
@@ -19,22 +19,8 @@ const kidWishItemSelect = {
   createdAt: true,
 } as const;
 
-async function verifyDevice(req: NextRequest) {
-  const session = requireDeviceSession(req);
-  const device = await prisma.householdDevice.findFirst({
-    where: {
-      id: session.deviceId,
-      householdId: session.householdId,
-      tokenHash: hashDeviceSecret(session.secret),
-      revokedAt: null,
-    },
-  });
-  if (!device) return null;
-  return session;
-}
-
 export const POST = withErrors(async (req: NextRequest) => {
-  const session = await verifyDevice(req);
+  const session = await getActiveDeviceSession(req);
   if (!session) return NextResponse.json({ error: "Device access revoked" }, { status: 401 });
 
   const body = await req.json();
@@ -107,7 +93,7 @@ export const POST = withErrors(async (req: NextRequest) => {
 });
 
 export const PATCH = withErrors(async (req: NextRequest) => {
-  const session = await verifyDevice(req);
+  const session = await getActiveDeviceSession(req);
   if (!session) return NextResponse.json({ error: "Device access revoked" }, { status: 401 });
   const body = await req.json();
   const id = typeof body.id === "string" ? body.id : "";

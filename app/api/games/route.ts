@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireParentSession, requireSession, withErrors } from "@/lib/api";
-import { canAccessMember } from "@/lib/child-access";
+import { canAccessMember, childAccessWhere } from "@/lib/child-access";
 import { getLevelFromPoints } from "@/lib/points";
 import { DEFAULT_GAME_SETTINGS, GAME_DEFINITIONS, gameByKey, type GameRewardType } from "@/lib/games";
 import { isMonthlyChoreOpen, startOfMonth } from "@/lib/chore-schedule";
@@ -94,12 +94,17 @@ export const GET = withErrors(async (req: NextRequest) => {
   const { householdId, parentId } = requireSession(req);
   const { searchParams } = new URL(req.url);
   const memberId = searchParams.get("memberId");
+  if (memberId && !(await canAccessMember(parentId, householdId, memberId))) {
+    return NextResponse.json({ error: "You do not have access to this family member" }, { status: 403 });
+  }
+  const memberAccess = await childAccessWhere(parentId, householdId);
 
   const settings = await ensureSettings(householdId);
   const recentSessions = await prisma.gameSession.findMany({
     where: {
       householdId,
       ...(memberId ? { memberId } : {}),
+      member: memberAccess,
     },
     include: { member: { select: { id: true, name: true, avatar: true, color: true } } },
     orderBy: { playedAt: "desc" },

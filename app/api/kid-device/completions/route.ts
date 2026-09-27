@@ -4,27 +4,13 @@ import { prisma } from "@/lib/prisma";
 import { withErrors } from "@/lib/api";
 import { getWeekStart } from "@/lib/allowance";
 import { calcPointsEarned, getLevelFromPoints } from "@/lib/points";
-import { hashDeviceSecret, requireDeviceSession } from "@/lib/device-session";
+import { getActiveDeviceSession } from "@/lib/device-session";
 import { awardChoreSkillXp } from "@/lib/skills";
 import { COMPLETION_EMOJIS } from "@/types";
 import { isMonthlyChoreOpen, startOfDay, startOfMonth } from "@/lib/chore-schedule";
 
-async function verifyDevice(req: NextRequest) {
-  const session = requireDeviceSession(req);
-  const device = await prisma.householdDevice.findFirst({
-    where: {
-      id: session.deviceId,
-      householdId: session.householdId,
-      tokenHash: hashDeviceSecret(session.secret),
-      revokedAt: null,
-    },
-  });
-  if (!device) return null;
-  return session;
-}
-
 export const POST = withErrors(async (req: NextRequest) => {
-  const session = await verifyDevice(req);
+  const session = await getActiveDeviceSession(req);
   if (!session) return NextResponse.json({ error: "Device access revoked" }, { status: 401 });
 
   const body = await req.json();

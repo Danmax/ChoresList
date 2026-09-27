@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { optionalSession, withErrors } from "@/lib/api";
 import { searchAmazonProducts } from "@/lib/amazon-creators";
 import { rateLimit } from "@/lib/rate-limit";
-import { requireDeviceSession, hashDeviceSecret } from "@/lib/device-session";
-import { prisma } from "@/lib/prisma";
+import { getActiveDeviceSession } from "@/lib/device-session";
 
 export const runtime = "nodejs";
 
@@ -12,9 +11,8 @@ export const GET = withErrors(async (req: NextRequest) => {
   let householdId = parent?.householdId ?? "";
   if (!householdId) {
     try {
-      const deviceSession = requireDeviceSession(req);
-      const device = await prisma.householdDevice.findFirst({ where: { id: deviceSession.deviceId, householdId: deviceSession.householdId, tokenHash: hashDeviceSecret(deviceSession.secret), revokedAt: null }, select: { householdId: true } });
-      householdId = device?.householdId ?? "";
+      const deviceSession = await getActiveDeviceSession(req);
+      householdId = deviceSession?.householdId ?? "";
     } catch {
       householdId = "";
     }

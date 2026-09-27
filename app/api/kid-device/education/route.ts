@@ -1,18 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { withErrors } from "@/lib/api";
-import { hashDeviceSecret, requireDeviceSession } from "@/lib/device-session";
+import { getActiveDeviceSession } from "@/lib/device-session";
 import { normalizeAnswer } from "@/lib/education";
 import { awardSkillXp, resolveSkillId } from "@/lib/skills";
 
 type SubmittedAnswer = { materialId: string; answer: string };
 
 async function verifiedSession(req: NextRequest) {
-  const session = requireDeviceSession(req);
-  const device = await prisma.householdDevice.findFirst({
-    where: { id: session.deviceId, householdId: session.householdId, tokenHash: hashDeviceSecret(session.secret), revokedAt: null },
-  });
-  return device ? session : null;
+  return getActiveDeviceSession(req);
 }
 
 function memberScope(session: NonNullable<Awaited<ReturnType<typeof verifiedSession>>>) {
@@ -42,7 +38,7 @@ export const POST = withErrors(async (req: NextRequest) => {
   const assignmentId = typeof body.assignmentId === "string" ? body.assignmentId : "";
   const assignment = await prisma.educationAssignment.findFirst({
     where: { id: assignmentId, householdId: session.householdId, ...memberScope(session) },
-    include: { set: { include: { materials: true } }, attempts: { where: { passed: true }, take: 1 } },
+    include: { set: { include: { materials: true } } },
   });
   if (!assignment) return NextResponse.json({ error: "Education assignment not found" }, { status: 404 });
   if (assignment.set.materials.length === 0) return NextResponse.json({ error: "This assignment has no questions" }, { status: 400 });
@@ -64,21 +60,26 @@ export const POST = withErrors(async (req: NextRequest) => {
   const totalCount = gradedAnswers.length;
   const score = Math.round((correctCount / totalCount) * 100);
   const passed = score >= assignment.passingScore;
-  const alreadyPassed = assignment.attempts.length > 0 || assignment.status === "completed";
-
-  const attempt = await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
       const created = await tx.educationAttempt.create({
         data: { householdId: session.householdId, assignmentId: assignment.id, memberId: assignment.memberId, score, correctCount, totalCount, passed, answers: gradedAnswers },
       });
+      let pointsAwarded = 0;
       if (passed) {
-        await tx.educationAssignment.update({ where: { id: assignment.id }, data: { status: "completed", completedAt: new Date() } });
-        if (!alreadyPassed && assignment.pointsReward > 0) {
+        // A conditional state change makes the reward idempotent when a child
+        // submits the same successful work from two tabs at once.
+        const completed = await tx.educationAssignment.updateMany({
+          where: { id: assignment.id, status: { not: "completed" } },
+          data: { status: "completed", completedAt: new Date() },
+        });
+        if (completed.count > 0 && assignment.pointsReward > 0) {
           await tx.familyMember.update({ where: { id: assignment.memberId }, data: { totalPoints: { increment: assignment.pointsReward } } });
           const skillId = await resolveSkillId(tx, { householdId: session.householdId, skillId: assignment.set.skillId, subject: assignment.set.subject });
           if (skillId) await awardSkillXp(tx, { householdId: session.householdId, memberId: assignment.memberId, skillId, xp: assignment.pointsReward, sourceType: "education_attempt", sourceId: created.id, note: "Education assignment passed" });
+          pointsAwarded = assignment.pointsReward;
         }
       }
-      return created;
+      return { attempt: created, pointsAwarded };
   });
-  return NextResponse.json({ attempt, score, correctCount, totalCount, passed, passingScore: assignment.passingScore, pointsAwarded: passed && !alreadyPassed ? assignment.pointsReward : 0, answers: gradedAnswers }, { status: 201 });
+  return NextResponse.json({ attempt: result.attempt, score, correctCount, totalCount, passed, passingScore: assignment.passingScore, pointsAwarded: result.pointsAwarded, answers: gradedAnswers }, { status: 201 });
 });
