@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, BookOpen, CheckCircle2, Circle, FileText, Gamepad2, Grid3X3, KeyRound, Puzzle, RefreshCw, Scissors, Shapes, Swords, Trophy } from "lucide-react";
+import { ArrowLeft, BookOpen, CheckCircle2, ChefHat, Circle, FileText, Gamepad2, Grid3X3, KeyRound, Puzzle, RefreshCw, Scissors, Shapes, Swords, Trophy } from "lucide-react";
 import { toast } from "sonner";
 
 type Member = {
@@ -16,7 +16,7 @@ type Member = {
 };
 
 type Game = {
-  key: "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot" | "shape-safari" | "codebreaker-quest" | "tic-tac-toe";
+  key: "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot" | "shape-safari" | "codebreaker-quest" | "tic-tac-toe" | "burger-rush";
   title: string;
   description: string;
   ageMin: number;
@@ -114,6 +114,7 @@ function iconForGame(key: string) {
   if (key === "shape-safari") return Shapes;
   if (key === "codebreaker-quest") return KeyRound;
   if (key === "tic-tac-toe") return Grid3X3;
+  if (key === "burger-rush") return ChefHat;
   return Gamepad2;
 }
 
@@ -227,6 +228,8 @@ export default function KidGamesPage() {
         <CodebreakerQuest onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("codebreaker-quest", score, duration, metadata)} />
       ) : activeGame === "tic-tac-toe" ? (
         <TicTacToe onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("tic-tac-toe", score, duration, metadata)} />
+      ) : activeGame === "burger-rush" ? (
+        <BurgerRush onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("burger-rush", score, duration, metadata)} />
       ) : (
         <section className="grid gap-4 sm:grid-cols-2">
           {games.map((game) => {
@@ -767,6 +770,141 @@ function TicTacToe({
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
         <button type="button" onClick={newRound} className="rounded-2xl bg-slate-100 px-4 py-3 text-sm font-black text-slate-700">New Round</button>
         <button type="button" onClick={saveGame} disabled={!complete} className="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white disabled:opacity-50">Save Game</button>
+      </div>
+    </section>
+  );
+}
+
+const BURGER_INGREDIENTS = [
+  { key: "bottom-bun", label: "Bottom Bun", emoji: "🟤" },
+  { key: "patty", label: "Patty", emoji: "🥩" },
+  { key: "cheese", label: "Cheese", emoji: "🧀" },
+  { key: "lettuce", label: "Lettuce", emoji: "🥬" },
+  { key: "tomato", label: "Tomato", emoji: "🍅" },
+  { key: "pickles", label: "Pickles", emoji: "🥒" },
+  { key: "onion", label: "Onions", emoji: "🧅" },
+  { key: "bacon", label: "Bacon", emoji: "🥓" },
+  { key: "hot-chilies", label: "Hot Chilies", emoji: "🌶️" },
+  { key: "sauce", label: "Sauce", emoji: "🥫" },
+  { key: "top-bun", label: "Top Bun", emoji: "🟠" },
+] as const;
+
+type BurgerIngredient = typeof BURGER_INGREDIENTS[number]["key"];
+type BurgerOrder = { id: string; customer: string; name: string; ingredients: BurgerIngredient[]; special?: boolean };
+
+const BURGER_ORDERS: BurgerOrder[] = [
+  { id: "classic", customer: "Mia", name: "Classic Cheeseburger", ingredients: ["bottom-bun", "sauce", "patty", "cheese", "top-bun"] },
+  { id: "garden", customer: "Jay", name: "Garden Burger", ingredients: ["bottom-bun", "lettuce", "tomato", "onion", "pickles", "top-bun"] },
+  { id: "bacon", customer: "Avery", name: "Bacon Stack", special: true, ingredients: ["bottom-bun", "sauce", "patty", "cheese", "bacon", "top-bun"] },
+  { id: "chili", customer: "Kai", name: "Hot Chili Special", special: true, ingredients: ["bottom-bun", "sauce", "patty", "cheese", "onion", "hot-chilies", "top-bun"] },
+  { id: "double", customer: "Noah", name: "Double Bacon Burger", special: true, ingredients: ["bottom-bun", "sauce", "patty", "cheese", "patty", "bacon", "top-bun"] },
+  { id: "deluxe", customer: "Zoe", name: "Everything Deluxe", special: true, ingredients: ["bottom-bun", "lettuce", "patty", "cheese", "bacon", "tomato", "onion", "pickles", "sauce", "top-bun"] },
+  { id: "fresh", customer: "Leo", name: "Fresh & Crunchy", ingredients: ["bottom-bun", "sauce", "lettuce", "patty", "tomato", "onion", "pickles", "top-bun"] },
+];
+
+function burgerIngredient(key: BurgerIngredient) {
+  return BURGER_INGREDIENTS.find((ingredient) => ingredient.key === key) ?? BURGER_INGREDIENTS[0];
+}
+
+function BurgerRush({
+  onExit,
+  onFinish,
+}: {
+  onExit: () => void;
+  onFinish: (score: number, durationSeconds: number, metadata: Record<string, unknown>) => void;
+}) {
+  const orders = useMemo(() => {
+    const bacon = BURGER_ORDERS.find((order) => order.id === "bacon")!;
+    const chili = BURGER_ORDERS.find((order) => order.id === "chili")!;
+    const rest = BURGER_ORDERS.filter((order) => order.id !== "bacon" && order.id !== "chili");
+    return shuffle([bacon, chili, ...shuffle(rest).slice(0, 3)]);
+  }, []);
+  const [orderIndex, setOrderIndex] = useState(0);
+  const [built, setBuilt] = useState<BurgerIngredient[]>([]);
+  const [completed, setCompleted] = useState(0);
+  const [mistakes, setMistakes] = useState(0);
+  const [feedback, setFeedback] = useState("Start with the bottom bun!");
+  const [serving, setServing] = useState(false);
+  const [startedAt] = useState(() => Date.now());
+  const current = orders[orderIndex];
+
+  function addIngredient(ingredient: BurgerIngredient) {
+    if (serving) return;
+    const expected = current.ingredients[built.length];
+    if (ingredient !== expected) {
+      setMistakes((value) => value + 1);
+      setFeedback(`Not yet—customer ${current.customer} needs ${burgerIngredient(expected).label} next.`);
+      return;
+    }
+
+    const nextBuilt = [...built, ingredient];
+    setBuilt(nextBuilt);
+    setFeedback(nextBuilt.length === current.ingredients.length ? "Perfect order! Serving now…" : "Great—keep stacking!");
+    if (nextBuilt.length !== current.ingredients.length) return;
+
+    setServing(true);
+    const nextCompleted = completed + 1;
+    setCompleted(nextCompleted);
+    setTimeout(() => {
+      if (orderIndex === orders.length - 1) {
+        const duration = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
+        const score = Math.max(50, nextCompleted * 100 + Math.max(0, 120 - duration) - mistakes * 15);
+        onFinish(score, duration, { customersServed: nextCompleted, mistakes, orders: orders.map((order) => order.id) });
+        return;
+      }
+      setOrderIndex((value) => value + 1);
+      setBuilt([]);
+      setFeedback("New ticket! Start with the bottom bun.");
+      setServing(false);
+    }, 750);
+  }
+
+  return (
+    <section className="mx-auto max-w-5xl rounded-3xl bg-white p-4 shadow-sm sm:p-6">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="flex items-center gap-2 text-2xl font-black text-slate-800"><ChefHat className="text-amber-700" /> Burger Rush</h2>
+          <p className="text-sm font-bold text-slate-500">Customer {orderIndex + 1}/{orders.length} · {completed} served · {mistakes} mistakes</p>
+        </div>
+        <button type="button" onClick={onExit} className="rounded-2xl bg-slate-100 px-4 py-2 text-sm font-black text-slate-600">Exit</button>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+        <div className="space-y-4">
+          <div className="rounded-3xl bg-amber-50 p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div><p className="text-xs font-black uppercase tracking-widest text-amber-700">Order ticket · {current.customer}</p><h3 className="mt-1 text-xl font-black text-slate-800">{current.name}</h3></div>
+              {current.special && <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-black text-red-700">Special order</span>}
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {current.ingredients.map((ingredient, index) => {
+                const item = burgerIngredient(ingredient);
+                return <span key={`${ingredient}-${index}`} className={`rounded-xl border px-2.5 py-2 text-sm font-black ${index < built.length ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-white text-slate-600"}`}>{item.emoji} {item.label}</span>;
+              })}
+            </div>
+          </div>
+
+          <div className="rounded-3xl bg-slate-900 p-5 text-center text-white">
+            <p className="text-xs font-black uppercase tracking-widest text-slate-400">Workline</p>
+            <div className="mt-3 flex min-h-44 flex-col items-center justify-end">
+              {built.length === 0 ? <span className="mb-12 text-sm font-bold text-slate-400">Your burger will stack here</span> : [...built].reverse().map((ingredient, index) => {
+                const item = burgerIngredient(ingredient);
+                return <span key={`${ingredient}-${built.length - index}`} className="-mb-1 flex min-w-48 items-center justify-center rounded-xl border border-white/10 bg-white/10 px-4 py-1 text-xl" title={item.label}>{item.emoji} <span className="ml-2 text-xs font-black text-slate-200">{item.label}</span></span>;
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <p className={`mb-3 rounded-2xl px-4 py-3 text-sm font-black ${feedback.startsWith("Not yet") ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>{feedback}</p>
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+            {BURGER_INGREDIENTS.map((ingredient) => (
+              <button key={ingredient.key} type="button" onClick={() => addIngredient(ingredient.key)} disabled={serving} className="min-h-24 rounded-2xl border-2 border-amber-100 bg-amber-50 p-2 text-center transition-all hover:-translate-y-0.5 hover:border-amber-300 disabled:opacity-50">
+                <span className="block text-3xl">{ingredient.emoji}</span><span className="mt-1 block text-xs font-black text-slate-700">{ingredient.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
     </section>
   );

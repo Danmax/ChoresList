@@ -1,4 +1,4 @@
-export type GameKey = "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot" | "shape-safari" | "codebreaker-quest" | "tic-tac-toe";
+export type GameKey = "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot" | "shape-safari" | "codebreaker-quest" | "tic-tac-toe" | "burger-rush";
 export type GameRewardType = "none" | "points" | "tickets";
 
 export type GameDefinition = {
@@ -80,6 +80,17 @@ export const GAME_DEFINITIONS: GameDefinition[] = [
     color: "#be185d",
     bg: "#fce7f3",
   },
+  {
+    key: "burger-rush",
+    title: "Burger Rush",
+    description: "Build burgers in the right order to satisfy five hungry customers.",
+    icon: "ChefHat",
+    ageMin: 7,
+    ageMax: 14,
+    playTime: "3-5 min",
+    color: "#b45309",
+    bg: "#fef3c7",
+  },
 ];
 
 export const DEFAULT_GAME_SETTINGS: Record<GameKey, {
@@ -137,6 +148,14 @@ export const DEFAULT_GAME_SETTINGS: Record<GameKey, {
     rewardTickets: 0,
     requiresChoresComplete: false,
     dailyPlayLimit: 5,
+  },
+  "burger-rush": {
+    enabled: true,
+    rewardType: "points",
+    rewardPoints: 10,
+    rewardTickets: 0,
+    requiresChoresComplete: false,
+    dailyPlayLimit: 3,
   },
 };
 
