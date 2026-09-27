@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireParentSession, requireSession, withErrors } from "@/lib/api";
-import { cleanAmazonImageUrl, cleanAmazonUrl } from "@/lib/amazon";
+import { cleanProductImageUrl, cleanProductUrl } from "@/lib/amazon";
 import { canAccessMember, childAccessWhere } from "@/lib/child-access";
 import { cleanGiftPurchaseStatus, parseEstimatedCostCents } from "@/lib/wishlists";
 
@@ -76,13 +76,13 @@ export const POST = withErrors(async (req: NextRequest) => {
     });
   }
   if (!list) return NextResponse.json({ error: "List not found" }, { status: 404 });
-  const cleanUrl = cleanAmazonUrl(amazonUrl);
-  const cleanImage = cleanAmazonImageUrl(imageUrl);
+  const cleanUrl = cleanProductUrl(amazonUrl);
+  const cleanImage = cleanProductImageUrl(imageUrl);
   if (typeof amazonUrl === "string" && amazonUrl.trim() && !cleanUrl) {
-    return NextResponse.json({ error: "Use a secure Amazon or Walmart product link" }, { status: 400 });
+    return NextResponse.json({ error: "Use a secure product link" }, { status: 400 });
   }
   if (typeof imageUrl === "string" && imageUrl.trim() && !cleanImage) {
-    return NextResponse.json({ error: "Use an Amazon or Walmart product image URL" }, { status: 400 });
+    return NextResponse.json({ error: "Use a secure product image URL" }, { status: 400 });
   }
   const estimatedCost = parseEstimatedCostCents(creatorType === "parent" ? body.estimatedCost : undefined);
   const priceAlert = parseEstimatedCostCents(creatorType === "parent" ? body.priceAlert : undefined);
@@ -122,10 +122,10 @@ export const PATCH = withErrors(async (req: NextRequest) => {
   }
   const title = typeof body.title === "string" ? body.title.trim().slice(0, 120) : "";
   if (!title) return NextResponse.json({ error: "Wish title is required" }, { status: 400 });
-  const amazonUrl = cleanAmazonUrl(body.amazonUrl);
-  const imageUrl = cleanAmazonImageUrl(body.imageUrl);
-  if (typeof body.amazonUrl === "string" && body.amazonUrl.trim() && !amazonUrl) return NextResponse.json({ error: "Use a secure Amazon or Walmart product link" }, { status: 400 });
-  if (typeof body.imageUrl === "string" && body.imageUrl.trim() && !imageUrl) return NextResponse.json({ error: "Use an Amazon or Walmart product image URL" }, { status: 400 });
+  const amazonUrl = cleanProductUrl(body.amazonUrl);
+  const imageUrl = cleanProductImageUrl(body.imageUrl);
+  if (typeof body.amazonUrl === "string" && body.amazonUrl.trim() && !amazonUrl) return NextResponse.json({ error: "Use a secure product link" }, { status: 400 });
+  if (typeof body.imageUrl === "string" && body.imageUrl.trim() && !imageUrl) return NextResponse.json({ error: "Use a secure product image URL" }, { status: 400 });
   const estimatedCost = parseEstimatedCostCents(editorType === "parent" ? body.estimatedCost : undefined);
   const priceAlert = parseEstimatedCostCents(editorType === "parent" ? body.priceAlert : undefined);
   if (!estimatedCost.valid || !priceAlert.valid) return NextResponse.json({ error: "Enter a valid price" }, { status: 400 });
@@ -167,9 +167,9 @@ export const PUT = withErrors(async (req: NextRequest) => {
   if (!(await canAccessMember(parentId, householdId, existing.memberId))) {
     return NextResponse.json({ error: "You do not have access to this child" }, { status: 403 });
   }
-  const cleanUrl = amazonUrl !== undefined ? cleanAmazonUrl(amazonUrl) : undefined;
+  const cleanUrl = amazonUrl !== undefined ? cleanProductUrl(amazonUrl) : undefined;
   if (typeof amazonUrl === "string" && amazonUrl.trim() && !cleanUrl) {
-    return NextResponse.json({ error: "Use a secure Amazon or Walmart product link" }, { status: 400 });
+    return NextResponse.json({ error: "Use a secure product link" }, { status: 400 });
   }
   const item = await prisma.wishListItem.update({
     where: { id, householdId },

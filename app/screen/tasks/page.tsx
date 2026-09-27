@@ -890,7 +890,7 @@ export default function TaskScreenPage() {
             <AmazonProductSearch initialQuery={wish.title} onSelect={(product) => setWish((current) => ({ ...current, title: product.title, amazonUrl: product.url, imageUrl: product.imageUrl ?? "" }))} />
 
             <div>
-              <Label className="font-bold text-slate-600">Amazon or Walmart product link (optional)</Label>
+              <Label className="font-bold text-slate-600">Product link from any store (optional)</Label>
               <ProductUrlInput value={wish.amazonUrl} onChange={(amazonUrl) => setWish((previous) => ({ ...previous, amazonUrl }))} onImage={(imageUrl) => setWish((previous) => ({ ...previous, imageUrl }))} className="mt-1 rounded-xl" placeholder="Paste the exact product link here" />
             </div>
 

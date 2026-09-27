@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { amazonSearchUrl, cleanAmazonImageUrl, cleanAmazonUrl, retailerForUrl, walmartSearchUrl } from "../lib/amazon";
+import { amazonSearchUrl, cleanAmazonImageUrl, cleanAmazonUrl, cleanProductImageUrl, cleanProductUrl, looksLikeImageUrl, retailerForUrl, walmartSearchUrl } from "../lib/amazon";
 
 test("amazon search URLs encode the item name", () => {
   assert.equal(amazonSearchUrl("LEGO Star Wars & ships"), "https://www.amazon.com/s?k=LEGO+Star+Wars+%26+ships");
@@ -33,4 +33,13 @@ test("secure Walmart product links and images can be attached to a wish", () => 
   assert.equal(cleanAmazonUrl("https://walmart.com.example.com/ip/example"), null);
   assert.equal(retailerForUrl("https://www.walmart.com/ip/example/123"), "Walmart");
   assert.equal(retailerForUrl("https://www.amazon.com/dp/B000123"), "Amazon");
+});
+
+test("wishlist links and images can come from an official store outside Amazon and Walmart", () => {
+  const bfdiImage = "https://shop.jacknjellify.com/cdn/shop/files/rn-image_picker_lib_temp_227333e1-5309-4644-beff-46dacf332085.jpg?v=1773215959&width=1280";
+  assert.equal(cleanProductUrl("https://shop.jacknjellify.com/products/bfdi-plush#details"), "https://shop.jacknjellify.com/products/bfdi-plush");
+  assert.equal(cleanProductImageUrl(bfdiImage), bfdiImage);
+  assert.equal(looksLikeImageUrl(bfdiImage), true);
+  assert.equal(retailerForUrl("https://shop.jacknjellify.com/products/bfdi-plush"), "shop.jacknjellify.com");
+  assert.equal(cleanProductUrl("http://shop.jacknjellify.com/products/bfdi-plush"), null);
 });

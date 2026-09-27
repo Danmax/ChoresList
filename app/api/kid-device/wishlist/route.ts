@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { withErrors } from "@/lib/api";
 import { hashDeviceSecret, requireDeviceSession } from "@/lib/device-session";
-import { cleanAmazonImageUrl, cleanAmazonUrl } from "@/lib/amazon";
+import { cleanProductImageUrl, cleanProductUrl } from "@/lib/amazon";
 
 const kidWishItemSelect = {
   id: true,
@@ -63,13 +63,13 @@ export const POST = withErrors(async (req: NextRequest) => {
     return NextResponse.json({ error: "Christmas-list additions are turned off by a parent" }, { status: 403 });
   }
 
-  const amazonUrl = cleanAmazonUrl(body.amazonUrl);
-  const imageUrl = cleanAmazonImageUrl(body.imageUrl);
+  const amazonUrl = cleanProductUrl(body.amazonUrl);
+  const imageUrl = cleanProductImageUrl(body.imageUrl);
   if (typeof body.amazonUrl === "string" && body.amazonUrl.trim() && !amazonUrl) {
-    return NextResponse.json({ error: "Use a secure Amazon or Walmart product link" }, { status: 400 });
+    return NextResponse.json({ error: "Use a secure product link" }, { status: 400 });
   }
   if (typeof body.imageUrl === "string" && body.imageUrl.trim() && !imageUrl) {
-    return NextResponse.json({ error: "Use an Amazon or Walmart product image URL" }, { status: 400 });
+    return NextResponse.json({ error: "Use a secure product image URL" }, { status: 400 });
   }
 
   const requestedListId = typeof body.listId === "string" ? body.listId : "";
@@ -117,10 +117,10 @@ export const PATCH = withErrors(async (req: NextRequest) => {
   if (!item) return NextResponse.json({ error: "Editable wish not found" }, { status: 404 });
   const title = typeof body.title === "string" ? body.title.trim().slice(0, 120) : "";
   if (!title) return NextResponse.json({ error: "Wish title is required" }, { status: 400 });
-  const amazonUrl = cleanAmazonUrl(body.amazonUrl);
-  const imageUrl = cleanAmazonImageUrl(body.imageUrl);
-  if (body.amazonUrl && !amazonUrl) return NextResponse.json({ error: "Use a secure Amazon or Walmart product link" }, { status: 400 });
-  if (body.imageUrl && !imageUrl) return NextResponse.json({ error: "Use an Amazon or Walmart product image URL" }, { status: 400 });
+  const amazonUrl = cleanProductUrl(body.amazonUrl);
+  const imageUrl = cleanProductImageUrl(body.imageUrl);
+  if (body.amazonUrl && !amazonUrl) return NextResponse.json({ error: "Use a secure product link" }, { status: 400 });
+  if (body.imageUrl && !imageUrl) return NextResponse.json({ error: "Use a secure product image URL" }, { status: 400 });
   const updated = await prisma.wishListItem.update({
     where: { id, householdId: session.householdId },
     data: { title, note: typeof body.note === "string" && body.note.trim() ? body.note.trim().slice(0, 500) : null, category: typeof body.category === "string" ? body.category.slice(0, 64) : "other", emoji: typeof body.emoji === "string" && body.emoji.trim() ? body.emoji.trim().slice(0, 32) : "🎁", amazonUrl, imageUrl },

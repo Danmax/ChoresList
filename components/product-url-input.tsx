@@ -4,7 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { ExternalLink, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { retailerForUrl } from "@/lib/amazon";
+import { looksLikeImageUrl, retailerForUrl, supportsProductPreview } from "@/lib/amazon";
 
 export function ProductUrlInput({ value, onChange, onImage, className, placeholder }: { value: string; onChange: (value: string) => void; onImage: (imageUrl: string) => void; className?: string; placeholder?: string }) {
   const [loading, setLoading] = useState(false);
@@ -12,6 +12,12 @@ export function ProductUrlInput({ value, onChange, onImage, className, placehold
 
   async function fetchImage() {
     if (!value.trim()) return;
+    if (looksLikeImageUrl(value.trim())) {
+      onImage(value.trim());
+      setPreview({ imageUrl: value.trim(), title: null });
+      return;
+    }
+    if (!supportsProductPreview(value.trim())) return;
     setLoading(true);
     try {
       const response = await fetch(`/api/product-preview?url=${encodeURIComponent(value.trim())}`);
