@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BookOpen, ChefHat, Gamepad2, Grid3X3, KeyRound, Puzzle, RefreshCw, Save, Shapes, Swords } from "lucide-react";
+import { BookOpen, ChefHat, Gamepad2, Grid3X3, KeyRound, Puzzle, RefreshCw, Save, Shapes, Swords, TreePine } from "lucide-react";
 import { toast } from "sonner";
 import { ParentPageHeader } from "@/components/parent-management-shell";
 
@@ -47,6 +47,7 @@ function iconForGame(key: string) {
   if (key === "codebreaker-quest") return KeyRound;
   if (key === "tic-tac-toe") return Grid3X3;
   if (key === "burger-rush") return ChefHat;
+  if (key === "jungle-vine-swing") return TreePine;
   return Gamepad2;
 }
 
@@ -58,6 +59,7 @@ function gameLabel(key: string) {
   if (key === "codebreaker-quest") return "Codebreaker Quest";
   if (key === "tic-tac-toe") return "Tic-Tac-Toe";
   if (key === "burger-rush") return "Burger Rush";
+  if (key === "jungle-vine-swing") return "Jungle Vine Swing";
   return key;
 }
 

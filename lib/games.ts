@@ -1,4 +1,4 @@
-export type GameKey = "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot" | "shape-safari" | "codebreaker-quest" | "tic-tac-toe" | "burger-rush";
+export type GameKey = "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot" | "shape-safari" | "codebreaker-quest" | "tic-tac-toe" | "burger-rush" | "jungle-vine-swing";
 export type GameRewardType = "none" | "points" | "tickets";
 
 export type GameDefinition = {
@@ -91,6 +91,17 @@ export const GAME_DEFINITIONS: GameDefinition[] = [
     color: "#b45309",
     bg: "#fef3c7",
   },
+  {
+    key: "jungle-vine-swing",
+    title: "Jungle Vine Swing",
+    description: "Swing through the jungle, collect bananas, and dodge falling coconuts.",
+    icon: "TreePine",
+    ageMin: 5,
+    ageMax: 14,
+    playTime: "2-3 min",
+    color: "#15803d",
+    bg: "#dcfce7",
+  },
 ];
 
 export const DEFAULT_GAME_SETTINGS: Record<GameKey, {
@@ -156,6 +167,14 @@ export const DEFAULT_GAME_SETTINGS: Record<GameKey, {
     rewardTickets: 0,
     requiresChoresComplete: false,
     dailyPlayLimit: 3,
+  },
+  "jungle-vine-swing": {
+    enabled: true,
+    rewardType: "points",
+    rewardPoints: 8,
+    rewardTickets: 0,
+    requiresChoresComplete: false,
+    dailyPlayLimit: 4,
   },
 };
 

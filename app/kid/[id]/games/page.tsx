@@ -3,7 +3,7 @@
 import { type DragEvent, type MouseEvent as ReactMouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, BookOpen, CheckCircle2, ChefHat, Circle, FileText, Gamepad2, Grid3X3, KeyRound, Puzzle, RefreshCw, Scissors, Shapes, Swords, Trophy } from "lucide-react";
+import { ArrowLeft, BookOpen, CheckCircle2, ChefHat, Circle, FileText, Gamepad2, Grid3X3, KeyRound, Puzzle, RefreshCw, Scissors, Shapes, Swords, TreePine, Trophy } from "lucide-react";
 import { toast } from "sonner";
 import { MemberAvatar } from "@/components/member-avatar";
 
@@ -19,7 +19,7 @@ type Member = {
 };
 
 type Game = {
-  key: "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot" | "shape-safari" | "codebreaker-quest" | "tic-tac-toe" | "burger-rush";
+  key: "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot" | "shape-safari" | "codebreaker-quest" | "tic-tac-toe" | "burger-rush" | "jungle-vine-swing";
   title: string;
   description: string;
   ageMin: number;
@@ -118,6 +118,7 @@ function iconForGame(key: string) {
   if (key === "codebreaker-quest") return KeyRound;
   if (key === "tic-tac-toe") return Grid3X3;
   if (key === "burger-rush") return ChefHat;
+  if (key === "jungle-vine-swing") return TreePine;
   return Gamepad2;
 }
 
@@ -233,6 +234,8 @@ export default function KidGamesPage() {
         <TicTacToe onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("tic-tac-toe", score, duration, metadata)} />
       ) : activeGame === "burger-rush" ? (
         <BurgerRush onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("burger-rush", score, duration, metadata)} />
+      ) : activeGame === "jungle-vine-swing" ? (
+        <JungleVineSwing onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("jungle-vine-swing", score, duration, metadata)} />
       ) : (
         <section className="grid gap-4 sm:grid-cols-2">
           {games.map((game) => {
@@ -1043,6 +1046,197 @@ function BurgerRush({
           </div>
         </div>
       </div>
+    </section>
+  );
+}
+
+type JungleItem = { id: number; kind: "banana" | "golden" | "coconut"; x: number; y: number };
+
+function JungleVineSwing({
+  onExit,
+  onFinish,
+}: {
+  onExit: () => void;
+  onFinish: (score: number, durationSeconds: number, metadata: Record<string, unknown>) => void;
+}) {
+  const [status, setStatus] = useState<"ready" | "playing" | "over">("ready");
+  const [items, setItems] = useState<JungleItem[]>([]);
+  const [score, setScore] = useState(0);
+  const [bananas, setBananas] = useState(0);
+  const [combo, setCombo] = useState(0);
+  const [hits, setHits] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(45);
+  const [swingPhase, setSwingPhase] = useState(0);
+  const [holding, setHolding] = useState(false);
+  const itemId = useRef(0);
+  const swingPhaseRef = useRef(0);
+  const holdingRef = useRef(false);
+  const scoreRef = useRef(0);
+  const bananasRef = useRef(0);
+  const comboRef = useRef(0);
+  const hitsRef = useRef(0);
+
+  const swingSize = holding ? 18 : 11;
+  const monkeyX = 50 + Math.sin(swingPhase) * swingSize;
+  const monkeyY = 52 + Math.cos(swingPhase) * swingSize;
+
+  function setHold(value: boolean) {
+    holdingRef.current = value;
+    setHolding(value);
+  }
+
+  function startRun() {
+    scoreRef.current = 0;
+    bananasRef.current = 0;
+    comboRef.current = 0;
+    hitsRef.current = 0;
+    swingPhaseRef.current = 0;
+    setScore(0);
+    setBananas(0);
+    setCombo(0);
+    setHits(0);
+    setTimeLeft(45);
+    setSwingPhase(0);
+    setItems([]);
+    setHold(false);
+    setStatus("playing");
+  }
+
+  useEffect(() => {
+    if (status !== "playing") return;
+    const ticker = window.setInterval(() => {
+      const phase = (swingPhaseRef.current + (holdingRef.current ? 0.31 : 0.2)) % (Math.PI * 2);
+      swingPhaseRef.current = phase;
+      setSwingPhase(phase);
+      const amplitude = holdingRef.current ? 18 : 11;
+      const monkeyX = 50 + Math.sin(phase) * amplitude;
+      const monkeyY = 52 + Math.cos(phase) * amplitude;
+
+      setItems((current) => {
+        const speed = 4.2 + Math.min(3.6, scoreRef.current / 140);
+        const remaining: JungleItem[] = [];
+        for (const item of current) {
+          const next = { ...item, x: item.x - speed };
+          if (Math.abs(next.x - monkeyX) < 7 && Math.abs(next.y - monkeyY) < 10) {
+            if (next.kind === "coconut") {
+              hitsRef.current += 1;
+              comboRef.current = 0;
+              setHits(hitsRef.current);
+              setCombo(0);
+              if (hitsRef.current >= 3) setStatus("over");
+            } else {
+              const nextCombo = comboRef.current + 1;
+              const points = next.kind === "golden" ? 50 : 10 + Math.min(50, nextCombo * 5);
+              comboRef.current = nextCombo;
+              bananasRef.current += 1;
+              scoreRef.current += points;
+              setCombo(nextCombo);
+              setBananas(bananasRef.current);
+              setScore(scoreRef.current);
+            }
+          } else if (next.x > -10) {
+            remaining.push(next);
+          }
+        }
+        if (Math.random() < 0.32 && remaining.length < 7) {
+          const roll = Math.random();
+          remaining.push({
+            id: itemId.current++,
+            kind: roll < 0.68 ? "banana" : roll < 0.78 ? "golden" : "coconut",
+            x: 108,
+            y: 25 + Math.random() * 50,
+          });
+        }
+        return remaining;
+      });
+    }, 100);
+    const clock = window.setInterval(() => {
+      setTimeLeft((seconds) => {
+        if (seconds <= 1) {
+          setStatus("over");
+          return 0;
+        }
+        return seconds - 1;
+      });
+    }, 1000);
+    return () => {
+      window.clearInterval(ticker);
+      window.clearInterval(clock);
+    };
+  }, [status]);
+
+  const finishRun = () => {
+    const duration = Math.max(1, 45 - timeLeft);
+    onFinish(score, duration, { bananas, coconutHits: hits, bestCombo: combo, remainingSeconds: timeLeft });
+  };
+
+  return (
+    <section className="mx-auto max-w-5xl rounded-3xl bg-white p-3 shadow-sm sm:p-6">
+      <div className="mb-3 flex items-center justify-between gap-3 sm:mb-5">
+        <div>
+          <h2 className="flex items-center gap-2 text-xl font-black text-emerald-950 sm:text-2xl"><TreePine className="text-emerald-600" /> Jungle Vine Swing</h2>
+          <p className="text-xs font-bold text-emerald-800 sm:text-sm">Hold to swing wider · release to glide through the fruit</p>
+        </div>
+        <button type="button" onClick={onExit} className="rounded-2xl bg-slate-100 px-4 py-2 text-sm font-black text-slate-600">Exit</button>
+      </div>
+
+      <div className="mb-3 grid grid-cols-3 gap-2 sm:mb-4 sm:gap-3">
+        <div className="rounded-2xl bg-yellow-100 px-3 py-2 text-center"><p className="text-[10px] font-black uppercase text-yellow-700">Score</p><p className="text-lg font-black text-yellow-950">🍌 {score}</p></div>
+        <div className="rounded-2xl bg-emerald-100 px-3 py-2 text-center"><p className="text-[10px] font-black uppercase text-emerald-700">Combo</p><p className="text-lg font-black text-emerald-950">×{combo}</p></div>
+        <div className="rounded-2xl bg-orange-100 px-3 py-2 text-center"><p className="text-[10px] font-black uppercase text-orange-700">Coconuts</p><p className="text-lg font-black text-orange-950">{"🥥".repeat(Math.max(0, 3 - hits))}</p></div>
+      </div>
+
+      <div
+        role="application"
+        aria-label="Jungle Vine Swing game area"
+        onPointerDown={() => status === "playing" && setHold(true)}
+        onPointerUp={() => setHold(false)}
+        onPointerCancel={() => setHold(false)}
+        onPointerLeave={() => setHold(false)}
+        className="relative h-[28rem] touch-none select-none overflow-hidden rounded-3xl border-4 border-emerald-900 bg-[linear-gradient(#8ce7ef_0%,#b9f3c3_48%,#3f9c54_49%,#176b3b_100%)] sm:h-[32rem]"
+      >
+        <div className="absolute inset-x-0 top-0 flex justify-between px-6 text-6xl opacity-40"><span>🌿</span><span>🌿</span></div>
+        <div className="absolute left-[8%] top-[18%] h-64 w-16 rounded-full bg-emerald-900/35" />
+        <div className="absolute right-[10%] top-[12%] h-72 w-20 rounded-full bg-emerald-900/35" />
+        <div className="absolute inset-x-0 bottom-0 h-24 bg-[radial-gradient(ellipse_at_center,_#65c958_0%,_#2c843d_55%,_#176b3b_100%)]" />
+
+        <div className="absolute left-1/2 top-0 h-[56%] w-1 origin-top bg-amber-950/80" style={{ transform: `translateX(-50%) rotate(${Math.sin(swingPhase) * swingSize * 1.45}deg)` }} />
+        <div className="absolute z-20 -translate-x-1/2 -translate-y-1/2 text-6xl drop-shadow-lg transition-[left,top] duration-100" style={{ left: `${monkeyX}%`, top: `${monkeyY}%` }} aria-label="Swinging monkey">🐒</div>
+
+        {items.map((item) => (
+          <div key={item.id} className={`absolute z-10 -translate-x-1/2 -translate-y-1/2 text-4xl ${item.kind === "coconut" ? "animate-bounce" : ""}`} style={{ left: `${item.x}%`, top: `${item.y}%` }}>
+            {item.kind === "banana" ? "🍌" : item.kind === "golden" ? "🌟🍌" : "🥥"}
+          </div>
+        ))}
+
+        <div className="absolute inset-x-0 bottom-3 z-30 flex items-center justify-between px-4 text-xs font-black text-white drop-shadow"><span>{timeLeft}s left</span><span>{bananas} bananas collected</span></div>
+
+        {status === "ready" && (
+          <div className="absolute inset-0 z-40 flex items-center justify-center bg-emerald-950/35 p-5 text-center">
+            <div className="max-w-sm rounded-3xl bg-white p-5 shadow-xl">
+              <p className="text-4xl">🐒🍌🥥</p><h3 className="mt-2 text-2xl font-black text-emerald-950">Ready to swing?</h3>
+              <p className="mt-2 text-sm font-bold text-slate-600">Bananas score 10+ combo points. Golden bananas score 50. Avoid three coconuts!</p>
+              <button type="button" onClick={startRun} className="mt-4 w-full rounded-2xl bg-emerald-600 px-5 py-3 font-black text-white shadow-lg">Start jungle run</button>
+            </div>
+          </div>
+        )}
+        {status === "over" && (
+          <div className="absolute inset-0 z-40 flex items-center justify-center bg-emerald-950/45 p-5 text-center">
+            <div className="max-w-sm rounded-3xl bg-white p-5 shadow-xl"><p className="text-4xl">🏆</p><h3 className="mt-2 text-2xl font-black text-emerald-950">Jungle run complete!</h3><p className="mt-2 font-bold text-slate-600">{score} points · {bananas} bananas · {hits} coconut hits</p><div className="mt-4 grid grid-cols-2 gap-2"><button type="button" onClick={startRun} className="rounded-2xl bg-emerald-100 px-4 py-3 font-black text-emerald-800">Play again</button><button type="button" onClick={finishRun} className="rounded-2xl bg-emerald-600 px-4 py-3 font-black text-white">Save run</button></div></div>
+          </div>
+        )}
+      </div>
+
+      <button
+        type="button"
+        disabled={status !== "playing"}
+        onPointerDown={() => setHold(true)}
+        onPointerUp={() => setHold(false)}
+        onPointerLeave={() => setHold(false)}
+        className={`mt-3 w-full rounded-2xl px-5 py-4 text-base font-black shadow-sm transition-all sm:hidden ${holding ? "scale-[0.98] bg-yellow-400 text-yellow-950" : "bg-emerald-600 text-white"} disabled:opacity-50`}
+      >
+        {holding ? "Swinging! Release to glide" : "Press and hold to swing"}
+      </button>
     </section>
   );
 }
