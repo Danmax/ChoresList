@@ -475,6 +475,13 @@ test('eel charges before a short shock and recovers; only the electric surface p
   }
 });
 
+test('falling into an eel river triggers the visible zap reaction', () => {
+  const s = active(); s.rivers = [{ x: PLAYER_X - 20, width: 500, resident: 'eel', waterAge: 1.6 }];
+  s.y = FLOOR + 54; s.vy = 300;
+  stepRunner(s, 1 / 120);
+  assert.equal(s.reaction, 'zap'); assert.ok(s.reactionLeft > 0); assert.equal(s.lives, 2);
+});
+
 for (let level = 0; level < LEVELS.length; level++) {
   for (const resident of ['piranha', 'eel'] as const) {
     test(`level ${level + 1}: ${resident} river has a safe timed jump route`, () => {

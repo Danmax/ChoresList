@@ -59,8 +59,20 @@ export function drawReaction(ctx: CanvasRenderingContext2D, s: Runner, x: number
   const t = 0.9 - s.reactionLeft;
   ctx.save(); ctx.translate(x, s.y - 48); ctx.lineWidth = 3;
   if (s.reaction === 'zap') {
-    ctx.strokeStyle = '#aaf8ff'; ctx.shadowColor = '#54cfff'; ctx.shadowBlur = 12;
-    for (let i = 0; i < 7; i++) { const a = i * Math.PI * 2 / 7 + t * 4; ctx.save(); ctx.rotate(a); ctx.beginPath(); ctx.moveTo(32, 0); ctx.lineTo(47, -9); ctx.lineTo(42, 6); ctx.lineTo(62, 0); ctx.stroke(); ctx.restore(); }
+    const flash = Math.floor(t * 17) % 2 === 0;
+    ctx.strokeStyle = flash ? '#f6ffff' : '#71e8ff'; ctx.shadowColor = '#54cfff'; ctx.shadowBlur = 18;
+    // A bright X-ray silhouette appears in alternating flashes during the
+    // electric hit. Simple bones stay legible at the game's small scale.
+    ctx.fillStyle = flash ? '#173b62cc' : '#0a4668aa';
+    ctx.beginPath(); ctx.ellipse(0, 0, 36, 49, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#e6fbff'; ctx.beginPath(); ctx.arc(0, -26, 14, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#123c59'; for (const eye of [-5, 5]) { ctx.beginPath(); ctx.arc(eye, -29, 3, 0, Math.PI * 2); ctx.fill(); }
+    ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(0, -11); ctx.lineTo(0, 20); ctx.stroke();
+    for (const side of [-1, 1]) {
+      for (let rib = 0; rib < 3; rib++) { const y = -7 + rib * 9; ctx.beginPath(); ctx.moveTo(0, y); ctx.quadraticCurveTo(side * 15, y - 7, side * 19, y + 4); ctx.stroke(); }
+      ctx.beginPath(); ctx.moveTo(side * 10, 5); ctx.lineTo(side * 28, 19); ctx.moveTo(side * 5, 19); ctx.lineTo(side * 19, 40); ctx.stroke();
+    }
+    for (let i = 0; i < 9; i++) { const a = i * Math.PI * 2 / 9 + t * 4; ctx.save(); ctx.rotate(a); ctx.beginPath(); ctx.moveTo(35, 0); ctx.lineTo(49, -10); ctx.lineTo(43, 7); ctx.lineTo(67, 0); ctx.stroke(); ctx.restore(); }
   } else if (s.reaction === 'tussle') {
     for (let i = 0; i < 9; i++) { const a = i * 2.4 + t * 10; ctx.fillStyle = i % 2 ? '#e2d8c4' : '#fff0d2'; ctx.beginPath(); ctx.arc(Math.cos(a) * 30, Math.sin(a) * 22, 19, 0, Math.PI * 2); ctx.fill(); }
     ctx.fillStyle = '#6a4181'; ctx.font = 'bold 25px sans-serif'; ctx.fillText('★  !  ★', 0, -12);

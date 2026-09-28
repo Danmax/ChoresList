@@ -15,10 +15,21 @@ export function drawPineapple(ctx: CanvasRenderingContext2D, x: number, y: numbe
   ctx.restore();
 }
 
-export function drawOrangutan(ctx: CanvasRenderingContext2D, o: Orangutan, camera: number) {
+export function drawOrangutan(ctx: CanvasRenderingContext2D, o: Orangutan, camera: number, sprite?: HTMLImageElement) {
   const x = o.x - camera, feet = FLOOR - 30;
   const dancing = o.state === 'dance', beat = Math.sin(o.age * 7);
   const sway = dancing ? beat * 7 : o.state === 'throw' ? -9 * (1 - o.age / 0.25) : 3;
+  if (sprite?.complete && sprite.naturalWidth) {
+    ctx.save(); ctx.translate(x, feet);
+    ctx.fillStyle = '#61432b'; ctx.fillRect(-39, 0, 78, 35);
+    ctx.fillStyle = '#b28a52'; ctx.beginPath(); ctx.ellipse(0, 0, 39, 9, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.translate(sway, dancing ? -Math.abs(beat) * 5 : 0); ctx.rotate(dancing ? beat * 0.035 : o.state === 'windup' ? -0.07 : 0);
+    ctx.drawImage(sprite, -77, -160, 154, 160); ctx.restore();
+    ctx.fillStyle = '#fff0bc'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(o.state === 'windup' ? 'PINEAPPLE WIND-UP!' : o.state === 'throw' ? 'SLIDE UNDER!' : 'DANCING ORANGUTAN', x, FLOOR - 202);
+    if (dancing) { ctx.font = '22px sans-serif'; ctx.fillText('♪', x - 57, FLOOR - 160 + beat * 9); ctx.fillText('♫', x + 57, FLOOR - 188 - beat * 8); }
+    return;
+  }
   ctx.save(); ctx.translate(x, feet); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   // A raised tree stump keeps the dancer outside the runner's collision lane.
   ctx.fillStyle = '#61432b'; ctx.fillRect(-39, 0, 78, 35); ctx.fillStyle = '#b28a52'; ctx.beginPath(); ctx.ellipse(0, 0, 39, 9, 0, 0, Math.PI * 2); ctx.fill();
@@ -65,7 +76,7 @@ export function drawOrangutan(ctx: CanvasRenderingContext2D, o: Orangutan, camer
   if (dancing) { ctx.font = '22px sans-serif'; ctx.fillText('♪', x - 57, FLOOR - 160 + beat * 9); ctx.fillText('♫', x + 57, FLOOR - 188 - beat * 8); }
 }
 
-export function drawWaterLife(ctx: CanvasRenderingContext2D, r: River, camera: number) {
+export function drawWaterLife(ctx: CanvasRenderingContext2D, r: River, camera: number, eelSprite?: HTMLImageElement) {
   if (!r.resident) return;
   ctx.save(); ctx.lineCap = 'round';
   const age = r.waterAge ?? 0;
@@ -91,11 +102,16 @@ export function drawWaterLife(ctx: CanvasRenderingContext2D, r: River, camera: n
     }
   } else {
     const x = r.x + r.width * 0.3 - camera, phase = eelPhase(r);
-    ctx.strokeStyle = phase === 'swim' ? '#34598c' : '#90d5df'; ctx.lineWidth = 15; ctx.beginPath();
-    for (let i = 0; i <= 18; i++) { const px = x - 65 + i * 7, py = FLOOR + 31 + Math.sin(i * 0.5 + age * 6) * 9; if (!i) ctx.moveTo(px, py); else ctx.lineTo(px, py); } ctx.stroke();
-    ctx.strokeStyle = '#aed1a6'; ctx.lineWidth = 3; ctx.stroke();
-    ctx.fillStyle = '#527f9f'; ctx.beginPath(); ctx.ellipse(x - 67, FLOOR + 31 + Math.sin(age * 6) * 9, 17, 10, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#ffff96'; ctx.beginPath(); ctx.arc(x - 74, FLOOR + 28 + Math.sin(age * 6) * 9, 3, 0, Math.PI * 2); ctx.fill();
+    if (eelSprite?.complete && eelSprite.naturalWidth) {
+      ctx.save(); ctx.translate(x, FLOOR + 32 + Math.sin(age * 6) * 4); ctx.rotate(Math.sin(age * 6) * 0.06);
+      ctx.drawImage(eelSprite, -80, -36, 160, 72); ctx.restore();
+    } else {
+      ctx.strokeStyle = phase === 'swim' ? '#34598c' : '#90d5df'; ctx.lineWidth = 15; ctx.beginPath();
+      for (let i = 0; i <= 18; i++) { const px = x - 65 + i * 7, py = FLOOR + 31 + Math.sin(i * 0.5 + age * 6) * 9; if (!i) ctx.moveTo(px, py); else ctx.lineTo(px, py); } ctx.stroke();
+      ctx.strokeStyle = '#aed1a6'; ctx.lineWidth = 3; ctx.stroke();
+      ctx.fillStyle = '#527f9f'; ctx.beginPath(); ctx.ellipse(x - 67, FLOOR + 31 + Math.sin(age * 6) * 9, 17, 10, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ffff96'; ctx.beginPath(); ctx.arc(x - 74, FLOOR + 28 + Math.sin(age * 6) * 9, 3, 0, Math.PI * 2); ctx.fill();
+    }
     if (phase !== 'swim') {
       ctx.fillStyle = phase === 'shock' ? '#95edff44' : '#c4edff18'; ctx.fillRect(x - 70, FLOOR - 28, 140, 76);
       ctx.strokeStyle = phase === 'shock' ? '#e8ffff' : '#8ac8e4'; ctx.lineWidth = phase === 'shock' ? 3 : 1.5;

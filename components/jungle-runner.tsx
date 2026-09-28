@@ -135,13 +135,28 @@ function lemmingArt(ctx: CanvasRenderingContext2D, x: number, y: number, age: nu
   ctx.fillStyle = '#231b20'; ctx.beginPath(); ctx.arc(-19, -8, 2, 0, Math.PI * 2); ctx.fill(); ctx.restore();
 }
 
-function fallbackMonkey(ctx: CanvasRenderingContext2D, frame: number) {
-  const stride = frame === 3 ? 0 : Math.sin(frame * Math.PI) * 10;
+function fallbackMonkey(ctx: CanvasRenderingContext2D, frame: number, elapsed: number) {
+  const stride = frame === 3 ? 0 : Math.sin(elapsed * 19) * 10;
   ctx.strokeStyle = '#6f3e27'; ctx.lineWidth = 9; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(22, -51); ctx.quadraticCurveTo(59, -66, 48, -22); ctx.quadraticCurveTo(40, -8, 27, -21); ctx.stroke();
   ctx.strokeStyle = '#4a291e'; ctx.lineWidth = 8; ctx.beginPath(); ctx.moveTo(-12, -15); ctx.lineTo(-21 + stride, 0); ctx.moveTo(12, -15); ctx.lineTo(20 - stride, 0); ctx.stroke();
   ctx.fillStyle = '#a76539'; ctx.beginPath(); ctx.ellipse(0, -34, 24, 31, 0, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(-12, -65, 20, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#f0c18a'; ctx.beginPath(); ctx.ellipse(-16, -59, 13, 15, 0, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#241713'; ctx.beginPath(); ctx.arc(-22, -65, 2.5, 0, Math.PI * 2); ctx.fill();
+}
+
+function monkeyRunLegs(ctx: CanvasRenderingContext2D, elapsed: number) {
+  const cycle = elapsed * 19;
+  for (const side of [-1, 1]) {
+    const phase = cycle + (side === 1 ? Math.PI : 0);
+    const reach = Math.sin(phase) * 19;
+    const lift = Math.max(0, Math.cos(phase)) * 13;
+    const hipX = side * 12;
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.strokeStyle = side === -1 ? '#783d21' : '#9c532d'; ctx.lineWidth = 15;
+    ctx.beginPath(); ctx.moveTo(hipX, -29); ctx.quadraticCurveTo(hipX + reach * 0.3, -17 - lift, hipX + reach, -8 - lift); ctx.stroke();
+    ctx.strokeStyle = '#efbc83'; ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(hipX + reach - 4, -6 - lift); ctx.lineTo(hipX + reach + 8, -6 - lift); ctx.stroke();
+  }
 }
 
 function hogArt(ctx: CanvasRenderingContext2D, x: number, y: number, age: number, jumping: boolean, preparing: boolean) {
@@ -195,7 +210,7 @@ function gemArt(ctx: CanvasRenderingContext2D, x: number, y: number, color: stri
   ctx.restore();
 }
 
-function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElement, predators: HTMLImageElement, wildlife: HTMLImageElement, insects: HTMLImageElement) {
+function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElement, predators: HTMLImageElement, wildlife: HTMLImageElement, insects: HTMLImageElement, allySprites: { orangutan: HTMLImageElement; eel: HTMLImageElement; sloth: HTMLImageElement; lemming: HTMLImageElement }) {
   const W = 800, H = 400;
   const night = s.level === 4;
   const cameraDistance = s.distance - s.cameraLead;
@@ -257,7 +272,7 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
       const lift = remaining > 0 ? Math.sin((0.6 - remaining) / 0.6 * Math.PI) * 13 : 0;
       animal(0, crocodileFrame(remaining), x + (i === 0 ? 35 : r.width - 35), FLOOR + 11 - lift, 94, 72, i === 0);
     }
-    drawWaterLife(ctx, r, cameraDistance);
+    drawWaterLife(ctx, r, cameraDistance, allySprites.eel);
     if (r.vine) {
       for (let i = 1; i < 5; i++) animal(0, Math.floor(s.elapsed * 5 + i) % 4, x + r.width * i / 5, FLOOR + 12, 112, 76, i % 2 === 0);
       const riverSwing = s.swing && 'river' in s.swing && s.swing.river === r ? s.swing : null;
@@ -281,7 +296,7 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     }
     ctx.fillStyle = '#fef08a'; ctx.font = 'bold 13px sans-serif'; ctx.fillText('BOUNCE', hx, FLOOR - 100);
   }
-  for (const o of s.orangutans) drawOrangutan(ctx, o, cameraDistance);
+  for (const o of s.orangutans) drawOrangutan(ctx, o, cameraDistance, allySprites.orangutan);
   for (const p of s.pineapples) drawPineapple(ctx, p.x - cameraDistance, p.y, p.rotation);
   for (const splat of s.splats) {
     ctx.save(); ctx.globalAlpha = 1 - splat.age / 0.65;
@@ -327,14 +342,21 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     const pos = slothPosition(sloth), x = pos.x - cameraDistance;
     if (x < -80 || x > 880) continue;
     ctx.strokeStyle = '#735244'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(x + Math.sin(sloth.age * 1.8) * 8, 0); ctx.quadraticCurveTo(x - 18, pos.y * 0.5, x, pos.y - 20); ctx.stroke();
-    slothArt(ctx, x, pos.y, sloth.age);
+    if (allySprites.sloth.complete && allySprites.sloth.naturalWidth) {
+      ctx.save(); ctx.translate(x, pos.y); ctx.rotate(Math.sin(sloth.age * 1.8) * 0.12);
+      ctx.drawImage(allySprites.sloth, -29, -43, 58, 86); ctx.restore();
+    } else slothArt(ctx, x, pos.y, sloth.age);
     ctx.fillStyle = '#fff4b4'; ctx.font = 'bold 12px sans-serif'; ctx.fillText('SLOTH GIFT', x, pos.y - 38);
   }
   for (const lemming of s.lemmings) {
     const x = lemming.x - cameraDistance;
     if (x < -80 || x > 880) continue;
     ctx.strokeStyle = '#9e7041'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(x + Math.sin(lemming.age * 2) * 12, 0); ctx.quadraticCurveTo(x - 20, lemming.y * 0.55, x, lemming.y - 16); ctx.stroke();
-    lemmingArt(ctx, x, lemming.y, lemming.age);
+    if (allySprites.lemming.complete && allySprites.lemming.naturalWidth) {
+      ctx.save(); ctx.translate(x, lemming.y - Math.abs(Math.sin(lemming.age * 8)) * 14);
+      ctx.rotate(Math.sin(lemming.age * 8) * 0.08);
+      ctx.drawImage(allySprites.lemming, -29, -29, 58, 48); ctx.restore();
+    } else lemmingArt(ctx, x, lemming.y, lemming.age);
     ctx.fillStyle = '#fff4b4'; ctx.font = 'bold 12px sans-serif'; ctx.fillText('JUMP: LEMMING SWING', x + 30, lemming.y - 48);
   }
   for (const item of s.items) {
@@ -419,6 +441,7 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
   const knocked = s.reactionLeft > 0 || s.stun > 0 || s.phase === 'over';
   const grounded = s.y >= FLOOR - 1;
   const frame = knocked ? 4 : s.phase === 'victory' ? 5 : s.duck && grounded ? 3 : !grounded ? 2 : Math.floor(s.elapsed * 9) % 2;
+  const running = s.phase === 'playing' && grounded && !s.duck && !knocked;
   if (dashBoost(s) + airBoost(s) > 5) {
     ctx.strokeStyle = '#fff0ad'; ctx.lineWidth = 3;
     for (let i = 0; i < 3; i++) {
@@ -433,6 +456,7 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
   else if (!grounded && !knocked) ctx.rotate(Math.max(-0.12, Math.min(0.12, s.vy / 4500)));
   if (s.invincible > 0 && !knocked) ctx.globalAlpha = 0.65 + Math.sin(s.elapsed * 30) * 0.25;
   if (sprite.complete && sprite.naturalWidth) {
+    if (running) monkeyRunLegs(ctx, s.elapsed);
     // This sheet is not a uniform grid: the slide extends across an old cell
     // boundary. Explicit artwork bounds prevent neighboring tails/feet bleeding.
     const bounds = [[8, 180, 330, 410], [375, 180, 300, 410], [716, 130, 357, 460], [1058, 310, 406, 280], [1508, 135, 311, 460], [1827, 135, 333, 455]][frame];
@@ -443,6 +467,7 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     if (s.reactionLeft > 0 && s.reaction === 'flatten') ctx.scale(1.5, 0.28 + Math.max(0, 0.3 - s.reactionLeft) * 2.4);
     if (s.reactionLeft > 0 && s.reaction === 'zap') ctx.rotate(Math.sin(s.reactionLeft * 100) * 0.12);
     ctx.save();
+    if (running) { ctx.beginPath(); ctx.rect(-65, -dh - 10, 130, dh - 21); ctx.clip(); }
     if (frame === 2) {
       // The jump hand and neighboring slide tail overlap in X, but not Y.
       const px = (x: number) => -dw / 2 + (x - sx) / sw * dw;
@@ -451,7 +476,7 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     }
     ctx.drawImage(sprite, sx * scale, sy * scale, sw * scale, sh * scale, -dw / 2, -dh + 8, dw, dh);
     ctx.restore();
-  } else fallbackMonkey(ctx, frame);
+  } else fallbackMonkey(ctx, frame, s.elapsed);
   ctx.restore();
   drawReaction(ctx, s, playerX);
   if (s.swing && 'river' in s.swing) {
@@ -514,6 +539,13 @@ export function JungleVineSwing({ onExit, onFinish }: {
     const predators = new Image(); predators.src = '/games/jungle-predators-v1.png';
     const insects = new Image(); insects.src = '/games/jungle-insects-v1.png';
     const wildlife = new Image(); wildlife.src = '/games/jungle-wildlife-v1.png';
+    const allySprites = {
+      orangutan: new Image(), eel: new Image(), sloth: new Image(), lemming: new Image(),
+    };
+    allySprites.orangutan.src = '/games/jungle-orangutan-v2.png';
+    allySprites.eel.src = '/games/jungle-electric-eel-v2.png';
+    allySprites.sloth.src = '/games/jungle-sloth-v2.png';
+    allySprites.lemming.src = '/games/jungle-lemming-v2.png';
     const ctx = canvas.current?.getContext('2d');
     if (!ctx) return;
     let frame = 0, previous = 0, accumulator = 0, lastHud = 0;
@@ -527,7 +559,7 @@ export function JungleVineSwing({ onExit, onFinish }: {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       if (canvas.current && canvas.current.width !== 800 * dpr) { canvas.current.width = 800 * dpr; canvas.current.height = 400 * dpr; }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      paint(ctx, world.current, sprite, predators, wildlife, insects);
+      paint(ctx, world.current, sprite, predators, wildlife, insects, allySprites);
       if (now - lastHud > 100) { publish(); lastHud = now; }
       frame = requestAnimationFrame(tick);
     };

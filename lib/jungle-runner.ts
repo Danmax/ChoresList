@@ -389,7 +389,7 @@ export function stepRunner(s: Runner, dt: number) {
       river.bounced = true;
       river.bounceLeft = 0.45;
       s.message = 'HIPPO BOUNCE!'; s.messageTime = 1;
-    } else if (s.y > FLOOR + 55) hurt(s, river.resident === 'eel' && eelPhase(river) === 'shock' ? 'ZAP! Electric water!' : 'SPLASH! Stay above the water!', river.resident === 'eel' && eelPhase(river) === 'shock' ? 'zap' : 'bonk');
+    } else if (s.y > FLOOR + 55) hurt(s, river.resident === 'eel' ? 'ZAP! Electric eel!' : 'SPLASH! Stay above the water!', river.resident === 'eel' ? 'zap' : 'bonk');
   } else if (s.y >= FLOOR) {
     s.y = FLOOR; s.vy = 0; s.jumps = 0;
   }
