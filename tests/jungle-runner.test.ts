@@ -108,7 +108,7 @@ for (let level = 0; level < LEVELS.length; level++) {
   test(`level ${level + 1}: tiger warns before appearing, leaps, and can be ducked`, () => {
     for (const dodge of [false, true]) {
       const s = active(); s.level = level; s.elapsed = level * 60 + 10;
-      const tiger = createPredator('tiger', PLAYER_X + runnerSpeed(s) * 2.5); s.predators = [tiger];
+      const tiger = createPredator('tiger', PLAYER_X + runnerSpeed(s) * 2.5, 0.5); s.predators = [tiger];
       advance(s, 0.1); assert.equal(tiger.state, 'warning'); assert.equal(s.lives, 3);
       advance(s, 0.6); assert.equal(tiger.state, 'warning');
       advance(s, 0.3); assert.equal(tiger.state, 'crouch');
@@ -203,3 +203,60 @@ for (const kind of ['rolling', 'bouncing'] as const) {
     advance(dodge, 0.3); assert.equal(dodge.lives, 3);
   });
 }
+
+test('coconut impact leaves a cracking shell that expires during hit stun', () => {
+  const s = active(); s.items = [{ x: PLAYER_X, y: FLOOR - 20, kind: 'rolling' }];
+  advance(s, 0.02); assert.equal(s.cracks.length, 1); assert.equal(s.items.length, 0);
+  advance(s, 0.3); assert.ok(s.cracks[0].age > 0.2); assert.equal(s.hits, 1);
+  advance(s, 0.5); assert.equal(s.cracks.length, 0);
+});
+
+test('second jump starts a forward burst and a flip, which diving cancels', () => {
+  const s = active(); jumpRunner(s); advance(s, 0.2); jumpRunner(s);
+  assert.equal(s.flipLeft, 0.5); assert.ok(travelSpeed(s) > runnerSpeed(s) + 170);
+  advance(s, 0.15); assert.ok(s.cameraLead > 0); assert.ok(s.flipLeft < 0.5);
+  duckRunner(s, true); assert.equal(s.flipLeft, 0);
+});
+
+for (let level = 0; level < 4; level++) {
+  test(`level ${level + 1}: a timed jump can catch a vine and cross the wide pit`, () => {
+    let cleared = false;
+    for (let delay = 0; delay < 1.8 && !cleared; delay += 0.025) {
+      const s = active(); s.level = level; s.elapsed = level * 60;
+      const river = { x: PLAYER_X + 260, width: 680, vine: true }; s.rivers = [river];
+      advance(s, delay); jumpRunner(s);
+      let caught = false;
+      for (let i = 0; i < 6 * 120; i++) { stepRunner(s, 1 / 120); caught ||= s.swing !== null; }
+      cleared = caught && s.lives === 3 && s.distance + PLAYER_X > river.x + river.width;
+    }
+    assert.ok(cleared, 'vine needs a reachable catch window');
+  });
+  for (const temperament of [0, 1]) {
+    test(`level ${level + 1}: tiger temperament ${temperament} remains dodgeable`, () => {
+      const s = active(); s.level = level; s.elapsed = level * 60;
+      const tiger = createPredator('tiger', PLAYER_X + runnerSpeed(s) * 2.5, temperament); s.predators = [tiger];
+      let dodged = false;
+      for (let i = 0; i < 480; i++) {
+        if (!dodged && tiger.state === 'attack') { duckRunner(s, true); dodged = true; }
+        stepRunner(s, 1 / 120);
+      }
+      assert.ok(dodged); assert.equal(s.lives, 3);
+    });
+  }
+}
+
+test('panther patrols, sees only in front, then charges after a short tell', () => {
+  const s = active(); const p = createPredator('panther', PLAYER_X + 230); s.predators = [p];
+  advance(s, 0.2); assert.equal(p.state, 'waiting'); assert.ok(p.x > p.homeX);
+  p.age = 1.2; advance(s, 0.02); assert.equal(p.state, 'warning');
+  const x = p.x; advance(s, 0.36); assert.equal(p.state, 'attack');
+  advance(s, 0.1); assert.ok(p.x < x - 30);
+});
+
+test('jump releases a caught vine and a missed vine has no hippo rescue', () => {
+  const s = active(); const river = { x: PLAYER_X, width: 680, vine: true, used: true };
+  s.rivers = [river]; s.swing = { river, progress: 0.5 }; s.jumps = 2;
+  jumpRunner(s); assert.equal(s.swing, null); assert.equal(s.jumps, 1); assert.equal(s.vy, -540);
+  const fall = active(); fall.rivers = [{ x: PLAYER_X, width: 680, vine: true }];
+  advance(fall, 0.6); assert.equal(fall.lives, 2); assert.equal(fall.bounces, 0);
+});

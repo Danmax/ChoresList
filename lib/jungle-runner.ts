@@ -8,9 +8,10 @@ export const LEVELS = [
 ] as const;
 export const LEVEL_SECONDS = 60;
 export const SLIDE_SECONDS = 1.5;
+export const FLIP_SECONDS = 0.5;
 export type RunnerItem = { x: number; y: number; kind: 'banana' | 'golden' | 'cherry' | 'drop' | 'low' | 'high' | 'canopy' | 'rolling' | 'bouncing'; collected?: boolean; vy?: number; rotation?: number };
 export type Bird = { x: number; y: number; gift: 'drop' | 'cherry'; dropped: boolean; releaseLeft?: number };
-export type River = { x: number; width: number; bounced?: boolean; bounceLeft?: number; snapLeft?: number[]; snapped?: boolean[] };
+export type River = { x: number; width: number; vine?: boolean; used?: boolean; bounced?: boolean; bounceLeft?: number; snapLeft?: number[]; snapped?: boolean[] };
 export function birdHeight(bird: Bird, elapsed: number) { return bird.y + Math.sin(elapsed * 7) * 5; }
 export function crocodileFrame(remaining: number) {
   if (remaining <= 0) return 0;
@@ -22,21 +23,28 @@ export function hippoFrame(river: River, worldX: number) {
   const ahead = river.x + river.width * 0.6 - worldX;
   return ahead > -65 && ahead < 240 ? ahead < 150 ? 2 : 1 : 0;
 }
-export type Predator = { kind: 'snake' | 'tiger'; x: number; y: number; state: 'waiting' | 'warning' | 'crouch' | 'attack' | 'recover'; age: number; hit: boolean };
-export function createPredator(kind: Predator['kind'], x: number): Predator {
-  return { kind, x, y: FLOOR - 22, state: 'waiting', age: 0, hit: false };
+export type Predator = { kind: 'snake' | 'tiger' | 'panther'; x: number; y: number; state: 'waiting' | 'warning' | 'crouch' | 'attack' | 'recover'; age: number; hit: boolean; temperament: number; homeX: number; facing: number };
+export function createPredator(kind: Predator['kind'], x: number, temperament = Math.random()): Predator {
+  return { kind, x, y: FLOOR - 22, state: 'waiting', age: 0, hit: false, temperament, homeX: x, facing: -1 };
 }
 export type Runner = ReturnType<typeof createRunner>;
 export function runnerSpeed(s: Runner) { return LEVELS[s.level].speed + (s.elapsed % LEVEL_SECONDS) * 0.3; }
 export function dashBoost(s: Runner) {
   return s.duck && s.y >= FLOOR - 1 && s.stun <= 0 ? 180 * (s.slideLeft / SLIDE_SECONDS) ** 2 : 0;
 }
-export function travelSpeed(s: Runner) { return runnerSpeed(s) + dashBoost(s); }
+export function airBoost(s: Runner) { return 180 * (s.flipLeft / FLIP_SECONDS) ** 2; }
+export function travelSpeed(s: Runner) { return runnerSpeed(s) + dashBoost(s) + airBoost(s); }
+export function vinePosition(r: River, elapsed: number, progress?: number) {
+  const t = progress ?? (0.5 + Math.sin(elapsed * 2.2 + r.x * 0.001) * 0.5);
+  return { x: r.x - 45 + (r.width + 90) * t, y: 160 + Math.sin(t * Math.PI) * 45 };
+}
 
 export function createRunner() {
   return {
     phase: 'ready' as 'ready' | 'playing' | 'over' | 'victory',
     distance: 0, elapsed: 0, level: 0, y: FLOOR, vy: 0, jumps: 0, duck: false, duckHeld: false, slideLeft: 0, cameraLead: 0,
+    flipLeft: 0, swing: null as { river: River; progress: number } | null,
+    cracks: [] as { x: number; y: number; age: number }[],
     golden: 0, cherries: 0, bonusScore: 0,
     lives: 3, bananas: 0, hits: 0, bounces: 0, stun: 0, invincible: 0,
     message: '', messageTime: 0, nextSection: 950, section: 0,
@@ -46,16 +54,21 @@ export function createRunner() {
 }
 
 export function jumpRunner(s: Runner) {
-  if (s.phase !== 'playing' || s.stun > 0 || s.jumps >= 2) return;
+  if (s.phase !== 'playing' || s.stun > 0) return;
+  if (s.swing) { s.swing = null; s.jumps = 0; }
+  if (s.jumps >= 2) return;
   s.duck = false;
   s.slideLeft = 0;
   s.vy = -540;
   s.jumps++;
+  if (s.jumps === 2) s.flipLeft = FLIP_SECONDS;
 }
 
 export function duckRunner(s: Runner, held: boolean) {
   if (!held) { s.duckHeld = false; s.duck = false; s.slideLeft = 0; return; }
   if (s.duckHeld || s.phase !== 'playing' || s.stun > 0) return;
+  if (s.swing) return;
+  s.flipLeft = 0;
   s.duckHeld = true;
   s.duck = true;
   s.slideLeft = SLIDE_SECONDS;
@@ -66,6 +79,8 @@ export function runnerScore(s: Runner) { return s.bananas * 10 + s.bonusScore; }
 
 function hurt(s: Runner, message: string) {
   if (s.invincible > 0) return;
+  s.swing = null;
+  s.flipLeft = 0;
   s.lives--;
   s.hits++;
   s.stun = 0.65;
@@ -84,9 +99,13 @@ function hurt(s: Runner, message: string) {
 // of screen size. Every challenge is followed by a long, safe coin trail.
 function addSection(s: Runner) {
   const x = s.nextSection;
-  const patterns = [[8, 1, 4, 3, 2, 6, 0], [5, 9, 4, 3, 1, 6, 8], [7, 5, 9, 4, 1, 3, 8, 6], [7, 9, 5, 8, 7, 3, 6, 5, 4, 1]][s.level];
+  const patterns = [[8, 1, 10, 11, 4, 3, 7, 6], [5, 9, 10, 11, 4, 3, 7, 6, 8], [7, 11, 5, 10, 9, 4, 1, 3, 8, 6], [7, 11, 10, 9, 5, 8, 7, 3, 6, 5, 4, 1]][s.level];
   const type = patterns[s.section++ % patterns.length];
-  if (type === 3) {
+  if (type === 10) {
+    s.rivers.push({ x, width: 680, vine: true });
+  } else if (type === 11) {
+    s.predators.push(createPredator('panther', x));
+  } else if (type === 3) {
     // Wider rivers at higher speeds preserve the hippo landing window.
     s.rivers.push({ x, width: Math.max(250, runnerSpeed(s) * 1.05) });
     for (let i = 0; i < 7; i++) s.items.push({ x: x + i * 40, y: FLOOR - 110, kind: 'banana' });
@@ -105,12 +124,15 @@ function addSection(s: Runner) {
   } else {
     s.items.push({ x, y: type === 0 ? FLOOR - 22 : type === 1 ? FLOOR - 64 : FLOOR - 118, kind: type === 0 ? 'low' : type === 1 ? 'high' : 'canopy' });
   }
-  for (let i = 0; i < 10; i++) s.items.push({ x: x + 470 + i * 40, y: FLOOR - 28, kind: 'banana' });
-  s.nextSection += 1100;
+  for (let i = 0; i < 10; i++) s.items.push({ x: x + (type === 10 ? 820 : 470) + i * 40, y: FLOOR - 28, kind: 'banana' });
+  s.nextSection += type === 10 ? 1450 : 1100;
 }
 
 export function stepRunner(s: Runner, dt: number) {
   if (s.phase !== 'playing') return;
+  for (const crack of s.cracks) crack.age += dt;
+  s.cracks = s.cracks.filter(c => c.age < 0.75);
+  s.flipLeft = Math.max(0, s.flipLeft - dt);
   s.messageTime = Math.max(0, s.messageTime - dt);
   s.invincible = Math.max(0, s.invincible - dt);
   if (s.stun > 0) { s.stun = Math.max(0, s.stun - dt); return; }
@@ -123,8 +145,8 @@ export function stepRunner(s: Runner, dt: number) {
   const level = Math.floor(s.elapsed / LEVEL_SECONDS);
   if (level !== s.level) { s.level = level; s.message = `LEVEL ${level + 1}: ${LEVELS[level].name}`; s.messageTime = 3; }
   const speed = runnerSpeed(s);
-  const boost = dashBoost(s);
-  s.distance += (speed + boost) * dt;
+  const boost = dashBoost(s) + airBoost(s);
+  if (!s.swing) s.distance += (speed + boost) * dt;
   // Camera lags briefly behind a dash: the monkey visibly surges forward while
   // world-space collisions stay aligned with the faster movement.
   s.cameraLead += (boost * 0.2 - s.cameraLead) * (1 - Math.exp(-10 * dt));
@@ -166,8 +188,20 @@ export function stepRunner(s: Runner, dt: number) {
     }
   }
   const previousY = s.y;
-  s.vy += 1500 * dt;
-  s.y += s.vy * dt;
+  if (s.swing) {
+    s.swing.progress = Math.min(1, s.swing.progress + dt * speed * 1.25 / (s.swing.river.width + 90));
+    const tip = vinePosition(s.swing.river, s.elapsed, s.swing.progress);
+    s.distance = tip.x - PLAYER_X; s.y = tip.y + 55; s.vy = 0;
+    if (s.swing.progress >= 1) { s.swing = null; s.jumps = 0; jumpRunner(s); }
+  } else { s.vy += 1500 * dt; s.y += s.vy * dt; }
+  for (const r of s.rivers) {
+    if (!r.vine || r.used || s.swing || s.jumps === 0 || s.duck) continue;
+    const tip = vinePosition(r, s.elapsed);
+    if (Math.abs(tip.x - (s.distance + PLAYER_X)) < 48 && Math.abs(tip.y - (s.y - 55)) < 50) {
+      r.used = true; s.swing = { river: r, progress: (tip.x - r.x + 45) / (r.width + 90) };
+      s.flipLeft = 0; s.message = 'VINE GRAB! Jump to release'; s.messageTime = 1.5;
+    }
+  }
   const worldX = s.distance + PLAYER_X;
   for (const r of s.rivers) {
     r.bounceLeft = Math.max(0, (r.bounceLeft ?? 0) - dt);
@@ -184,7 +218,7 @@ export function stepRunner(s: Runner, dt: number) {
   if (river && s.invincible <= 0) {
     const hippoX = river.x + river.width * 0.6;
     const hippoTop = FLOOR - 12;
-    if (Math.abs(worldX - hippoX) < 44 && s.vy > 0 && previousY <= hippoTop && s.y >= hippoTop) {
+    if (!river.vine && Math.abs(worldX - hippoX) < 44 && s.vy > 0 && previousY <= hippoTop && s.y >= hippoTop) {
       s.y = hippoTop;
       s.vy = -580;
       s.jumps = 1;
@@ -209,22 +243,37 @@ export function stepRunner(s: Runner, dt: number) {
         p.y = FLOOR - 22 - 110 * Math.sin(Math.min(1, p.age / 1.15) * Math.PI);
         if (p.age >= 1.15) { p.state = 'recover'; p.age = 0; }
       }
+    } else if (p.kind === 'panther') {
+      if (p.state === 'waiting') {
+        p.x = p.homeX + Math.sin(p.age * 1.5) * 75;
+        p.facing = Math.cos(p.age * 1.5) >= 0 ? 1 : -1;
+        const delta = worldX - p.x;
+        if (Math.abs(delta) < speed * 1.5 && delta * p.facing > 0 && s.y > FLOOR - 190) {
+          p.state = 'warning'; p.age = 0;
+        }
+      } else if (p.state === 'warning' && p.age > 0.32) {
+        p.state = 'attack'; p.age = 0; p.facing = worldX < p.x ? -1 : 1;
+      } else if (p.state === 'attack') {
+        p.x += p.facing * (speed + 280) * dt;
+        p.y = FLOOR - 27 - Math.sin(Math.min(1, p.age / 0.8) * Math.PI) * 15;
+        if (p.age > 0.9) { p.state = 'recover'; p.age = 0; }
+      }
     } else {
       if (p.state === 'waiting' && ahead < speed * 2.5) { p.state = 'warning'; p.age = 0; }
       else if (p.state === 'warning' && p.age >= 0.9) { p.state = 'crouch'; p.age = 0; }
-      else if (p.state === 'crouch' && ahead < speed * 0.9) { p.state = 'attack'; p.age = 0; }
+      else if (p.state === 'crouch' && ahead < speed * (0.75 + p.temperament * 0.4)) { p.state = 'attack'; p.age = 0; }
       if (p.state === 'attack') {
-        p.x -= speed * 0.45 * dt;
-        p.y = FLOOR - 32 - 55 * Math.sin(Math.min(1, p.age / 1.2) * Math.PI);
+        p.x -= speed * (0.35 + p.temperament * 0.4) * dt;
+        p.y = FLOOR - 42 - (50 + p.temperament * 25) * Math.sin(Math.min(1, p.age / 1.2) * Math.PI);
         if (p.age >= 1.2) { p.state = 'recover'; p.age = 0; }
       }
     }
-    const visible = p.kind === 'snake' || !['waiting', 'warning'].includes(p.state);
+    const visible = p.kind !== 'tiger' || !['waiting', 'warning'].includes(p.state);
     const radiusX = p.kind === 'snake' ? 32 : 48;
     const radiusY = p.kind === 'snake' ? 25 : 28;
     if (visible && !p.hit && s.invincible <= 0 && Math.abs(p.x - worldX) < radiusX + 16 && p.y + radiusY >= s.y - height && p.y - radiusY <= s.y - 4) {
       p.hit = true;
-      hurt(s, p.kind === 'snake' ? 'SNAKE STRIKE! Double jump!' : 'TIGER POUNCE! Watch the warning!');
+      hurt(s, p.kind === 'snake' ? 'SNAKE STRIKE! Double jump!' : p.kind === 'panther' ? 'PANTHER CHARGE! Jump over it!' : 'TIGER POUNCE! Watch the warning!');
       break;
     }
   }
@@ -240,7 +289,7 @@ export function stepRunner(s: Runner, dt: number) {
       if (item.kind === 'cherry') { s.cherries++; s.bonusScore += 50; s.message = 'SWEET! +50 POINTS'; s.messageTime = 1; }
       else { s.bananas += item.kind === 'golden' ? 10 : 1; if (item.kind === 'golden') { s.golden++; s.message = 'GOLDEN BANANA! +10 COINS'; s.messageTime = 1; } }
       if (Math.floor(s.bananas / 100) > Math.floor(previous / 100)) { s.lives++; s.message = '100 BANANAS! +1 LIFE'; s.messageTime = 2; }
-    } else if (s.invincible <= 0) { item.collected = true; hurt(s, 'BONK!'); break; }
+    } else if (s.invincible <= 0) { item.collected = true; s.cracks.push({ x: item.x, y: item.y, age: 0 }); hurt(s, 'CRACK!'); break; }
   }
   s.items = s.items.filter(i => i.x > s.distance - 60 && !i.collected);
   s.rivers = s.rivers.filter(r => r.x + r.width > s.distance - 60);

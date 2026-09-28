@@ -1,7 +1,41 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react';
-import { birdHeight, crocodileFrame, hippoFrame, createRunner, dashBoost, duckRunner, FLOOR, jumpRunner, LEVELS, LEVEL_SECONDS, PLAYER_X, runnerScore, travelSpeed, stepRunner, type Runner } from '@/lib/jungle-runner';
+import { airBoost, FLIP_SECONDS, vinePosition, birdHeight, crocodileFrame, hippoFrame, createRunner, dashBoost, duckRunner, FLOOR, jumpRunner, LEVELS, LEVEL_SECONDS, PLAYER_X, runnerScore, travelSpeed, stepRunner, type Runner } from '@/lib/jungle-runner';
+
+// Canvas artwork keeps shells and moving limbs crisp at every display density.
+function coconut(ctx: CanvasRenderingContext2D, x: number, y: number, rotation = 0, split = 0) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(rotation);
+  for (const side of [-1, 1]) {
+    ctx.save(); ctx.translate(side * split * 30, -split * 12); ctx.rotate(side * split);
+    ctx.fillStyle = '#754020'; ctx.strokeStyle = '#3e2415'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, 0, 20, side === -1 ? Math.PI / 2 : -Math.PI / 2, side === -1 ? Math.PI * 1.5 : Math.PI / 2); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#ad7846';
+    for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(side * (5 + i * 4), -12); ctx.quadraticCurveTo(side * 22, 0, side * (5 + i * 3), 13); ctx.stroke(); }
+    if (split > 0) { ctx.fillStyle = '#fff5d9'; ctx.beginPath(); ctx.ellipse(0, 0, 6, 18, 0, 0, Math.PI * 2); ctx.fill(); }
+    ctx.restore();
+  }
+  if (!split) { ctx.fillStyle = '#301d12'; for (const [a, b] of [[-6, -5], [3, -7], [-1, 3]]) { ctx.beginPath(); ctx.arc(a, b, 2.5, 0, Math.PI * 2); ctx.fill(); } }
+  ctx.restore();
+}
+
+function panther(ctx: CanvasRenderingContext2D, x: number, y: number, age: number, facing: number, attacking: boolean) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(-facing, 1);
+  ctx.strokeStyle = '#151923'; ctx.lineWidth = 9; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(35, 0); ctx.bezierCurveTo(70, -5, 72, -35, 55, -29 + Math.sin(age * 4) * 8); ctx.stroke();
+  for (let i = 0; i < 4; i++) {
+    const hip = i < 2 ? -25 : 24, stride = Math.sin(age * (attacking ? 24 : 8) + i * Math.PI) * (attacking ? 24 : 10);
+    ctx.strokeStyle = i % 2 ? '#313846' : '#10151f'; ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(hip, 5); ctx.lineTo(hip + stride, 25); ctx.lineTo(hip + stride - 8, 27); ctx.stroke();
+  }
+  ctx.fillStyle = '#171e2b'; ctx.beginPath(); ctx.ellipse(0, -3, attacking ? 48 : 41, 18, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#090f19'; ctx.beginPath(); ctx.ellipse(-39, -10, 21, 18, -0.15, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(-47, -20); ctx.lineTo(-46, -34); ctx.lineTo(-34, -23); ctx.fill();
+  ctx.fillStyle = '#bded53'; ctx.fillRect(-52, -15, 9, 3);
+  ctx.fillStyle = attacking ? '#d5676d' : '#586373'; ctx.fillRect(-59, -2, 19, attacking ? 8 : 3);
+  if (attacking) { ctx.fillStyle = '#fff8e5'; ctx.beginPath(); ctx.moveTo(-55, -2); ctx.lineTo(-51, 8); ctx.lineTo(-48, -2); ctx.fill(); }
+  ctx.restore();
+}
 
 function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElement, predators: HTMLImageElement, wildlife: HTMLImageElement) {
   const W = 800, H = 400;
@@ -52,6 +86,15 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
       const lift = remaining > 0 ? Math.sin((0.6 - remaining) / 0.6 * Math.PI) * 13 : 0;
       animal(0, crocodileFrame(remaining), x + (i === 0 ? 35 : r.width - 35), FLOOR + 11 - lift, 94, 72, i === 0);
     }
+    if (r.vine) {
+      for (let i = 1; i < 5; i++) animal(0, Math.floor(s.elapsed * 5 + i) % 4, x + r.width * i / 5, FLOOR + 12, 112, 76, i % 2 === 0);
+      const tip = vinePosition(r, s.elapsed, s.swing?.river === r ? s.swing.progress : undefined);
+      ctx.strokeStyle = '#334925'; ctx.lineWidth = 9; ctx.beginPath(); ctx.moveTo(x + r.width / 2, -80); ctx.lineTo(tip.x - cameraDistance, tip.y); ctx.stroke();
+      ctx.strokeStyle = '#8dbf4b'; ctx.lineWidth = 3; ctx.stroke();
+      ctx.fillStyle = '#fef08a'; ctx.beginPath(); ctx.arc(tip.x - cameraDistance, tip.y, 9, 0, Math.PI * 2); ctx.fill();
+      ctx.font = 'bold 14px sans-serif'; ctx.fillText(s.swing?.river === r ? 'JUMP TO RELEASE' : 'JUMP & CATCH THE VINE', s.swing?.river === r ? playerX + 130 : x + 70, FLOOR - 115);
+      continue;
+    }
     ctx.fillStyle = '#fff5b6'; ctx.fillRect(x - 65, FLOOR - 80, 62, 23);
     ctx.fillStyle = '#174d35'; ctx.font = 'bold 12px sans-serif'; ctx.fillText('CLIFF ↑', x - 34, FLOOR - 68);
     const hx = x + r.width * 0.6;
@@ -70,7 +113,7 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     const y = birdHeight(bird, s.elapsed);
     const wingFrame = (bird.releaseLeft ?? 0) > 0 ? 3 : [0, 1, 2, 1][Math.floor(s.elapsed * 10) % 4];
     animal(2, wingFrame, x, y - 40, 78, 70);
-    if (!bird.dropped) { ctx.font = '22px sans-serif'; ctx.fillText(bird.gift === 'cherry' ? '🍒' : '🥥', x, y + 25); }
+    if (!bird.dropped) { if (bird.gift === 'drop') coconut(ctx, x, y + 25); else { ctx.font = '22px sans-serif'; ctx.fillText('🍒', x, y + 25); } }
   }
   for (const item of s.items) {
     const x = item.x - cameraDistance;
@@ -89,7 +132,7 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     ctx.save(); ctx.translate(x, item.y);
     if (movingCoconut) ctx.rotate(item.rotation ?? 0);
     ctx.font = collectible ? '27px sans-serif' : '38px sans-serif';
-    ctx.fillText(item.kind === 'cherry' ? '🍒' : collectible ? '🍌' : '🥥', 0, 0);
+    if (collectible) ctx.fillText(item.kind === 'cherry' ? '🍒' : '🍌', 0, 0); else coconut(ctx, 0, 0);
     ctx.restore();
     if (!collectible) {
       const labelY = item.kind === 'drop' ? item.y + 34 : item.y - 33;
@@ -98,19 +141,34 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
       ctx.fillText(movingCoconut || ['low', 'drop'].includes(item.kind) ? 'JUMP' : item.kind === 'high' ? 'DUCK' : 'RUN', x, labelY);
     }
   }
+  for (const crack of s.cracks) {
+    ctx.save(); ctx.globalAlpha = 1 - crack.age / 0.75;
+    coconut(ctx, crack.x - cameraDistance, crack.y + 120 * crack.age ** 2, crack.age, 0.2 + crack.age * 2);
+    ctx.fillStyle = '#fff6de';
+    for (let i = 0; i < 7; i++) { const a = i * Math.PI * 2 / 7; ctx.beginPath(); ctx.arc(crack.x - cameraDistance + Math.cos(a) * crack.age * 110, crack.y + Math.sin(a) * crack.age * 80, 3, 0, Math.PI * 2); ctx.fill(); }
+    ctx.restore();
+  }
   for (const p of s.predators) {
     if (p.kind === 'tiger' && ['waiting', 'warning'].includes(p.state)) continue;
     const x = p.x - cameraDistance;
     if (x < -100 || x > 900) continue;
+    if (p.kind === 'panther') {
+      panther(ctx, x, p.y, p.age, p.facing, p.state === 'attack');
+      ctx.fillStyle = p.state === 'waiting' ? '#172031' : '#fff176'; ctx.font = 'bold 13px sans-serif';
+      ctx.fillText(p.state === 'waiting' ? 'PANTHER PATROL' : 'SPOTTED! JUMP!', x, p.y - 53);
+      continue;
+    }
     const frame = p.state === 'attack' ? p.age < 0.13 ? 1 : p.age < 0.9 ? 2 : 3 : p.state === 'crouch' ? 1 : p.state === 'recover' ? 3 : Math.floor(p.age * 3) % 2 === 0 ? 0 : 3;
     // Individually bounded frames preserve the generated poses' transparent margins.
     const frames = p.kind === 'snake'
       ? [[40, 60, 325, 385], [437, 60, 326, 385], [790, 60, 575, 385], [1390, 70, 330, 370]]
       : [[15, 500, 410, 350], [445, 500, 365, 350], [810, 490, 560, 355], [1380, 490, 375, 360]];
     const [sx, sy, sw, sh] = frames[frame];
-    const width = p.kind === 'tiger' ? (frame === 2 ? 155 : 115) : (frame === 2 ? 100 : 62);
-    const height = p.kind === 'tiger' ? 84 : 72;
+    const width = p.kind === 'tiger' ? (frame === 2 ? 177 : 133) : (frame === 2 ? 100 : 62);
+    const height = p.kind === 'tiger' ? 96 : 72;
+    ctx.save(); if (p.kind === 'tiger') { ctx.filter = 'contrast(1.3) saturate(1.25)'; ctx.shadowColor = '#b53616'; ctx.shadowBlur = p.state === 'attack' ? 15 : 5; }
     if (predators.complete && predators.naturalWidth) ctx.drawImage(predators, sx, sy, sw, sh, x - width / 2, p.y - height / 2, width, height);
+    ctx.restore();
     ctx.fillStyle = '#fff5b6'; ctx.fillRect(x - 48, p.y - height / 2 - 24, 96, 20);
     ctx.fillStyle = '#713719'; ctx.font = 'bold 12px sans-serif';
     ctx.fillText(p.kind === 'snake' ? 'DOUBLE JUMP' : p.state === 'attack' ? 'DUCK / DIVE!' : 'GET READY!', x, p.y - height / 2 - 14);
@@ -130,17 +188,18 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
   const knocked = s.stun > 0 || s.phase === 'over';
   const grounded = s.y >= FLOOR - 1;
   const frame = knocked ? 4 : s.phase === 'victory' ? 5 : s.duck && grounded ? 3 : !grounded ? 2 : Math.floor(s.elapsed * 9) % 2;
-  if (dashBoost(s) > 5) {
+  if (dashBoost(s) + airBoost(s) > 5) {
     ctx.strokeStyle = '#fff0ad'; ctx.lineWidth = 3;
     for (let i = 0; i < 3; i++) {
-      const length = dashBoost(s) * 0.3;
-      ctx.beginPath(); ctx.moveTo(playerX - 30 - length, FLOOR - 8 - i * 10); ctx.lineTo(playerX - 35, FLOOR - 8 - i * 10); ctx.stroke();
+      const length = (dashBoost(s) + airBoost(s)) * 0.3;
+      ctx.beginPath(); ctx.moveTo(playerX - 30 - length, s.y - 8 - i * 10); ctx.lineTo(playerX - 35, s.y - 8 - i * 10); ctx.stroke();
     }
   }
   ctx.save();
   const bob = grounded && !s.duck && s.phase === 'playing' && !knocked ? Math.sin(s.elapsed * 18 * Math.PI) * 2 : 0;
   ctx.translate(playerX + (knocked ? Math.sin(s.stun * 70) * 6 : 0), s.y + bob);
-  if (!grounded && !knocked) ctx.rotate(Math.max(-0.12, Math.min(0.12, s.vy / 4500)));
+  if (s.flipLeft > 0 && !knocked) { ctx.translate(0, -46); ctx.rotate((1 - s.flipLeft / FLIP_SECONDS) * Math.PI * 2); ctx.translate(0, 46); }
+  else if (!grounded && !knocked) ctx.rotate(Math.max(-0.12, Math.min(0.12, s.vy / 4500)));
   if (s.invincible > 0 && !knocked) ctx.globalAlpha = 0.65 + Math.sin(s.elapsed * 30) * 0.25;
   if (sprite.complete && sprite.naturalWidth) {
     const cell = sprite.naturalWidth / 6;
@@ -148,6 +207,12 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     ctx.drawImage(sprite, frame * cell, 110, cell, 490, -47, -100, 94, 108);
   }
   ctx.restore();
+  if (s.swing) {
+    const tip = vinePosition(s.swing.river, s.elapsed, s.swing.progress);
+    ctx.strokeStyle = '#713a1d'; ctx.lineWidth = 9; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(playerX + 8, s.y - 40); ctx.lineTo(tip.x - cameraDistance, tip.y); ctx.stroke();
+    ctx.fillStyle = '#efb568'; ctx.beginPath(); ctx.arc(tip.x - cameraDistance, tip.y, 6, 0, Math.PI * 2); ctx.fill();
+  }
   if (knocked) {
     ctx.font = '24px sans-serif';
     for (let i = 0; i < 3; i++) { const a = s.elapsed * 8 + i * Math.PI * 2 / 3; ctx.fillText('⭐', playerX + Math.cos(a) * 35, s.y - 102 + Math.sin(a) * 8); }
@@ -230,14 +295,14 @@ export function JungleVineSwing({ onExit, onFinish }: {
       <div className="mb-2 flex justify-between gap-2 text-sm font-black"><span>🍌 {hud.bananas} <small className="block text-yellow-200">{hud.bananas % 100}/100 → +1 life</small></span><span>❤️ {hud.lives} lives</span><span>{hud.seconds}s · {hud.score} pts</span></div>
       <p className="mb-2 text-xs font-bold text-yellow-200">Level {hud.level + 1}/{LEVELS.length} · {LEVELS[hud.level].name} · {hud.speed.toFixed(1)}× pace · ⭐ {hud.golden} gold · 🍒 {hud.cherries}</p>
       <div className="relative overflow-hidden rounded-2xl border-2 border-emerald-700">
-        <canvas ref={canvas} width={800} height={400} aria-label="Jungle runner: double jump striking snakes, watch danger sense before tigers pounce, slide under tigers, and bounce across rivers on hippos" className="block aspect-[2/1] w-full" />
-        {(hud.phase === 'ready' || ended || hud.paused) && <div className="absolute inset-0 flex items-center justify-center bg-emerald-950/75 p-3"><div className="max-w-md text-center"><h3 className="text-lg font-black sm:text-2xl">{hud.paused ? 'Taking a breather' : ended ? hud.phase === 'victory' ? 'Jungle victory!' : 'Run complete!' : 'Find your jungle rhythm'}</h3><p className="my-2 text-xs sm:text-sm">{ended ? `${hud.bananas} banana coins · ${hud.golden} gold · ${hud.cherries} cherries · ${hud.score} points` : 'Four faster jungle levels! Double jump striking snakes. Danger sense warns of tigers: slide under the pounce. Gold +10 coins; cherries +50 points.'}</p>{hud.paused ? <button onClick={pause} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Resume</button> : ended ? <button onClick={() => { if (saved.current) return; saved.current = true; const s = world.current; onFinish(runnerScore(s), Math.max(1, Math.round(s.elapsed)), { bananas: s.bananas, goldenBananas: s.golden, cherries: s.cherries, levelsCompleted: s.phase === 'victory' ? LEVELS.length : s.level, hits: s.hits, hippoBounces: s.bounces, extraLives: Math.floor(s.bananas / 100) }); }} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Save run</button> : <button onClick={start} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Let’s run</button>}</div></div>}
+        <canvas ref={canvas} width={800} height={400} aria-label="Jungle runner: flip over coconuts and panthers, slide under tiger pounces, and catch vines over crocodile pits" className="block aspect-[2/1] w-full" />
+        {(hud.phase === 'ready' || ended || hud.paused) && <div className="absolute inset-0 flex items-center justify-center bg-emerald-950/75 p-3"><div className="max-w-md text-center"><h3 className="text-lg font-black sm:text-2xl">{hud.paused ? 'Taking a breather' : ended ? hud.phase === 'victory' ? 'Jungle victory!' : 'Run complete!' : 'Find your jungle rhythm'}</h3><p className="my-2 text-xs sm:text-sm">{ended ? `${hud.bananas} banana coins · ${hud.golden} gold · ${hud.cherries} cherries · ${hud.score} points` : 'Double jump to front flip and dash! Catch a moving vine over wide croc pits; jump again to release or ride to the far bank. Slide under tiger pounces. Jump over charging panthers! Gold +10 coins; cherries +50 points.'}</p>{hud.paused ? <button onClick={pause} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Resume</button> : ended ? <button onClick={() => { if (saved.current) return; saved.current = true; const s = world.current; onFinish(runnerScore(s), Math.max(1, Math.round(s.elapsed)), { bananas: s.bananas, goldenBananas: s.golden, cherries: s.cherries, levelsCompleted: s.phase === 'victory' ? LEVELS.length : s.level, hits: s.hits, hippoBounces: s.bounces, extraLives: Math.floor(s.bananas / 100) }); }} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Save run</button> : <button onClick={start} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Let’s run</button>}</div></div>}
       </div>
       <div className="mt-3 grid grid-cols-2 gap-3">
-        <button disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); jump(); }} onClick={e => { if (e.detail === 0) jump(); }} className="min-h-14 touch-none select-none rounded-2xl bg-yellow-300 p-3 font-black text-emerald-950 disabled:opacity-40">JUMP <small className="block">Tap again: double jump</small></button>
+        <button disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); jump(); }} onClick={e => { if (e.detail === 0) jump(); }} className="min-h-14 touch-none select-none rounded-2xl bg-yellow-300 p-3 font-black text-emerald-950 disabled:opacity-40">JUMP <small className="block">Tap again: flip / release vine</small></button>
         <button disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); duck(`pointer-${e.pointerId}`, true); }} onPointerUp={e => duck(`pointer-${e.pointerId}`, false)} onPointerCancel={e => duck(`pointer-${e.pointerId}`, false)} onLostPointerCapture={e => duck(`pointer-${e.pointerId}`, false)} onKeyDown={e => { if (e.key === 'Enter') duck('enter', true); }} onKeyUp={e => { if (e.key === 'Enter') duck('enter', false); }} className="min-h-14 touch-none select-none rounded-2xl bg-emerald-600 p-3 font-black disabled:opacity-40">SLIDE {hud.slide > 0 ? `${hud.slide.toFixed(1)}s` : ''} <small className="block">Fast dash → slow · 1.5s</small></button>
       </div>
-      <p className="mt-2 text-center text-xs text-emerald-200">Space / ↑: double jump · ↓: dive / dash (1.5s) · Release before sliding again</p>
+      <p className="mt-2 text-center text-xs text-emerald-200">Space / ↑: jump / flip / release vine · ↓: dive / dash (1.5s) · Release before sliding again</p>
     </div>
   </section>;
 }
