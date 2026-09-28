@@ -20,11 +20,29 @@ export function drawOrangutan(ctx: CanvasRenderingContext2D, o: Orangutan, camer
   const dancing = o.state === 'dance', beat = Math.sin(o.age * 7);
   const sway = dancing ? beat * 7 : o.state === 'throw' ? -9 * (1 - o.age / 0.25) : 3;
   if (sprite?.complete && sprite.naturalWidth) {
+    // The supplied orangutan art is a seven-frame strip: four pineapple
+    // throw poses, then three celebratory dance poses. Crop the active cell
+    // rather than squeezing the entire sheet into one character.
+    const cellWidth = sprite.naturalWidth / 7;
+    const frame = o.state === 'dance'
+      ? 4 + Math.floor(o.age * 6) % 3
+      : o.state === 'windup'
+        ? (o.age < 0.28 ? 0 : 1)
+        : o.state === 'throw'
+          ? (o.age < 0.12 ? 2 : 3)
+          : 3;
     ctx.save(); ctx.translate(x, feet);
     ctx.fillStyle = '#61432b'; ctx.fillRect(-39, 0, 78, 35);
     ctx.fillStyle = '#b28a52'; ctx.beginPath(); ctx.ellipse(0, 0, 39, 9, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.translate(sway, dancing ? -Math.abs(beat) * 5 : 0); ctx.rotate(dancing ? beat * 0.035 : o.state === 'windup' ? -0.07 : 0);
-    ctx.drawImage(sprite, -77, -160, 154, 160); ctx.restore();
+    // These measured bounds remove the transparent top/bottom band while
+    // retaining every hand, foot, and the pineapple in the throw poses.
+    ctx.drawImage(sprite, frame * cellWidth, 92, cellWidth, 470, -64, -192, 128, 192); ctx.restore();
+    // The sheet contains the fruit through release; while he dances between
+    // throws, keep the held pineapple visible at the launch hand.
+    if (o.state === 'dance' && o.throws < 3) {
+      const hand = orangutanHand(o);
+      drawPineapple(ctx, hand.x - camera, hand.y - 8, 0, 0.75);
+    }
     ctx.fillStyle = '#fff0bc'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
     ctx.fillText(o.state === 'windup' ? 'PINEAPPLE WIND-UP!' : o.state === 'throw' ? 'SLIDE UNDER!' : 'DANCING ORANGUTAN', x, FLOOR - 202);
     if (dancing) { ctx.font = '22px sans-serif'; ctx.fillText('♪', x - 57, FLOOR - 160 + beat * 9); ctx.fillText('♫', x + 57, FLOOR - 188 - beat * 8); }
