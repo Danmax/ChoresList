@@ -10,16 +10,17 @@ export const LEVELS = [
 export const LEVEL_SECONDS = 60;
 export const SLIDE_SECONDS = 1.5;
 export const FLIP_SECONDS = 0.5;
+export const GEM_Y = FLOOR - 235;
 export type RunnerItem = { x: number; y: number; kind: 'banana' | 'golden' | 'cherry' | 'gem' | 'drop' | 'low' | 'high' | 'canopy' | 'rolling' | 'bouncing'; collected?: boolean; level?: number; vy?: number; rotation?: number };
 export const GEMS = [
   { name: 'Emerald', color: '#4cf7ae' }, { name: 'Sapphire', color: '#6fbaff' },
   { name: 'Ruby', color: '#ff6e97' }, { name: 'Amber', color: '#ffcb56' },
   { name: 'Moonstone', color: '#d2b7ff' },
 ] as const;
-export type Hog = { x: number; y: number; vy: number; age: number; jumper: boolean; jumpIn: number; active: boolean };
+export type Hog = { herdX: number; x: number; y: number; vy: number; age: number; jumper: boolean; jumpIn: number; active: boolean };
 export function createHogs(x: number, speed: number, random = Math.random): Hog[] {
-  const gap = (speed + 105) * 0.85;
-  return Array.from({ length: 6 }, (_, i) => ({ x: x + i * gap + (i >= 4 ? gap * 0.4 : 0), y: FLOOR - 25, vy: 0, age: 0, jumper: i >= 4, jumpIn: 0.5 + random() * 1.2, active: false }));
+  const gap = (speed + 105) * 0.46;
+  return Array.from({ length: 6 }, (_, i) => ({ herdX: x, x: x + i * gap + (i >= 4 ? gap * 0.2 : 0), y: FLOOR - 25, vy: 0, age: 0, jumper: i >= 4, jumpIn: 0.5 + random() * 1.2, active: false }));
 }
 export type Bat = { x: number; y: number; age: number; state: 'flying' | 'warning' | 'diving' | 'leaving' };
 export function createBats(x: number): Bat[] {
@@ -65,9 +66,9 @@ export function hippoFrame(river: River, worldX: number) {
   const ahead = river.x + river.width * 0.6 - worldX;
   return ahead > -65 && ahead < 240 ? ahead < 150 ? 2 : 1 : 0;
 }
-export type Predator = { kind: 'snake' | 'tiger' | 'panther'; x: number; y: number; state: 'waiting' | 'warning' | 'crouch' | 'attack' | 'recover'; age: number; hit: boolean; temperament: number; homeX: number; facing: number };
+export type Predator = { kind: 'snake' | 'tiger' | 'panther'; x: number; y: number; state: 'waiting' | 'warning' | 'crouch' | 'attack' | 'recover'; age: number; hit: boolean; temperament: number; homeX: number; facing: number; attackStyle: 'leap' | 'rush' | 'intercept'; attackSpeed: number; leapHeight: number };
 export function createPredator(kind: Predator['kind'], x: number, temperament = Math.random()): Predator {
-  return { kind, x, y: FLOOR - 22, state: 'waiting', age: 0, hit: false, temperament, homeX: x, facing: -1 };
+  return { kind, x, y: FLOOR - 22, state: 'waiting', age: 0, hit: false, temperament, homeX: x, facing: -1, attackStyle: 'leap', attackSpeed: 0, leapHeight: 0 };
 }
 export type Runner = ReturnType<typeof createRunner>;
 export function runnerSpeed(s: Runner) { return LEVELS[s.level].speed + (s.elapsed % LEVEL_SECONDS) * 0.3; }
@@ -185,7 +186,7 @@ function addSection(s: Runner) {
   for (let i = 0; i < 10; i++) s.items.push({ x: x + recovery + i * 40, y: FLOOR - 28, kind: 'banana' });
   if (!s.gemSpawned[s.level]) {
     s.gemSpawned[s.level] = true;
-    s.items.push({ x: x + recovery + 180, y: FLOOR - 115, kind: 'gem', level: s.level });
+    s.items.push({ x: x + recovery + 180, y: GEM_Y, kind: 'gem', level: s.level });
   }
   s.nextSection += recovery + 630;
 }
@@ -347,7 +348,7 @@ export function stepRunner(s: Runner, dt: number) {
   });
   for (const hog of s.hogs) {
     const ahead = hog.x - worldX;
-    if (!hog.active && ahead < 780) { hog.active = true; }
+    if (!hog.active && hog.herdX - worldX < 780) { hog.active = true; }
     if (!hog.active) continue;
     hog.age += dt; hog.x -= 105 * dt;
     if (hog.jumper && hog.y >= FLOOR - 25) {
@@ -403,20 +404,28 @@ export function stepRunner(s: Runner, dt: number) {
         if (Math.abs(delta) < speed * 1.5 && delta * p.facing > 0 && s.y > FLOOR - 190) {
           p.state = 'warning'; p.age = 0;
         }
-      } else if (p.state === 'warning' && p.age > 0.32) {
+      } else if (p.state === 'warning' && p.age > 0.45) {
         p.state = 'attack'; p.age = 0; p.facing = worldX < p.x ? -1 : 1;
       } else if (p.state === 'attack') {
         p.x += p.facing * (speed + 280) * dt;
-        p.y = FLOOR - 27 - Math.sin(Math.min(1, p.age / 0.8) * Math.PI) * 15;
-        if (p.age > 0.9) { p.state = 'recover'; p.age = 0; }
+        p.y = FLOOR - 27 - Math.sin(Math.min(1, p.age / 1.05) * Math.PI) * 125;
+        if (p.age > 1.05) { p.state = 'recover'; p.age = 0; }
       }
     } else {
       if (p.state === 'waiting' && ahead < speed * 2.5) { p.state = 'warning'; p.age = 0; }
-      else if (p.state === 'warning' && p.age >= 0.9) { p.state = 'crouch'; p.age = 0; }
-      else if (p.state === 'crouch' && ahead < speed * (0.75 + p.temperament * 0.4)) { p.state = 'attack'; p.age = 0; }
+      else if (p.state === 'warning' && p.age >= 0.9) {
+        // Read the player's approach, then commit to a visible, counterable tell.
+        p.attackStyle = s.duck && s.y >= FLOOR - 1 ? 'rush' : s.jumps > 0 ? 'intercept' : 'leap';
+        p.leapHeight = p.attackStyle === 'intercept' ? 145 + p.temperament * 20 : 95 + p.temperament * 30;
+        p.state = 'crouch'; p.age = 0;
+      }
+      else if (p.state === 'crouch' && p.age >= 0.35 && ahead < speed * (0.75 + p.temperament * 0.4)) {
+        p.attackSpeed = speed * (0.6 + p.temperament * 0.45) + dashBoost(s) * 0.7;
+        p.state = 'attack'; p.age = 0;
+      }
       if (p.state === 'attack') {
-        p.x -= speed * (0.6 + p.temperament * 0.45) * dt;
-        p.y = FLOOR - 42 - (95 + p.temperament * 30) * Math.sin(Math.min(1, p.age / 0.95) * Math.PI);
+        p.x -= (p.attackSpeed || speed * (0.6 + p.temperament * 0.45)) * dt;
+        p.y = p.attackStyle === 'rush' ? FLOOR - 27 : FLOOR - 42 - (p.leapHeight || 95 + p.temperament * 30) * Math.sin(Math.min(1, p.age / 0.95) * Math.PI);
         if (p.age >= 0.95) { p.state = 'recover'; p.age = 0; }
       }
     }
@@ -425,15 +434,15 @@ export function stepRunner(s: Runner, dt: number) {
     const radiusY = p.kind === 'snake' ? 25 : 28;
     if (visible && !p.hit && s.invincible <= 0 && Math.abs(p.x - worldX) < radiusX + 16 && p.y + radiusY >= s.y - height && p.y - radiusY <= s.y - 4) {
       p.hit = true;
-      hurt(s, p.kind === 'snake' ? 'SNAKE STRIKE! Double jump!' : p.kind === 'panther' ? 'PANTHER CHARGE! Jump over it!' : 'TIGER POUNCE! Watch the warning!');
+      hurt(s, p.kind === 'snake' ? 'SNAKE STRIKE! Double jump!' : p.kind === 'panther' ? 'PANTHER CHARGE! Jump over it!' : p.attackStyle === 'rush' ? 'TIGER CHARGE! Jump over!' : 'TIGER POUNCE! Slide beneath!');
       break;
     }
   }
   s.predators = s.predators.filter(p => p.x > s.distance - 120);
   for (const item of s.items) {
     const collectible = ['banana', 'golden', 'cherry', 'gem'].includes(item.kind);
-    if (item.collected || Math.abs(item.x - worldX) > (collectible ? 30 : 33)) continue;
-    const radius = collectible ? 14 : 20;
+    if (item.collected || Math.abs(item.x - worldX) > (item.kind === 'gem' ? 22 : collectible ? 30 : 33)) continue;
+    const radius = item.kind === 'gem' ? 10 : collectible ? 14 : 20;
     if (item.y + radius < s.y - height || item.y - radius > s.y - 4) continue;
     if (collectible) {
       item.collected = true;

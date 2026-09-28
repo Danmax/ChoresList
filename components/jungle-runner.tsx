@@ -1,5 +1,6 @@
 "use client";
 
+import { pantherPaw } from '@/lib/jungle-motion';
 import { drawWaterLife, drawOrangutan, drawPineapple } from '@/lib/jungle-water-art';
 import { useEffect, useRef, useState } from 'react';
 import { GEMS, spiderPosition, airBoost, FLIP_SECONDS, vinePosition, birdHeight, crocodileFrame, hippoFrame, createRunner, dashBoost, duckRunner, FLOOR, jumpRunner, LEVELS, LEVEL_SECONDS, PLAYER_X, runnerScore, travelSpeed, stepRunner, type Runner } from '@/lib/jungle-runner';
@@ -21,7 +22,8 @@ function coconut(ctx: CanvasRenderingContext2D, x: number, y: number, rotation =
 }
 
 function panther(ctx: CanvasRenderingContext2D, x: number, y: number, age: number, facing: number, attacking: boolean, crouching = false) {
-  const cycle = age * (attacking ? 22 : 7), stride = attacking ? 29 : 15;
+  const cycle = age * 7, stride = 15;
+  const leap = attacking ? Math.sin(Math.min(1, age / 1.05) * Math.PI) : 0;
   const bob = Math.sin(cycle * 2) * (attacking ? 3 : 1.5);
   ctx.save(); ctx.translate(x, y - 7 + bob + (crouching ? 7 : 0)); ctx.scale(-facing, 1);
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
@@ -32,8 +34,10 @@ function panther(ctx: CanvasRenderingContext2D, x: number, y: number, age: numbe
   for (const far of [true, false]) {
     for (const front of [false, true]) {
       const phase = cycle + (front ? Math.PI : 0) + (far ? 1.8 : 0);
-      const hip = front ? -29 : 32, reach = Math.sin(phase) * stride;
-      const lift = Math.max(0, Math.cos(phase)) * (attacking ? 17 : 9);
+      const hip = front ? -29 : 32;
+      const paw = pantherPaw(phase, stride);
+      const reach = attacking ? (front ? -27 : 24) * (1 - leap * 0.45) : paw.reach;
+      const lift = attacking ? 8 + leap * 17 : paw.lift;
       ctx.strokeStyle = far ? '#0a101a' : '#26303d'; ctx.lineWidth = front ? 12 : 14;
       ctx.beginPath(); ctx.moveTo(hip, -3); ctx.quadraticCurveTo(hip + (front ? -9 : 11), 14, hip + reach, 31 - lift); ctx.stroke();
       ctx.strokeStyle = far ? '#101722' : '#151d29'; ctx.lineWidth = 9;
@@ -114,16 +118,20 @@ function hogArt(ctx: CanvasRenderingContext2D, x: number, y: number, age: number
     ctx.strokeStyle = i % 2 ? '#3f2924' : '#251c1b'; ctx.lineWidth = 7;
     ctx.beginPath(); ctx.moveTo(hip, 8); ctx.lineTo(hip + stride, jumping ? 16 : 23); ctx.lineTo(hip + stride - 5, jumping ? 17 : 24); ctx.stroke();
   }
-  const fur = ctx.createLinearGradient(0, -24, 0, 17); fur.addColorStop(0, '#8b6450'); fur.addColorStop(1, '#49322b'); ctx.fillStyle = fur;
+  const fur = ctx.createLinearGradient(0, -24, 0, 17); fur.addColorStop(0, '#725047'); fur.addColorStop(1, '#30221f'); ctx.fillStyle = fur;
   ctx.beginPath(); ctx.ellipse(2, -2, 34, 23, -0.1, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#302323'; ctx.beginPath(); ctx.moveTo(-26, -15);
-  for (let i = 0; i < 9; i++) { ctx.lineTo(-24 + i * 6, -28 - i % 2 * 5); ctx.lineTo(-20 + i * 6, -19); } ctx.closePath(); ctx.fill();
+  for (let i = 0; i < 9; i++) { ctx.lineTo(-24 + i * 6, -32 - i % 2 * 7); ctx.lineTo(-20 + i * 6, -19); } ctx.closePath(); ctx.fill();
   ctx.fillStyle = '#70503d'; ctx.beginPath(); ctx.moveTo(-15, -18); ctx.lineTo(-37, -14); ctx.lineTo(-51, 5); ctx.lineTo(-30, 15); ctx.lineTo(-14, 7); ctx.closePath(); ctx.fill();
   ctx.fillStyle = '#a67c64'; ctx.beginPath(); ctx.ellipse(-46, 4, 10, 8, -0.2, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#291c1b'; ctx.beginPath(); ctx.arc(-50, 3, 2, 0, Math.PI * 2); ctx.arc(-44, 5, 2, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#4c342a'; ctx.beginPath(); ctx.moveTo(-24, -14); ctx.lineTo(-31, -33); ctx.lineTo(-12, -24); ctx.fill();
-  ctx.strokeStyle = '#fff0cc'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(-37, 12); ctx.quadraticCurveTo(-50, 10, -45, -2); ctx.stroke();
-  ctx.fillStyle = '#ffce6c'; ctx.beginPath(); ctx.arc(-32, -9, 3, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#271619'; ctx.beginPath(); ctx.ellipse(-35, 11, 14, 6, -0.2, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#fff0cc'; ctx.lineWidth = 5;
+  for (const offset of [0, 9]) { ctx.beginPath(); ctx.moveTo(-32 - offset, 14); ctx.quadraticCurveTo(-49 - offset, 13, -44 - offset, -10); ctx.stroke(); }
+  ctx.fillStyle = '#ff8a48'; ctx.beginPath(); ctx.ellipse(-32, -9, 5, 2.5, 0.15, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#291c1b'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(-40, -16); ctx.lineTo(-26, -10); ctx.stroke();
+  ctx.strokeStyle = '#c39780'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(-18, -10); ctx.lineTo(-13, -2); ctx.moveTo(-13, -13); ctx.lineTo(-8, -5); ctx.stroke();
   ctx.strokeStyle = '#39241e'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(33, 0); ctx.bezierCurveTo(50, -7, 41, -18, 38, -8); ctx.stroke();
   if (preparing) { ctx.fillStyle = '#ffeb8b'; ctx.font = 'bold 17px sans-serif'; ctx.fillText('↑', 0, -45); }
   ctx.restore();
@@ -289,6 +297,7 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
       gemArt(ctx, x, item.y, gem.color, s.elapsed);
       ctx.fillStyle = '#142739'; ctx.fillRect(x - 78, item.y - 51, 156, 22);
       ctx.fillStyle = '#efffff'; ctx.font = 'bold 12px sans-serif'; ctx.fillText(`${gem.name.toUpperCase()} +250`, x, item.y - 40);
+      ctx.fillStyle = '#153747'; ctx.fillRect(x - 65, item.y + 32, 130, 20); ctx.fillStyle = '#eaffff'; ctx.fillText('TIMED DOUBLE JUMP', x, item.y + 42);
       continue;
     }
     if (item.kind === 'golden') {
@@ -327,10 +336,10 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     if (p.kind === 'panther') {
       panther(ctx, x, p.y, p.age, p.facing, p.state === 'attack', p.state === 'warning');
       ctx.fillStyle = p.state === 'waiting' && !night ? '#172031' : '#fff176'; ctx.font = 'bold 13px sans-serif';
-      ctx.fillText(p.state === 'waiting' ? 'PANTHER PATROL' : 'SPOTTED! JUMP!', x, p.y - 53);
+      ctx.fillText(p.state === 'waiting' ? 'PANTHER PATROL' : 'HIGH POUNCE! SLIDE!', x, p.y - 53);
       continue;
     }
-    const frame = p.state === 'attack' ? p.age < 0.13 ? 1 : p.age < (p.kind === 'tiger' ? 0.72 : 0.9) ? 2 : 3 : p.state === 'crouch' ? 1 : p.state === 'recover' ? 3 : Math.floor(p.age * 3) % 2 === 0 ? 0 : 3;
+    const frame = p.kind === 'tiger' && p.attackStyle === 'rush' && p.state === 'attack' ? (Math.floor(p.age * 12) % 2 === 0 ? 0 : 3) : p.state === 'attack' ? p.age < 0.13 ? 1 : p.age < (p.kind === 'tiger' ? 0.72 : 0.9) ? 2 : 3 : p.state === 'crouch' ? 1 : p.state === 'recover' ? 3 : Math.floor(p.age * 3) % 2 === 0 ? 0 : 3;
     // Individually bounded frames preserve the generated poses' transparent margins.
     const frames = p.kind === 'snake'
       ? [[40, 60, 325, 385], [437, 60, 326, 385], [790, 60, 575, 385], [1390, 70, 330, 370]]
@@ -343,7 +352,7 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     ctx.restore();
     ctx.fillStyle = '#fff5b6'; ctx.fillRect(x - 48, p.y - height / 2 - 24, 96, 20);
     ctx.fillStyle = '#713719'; ctx.font = 'bold 12px sans-serif';
-    ctx.fillText(p.kind === 'snake' ? 'DOUBLE JUMP' : p.state === 'attack' ? 'DUCK / DIVE!' : 'GET READY!', x, p.y - height / 2 - 14);
+    ctx.fillText(p.kind === 'snake' ? 'DOUBLE JUMP' : p.attackStyle === 'rush' ? 'LOW! JUMP!' : p.attackStyle === 'intercept' ? 'AIR HUNT! DIVE!' : p.state === 'attack' ? 'DUCK / DIVE!' : 'HIGH! SLIDE!', x, p.y - height / 2 - 14);
   }
   const tigerWarning = s.predators.some(p => p.kind === 'tiger' && ['warning', 'crouch'].includes(p.state));
   if (tigerWarning) {
@@ -468,7 +477,7 @@ export function JungleVineSwing({ onExit, onFinish }: {
       <p className="mb-2 text-xs font-bold text-yellow-200">Level {hud.level + 1}/{LEVELS.length} · {LEVELS[hud.level].name} · {hud.speed.toFixed(1)}× pace · ⭐ {hud.golden} gold · 🍒 {hud.cherries} · 💎 {hud.gems}/{LEVELS.length} · {GEMS[hud.level].name}: {hud.levelGem ? "collected" : "find it!"}</p>
       <div className="relative overflow-hidden rounded-2xl border-2 border-emerald-700">
         <canvas ref={canvas} width={800} height={400} aria-label="Jungle runner: flip over coconuts and panthers, slide under tiger pounces, catch vines over crocodile pits, jump onto stampeding elephant backs, jump over six-hog herds, avoid jumping piranhas and eel shocks, dodge pineapples from dancing orangutans, collect one gem per level, and slide under spiders and diving bat waves in the moonlit fifth level" className="block aspect-[2/1] w-full" />
-        {(hud.phase === 'ready' || ended || hud.paused) && <div className="absolute inset-0 flex items-center justify-center bg-emerald-950/75 p-3"><div className="max-w-md text-center"><h3 className="text-lg font-black sm:text-2xl">{hud.paused ? 'Taking a breather' : ended ? hud.phase === 'victory' ? 'Jungle victory!' : 'Run complete!' : 'Find your jungle rhythm'}</h3><p className="my-2 text-xs sm:text-sm">{ended ? `${hud.bananas} banana coins · ${hud.golden} gold · ${hud.cherries} cherries · ${hud.gems}/${LEVELS.length} gems · ${hud.score} points` : 'Double jump to front flip and dash! Catch a moving vine over wide croc pits; jump again to release or ride to the far bank. Slide under tiger pounces. Jump over charging panthers. Double jump onto elephant backs during stampedes. Hog herds have four runners and two random jumpers—jump or bounce over them. At night, slide under spiders and diving bat waves. Watch for piranha leaps and electric water. Slide under pineapples from the dancing orangutan! Find one gem per level for +250 points!'}</p>{hud.paused ? <button onClick={pause} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Resume</button> : ended ? <button onClick={() => { if (saved.current) return; saved.current = true; const s = world.current; onFinish(runnerScore(s), Math.max(1, Math.round(s.elapsed)), { bananas: s.bananas, goldenBananas: s.golden, cherries: s.cherries, gems: s.gems, gemLevels: s.gemCollected, levelsCompleted: s.phase === 'victory' ? LEVELS.length : s.level, hits: s.hits, hippoBounces: s.bounces, elephantBounces: s.elephantBounces, extraLives: Math.floor(s.bananas / 100) }); }} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Save run</button> : <button onClick={start} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Let’s run</button>}</div></div>}
+        {(hud.phase === 'ready' || ended || hud.paused) && <div className="absolute inset-0 flex items-center justify-center bg-emerald-950/75 p-3"><div className="max-w-md text-center"><h3 className="text-lg font-black sm:text-2xl">{hud.paused ? 'Taking a breather' : ended ? hud.phase === 'victory' ? 'Jungle victory!' : 'Run complete!' : 'Find your jungle rhythm'}</h3><p className="my-2 text-xs sm:text-sm">{ended ? `${hud.bananas} banana coins · ${hud.golden} gold · ${hud.cherries} cherries · ${hud.gems}/${LEVELS.length} gems · ${hud.score} points` : 'Double jump to front flip and dash! Catch a moving vine over wide croc pits; jump again to release or ride to the far bank. Read tiger tells: slide under high pounces, jump low charges, and dive from air hunts. Slide under high-leaping panthers. Double jump onto elephant backs during stampedes. Hog herds have four runners and two random jumpers—jump or bounce over them. At night, slide under spiders and diving bat waves. Watch for piranha leaps and electric water. Slide under pineapples from the dancing orangutan! Time a double jump to reach each level’s high gem for +250 points!'}</p>{hud.paused ? <button onClick={pause} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Resume</button> : ended ? <button onClick={() => { if (saved.current) return; saved.current = true; const s = world.current; onFinish(runnerScore(s), Math.max(1, Math.round(s.elapsed)), { bananas: s.bananas, goldenBananas: s.golden, cherries: s.cherries, gems: s.gems, gemLevels: s.gemCollected, levelsCompleted: s.phase === 'victory' ? LEVELS.length : s.level, hits: s.hits, hippoBounces: s.bounces, elephantBounces: s.elephantBounces, extraLives: Math.floor(s.bananas / 100) }); }} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Save run</button> : <button onClick={start} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Let’s run</button>}</div></div>}
       </div>
       <div className="mt-3 grid grid-cols-2 gap-3">
         <button disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); jump(); }} onClick={e => { if (e.detail === 0) jump(); }} className="min-h-14 touch-none select-none rounded-2xl bg-yellow-300 p-3 font-black text-emerald-950 disabled:opacity-40">JUMP <small className="block">Tap again: flip / release vine</small></button>

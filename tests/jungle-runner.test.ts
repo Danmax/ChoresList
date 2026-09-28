@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createOrangutan, orangutanHand, piranhaPosition, eelPhase, createHogs, createBats, GEMS, spiderPosition, ELEPHANT_TOP, crocodileFrame, hippoFrame, createRunner, createPredator, dashBoost, duckRunner, FLOOR, jumpRunner, LEVELS, PLAYER_X, runnerScore, runnerSpeed, stepRunner, travelSpeed } from '../lib/jungle-runner';
+import { pantherPaw } from '../lib/jungle-motion';
+import { GEM_Y, createOrangutan, orangutanHand, piranhaPosition, eelPhase, createHogs, createBats, GEMS, spiderPosition, ELEPHANT_TOP, crocodileFrame, hippoFrame, createRunner, createPredator, dashBoost, duckRunner, FLOOR, jumpRunner, LEVELS, PLAYER_X, runnerScore, runnerSpeed, stepRunner, travelSpeed } from '../lib/jungle-runner';
 
 function active() { const s = createRunner(); s.phase = 'playing'; s.items = []; s.nextSection = 100000; return s; }
 function advance(s: ReturnType<typeof active>, seconds: number, fps = 120) { for (let i = 0; i < seconds * fps; i++) stepRunner(s, 1 / fps); }
@@ -250,7 +251,7 @@ test('panther patrols, sees only in front, then charges after a short tell', () 
   const s = active(); const p = createPredator('panther', PLAYER_X + 230); s.predators = [p];
   advance(s, 0.2); assert.equal(p.state, 'waiting'); assert.ok(p.x > p.homeX);
   p.age = 1.2; advance(s, 0.02); assert.equal(p.state, 'warning');
-  const x = p.x; advance(s, 0.36); assert.equal(p.state, 'attack');
+  const x = p.x; advance(s, 0.49); assert.equal(p.state, 'attack');
   advance(s, 0.1); assert.ok(p.x < x - 30);
 });
 
@@ -329,16 +330,20 @@ test('hogs stay in their section until approach, hurt on contact, and can be bou
 });
 
 for (let level = 0; level < LEVELS.length; level++) {
-  test(`level ${level + 1}: six running hogs have enough space for repeated jumps`, () => {
-    const s = active(); s.level = level; s.elapsed = level * 60;
-    s.hogs = createHogs(PLAYER_X + 600, runnerSpeed(s));
-    for (const h of s.hogs) h.jumpIn = 100;
-    for (let i = 0; i < 10 * 120; i++) {
-      const next = s.hogs.find(h => h.x > s.distance + PLAYER_X - 35);
-      if (next && s.jumps === 0 && next.x - s.distance - PLAYER_X < (runnerSpeed(s) + 105) * 0.35) jumpRunner(s);
-      stepRunner(s, 1 / 120);
+  test(`level ${level + 1}: compact hog herds can be crossed with jumps and back bounces`, () => {
+    let cleared = false;
+    for (let timing = 0.2; timing <= 0.55 && !cleared; timing += 0.025) {
+      const s = active(); s.level = level; s.elapsed = level * 60;
+      s.hogs = createHogs(PLAYER_X + 600, runnerSpeed(s));
+      for (const h of s.hogs) h.jumpIn = 100;
+      for (let i = 0; i < 10 * 120; i++) {
+        const next = s.hogs.find(h => h.x > s.distance + PLAYER_X - 35);
+        if (next && next.x - s.distance - PLAYER_X < (runnerSpeed(s) + 105) * timing && (s.jumps === 0 || (s.jumps === 1 && s.vy > 100))) jumpRunner(s);
+        stepRunner(s, 1 / 120);
+      }
+      cleared = s.hits === 0 && s.hogs.length === 0;
     }
-    assert.equal(s.hits, 0); assert.equal(s.hogs.length, 0);
+    assert.ok(cleared, 'compact herd must retain a clean jump route');
   });
 }
 
@@ -366,10 +371,15 @@ test('gem collection awards 250 points once per level, and restart clears progre
   assert.deepEqual(s.gemCollected, [true, true, true, true, true]); assert.equal(createRunner().gems, 0);
 });
 
-test('a jumping monkey can reach the authored gem height', () => {
-  const s = active(); jumpRunner(s); advance(s, 0.2);
-  s.items = [{ x: s.distance + PLAYER_X, y: FLOOR - 115, kind: 'gem', level: 0 }];
-  advance(s, 0.02); assert.equal(s.gems, 1); assert.equal(s.hits, 0);
+test('high gems require a timed double jump, not a single jump', () => {
+  const single = active(); jumpRunner(single);
+  for (let i = 0; i < 120; i++) {
+    single.items = [{ x: single.distance + PLAYER_X, y: GEM_Y, kind: 'gem', level: 0 }]; stepRunner(single, 1 / 120);
+  }
+  assert.equal(single.gems, 0);
+  const double = active(); jumpRunner(double); advance(double, 0.3); jumpRunner(double); advance(double, 0.28);
+  double.items = [{ x: double.distance + PLAYER_X, y: GEM_Y, kind: 'gem', level: 0 }];
+  advance(double, 0.02); assert.equal(double.gems, 1); assert.equal(double.hits, 0);
 });
 
 test('bat waves telegraph then dive, and a timed slide clears all four', () => {
@@ -475,4 +485,47 @@ test('a complete run includes both aquatic hazards and orangutan encounters', ()
     dancer ||= s.orangutans.length > 0;
   }
   assert.deepEqual([...residents].sort(), ['eel', 'piranha']); assert.ok(dancer);
+});
+
+
+test('panther paws plant on the backward stroke and lift on the forward stroke', () => {
+  const planted = pantherPaw(0, 15), plantedNext = pantherPaw(0.1, 15);
+  assert.equal(planted.lift, 0); assert.ok(plantedNext.reach > planted.reach);
+  const lifted = pantherPaw(Math.PI, 15), liftedNext = pantherPaw(Math.PI + 0.1, 15);
+  assert.ok(lifted.lift > 0); assert.ok(liftedNext.reach < lifted.reach);
+});
+
+test('panther makes a high leap with a recovery rather than a low running charge', () => {
+  const s = active(); s.invincible = 10; const p = createPredator('panther', 900); p.state = 'attack'; s.predators = [p];
+  advance(s, 0.5); assert.ok(p.y < FLOOR - 145); assert.ok(p.x < 900);
+  advance(s, 0.6); assert.equal(p.state, 'recover');
+});
+
+test('tiger commits to a low charge against an early slide and allows a jump counter', () => {
+  for (const counter of [false, true]) {
+    const s = active(); const p = createPredator('tiger', PLAYER_X + runnerSpeed(s) * 2.5, 0.5); s.predators = [p];
+    advance(s, 0.65); duckRunner(s, true);
+    let told = false;
+    for (let i = 0; i < 300; i++) {
+      if (!told && p.state === 'crouch') { told = true; assert.equal(p.attackStyle, 'rush'); }
+      if (counter && p.state === 'attack' && s.jumps === 0) jumpRunner(s);
+      stepRunner(s, 1 / 120);
+    }
+    assert.ok(told); assert.equal(s.hits, counter ? 0 : 1);
+  }
+});
+
+test('tiger reads an airborne approach, telegraphs an intercept and locks its attack', () => {
+  const s = active(); const p = createPredator('tiger', PLAYER_X + runnerSpeed(s) * 2.5, 0.5); s.predators = [p];
+  advance(s, 0.65); jumpRunner(s); advance(s, 0.3);
+  assert.equal(p.state, 'crouch'); assert.equal(p.attackStyle, 'intercept'); assert.ok(p.leapHeight >= 145);
+  advance(s, 1); assert.equal(p.attackStyle, 'intercept');
+});
+
+test('hog spacing is compact while preserving four runners and two jumpers', () => {
+  for (const speed of [205, 445]) {
+    const herd = createHogs(1000, speed);
+    assert.ok(herd[1].x - herd[0].x < (speed + 105) * 0.5);
+    assert.equal(herd.filter(h => h.jumper).length, 2);
+  }
 });
