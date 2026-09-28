@@ -144,21 +144,6 @@ function fallbackMonkey(ctx: CanvasRenderingContext2D, frame: number, elapsed: n
   ctx.fillStyle = '#241713'; ctx.beginPath(); ctx.arc(-22, -65, 2.5, 0, Math.PI * 2); ctx.fill();
 }
 
-function monkeyRunLegs(ctx: CanvasRenderingContext2D, elapsed: number) {
-  const cycle = elapsed * 19;
-  for (const side of [-1, 1]) {
-    const phase = cycle + (side === 1 ? Math.PI : 0);
-    const reach = Math.sin(phase) * 19;
-    const lift = Math.max(0, Math.cos(phase)) * 13;
-    const hipX = side * 12;
-    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    ctx.strokeStyle = side === -1 ? '#783d21' : '#9c532d'; ctx.lineWidth = 15;
-    ctx.beginPath(); ctx.moveTo(hipX, -29); ctx.quadraticCurveTo(hipX + reach * 0.3, -17 - lift, hipX + reach, -8 - lift); ctx.stroke();
-    ctx.strokeStyle = '#efbc83'; ctx.lineWidth = 8;
-    ctx.beginPath(); ctx.moveTo(hipX + reach - 4, -6 - lift); ctx.lineTo(hipX + reach + 8, -6 - lift); ctx.stroke();
-  }
-}
-
 function hogArt(ctx: CanvasRenderingContext2D, x: number, y: number, age: number, jumping: boolean, preparing: boolean) {
   ctx.save(); ctx.translate(x, y + (preparing ? 5 : 0)); ctx.lineCap = 'round';
   for (let i = 0; i < 4; i++) {
@@ -441,7 +426,6 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
   const knocked = s.reactionLeft > 0 || s.stun > 0 || s.phase === 'over';
   const grounded = s.y >= FLOOR - 1;
   const frame = knocked ? 4 : s.phase === 'victory' ? 5 : s.duck && grounded ? 3 : !grounded ? 2 : Math.floor(s.elapsed * 9) % 2;
-  const running = s.phase === 'playing' && grounded && !s.duck && !knocked;
   if (dashBoost(s) + airBoost(s) > 5) {
     ctx.strokeStyle = '#fff0ad'; ctx.lineWidth = 3;
     for (let i = 0; i < 3; i++) {
@@ -456,7 +440,6 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
   else if (!grounded && !knocked) ctx.rotate(Math.max(-0.12, Math.min(0.12, s.vy / 4500)));
   if (s.invincible > 0 && !knocked) ctx.globalAlpha = 0.65 + Math.sin(s.elapsed * 30) * 0.25;
   if (sprite.complete && sprite.naturalWidth) {
-    if (running) monkeyRunLegs(ctx, s.elapsed);
     // This sheet is not a uniform grid: the slide extends across an old cell
     // boundary. Explicit artwork bounds prevent neighboring tails/feet bleeding.
     const bounds = [[8, 180, 330, 410], [375, 180, 300, 410], [716, 130, 357, 460], [1058, 310, 406, 280], [1508, 135, 311, 460], [1827, 135, 333, 455]][frame];
@@ -467,14 +450,22 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     if (s.reactionLeft > 0 && s.reaction === 'flatten') ctx.scale(1.5, 0.28 + Math.max(0, 0.3 - s.reactionLeft) * 2.4);
     if (s.reactionLeft > 0 && s.reaction === 'zap') ctx.rotate(Math.sin(s.reactionLeft * 100) * 0.12);
     ctx.save();
-    if (running) { ctx.beginPath(); ctx.rect(-65, -dh - 10, 130, dh - 21); ctx.clip(); }
     if (frame === 2) {
       // The jump hand and neighboring slide tail overlap in X, but not Y.
       const px = (x: number) => -dw / 2 + (x - sx) / sw * dw;
       const py = (y: number) => -dh + 8 + (y - sy) / sh * dh;
       ctx.beginPath(); ctx.moveTo(px(716), py(130)); ctx.lineTo(px(1073), py(130)); ctx.lineTo(px(1073), py(345)); ctx.lineTo(px(1045), py(345)); ctx.lineTo(px(1045), py(590)); ctx.lineTo(px(716), py(590)); ctx.closePath(); ctx.clip();
     }
-    ctx.drawImage(sprite, sx * scale, sy * scale, sw * scale, sh * scale, -dw / 2, -dh + 8, dw, dh);
+    if (frame === 1) {
+      // Both original running poses have the same leading leg. Keep the second
+      // pose's face, arms and tail, and reverse only its legs from that image.
+      ctx.save(); ctx.beginPath(); ctx.rect(-dw / 2, -dh, dw, dh - 25); ctx.clip();
+      ctx.drawImage(sprite, sx * scale, sy * scale, sw * scale, sh * scale, -dw / 2, -dh + 8, dw, dh);
+      ctx.restore();
+      ctx.save(); ctx.beginPath(); ctx.rect(-dw / 2, -25, dw, 35); ctx.clip(); ctx.scale(-1, 1);
+      ctx.drawImage(sprite, sx * scale, sy * scale, sw * scale, sh * scale, -dw / 2, -dh + 8, dw, dh);
+      ctx.restore();
+    } else ctx.drawImage(sprite, sx * scale, sy * scale, sw * scale, sh * scale, -dw / 2, -dh + 8, dw, dh);
     ctx.restore();
   } else fallbackMonkey(ctx, frame, s.elapsed);
   ctx.restore();
