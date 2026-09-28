@@ -94,7 +94,7 @@ export const GAME_DEFINITIONS: GameDefinition[] = [
   {
     key: "jungle-vine-swing",
     title: "Jungle Runner",
-    description: "Survive stampeding elephants, leaping tigers, and prowling panthers, then brave swinging spiders in the moonlit jungle.",
+    description: "Collect a special gem in every level, dodge wild hog herds and stampeding elephants, then brave spiders and diving bats in the moonlit jungle.",
     icon: "TreePine",
     ageMin: 5,
     ageMax: 14,

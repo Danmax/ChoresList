@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react';
-import { spiderPosition, airBoost, FLIP_SECONDS, vinePosition, birdHeight, crocodileFrame, hippoFrame, createRunner, dashBoost, duckRunner, FLOOR, jumpRunner, LEVELS, LEVEL_SECONDS, PLAYER_X, runnerScore, travelSpeed, stepRunner, type Runner } from '@/lib/jungle-runner';
+import { GEMS, spiderPosition, airBoost, FLIP_SECONDS, vinePosition, birdHeight, crocodileFrame, hippoFrame, createRunner, dashBoost, duckRunner, FLOOR, jumpRunner, LEVELS, LEVEL_SECONDS, PLAYER_X, runnerScore, travelSpeed, stepRunner, type Runner } from '@/lib/jungle-runner';
 
 // Canvas artwork keeps shells and moving limbs crisp at every display density.
 function coconut(ctx: CanvasRenderingContext2D, x: number, y: number, rotation = 0, split = 0) {
@@ -106,6 +106,53 @@ function spiderArt(ctx: CanvasRenderingContext2D, x: number, y: number, age: num
   ctx.restore();
 }
 
+function hogArt(ctx: CanvasRenderingContext2D, x: number, y: number, age: number, jumping: boolean, preparing: boolean) {
+  ctx.save(); ctx.translate(x, y + (preparing ? 5 : 0)); ctx.lineCap = 'round';
+  for (let i = 0; i < 4; i++) {
+    const hip = i < 2 ? -20 : 21, stride = jumping ? (i < 2 ? -10 : 10) : Math.sin(age * 19 + i * 2.4) * 10;
+    ctx.strokeStyle = i % 2 ? '#3f2924' : '#251c1b'; ctx.lineWidth = 7;
+    ctx.beginPath(); ctx.moveTo(hip, 8); ctx.lineTo(hip + stride, jumping ? 16 : 23); ctx.lineTo(hip + stride - 5, jumping ? 17 : 24); ctx.stroke();
+  }
+  const fur = ctx.createLinearGradient(0, -24, 0, 17); fur.addColorStop(0, '#8b6450'); fur.addColorStop(1, '#49322b'); ctx.fillStyle = fur;
+  ctx.beginPath(); ctx.ellipse(2, -2, 34, 23, -0.1, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#302323'; ctx.beginPath(); ctx.moveTo(-26, -15);
+  for (let i = 0; i < 9; i++) { ctx.lineTo(-24 + i * 6, -28 - i % 2 * 5); ctx.lineTo(-20 + i * 6, -19); } ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#70503d'; ctx.beginPath(); ctx.moveTo(-15, -18); ctx.lineTo(-37, -14); ctx.lineTo(-51, 5); ctx.lineTo(-30, 15); ctx.lineTo(-14, 7); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#a67c64'; ctx.beginPath(); ctx.ellipse(-46, 4, 10, 8, -0.2, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#291c1b'; ctx.beginPath(); ctx.arc(-50, 3, 2, 0, Math.PI * 2); ctx.arc(-44, 5, 2, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#4c342a'; ctx.beginPath(); ctx.moveTo(-24, -14); ctx.lineTo(-31, -33); ctx.lineTo(-12, -24); ctx.fill();
+  ctx.strokeStyle = '#fff0cc'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(-37, 12); ctx.quadraticCurveTo(-50, 10, -45, -2); ctx.stroke();
+  ctx.fillStyle = '#ffce6c'; ctx.beginPath(); ctx.arc(-32, -9, 3, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#39241e'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(33, 0); ctx.bezierCurveTo(50, -7, 41, -18, 38, -8); ctx.stroke();
+  if (preparing) { ctx.fillStyle = '#ffeb8b'; ctx.font = 'bold 17px sans-serif'; ctx.fillText('↑', 0, -45); }
+  ctx.restore();
+}
+
+function batArt(ctx: CanvasRenderingContext2D, x: number, y: number, age: number, diving: boolean) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(diving ? -0.18 : 0);
+  const flap = Math.sin(age * 24) * 19;
+  for (const side of [-1, 1]) {
+    ctx.fillStyle = '#473650'; ctx.strokeStyle = '#bc9bbf'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(side * 5, -7); ctx.quadraticCurveTo(side * 21, -29 + flap, side * 44, -14 + flap);
+    ctx.quadraticCurveTo(side * 31, -6, side * 34, 9); ctx.quadraticCurveTo(side * 22, 0, side * 21, 16); ctx.quadraticCurveTo(side * 10, 5, side * 5, 13); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(side * 6, -5); ctx.lineTo(side * 34, 9); ctx.moveTo(side * 6, -5); ctx.lineTo(side * 21, 16); ctx.stroke();
+  }
+  ctx.fillStyle = '#1c172d'; ctx.beginPath(); ctx.ellipse(0, 4, 9, 15, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(-8, -5); ctx.lineTo(-10, -24); ctx.lineTo(0, -13); ctx.lineTo(10, -24); ctx.lineTo(8, -5); ctx.fill();
+  ctx.fillStyle = diving ? '#ffad78' : '#e4d178'; for (const side of [-1, 1]) { ctx.beginPath(); ctx.arc(side * 4, -5, 2, 0, Math.PI * 2); ctx.fill(); }
+  ctx.fillStyle = '#fff5df'; ctx.fillRect(-4, 2, 2, 4); ctx.fillRect(2, 2, 2, 4);
+  ctx.restore();
+}
+
+function gemArt(ctx: CanvasRenderingContext2D, x: number, y: number, color: string, elapsed: number) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(0.85 + Math.sin(elapsed * 3) * 0.15, 1);
+  ctx.shadowColor = color; ctx.shadowBlur = 18; ctx.fillStyle = color; ctx.strokeStyle = '#f3ffff'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(-12, -19); ctx.lineTo(12, -19); ctx.lineTo(23, -4); ctx.lineTo(0, 24); ctx.lineTo(-23, -4); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.shadowBlur = 0; ctx.fillStyle = '#ffffff66'; ctx.beginPath(); ctx.moveTo(-12, -19); ctx.lineTo(-7, -4); ctx.lineTo(0, 24); ctx.lineTo(-23, -4); ctx.fill();
+  ctx.strokeStyle = '#ffffffaa'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-23, -4); ctx.lineTo(23, -4); ctx.moveTo(12, -19); ctx.lineTo(7, -4); ctx.lineTo(0, 24); ctx.stroke();
+  ctx.restore();
+}
+
 function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElement, predators: HTMLImageElement, wildlife: HTMLImageElement) {
   const W = 800, H = 400;
   const night = s.level === LEVELS.length - 1;
@@ -189,6 +236,18 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     }
     ctx.fillStyle = '#fef08a'; ctx.font = 'bold 13px sans-serif'; ctx.fillText('BOUNCE', hx, FLOOR - 100);
   }
+  for (const hog of s.hogs) {
+    const x = hog.x - cameraDistance;
+    if (x < -100 || x > 900) continue;
+    hogArt(ctx, x, hog.y, hog.age, hog.y < FLOOR - 26, hog.jumper && hog.jumpIn < 0.3 && hog.y >= FLOOR - 26);
+    ctx.fillStyle = '#fff1b0'; ctx.font = 'bold 11px sans-serif'; ctx.fillText(hog.jumper ? 'LEAPING HOG' : 'WILD HOG', x, hog.y - 49);
+  }
+  for (const bat of s.bats) {
+    batArt(ctx, bat.x - cameraDistance, bat.y, s.elapsed + bat.x * 0.001, bat.state === 'diving');
+  }
+  if (s.bats.some(b => b.state === 'warning' || b.state === 'diving')) {
+    ctx.fillStyle = '#2e2447'; ctx.fillRect(230, 103, 350, 26); ctx.fillStyle = '#f1dcff'; ctx.font = 'bold 14px sans-serif'; ctx.fillText('DIVING BAT WAVE — SLIDE UNDER!', 405, 116);
+  }
   for (const herd of s.herds) {
     for (let i = 2; i >= 0; i--) elephant(ctx, herd.x + i * 175 - cameraDistance, herd.age + i * 0.4, herd.charging);
     if (herd.warned && herd.x + 350 > s.distance + PLAYER_X) {
@@ -211,7 +270,14 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
   for (const item of s.items) {
     const x = item.x - cameraDistance;
     if (x < -40 || x > 850) continue;
-    const collectible = ['banana', 'golden', 'cherry'].includes(item.kind);
+    const collectible = ['banana', 'golden', 'cherry', 'gem'].includes(item.kind);
+    if (item.kind === 'gem') {
+      const gem = GEMS[item.level ?? s.level];
+      gemArt(ctx, x, item.y, gem.color, s.elapsed);
+      ctx.fillStyle = '#142739'; ctx.fillRect(x - 78, item.y - 51, 156, 22);
+      ctx.fillStyle = '#efffff'; ctx.font = 'bold 12px sans-serif'; ctx.fillText(`${gem.name.toUpperCase()} +250`, x, item.y - 40);
+      continue;
+    }
     if (item.kind === 'golden') {
       ctx.fillStyle = '#ffe663'; ctx.beginPath(); ctx.arc(x, item.y, 23 + Math.sin(s.elapsed * 6) * 2, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#593700'; ctx.font = 'bold 12px sans-serif'; ctx.fillText('DOUBLE ↑', x, item.y - 33);
@@ -328,13 +394,13 @@ export function JungleVineSwing({ onExit, onFinish }: {
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const world = useRef(createRunner());
-  const [hud, setHud] = useState({ phase: 'ready', lives: 3, bananas: 0, seconds: 60, paused: false, level: 0, score: 0, golden: 0, cherries: 0, slide: 0, speed: 1 });
+  const [hud, setHud] = useState({ phase: 'ready', lives: 3, bananas: 0, seconds: 60, paused: false, level: 0, score: 0, golden: 0, cherries: 0, gems: 0, levelGem: false, slide: 0, speed: 1 });
   const paused = useRef(false);
   const saved = useRef(false);
   const duckSources = useRef(new Set<string>());
   const publish = () => {
     const s = world.current;
-    setHud({ phase: s.phase, lives: s.lives, bananas: s.bananas, seconds: Math.max(0, Math.ceil((s.level + 1) * LEVEL_SECONDS - s.elapsed)), paused: paused.current, level: s.level, score: runnerScore(s), golden: s.golden, cherries: s.cherries, slide: s.slideLeft, speed: travelSpeed(s) / LEVELS[0].speed });
+    setHud({ phase: s.phase, lives: s.lives, bananas: s.bananas, seconds: Math.max(0, Math.ceil((s.level + 1) * LEVEL_SECONDS - s.elapsed)), paused: paused.current, level: s.level, score: runnerScore(s), golden: s.golden, cherries: s.cherries, gems: s.gems, levelGem: s.gemCollected[s.level], slide: s.slideLeft, speed: travelSpeed(s) / LEVELS[0].speed });
   };
   function jump() { if (!paused.current) { duckSources.current.clear(); jumpRunner(world.current); } }
   function duck(source: string, down: boolean) {
@@ -386,10 +452,10 @@ export function JungleVineSwing({ onExit, onFinish }: {
     <div className="mx-auto w-full max-w-4xl">
       <header className="mb-2 flex items-center justify-between gap-2"><h2 className="font-black">Jungle Runner</h2><div className="flex gap-2"><button onClick={pause} disabled={hud.phase !== 'playing'} className="rounded-xl bg-white/10 px-3 py-2 disabled:opacity-40">{hud.paused ? 'Resume' : 'Pause'}</button><button onClick={onExit} className="rounded-xl bg-white/10 px-3 py-2">Exit</button></div></header>
       <div className="mb-2 flex justify-between gap-2 text-sm font-black"><span>🍌 {hud.bananas} <small className="block text-yellow-200">{hud.bananas % 100}/100 → +1 life</small></span><span>❤️ {hud.lives} lives</span><span>{hud.seconds}s · {hud.score} pts</span></div>
-      <p className="mb-2 text-xs font-bold text-yellow-200">Level {hud.level + 1}/{LEVELS.length} · {LEVELS[hud.level].name} · {hud.speed.toFixed(1)}× pace · ⭐ {hud.golden} gold · 🍒 {hud.cherries}</p>
+      <p className="mb-2 text-xs font-bold text-yellow-200">Level {hud.level + 1}/{LEVELS.length} · {LEVELS[hud.level].name} · {hud.speed.toFixed(1)}× pace · ⭐ {hud.golden} gold · 🍒 {hud.cherries} · 💎 {hud.gems}/{LEVELS.length} · {GEMS[hud.level].name}: {hud.levelGem ? "collected" : "find it!"}</p>
       <div className="relative overflow-hidden rounded-2xl border-2 border-emerald-700">
-        <canvas ref={canvas} width={800} height={400} aria-label="Jungle runner: flip over coconuts and panthers, slide under tiger pounces, catch vines over crocodile pits, jump onto stampeding elephant backs, and slide under spiders in the moonlit fifth level" className="block aspect-[2/1] w-full" />
-        {(hud.phase === 'ready' || ended || hud.paused) && <div className="absolute inset-0 flex items-center justify-center bg-emerald-950/75 p-3"><div className="max-w-md text-center"><h3 className="text-lg font-black sm:text-2xl">{hud.paused ? 'Taking a breather' : ended ? hud.phase === 'victory' ? 'Jungle victory!' : 'Run complete!' : 'Find your jungle rhythm'}</h3><p className="my-2 text-xs sm:text-sm">{ended ? `${hud.bananas} banana coins · ${hud.golden} gold · ${hud.cherries} cherries · ${hud.score} points` : 'Double jump to front flip and dash! Catch a moving vine over wide croc pits; jump again to release or ride to the far bank. Slide under tiger pounces. Jump over charging panthers. Double jump onto elephant backs during stampedes. Reach level 5 for moonlight and swinging spiders—slide underneath! Gold +10 coins; cherries +50 points.'}</p>{hud.paused ? <button onClick={pause} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Resume</button> : ended ? <button onClick={() => { if (saved.current) return; saved.current = true; const s = world.current; onFinish(runnerScore(s), Math.max(1, Math.round(s.elapsed)), { bananas: s.bananas, goldenBananas: s.golden, cherries: s.cherries, levelsCompleted: s.phase === 'victory' ? LEVELS.length : s.level, hits: s.hits, hippoBounces: s.bounces, elephantBounces: s.elephantBounces, extraLives: Math.floor(s.bananas / 100) }); }} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Save run</button> : <button onClick={start} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Let’s run</button>}</div></div>}
+        <canvas ref={canvas} width={800} height={400} aria-label="Jungle runner: flip over coconuts and panthers, slide under tiger pounces, catch vines over crocodile pits, jump onto stampeding elephant backs, jump over six-hog herds, collect one gem per level, and slide under spiders and diving bat waves in the moonlit fifth level" className="block aspect-[2/1] w-full" />
+        {(hud.phase === 'ready' || ended || hud.paused) && <div className="absolute inset-0 flex items-center justify-center bg-emerald-950/75 p-3"><div className="max-w-md text-center"><h3 className="text-lg font-black sm:text-2xl">{hud.paused ? 'Taking a breather' : ended ? hud.phase === 'victory' ? 'Jungle victory!' : 'Run complete!' : 'Find your jungle rhythm'}</h3><p className="my-2 text-xs sm:text-sm">{ended ? `${hud.bananas} banana coins · ${hud.golden} gold · ${hud.cherries} cherries · ${hud.gems}/${LEVELS.length} gems · ${hud.score} points` : 'Double jump to front flip and dash! Catch a moving vine over wide croc pits; jump again to release or ride to the far bank. Slide under tiger pounces. Jump over charging panthers. Double jump onto elephant backs during stampedes. Hog herds have four runners and two random jumpers—jump or bounce over them. At night, slide under spiders and diving bat waves. Find one gem per level for +250 points!'}</p>{hud.paused ? <button onClick={pause} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Resume</button> : ended ? <button onClick={() => { if (saved.current) return; saved.current = true; const s = world.current; onFinish(runnerScore(s), Math.max(1, Math.round(s.elapsed)), { bananas: s.bananas, goldenBananas: s.golden, cherries: s.cherries, gems: s.gems, gemLevels: s.gemCollected, levelsCompleted: s.phase === 'victory' ? LEVELS.length : s.level, hits: s.hits, hippoBounces: s.bounces, elephantBounces: s.elephantBounces, extraLives: Math.floor(s.bananas / 100) }); }} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Save run</button> : <button onClick={start} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Let’s run</button>}</div></div>}
       </div>
       <div className="mt-3 grid grid-cols-2 gap-3">
         <button disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); jump(); }} onClick={e => { if (e.detail === 0) jump(); }} className="min-h-14 touch-none select-none rounded-2xl bg-yellow-300 p-3 font-black text-emerald-950 disabled:opacity-40">JUMP <small className="block">Tap again: flip / release vine</small></button>

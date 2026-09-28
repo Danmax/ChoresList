@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { spiderPosition, ELEPHANT_TOP, crocodileFrame, hippoFrame, createRunner, createPredator, dashBoost, duckRunner, FLOOR, jumpRunner, LEVELS, PLAYER_X, runnerScore, runnerSpeed, stepRunner, travelSpeed } from '../lib/jungle-runner';
+import { createHogs, createBats, GEMS, spiderPosition, ELEPHANT_TOP, crocodileFrame, hippoFrame, createRunner, createPredator, dashBoost, duckRunner, FLOOR, jumpRunner, LEVELS, PLAYER_X, runnerScore, runnerSpeed, stepRunner, travelSpeed } from '../lib/jungle-runner';
 
 function active() { const s = createRunner(); s.phase = 'playing'; s.items = []; s.nextSection = 100000; return s; }
 function advance(s: ReturnType<typeof active>, seconds: number, fps = 120) { for (let i = 0; i < seconds * fps; i++) stepRunner(s, 1 / fps); }
@@ -126,8 +126,8 @@ for (let level = 0; level < LEVELS.length; level++) {
 test('authored sections always leave clear recovery space after hazards and rivers', () => {
   const s = createRunner(); s.phase = 'playing';
   for (let i = 0; i < 40 * 120; i++) { s.invincible = 5; stepRunner(s, 1 / 120); }
-  assert.ok(s.section >= 8);
-  const hazards = s.items.filter(i => i.kind !== 'banana');
+  assert.ok(s.section >= 6);
+  const hazards = s.items.filter(i => !['banana', 'gem', 'golden', 'cherry'].includes(i.kind));
   for (let i = 1; i < hazards.length; i++) assert.ok(hazards[i].x - hazards[i - 1].x >= 1100);
 });
 
@@ -307,4 +307,89 @@ test('tiger leap is higher and completes sooner than the previous pounce', () =>
   const s = active(); const tiger = createPredator('tiger', 900, 0.5); tiger.state = 'attack'; s.predators = [tiger];
   advance(s, 0.45); assert.ok(tiger.y < FLOOR - 145); assert.ok(tiger.x < 900 - runnerSpeed(s) * 0.7 * 0.45);
   advance(s, 0.51); assert.equal(tiger.state, 'recover');
+});
+
+
+test('hog herds have four runners followed by two randomly timed jumpers', () => {
+  const low = createHogs(700, 205, () => 0), high = createHogs(700, 205, () => 1);
+  assert.equal(low.length, 6); assert.equal(low.filter(h => !h.jumper).length, 4);
+  assert.equal(low.filter(h => h.jumper).length, 2); assert.notEqual(low[4].jumpIn, high[4].jumpIn);
+  const s = active(); s.invincible = 10; s.hogs = low;
+  low.forEach((h, i) => { h.x = 500 + i * 20; });
+  advance(s, 0.65); assert.ok(low[4].y < FLOOR - 25); assert.equal(low[0].y, FLOOR - 25);
+  const y = low[4].y; advance(s, 0.2); assert.notEqual(low[4].y, y);
+});
+
+test('hogs stay in their section until approach, hurt on contact, and can be bounced on', () => {
+  const s = active(); s.hogs = createHogs(3000, 205); advance(s, 0.5); assert.equal(s.hogs[0].x, 3000);
+  const hit = active(); hit.hogs = createHogs(PLAYER_X, 205); advance(hit, 0.02); assert.equal(hit.hits, 1);
+  const bounce = active(); bounce.hogs = [createHogs(PLAYER_X, 205)[0]];
+  bounce.y = FLOOR - 50; bounce.vy = 350; bounce.jumps = 2;
+  advance(bounce, 0.02); assert.equal(bounce.hits, 0); assert.ok(bounce.vy < 0); assert.equal(bounce.jumps, 1);
+});
+
+for (let level = 0; level < LEVELS.length; level++) {
+  test(`level ${level + 1}: six running hogs have enough space for repeated jumps`, () => {
+    const s = active(); s.level = level; s.elapsed = level * 60;
+    s.hogs = createHogs(PLAYER_X + 600, runnerSpeed(s));
+    for (const h of s.hogs) h.jumpIn = 100;
+    for (let i = 0; i < 10 * 120; i++) {
+      const next = s.hogs.find(h => h.x > s.distance + PLAYER_X - 35);
+      if (next && s.jumps === 0 && next.x - s.distance - PLAYER_X < (runnerSpeed(s) + 105) * 0.35) jumpRunner(s);
+      stepRunner(s, 1 / 120);
+    }
+    assert.equal(s.hits, 0); assert.equal(s.hogs.length, 0);
+  });
+}
+
+test('full run spawns exactly one gem per level and bats only at night', () => {
+  const s = createRunner(); s.phase = 'playing';
+  const seen = new Set<object>(), counts = GEMS.map(() => 0); let nightBats = false;
+  for (let i = 0; i < 301 * 120; i++) {
+    s.invincible = 5; stepRunner(s, 1 / 120);
+    for (const item of s.items) if (item.kind === 'gem' && !seen.has(item)) { seen.add(item); counts[item.level!]++; }
+    if (s.bats.length) { assert.equal(s.level, 4); nightBats = true; }
+  }
+  assert.deepEqual(counts, [1, 1, 1, 1, 1]); assert.ok(nightBats); assert.equal(s.phase, 'victory');
+});
+
+test('gem collection awards 250 points once per level, and restart clears progress', () => {
+  const s = active();
+  for (let level = 0; level < LEVELS.length; level++) {
+    s.level = level; s.elapsed = level * 60;
+    for (let duplicate = 0; duplicate < 2; duplicate++) {
+      s.items = [{ x: s.distance + PLAYER_X, y: FLOOR - 40, kind: 'gem', level }];
+      stepRunner(s, 1 / 120);
+    }
+  }
+  assert.equal(s.gems, 5); assert.equal(runnerScore(s), 1250); assert.equal(s.bananas, 0);
+  assert.deepEqual(s.gemCollected, [true, true, true, true, true]); assert.equal(createRunner().gems, 0);
+});
+
+test('a jumping monkey can reach the authored gem height', () => {
+  const s = active(); jumpRunner(s); advance(s, 0.2);
+  s.items = [{ x: s.distance + PLAYER_X, y: FLOOR - 115, kind: 'gem', level: 0 }];
+  advance(s, 0.02); assert.equal(s.gems, 1); assert.equal(s.hits, 0);
+});
+
+test('bat waves telegraph then dive, and a timed slide clears all four', () => {
+  for (const slide of [false, true]) {
+    const s = active(); s.level = 4; s.elapsed = 240; s.bats = createBats(PLAYER_X + 600);
+    let warned = false, diving = false, ducked = false;
+    for (let i = 0; i < 3 * 120; i++) {
+      warned ||= s.bats.some(b => b.state === 'warning'); diving ||= s.bats.some(b => b.state === 'diving');
+      if (slide && !ducked && s.bats.some(b => b.state === 'diving' && b.x - s.distance - PLAYER_X < 220)) { duckRunner(s, true); ducked = true; }
+      stepRunner(s, 1 / 120);
+    }
+    assert.ok(warned && diving); assert.equal(s.hits, slide ? 0 : 1);
+    if (slide) assert.equal(s.bats.length, 0);
+  }
+});
+
+test('airborne hogs can be ducked, and jumpers do not launch at point-blank range', () => {
+  const s = active(); const hog = createHogs(PLAYER_X, 205)[4]; hog.x = PLAYER_X; hog.y = FLOOR - 100; hog.vy = 0;
+  s.hogs = [hog]; duckRunner(s, true); advance(s, 0.04); assert.equal(s.hits, 0);
+  const near = active(); near.invincible = 5;
+  const jumper = createHogs(PLAYER_X, 205)[4]; jumper.x = PLAYER_X + 80; jumper.jumpIn = 0; near.hogs = [jumper];
+  advance(near, 0.1); assert.equal(jumper.y, FLOOR - 25);
 });

@@ -10,7 +10,21 @@ export const LEVELS = [
 export const LEVEL_SECONDS = 60;
 export const SLIDE_SECONDS = 1.5;
 export const FLIP_SECONDS = 0.5;
-export type RunnerItem = { x: number; y: number; kind: 'banana' | 'golden' | 'cherry' | 'drop' | 'low' | 'high' | 'canopy' | 'rolling' | 'bouncing'; collected?: boolean; vy?: number; rotation?: number };
+export type RunnerItem = { x: number; y: number; kind: 'banana' | 'golden' | 'cherry' | 'gem' | 'drop' | 'low' | 'high' | 'canopy' | 'rolling' | 'bouncing'; collected?: boolean; level?: number; vy?: number; rotation?: number };
+export const GEMS = [
+  { name: 'Emerald', color: '#4cf7ae' }, { name: 'Sapphire', color: '#6fbaff' },
+  { name: 'Ruby', color: '#ff6e97' }, { name: 'Amber', color: '#ffcb56' },
+  { name: 'Moonstone', color: '#d2b7ff' },
+] as const;
+export type Hog = { x: number; y: number; vy: number; age: number; jumper: boolean; jumpIn: number; active: boolean };
+export function createHogs(x: number, speed: number, random = Math.random): Hog[] {
+  const gap = (speed + 105) * 0.85;
+  return Array.from({ length: 6 }, (_, i) => ({ x: x + i * gap + (i >= 4 ? gap * 0.4 : 0), y: FLOOR - 25, vy: 0, age: 0, jumper: i >= 4, jumpIn: 0.5 + random() * 1.2, active: false }));
+}
+export type Bat = { x: number; y: number; age: number; state: 'flying' | 'warning' | 'diving' | 'leaving' };
+export function createBats(x: number): Bat[] {
+  return Array.from({ length: 4 }, (_, i) => ({ x: x + i * 100, y: 80 + i % 2 * 16, age: 0, state: 'flying' }));
+}
 export type Herd = { x: number; age: number; charging: boolean; warned: boolean };
 export type Spider = { x: number; phase: number };
 export const ELEPHANT_TOP = FLOOR - 112;
@@ -53,10 +67,12 @@ export function createRunner() {
     distance: 0, elapsed: 0, level: 0, y: FLOOR, vy: 0, jumps: 0, duck: false, duckHeld: false, slideLeft: 0, cameraLead: 0,
     flipLeft: 0, swing: null as { river: River; progress: number } | null,
     cracks: [] as { x: number; y: number; age: number }[],
-    golden: 0, cherries: 0, bonusScore: 0,
+    golden: 0, cherries: 0, bonusScore: 0, gems: 0,
+    gemSpawned: LEVELS.map(() => false), gemCollected: LEVELS.map(() => false),
     lives: 3, bananas: 0, hits: 0, bounces: 0, stun: 0, invincible: 0,
     message: '', messageTime: 0, nextSection: 950, section: 0,
     items: Array.from({ length: 12 }, (_, i): RunnerItem => ({ x: 380 + i * 42, y: FLOOR - 30, kind: 'banana' })),
+    hogs: [] as Hog[], bats: [] as Bat[],
     herds: [] as Herd[], spiders: [] as Spider[], elephantBounces: 0,
     rivers: [] as River[], birds: [] as Bird[], birdsSpawned: 0, predators: [] as Predator[],
   };
@@ -108,9 +124,15 @@ function hurt(s: Runner, message: string) {
 // of screen size. Every challenge is followed by a long, safe coin trail.
 function addSection(s: Runner) {
   const x = s.nextSection;
-  const patterns = [[8, 1, 10, 11, 12, 4, 3, 7, 6], [12, 5, 9, 10, 11, 4, 3, 7, 6, 8], [7, 12, 11, 5, 10, 9, 4, 1, 3, 8, 6], [7, 11, 12, 10, 9, 5, 8, 7, 3, 6, 5, 4, 1], [13, 11, 13, 12, 10, 7, 13, 4, 8]][s.level];
+  const patterns = [[8, 14, 10, 11, 12, 4, 3, 7, 6], [12, 14, 5, 9, 10, 11, 4, 3, 7, 6, 8], [7, 14, 12, 11, 5, 10, 9, 4, 1, 3, 8, 6], [7, 11, 14, 12, 10, 9, 5, 8, 7, 3, 6, 5, 4, 1], [13, 15, 14, 11, 13, 12, 15, 10, 7, 13, 4, 8]][s.level];
   const type = patterns[s.section++ % patterns.length];
-  if (type === 12) {
+  let recovery = type === 10 || type === 12 ? 820 : 470;
+  if (type === 14) {
+    const hogs = createHogs(x, runnerSpeed(s)); s.hogs.push(...hogs);
+    recovery = hogs[5].x - x + 400;
+  } else if (type === 15) {
+    s.bats.push(...createBats(x)); recovery = 800;
+  } else if (type === 12) {
     s.herds.push({ x, age: 0, charging: false, warned: false });
   } else if (type === 13) {
     s.spiders.push({ x, phase: s.section * 1.7 });
@@ -137,8 +159,12 @@ function addSection(s: Runner) {
   } else {
     s.items.push({ x, y: type === 0 ? FLOOR - 22 : type === 1 ? FLOOR - 64 : FLOOR - 118, kind: type === 0 ? 'low' : type === 1 ? 'high' : 'canopy' });
   }
-  for (let i = 0; i < 10; i++) s.items.push({ x: x + (type === 10 || type === 12 ? 820 : 470) + i * 40, y: FLOOR - 28, kind: 'banana' });
-  s.nextSection += type === 10 || type === 12 ? 1450 : 1100;
+  for (let i = 0; i < 10; i++) s.items.push({ x: x + recovery + i * 40, y: FLOOR - 28, kind: 'banana' });
+  if (!s.gemSpawned[s.level]) {
+    s.gemSpawned[s.level] = true;
+    s.items.push({ x: x + recovery + 180, y: FLOOR - 115, kind: 'gem', level: s.level });
+  }
+  s.nextSection += recovery + 630;
 }
 
 export function stepRunner(s: Runner, dt: number) {
@@ -156,7 +182,7 @@ export function stepRunner(s: Runner, dt: number) {
   s.elapsed += dt;
   if (s.elapsed >= LEVEL_SECONDS * LEVELS.length) { s.phase = 'victory'; return; }
   const level = Math.floor(s.elapsed / LEVEL_SECONDS);
-  if (level !== s.level) { s.level = level; s.section = 0; s.message = `LEVEL ${level + 1}: ${LEVELS[level].name}`; s.messageTime = 3; }
+  if (level !== s.level) { s.level = level; s.section = 0; s.items = s.items.filter(i => i.kind !== 'gem'); s.message = `LEVEL ${level + 1}: ${LEVELS[level].name}`; s.messageTime = 3; }
   const speed = runnerSpeed(s);
   const boost = dashBoost(s) + airBoost(s);
   if (!s.swing) s.distance += (speed + boost) * dt;
@@ -263,6 +289,41 @@ export function stepRunner(s: Runner, dt: number) {
   }
   s.herds = s.herds.filter(h => h.x + 440 > s.distance - 80);
   const height = s.duck && s.y >= FLOOR - 1 ? 30 : 76;
+  for (const hog of s.hogs) {
+    const ahead = hog.x - worldX;
+    if (!hog.active && ahead < 780) { hog.active = true; }
+    if (!hog.active) continue;
+    hog.age += dt; hog.x -= 105 * dt;
+    if (hog.jumper && hog.y >= FLOOR - 25) {
+      hog.jumpIn -= dt;
+      // Crouching tells the player a leap is coming; never start a surprise
+      // leap at point-blank range.
+      if (hog.jumpIn <= 0 && Math.abs(ahead) > 150) { hog.vy = -390; hog.jumpIn = 1.2 + Math.random() * 1.4; }
+    }
+    hog.vy += 1000 * dt; hog.y += hog.vy * dt;
+    if (hog.y >= FLOOR - 25) { hog.y = FLOOR - 25; hog.vy = 0; }
+    if (Math.abs(hog.x - worldX) < 48) {
+      const top = hog.y - 23;
+      if (s.vy > 0 && previousY <= top + 8 && s.y >= top) {
+        s.y = top; s.vy = -480; s.jumps = 1; s.duck = false; s.slideLeft = 0; s.flipLeft = 0;
+      } else if (hog.y + 23 >= s.y - height && top <= s.y - 4) hurt(s, 'WILD HOGS! Jump or bounce over!');
+    }
+  }
+  s.hogs = s.hogs.filter(h => h.x > s.distance - 120);
+  for (const bat of s.bats) {
+    bat.age += dt;
+    if (bat.state === 'flying') {
+      bat.y = 85 + Math.sin(bat.age * 5) * 10;
+      if (bat.x - worldX < speed * 1.15) { bat.state = 'warning'; bat.age = 0; }
+    } else if (bat.state === 'warning' && bat.age >= 0.3) { bat.state = 'diving'; bat.age = 0; }
+    else if (bat.state === 'diving') {
+      bat.x -= 160 * dt;
+      bat.y = 90 + 164 * Math.sin(Math.min(1, bat.age / 1.1) * Math.PI);
+      if (bat.age >= 1.1) { bat.state = 'leaving'; bat.age = 0; }
+    } else if (bat.state === 'leaving') { bat.x -= 220 * dt; bat.y -= 110 * dt; }
+    if (Math.abs(bat.x - worldX) < 39 && bat.y + 18 >= s.y - height && bat.y - 18 <= s.y - 4) hurt(s, 'DIVING BATS! Slide beneath the wave!');
+  }
+  s.bats = s.bats.filter(b => b.x > s.distance - 100 && b.y > -60);
   for (const spider of s.spiders) {
     const pos = spiderPosition(spider, s.elapsed);
     if (Math.abs(pos.x - worldX) < 43 && pos.y + 23 >= s.y - height && pos.y - 23 <= s.y - 4) hurt(s, 'SPIDER SWING! Slide under!');
@@ -314,14 +375,20 @@ export function stepRunner(s: Runner, dt: number) {
   }
   s.predators = s.predators.filter(p => p.x > s.distance - 120);
   for (const item of s.items) {
-    const collectible = ['banana', 'golden', 'cherry'].includes(item.kind);
+    const collectible = ['banana', 'golden', 'cherry', 'gem'].includes(item.kind);
     if (item.collected || Math.abs(item.x - worldX) > (collectible ? 30 : 33)) continue;
     const radius = collectible ? 14 : 20;
     if (item.y + radius < s.y - height || item.y - radius > s.y - 4) continue;
     if (collectible) {
       item.collected = true;
       const previous = s.bananas;
-      if (item.kind === 'cherry') { s.cherries++; s.bonusScore += 50; s.message = 'SWEET! +50 POINTS'; s.messageTime = 1; }
+      if (item.kind === 'gem') {
+        const gemLevel = item.level ?? s.level;
+        if (!s.gemCollected[gemLevel]) {
+          s.gemCollected[gemLevel] = true; s.gems++; s.bonusScore += 250;
+          s.message = `${GEMS[gemLevel].name.toUpperCase()}! +250 POINTS`; s.messageTime = 2;
+        }
+      } else if (item.kind === 'cherry') { s.cherries++; s.bonusScore += 50; s.message = 'SWEET! +50 POINTS'; s.messageTime = 1; }
       else { s.bananas += item.kind === 'golden' ? 10 : 1; if (item.kind === 'golden') { s.golden++; s.message = 'GOLDEN BANANA! +10 COINS'; s.messageTime = 1; } }
       if (Math.floor(s.bananas / 100) > Math.floor(previous / 100)) { s.lives++; s.message = '100 BANANAS! +1 LIFE'; s.messageTime = 2; }
     } else if (s.invincible <= 0) { item.collected = true; s.cracks.push({ x: item.x, y: item.y, age: 0 }); hurt(s, 'CRACK!'); break; }
