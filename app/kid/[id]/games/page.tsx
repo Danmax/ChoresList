@@ -1059,30 +1059,43 @@ function JungleVineSwing({
   onExit: () => void;
   onFinish: (score: number, durationSeconds: number, metadata: Record<string, unknown>) => void;
 }) {
-  const [status, setStatus] = useState<"ready" | "playing" | "over">("ready");
+  const [status, setStatus] = useState<"ready" | "playing" | "knocked" | "victory" | "over">("ready");
   const [items, setItems] = useState<JungleItem[]>([]);
   const [score, setScore] = useState(0);
   const [bananas, setBananas] = useState(0);
   const [combo, setCombo] = useState(0);
   const [hits, setHits] = useState(0);
   const [timeLeft, setTimeLeft] = useState(45);
-  const [swingPhase, setSwingPhase] = useState(0);
-  const [holding, setHolding] = useState(false);
+  const [playerX, setPlayerX] = useState(50);
+  const [jumping, setJumping] = useState(false);
   const itemId = useRef(0);
-  const swingPhaseRef = useRef(0);
-  const holdingRef = useRef(false);
+  const playerXRef = useRef(50);
+  const jumpingRef = useRef(false);
   const scoreRef = useRef(0);
   const bananasRef = useRef(0);
   const comboRef = useRef(0);
   const hitsRef = useRef(0);
 
-  const swingSize = holding ? 18 : 11;
-  const monkeyX = 50 + Math.sin(swingPhase) * swingSize;
-  const monkeyY = 52 + Math.cos(swingPhase) * swingSize;
+  const monkeyY = jumping ? 45 : 68;
+  const spriteFrame = status === "knocked" ? 2 : status === "victory" ? 3 : jumping ? 1 : 0;
 
-  function setHold(value: boolean) {
-    holdingRef.current = value;
-    setHolding(value);
+  function move(direction: -1 | 1) {
+    if (status !== "playing") return;
+    setPlayerX((value) => {
+      const next = Math.max(10, Math.min(90, value + direction * 10));
+      playerXRef.current = next;
+      return next;
+    });
+  }
+
+  function jump() {
+    if (status !== "playing" || jumpingRef.current) return;
+    jumpingRef.current = true;
+    setJumping(true);
+    window.setTimeout(() => {
+      jumpingRef.current = false;
+      setJumping(false);
+    }, 650);
   }
 
   function startRun() {
@@ -1090,27 +1103,34 @@ function JungleVineSwing({
     bananasRef.current = 0;
     comboRef.current = 0;
     hitsRef.current = 0;
-    swingPhaseRef.current = 0;
+    playerXRef.current = 50;
+    jumpingRef.current = false;
     setScore(0);
     setBananas(0);
     setCombo(0);
     setHits(0);
     setTimeLeft(45);
-    setSwingPhase(0);
+    setPlayerX(50);
+    setJumping(false);
     setItems([]);
-    setHold(false);
     setStatus("playing");
   }
 
   useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "ArrowLeft" || event.key.toLowerCase() === "a") { event.preventDefault(); move(-1); }
+      if (event.key === "ArrowRight" || event.key.toLowerCase() === "d") { event.preventDefault(); move(1); }
+      if (event.key === "ArrowUp" || event.key === " " || event.key.toLowerCase() === "w") { event.preventDefault(); jump(); }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  });
+
+  useEffect(() => {
     if (status !== "playing") return;
     const ticker = window.setInterval(() => {
-      const phase = (swingPhaseRef.current + (holdingRef.current ? 0.31 : 0.2)) % (Math.PI * 2);
-      swingPhaseRef.current = phase;
-      setSwingPhase(phase);
-      const amplitude = holdingRef.current ? 18 : 11;
-      const monkeyX = 50 + Math.sin(phase) * amplitude;
-      const monkeyY = 52 + Math.cos(phase) * amplitude;
+      const monkeyX = playerXRef.current;
+      const monkeyY = jumpingRef.current ? 45 : 68;
 
       setItems((current) => {
         const speed = 4.2 + Math.min(3.6, scoreRef.current / 140);
@@ -1123,7 +1143,13 @@ function JungleVineSwing({
               comboRef.current = 0;
               setHits(hitsRef.current);
               setCombo(0);
-              if (hitsRef.current >= 3) setStatus("over");
+              setItems([]);
+              if (hitsRef.current >= 3) {
+                setStatus("over");
+              } else {
+                setStatus("knocked");
+                window.setTimeout(() => setStatus("playing"), 1050);
+              }
             } else {
               const nextCombo = comboRef.current + 1;
               const points = next.kind === "golden" ? 50 : 10 + Math.min(50, nextCombo * 5);
@@ -1153,7 +1179,7 @@ function JungleVineSwing({
     const clock = window.setInterval(() => {
       setTimeLeft((seconds) => {
         if (seconds <= 1) {
-          setStatus("over");
+          setStatus("victory");
           return 0;
         }
         return seconds - 1;
@@ -1175,7 +1201,7 @@ function JungleVineSwing({
       <div className="mb-3 flex items-center justify-between gap-3 sm:mb-5">
         <div>
           <h2 className="flex items-center gap-2 text-xl font-black text-emerald-950 sm:text-2xl"><TreePine className="text-emerald-600" /> Jungle Vine Swing</h2>
-          <p className="text-xs font-bold text-emerald-800 sm:text-sm">Hold to swing wider · release to glide through the fruit</p>
+          <p className="text-xs font-bold text-emerald-800 sm:text-sm">Move left and right · jump over coconuts · collect every banana</p>
         </div>
         <button type="button" onClick={onExit} className="rounded-2xl bg-slate-100 px-4 py-2 text-sm font-black text-slate-600">Exit</button>
       </div>
@@ -1188,20 +1214,26 @@ function JungleVineSwing({
 
       <div
         role="application"
-        aria-label="Jungle Vine Swing game area"
-        onPointerDown={() => status === "playing" && setHold(true)}
-        onPointerUp={() => setHold(false)}
-        onPointerCancel={() => setHold(false)}
-        onPointerLeave={() => setHold(false)}
-        className="relative h-[28rem] touch-none select-none overflow-hidden rounded-3xl border-4 border-emerald-900 bg-[linear-gradient(#8ce7ef_0%,#b9f3c3_48%,#3f9c54_49%,#176b3b_100%)] sm:h-[32rem]"
+        aria-label="Jungle runner game area"
+        className="relative h-[28rem] select-none overflow-hidden rounded-3xl border-4 border-emerald-900 bg-[linear-gradient(#8ce7ef_0%,#b9f3c3_48%,#3f9c54_49%,#176b3b_100%)] sm:h-[32rem]"
       >
         <div className="absolute inset-x-0 top-0 flex justify-between px-6 text-6xl opacity-40"><span>🌿</span><span>🌿</span></div>
         <div className="absolute left-[8%] top-[18%] h-64 w-16 rounded-full bg-emerald-900/35" />
         <div className="absolute right-[10%] top-[12%] h-72 w-20 rounded-full bg-emerald-900/35" />
         <div className="absolute inset-x-0 bottom-0 h-24 bg-[radial-gradient(ellipse_at_center,_#65c958_0%,_#2c843d_55%,_#176b3b_100%)]" />
 
-        <div className="absolute left-1/2 top-0 h-[56%] w-1 origin-top bg-amber-950/80" style={{ transform: `translateX(-50%) rotate(${Math.sin(swingPhase) * swingSize * 1.45}deg)` }} />
-        <div className="absolute z-20 -translate-x-1/2 -translate-y-1/2 text-6xl drop-shadow-lg transition-[left,top] duration-100" style={{ left: `${monkeyX}%`, top: `${monkeyY}%` }} aria-label="Swinging monkey">🐒</div>
+        <div className="absolute inset-x-0 bottom-[22%] h-3 bg-emerald-950/30" />
+        <div
+          className={`absolute z-20 h-32 w-28 -translate-x-1/2 -translate-y-1/2 bg-no-repeat drop-shadow-lg transition-[left,top] duration-150 ${status === "knocked" ? "animate-pulse" : jumping ? "scale-110" : ""}`}
+          style={{
+            left: `${playerX}%`,
+            top: `${monkeyY}%`,
+            backgroundImage: "url('/games/jungle-monkey-sprites.png')",
+            backgroundSize: "400% 100%",
+            backgroundPosition: `${spriteFrame * (100 / 3)}% center`,
+          }}
+          aria-label={status === "knocked" ? "Dizzy monkey" : jumping ? "Jumping monkey" : status === "victory" ? "Victorious monkey" : "Running monkey"}
+        />
 
         {items.map((item) => (
           <div key={item.id} className={`absolute z-10 -translate-x-1/2 -translate-y-1/2 text-4xl ${item.kind === "coconut" ? "animate-bounce" : ""}`} style={{ left: `${item.x}%`, top: `${item.y}%` }}>
@@ -1210,6 +1242,8 @@ function JungleVineSwing({
         ))}
 
         <div className="absolute inset-x-0 bottom-3 z-30 flex items-center justify-between px-4 text-xs font-black text-white drop-shadow"><span>{timeLeft}s left</span><span>{bananas} bananas collected</span></div>
+
+        {status === "knocked" && <div className="absolute inset-0 z-30 flex items-center justify-center bg-red-900/20"><p className="animate-bounce rounded-2xl bg-red-500 px-5 py-3 text-2xl font-black text-white shadow-xl">BONK! 💥</p></div>}
 
         {status === "ready" && (
           <div className="absolute inset-0 z-40 flex items-center justify-center bg-emerald-950/35 p-5 text-center">
@@ -1220,23 +1254,19 @@ function JungleVineSwing({
             </div>
           </div>
         )}
-        {status === "over" && (
+        {(status === "over" || status === "victory") && (
           <div className="absolute inset-0 z-40 flex items-center justify-center bg-emerald-950/45 p-5 text-center">
-            <div className="max-w-sm rounded-3xl bg-white p-5 shadow-xl"><p className="text-4xl">🏆</p><h3 className="mt-2 text-2xl font-black text-emerald-950">Jungle run complete!</h3><p className="mt-2 font-bold text-slate-600">{score} points · {bananas} bananas · {hits} coconut hits</p><div className="mt-4 grid grid-cols-2 gap-2"><button type="button" onClick={startRun} className="rounded-2xl bg-emerald-100 px-4 py-3 font-black text-emerald-800">Play again</button><button type="button" onClick={finishRun} className="rounded-2xl bg-emerald-600 px-4 py-3 font-black text-white">Save run</button></div></div>
+            <div className="max-w-sm rounded-3xl bg-white p-5 shadow-xl"><p className="text-4xl">{status === "victory" ? "🏆" : "💫"}</p><h3 className="mt-2 text-2xl font-black text-emerald-950">{status === "victory" ? "Jungle victory!" : "Coconut knockout!"}</h3><p className="mt-2 font-bold text-slate-600">{score} points · {bananas} bananas · {hits} coconut hits</p><div className="mt-4 grid grid-cols-2 gap-2"><button type="button" onClick={startRun} className="rounded-2xl bg-emerald-100 px-4 py-3 font-black text-emerald-800">Play again</button><button type="button" onClick={finishRun} className="rounded-2xl bg-emerald-600 px-4 py-3 font-black text-white">Save run</button></div></div>
           </div>
         )}
       </div>
 
-      <button
-        type="button"
-        disabled={status !== "playing"}
-        onPointerDown={() => setHold(true)}
-        onPointerUp={() => setHold(false)}
-        onPointerLeave={() => setHold(false)}
-        className={`mt-3 w-full rounded-2xl px-5 py-4 text-base font-black shadow-sm transition-all sm:hidden ${holding ? "scale-[0.98] bg-yellow-400 text-yellow-950" : "bg-emerald-600 text-white"} disabled:opacity-50`}
-      >
-        {holding ? "Swinging! Release to glide" : "Press and hold to swing"}
-      </button>
+      <div className="mt-3 grid grid-cols-3 gap-2 sm:mx-auto sm:max-w-md">
+        <button type="button" disabled={status !== "playing"} onClick={() => move(-1)} className="rounded-2xl bg-emerald-100 px-4 py-4 text-2xl font-black text-emerald-900 disabled:opacity-50" aria-label="Move left">←</button>
+        <button type="button" disabled={status !== "playing"} onClick={jump} className="rounded-2xl bg-yellow-400 px-4 py-4 text-sm font-black text-yellow-950 shadow-sm disabled:opacity-50">JUMP</button>
+        <button type="button" disabled={status !== "playing"} onClick={() => move(1)} className="rounded-2xl bg-emerald-100 px-4 py-4 text-2xl font-black text-emerald-900 disabled:opacity-50" aria-label="Move right">→</button>
+      </div>
+      <p className="mt-2 text-center text-xs font-bold text-slate-500">Keyboard: ← / → to move · Space or ↑ to jump</p>
     </section>
   );
 }
