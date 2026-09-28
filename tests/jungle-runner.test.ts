@@ -63,6 +63,15 @@ test('ally gifts grant a heart, fruit bonus, and a full twelve seconds of star p
   assert.ok(star.invincible > 11.9); advance(star, 11.5); assert.ok(star.invincible > 0); advance(star, 0.6); assert.equal(star.invincible, 0);
 });
 
+test('sloths wait for the approaching monkey, lower a gift, then climb back up', () => {
+  const s = active();
+  s.sloths = [{ x: PLAYER_X + 700, y: 22, homeY: 22, targetY: FLOOR - 92, age: 0, state: 'waiting', reward: 'heart', dropped: false }];
+  advance(s, 0.1); assert.equal(s.sloths[0].y, 22);
+  s.sloths[0].x = s.distance + PLAYER_X + 600;
+  advance(s, 1.5); assert.equal(s.sloths[0].dropped, true); assert.equal(s.sloths[0].state, 'climbing');
+  advance(s, 1); assert.equal(s.sloths[0].y, 22);
+});
+
 test('a jumping monkey can catch a lemming lift and swing safely past a herd', () => {
   const s = active(); s.lemmings = [{ x: PLAYER_X + 10, y: FLOOR - 112, endX: PLAYER_X + 700, age: 0, used: false }];
   jumpRunner(s); advance(s, 0.25);

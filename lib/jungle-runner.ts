@@ -42,7 +42,7 @@ export function spiderPosition(spider: Spider, elapsed: number) {
   return { x: spider.x + Math.sin(angle) * 222, y: 25 + Math.cos(angle) * 222 };
 }
 export type Bird = { x: number; y: number; gift: 'drop' | 'cherry' | 'heart' | 'fruit' | 'star'; dropped: boolean; releaseLeft?: number };
-export type Sloth = { x: number; y: number; targetY: number; age: number; reward: 'heart' | 'fruit' | 'star'; dropped: boolean };
+export type Sloth = { x: number; y: number; homeY: number; targetY: number; age: number; state: 'waiting' | 'lowering' | 'climbing'; reward: 'heart' | 'fruit' | 'star'; dropped: boolean };
 export type Lemming = { x: number; y: number; endX: number; age: number; used: boolean };
 export type River = { resident?: 'piranha' | 'eel'; waterAge?: number; x: number; width: number; vine?: boolean; used?: boolean; bounced?: boolean; bounceLeft?: number; snapLeft?: number[]; snapped?: boolean[] };
 export type Orangutan = { x: number; age: number; state: 'dance' | 'windup' | 'throw' | 'recover'; throws: number };
@@ -66,7 +66,7 @@ export function eelPhase(r: River) {
   return t < 0.85 ? 'charge' : t < 1.4 ? 'shock' : 'swim';
 }
 export function birdHeight(bird: Bird, elapsed: number) { return bird.y + Math.sin(elapsed * 7) * 5; }
-export function slothPosition(sloth: Sloth) { return { x: sloth.x, y: Math.min(sloth.targetY, sloth.y + sloth.age * 52) }; }
+export function slothPosition(sloth: Sloth) { return { x: sloth.x, y: sloth.y }; }
 export function crocodileFrame(remaining: number) {
   if (remaining <= 0) return 0;
   const age = 0.6 - remaining;
@@ -238,7 +238,7 @@ function addSection(s: Runner) {
   // slow descent makes the reward readable rather than a surprise pickup.
   if (s.section % 3 === 0) {
     const rewards: Sloth['reward'][] = ['heart', 'fruit', 'star'];
-    s.sloths.push({ x: x + recovery * 0.55, y: 22, targetY: FLOOR - 92, age: 0, reward: rewards[(s.section / 3 - 1) % rewards.length], dropped: false });
+    s.sloths.push({ x: x + recovery * 0.55, y: 22, homeY: 22, targetY: FLOOR - 92, age: 0, state: 'waiting', reward: rewards[(s.section / 3 - 1) % rewards.length], dropped: false });
   }
   for (let i = 0; i < 10; i++) s.items.push({ x: x + recovery + i * 40, y: FLOOR - 28, kind: 'banana' });
   if (!s.gemSpawned[s.level]) {
@@ -291,12 +291,19 @@ export function stepRunner(s: Runner, dt: number) {
   s.birds = s.birds.filter(b => b.x > s.distance - 80);
   for (const sloth of s.sloths) {
     sloth.age += dt;
-    if (!sloth.dropped && slothPosition(sloth).y >= sloth.targetY) {
+    const ahead = sloth.x - (s.distance + PLAYER_X);
+    // Do not begin the slow descent until the player can see the whole gift
+    // sequence. Once the gift is left, the sloth climbs back to its canopy.
+    if (sloth.state === 'waiting' && ahead < 620 && ahead > -70) sloth.state = 'lowering';
+    if (sloth.state === 'lowering') sloth.y = Math.min(sloth.targetY, sloth.y + 150 * dt);
+    if (!sloth.dropped && sloth.state === 'lowering' && sloth.y >= sloth.targetY) {
       sloth.dropped = true;
       s.items.push({ x: sloth.x, y: sloth.targetY + 18, kind: sloth.reward });
+      sloth.state = 'climbing';
     }
+    if (sloth.state === 'climbing') sloth.y = Math.max(sloth.homeY, sloth.y - 220 * dt);
   }
-  s.sloths = s.sloths.filter(sloth => sloth.x > s.distance - 100 && !sloth.dropped);
+  s.sloths = s.sloths.filter(sloth => sloth.x > s.distance - 100);
   for (const lemming of s.lemmings) {
     lemming.age += dt;
     if (lemming.used || s.swing || s.jumps === 0) continue;
