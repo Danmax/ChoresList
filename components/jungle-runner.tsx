@@ -1,10 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react';
-import { createRunner, duckRunner, FLOOR, jumpRunner, LEVELS, LEVEL_SECONDS, PLAYER_X, runnerScore, runnerSpeed, stepRunner, type Runner } from '@/lib/jungle-runner';
+import { birdHeight, crocodileFrame, hippoFrame, createRunner, dashBoost, duckRunner, FLOOR, jumpRunner, LEVELS, LEVEL_SECONDS, PLAYER_X, runnerScore, travelSpeed, stepRunner, type Runner } from '@/lib/jungle-runner';
 
-function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElement, predators: HTMLImageElement) {
+function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElement, predators: HTMLImageElement, wildlife: HTMLImageElement) {
   const W = 800, H = 400;
+  const cameraDistance = s.distance - s.cameraLead;
+  const playerX = PLAYER_X + s.cameraLead;
+  const animal = (row: number, frame: number, x: number, y: number, width: number, height: number, flip = false) => {
+    if (!wildlife.complete || !wildlife.naturalWidth) return;
+    const cellW = wildlife.naturalWidth / 4, cellH = wildlife.naturalHeight / 3;
+    ctx.save(); ctx.translate(x, y); if (flip) ctx.scale(-1, 1);
+    ctx.drawImage(wildlife, frame * cellW, row * cellH, cellW, cellH, -width / 2, 0, width, height);
+    ctx.restore();
+  };
   ctx.clearRect(0, 0, W, H);
   const sky = ctx.createLinearGradient(0, 0, 0, H);
   sky.addColorStop(0, LEVELS[s.level].sky); sky.addColorStop(1, LEVELS[s.level].mist);
@@ -13,7 +22,7 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
   // Three independent speeds create depth without moving the collision plane.
   for (let layer = 0; layer < 3; layer++) {
     const spacing = [240, 190, 330][layer];
-    const offset = (s.distance * [0.12, 0.35, 0.65][layer]) % spacing;
+    const offset = (cameraDistance * [0.12, 0.35, 0.65][layer]) % spacing;
     for (let i = -1; i < 6; i++) {
       const x = i * spacing - offset;
       if (layer === 0) {
@@ -31,48 +40,67 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
   ctx.fillStyle = '#956337'; ctx.fillRect(0, FLOOR, W, H - FLOOR);
   ctx.fillStyle = '#8bc34b'; ctx.fillRect(0, FLOOR, W, 9);
   ctx.fillStyle = '#bc884b';
-  for (let i = -1; i < 24; i++) ctx.fillRect(i * 45 - s.distance % 45, FLOOR + 30 + i % 3 * 10, 18, 5);
+  for (let i = -1; i < 24; i++) ctx.fillRect(i * 45 - cameraDistance % 45, FLOOR + 30 + i % 3 * 10, 18, 5);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   for (const r of s.rivers) {
-    const x = r.x - s.distance;
+    const x = r.x - cameraDistance;
     ctx.fillStyle = '#166879'; ctx.fillRect(x, FLOOR, r.width, 90);
     ctx.fillStyle = '#69d9db'; ctx.fillRect(x, FLOOR + 40, r.width, 50);
     ctx.fillStyle = '#5b3f30'; ctx.fillRect(x - 6, FLOOR, 6, 90); ctx.fillRect(x + r.width, FLOOR, 6, 90);
-    ctx.font = '38px sans-serif'; ctx.fillText('🐊', x + 35, 372); ctx.fillText('🐊', x + r.width - 35, 372);
+    for (let i = 0; i < 2; i++) {
+      const remaining = r.snapLeft?.[i] ?? 0;
+      const lift = remaining > 0 ? Math.sin((0.6 - remaining) / 0.6 * Math.PI) * 13 : 0;
+      animal(0, crocodileFrame(remaining), x + (i === 0 ? 35 : r.width - 35), FLOOR + 11 - lift, 94, 72, i === 0);
+    }
     ctx.fillStyle = '#fff5b6'; ctx.fillRect(x - 65, FLOOR - 80, 62, 23);
     ctx.fillStyle = '#174d35'; ctx.font = 'bold 12px sans-serif'; ctx.fillText('CLIFF ↑', x - 34, FLOOR - 68);
     const hx = x + r.width * 0.6;
-    ctx.fillStyle = '#9284a4'; ctx.beginPath(); ctx.ellipse(hx, FLOOR + 8, 44, 20, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.font = '58px sans-serif'; ctx.fillText('🦛', hx, FLOOR + 5);
-    ctx.fillStyle = '#fef08a'; ctx.font = 'bold 13px sans-serif'; ctx.fillText('BOUNCE', hx, FLOOR - 33);
+    const hf = hippoFrame(r, s.distance + PLAYER_X);
+    const spring = (r.bounceLeft ?? 0) > 0 ? Math.sin((0.45 - r.bounceLeft!) / 0.45 * Math.PI) * 8 : 0;
+    animal(1, hf, hx + 20, FLOOR - 98 - spring, 132, 126 + spring);
+    if (hf === 2) {
+      // The glowing lower jaw is the existing safe landing surface.
+      ctx.strokeStyle = '#fff5a3'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.ellipse(hx - 8, FLOOR - 12, 26, 4, 0, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.fillStyle = '#fef08a'; ctx.font = 'bold 13px sans-serif'; ctx.fillText('BOUNCE', hx, FLOOR - 100);
   }
   for (const bird of s.birds) {
-    const x = bird.x - s.distance;
-    const y = bird.y + Math.sin(s.elapsed * 7) * 5;
-    ctx.font = '36px sans-serif'; ctx.fillText('🦜', x, y);
-    ctx.strokeStyle = bird.gift === 'cherry' ? '#ffec9c' : '#914d26'; ctx.lineWidth = 5;
-    ctx.beginPath(); ctx.moveTo(x - 10, y); ctx.lineTo(x - 33, y - 12 + Math.sin(s.elapsed * 15) * 12); ctx.stroke();
+    const x = bird.x - cameraDistance;
+    const y = birdHeight(bird, s.elapsed);
+    const wingFrame = (bird.releaseLeft ?? 0) > 0 ? 3 : [0, 1, 2, 1][Math.floor(s.elapsed * 10) % 4];
+    animal(2, wingFrame, x, y - 40, 78, 70);
     if (!bird.dropped) { ctx.font = '22px sans-serif'; ctx.fillText(bird.gift === 'cherry' ? '🍒' : '🥥', x, y + 25); }
   }
   for (const item of s.items) {
-    const x = item.x - s.distance;
+    const x = item.x - cameraDistance;
     if (x < -40 || x > 850) continue;
     const collectible = ['banana', 'golden', 'cherry'].includes(item.kind);
     if (item.kind === 'golden') {
       ctx.fillStyle = '#ffe663'; ctx.beginPath(); ctx.arc(x, item.y, 23 + Math.sin(s.elapsed * 6) * 2, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#593700'; ctx.font = 'bold 12px sans-serif'; ctx.fillText('DOUBLE ↑', x, item.y - 33);
     }
+    const movingCoconut = item.kind === 'rolling' || item.kind === 'bouncing' || item.kind === 'drop';
+    if (movingCoconut) {
+      ctx.fillStyle = '#153b3540'; ctx.beginPath(); ctx.ellipse(x, FLOOR - 2, 22, 4, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#fff6c999'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(x + 27, item.y - 3); ctx.lineTo(x + 43, item.y - 3); ctx.stroke();
+    }
+    ctx.save(); ctx.translate(x, item.y);
+    if (movingCoconut) ctx.rotate(item.rotation ?? 0);
     ctx.font = collectible ? '27px sans-serif' : '38px sans-serif';
-    ctx.fillText(item.kind === 'cherry' ? '🍒' : collectible ? '🍌' : '🥥', x, item.y);
+    ctx.fillText(item.kind === 'cherry' ? '🍒' : collectible ? '🍌' : '🥥', 0, 0);
+    ctx.restore();
     if (!collectible) {
-      ctx.fillStyle = '#fff'; ctx.fillRect(x - 29, item.y - 43, 58, 19);
+      const labelY = item.kind === 'drop' ? item.y + 34 : item.y - 33;
+      ctx.fillStyle = '#fff'; ctx.fillRect(x - 29, labelY - 10, 58, 19);
       ctx.fillStyle = '#174d35'; ctx.font = 'bold 12px sans-serif';
-      ctx.fillText(['low', 'drop'].includes(item.kind) ? 'JUMP' : item.kind === 'high' ? 'DUCK' : 'RUN', x, item.y - 33);
+      ctx.fillText(movingCoconut || ['low', 'drop'].includes(item.kind) ? 'JUMP' : item.kind === 'high' ? 'DUCK' : 'RUN', x, labelY);
     }
   }
   for (const p of s.predators) {
     if (p.kind === 'tiger' && ['waiting', 'warning'].includes(p.state)) continue;
-    const x = p.x - s.distance;
+    const x = p.x - cameraDistance;
     if (x < -100 || x > 900) continue;
     const frame = p.state === 'attack' ? p.age < 0.13 ? 1 : p.age < 0.9 ? 2 : 3 : p.state === 'crouch' ? 1 : p.state === 'recover' ? 3 : Math.floor(p.age * 3) % 2 === 0 ? 0 : 3;
     // Individually bounded frames preserve the generated poses' transparent margins.
@@ -93,8 +121,8 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     for (let i = 0; i < 7; i++) {
       const a = Math.PI + i * Math.PI / 6;
       const pulse = 4 * Math.sin(s.elapsed * 18);
-      ctx.beginPath(); ctx.moveTo(PLAYER_X + Math.cos(a) * 38, s.y - 88 + Math.sin(a) * 38);
-      ctx.lineTo(PLAYER_X + Math.cos(a) * (55 + pulse), s.y - 88 + Math.sin(a) * (55 + pulse)); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(playerX + Math.cos(a) * 38, s.y - 88 + Math.sin(a) * 38);
+      ctx.lineTo(playerX + Math.cos(a) * (55 + pulse), s.y - 88 + Math.sin(a) * (55 + pulse)); ctx.stroke();
     }
     ctx.fillStyle = '#762f27'; ctx.fillRect(230, 12, 350, 34);
     ctx.fillStyle = '#fff6af'; ctx.font = 'bold 18px sans-serif'; ctx.fillText('⚡ DANGER SENSE — TIGER AHEAD!', 405, 29);
@@ -102,9 +130,16 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
   const knocked = s.stun > 0 || s.phase === 'over';
   const grounded = s.y >= FLOOR - 1;
   const frame = knocked ? 4 : s.phase === 'victory' ? 5 : s.duck && grounded ? 3 : !grounded ? 2 : Math.floor(s.elapsed * 9) % 2;
+  if (dashBoost(s) > 5) {
+    ctx.strokeStyle = '#fff0ad'; ctx.lineWidth = 3;
+    for (let i = 0; i < 3; i++) {
+      const length = dashBoost(s) * 0.3;
+      ctx.beginPath(); ctx.moveTo(playerX - 30 - length, FLOOR - 8 - i * 10); ctx.lineTo(playerX - 35, FLOOR - 8 - i * 10); ctx.stroke();
+    }
+  }
   ctx.save();
   const bob = grounded && !s.duck && s.phase === 'playing' && !knocked ? Math.sin(s.elapsed * 18 * Math.PI) * 2 : 0;
-  ctx.translate(PLAYER_X + (knocked ? Math.sin(s.stun * 70) * 6 : 0), s.y + bob);
+  ctx.translate(playerX + (knocked ? Math.sin(s.stun * 70) * 6 : 0), s.y + bob);
   if (!grounded && !knocked) ctx.rotate(Math.max(-0.12, Math.min(0.12, s.vy / 4500)));
   if (s.invincible > 0 && !knocked) ctx.globalAlpha = 0.65 + Math.sin(s.elapsed * 30) * 0.25;
   if (sprite.complete && sprite.naturalWidth) {
@@ -115,12 +150,12 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
   ctx.restore();
   if (knocked) {
     ctx.font = '24px sans-serif';
-    for (let i = 0; i < 3; i++) { const a = s.elapsed * 8 + i * Math.PI * 2 / 3; ctx.fillText('⭐', PLAYER_X + Math.cos(a) * 35, s.y - 102 + Math.sin(a) * 8); }
+    for (let i = 0; i < 3; i++) { const a = s.elapsed * 8 + i * Math.PI * 2 / 3; ctx.fillText('⭐', playerX + Math.cos(a) * 35, s.y - 102 + Math.sin(a) * 8); }
   }
   // Foreground grasses scroll fastest and stay below the playable area.
   ctx.fillStyle = '#225939';
   for (let i = -1; i < 14; i++) {
-    const x = i * 80 - (s.distance * 1.2) % 80;
+    const x = i * 80 - (cameraDistance * 1.2) % 80;
     ctx.beginPath(); ctx.moveTo(x, 400); ctx.lineTo(x + 12, 371); ctx.lineTo(x + 19, 389); ctx.lineTo(x + 34, 365); ctx.lineTo(x + 43, 400); ctx.fill();
   }
   if (s.messageTime > 0) {
@@ -141,7 +176,7 @@ export function JungleVineSwing({ onExit, onFinish }: {
   const duckSources = useRef(new Set<string>());
   const publish = () => {
     const s = world.current;
-    setHud({ phase: s.phase, lives: s.lives, bananas: s.bananas, seconds: Math.max(0, Math.ceil((s.level + 1) * LEVEL_SECONDS - s.elapsed)), paused: paused.current, level: s.level, score: runnerScore(s), golden: s.golden, cherries: s.cherries, slide: s.slideLeft, speed: runnerSpeed(s) / LEVELS[0].speed });
+    setHud({ phase: s.phase, lives: s.lives, bananas: s.bananas, seconds: Math.max(0, Math.ceil((s.level + 1) * LEVEL_SECONDS - s.elapsed)), paused: paused.current, level: s.level, score: runnerScore(s), golden: s.golden, cherries: s.cherries, slide: s.slideLeft, speed: travelSpeed(s) / LEVELS[0].speed });
   };
   function jump() { if (!paused.current) { duckSources.current.clear(); jumpRunner(world.current); } }
   function duck(source: string, down: boolean) {
@@ -154,6 +189,7 @@ export function JungleVineSwing({ onExit, onFinish }: {
   useEffect(() => {
     const sprite = new Image(); sprite.src = '/games/jungle-monkey-runner-sprites-v2.png';
     const predators = new Image(); predators.src = '/games/jungle-predators-v1.png';
+    const wildlife = new Image(); wildlife.src = '/games/jungle-wildlife-v1.png';
     const ctx = canvas.current?.getContext('2d');
     if (!ctx) return;
     let frame = 0, previous = 0, accumulator = 0, lastHud = 0;
@@ -167,7 +203,7 @@ export function JungleVineSwing({ onExit, onFinish }: {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       if (canvas.current && canvas.current.width !== 800 * dpr) { canvas.current.width = 800 * dpr; canvas.current.height = 400 * dpr; }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      paint(ctx, world.current, sprite, predators);
+      paint(ctx, world.current, sprite, predators, wildlife);
       if (now - lastHud > 100) { publish(); lastHud = now; }
       frame = requestAnimationFrame(tick);
     };
@@ -199,9 +235,9 @@ export function JungleVineSwing({ onExit, onFinish }: {
       </div>
       <div className="mt-3 grid grid-cols-2 gap-3">
         <button disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); jump(); }} onClick={e => { if (e.detail === 0) jump(); }} className="min-h-14 touch-none select-none rounded-2xl bg-yellow-300 p-3 font-black text-emerald-950 disabled:opacity-40">JUMP <small className="block">Tap again: double jump</small></button>
-        <button disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); duck(`pointer-${e.pointerId}`, true); }} onPointerUp={e => duck(`pointer-${e.pointerId}`, false)} onPointerCancel={e => duck(`pointer-${e.pointerId}`, false)} onLostPointerCapture={e => duck(`pointer-${e.pointerId}`, false)} onKeyDown={e => { if (e.key === 'Enter') duck('enter', true); }} onKeyUp={e => { if (e.key === 'Enter') duck('enter', false); }} className="min-h-14 touch-none select-none rounded-2xl bg-emerald-600 p-3 font-black disabled:opacity-40">SLIDE {hud.slide > 0 ? `${hud.slide.toFixed(1)}s` : ''} <small className="block">1.5s max · release to reset</small></button>
+        <button disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); duck(`pointer-${e.pointerId}`, true); }} onPointerUp={e => duck(`pointer-${e.pointerId}`, false)} onPointerCancel={e => duck(`pointer-${e.pointerId}`, false)} onLostPointerCapture={e => duck(`pointer-${e.pointerId}`, false)} onKeyDown={e => { if (e.key === 'Enter') duck('enter', true); }} onKeyUp={e => { if (e.key === 'Enter') duck('enter', false); }} className="min-h-14 touch-none select-none rounded-2xl bg-emerald-600 p-3 font-black disabled:opacity-40">SLIDE {hud.slide > 0 ? `${hud.slide.toFixed(1)}s` : ''} <small className="block">Fast dash → slow · 1.5s</small></button>
       </div>
-      <p className="mt-2 text-center text-xs text-emerald-200">Space / ↑: double jump · ↓: dive / slide (1.5s) · Release before sliding again</p>
+      <p className="mt-2 text-center text-xs text-emerald-200">Space / ↑: double jump · ↓: dive / dash (1.5s) · Release before sliding again</p>
     </div>
   </section>;
 }

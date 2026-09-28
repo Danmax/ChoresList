@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createRunner, createPredator, duckRunner, FLOOR, jumpRunner, LEVELS, PLAYER_X, runnerScore, runnerSpeed, stepRunner } from '../lib/jungle-runner';
+import { crocodileFrame, hippoFrame, createRunner, createPredator, dashBoost, duckRunner, FLOOR, jumpRunner, LEVELS, PLAYER_X, runnerScore, runnerSpeed, stepRunner, travelSpeed } from '../lib/jungle-runner';
 
 function active() { const s = createRunner(); s.phase = 'playing'; s.items = []; s.nextSection = 100000; return s; }
 function advance(s: ReturnType<typeof active>, seconds: number, fps = 120) { for (let i = 0; i < seconds * fps; i++) stepRunner(s, 1 / fps); }
@@ -129,3 +129,77 @@ test('authored sections always leave clear recovery space after hazards and rive
   const hazards = s.items.filter(i => i.kind !== 'banana');
   for (let i = 1; i < hazards.length; i++) assert.ok(hazards[i].x - hazards[i - 1].x >= 1100);
 });
+
+test('slide surges forward, eases down, and returns to running speed after 1.5 seconds', () => {
+  const dash = active(), run = active(); duckRunner(dash, true);
+  assert.equal(dashBoost(dash), 180);
+  advance(dash, 0.3); const early = dashBoost(dash);
+  assert.ok(dash.cameraLead > 0);
+  advance(dash, 0.6); assert.ok(dashBoost(dash) < early);
+  advance(dash, 0.7); advance(run, 1.6);
+  assert.equal(dashBoost(dash), 0); assert.equal(travelSpeed(dash), runnerSpeed(dash));
+  assert.ok(dash.distance > run.distance + 80);
+  assert.ok(dash.distance < run.distance + 95);
+});
+
+test('crocodiles snap once as the monkey jumps above each bank', () => {
+  const s = active(); s.rivers = [{ x: PLAYER_X + 10, width: 250 }]; jumpRunner(s);
+  advance(s, 0.1); const r = s.rivers[0];
+  assert.equal(r.snapped?.[0], true); assert.ok((r.snapLeft?.[0] ?? 0) > 0);
+  assert.equal(crocodileFrame(0.55), 1); assert.equal(crocodileFrame(0.35), 2); assert.equal(crocodileFrame(0.1), 3); assert.equal(crocodileFrame(0), 0);
+  advance(s, 1.1); assert.equal(r.snapped?.[1], true); assert.equal(r.snapLeft?.[0], 0); assert.equal(s.lives, 3);
+});
+
+test('hippo opens on approach, springs on contact, and finishes its bounce animation', () => {
+  const s = active(); s.rivers = [{ x: PLAYER_X + 10, width: 250 }]; const r = s.rivers[0];
+  assert.equal(hippoFrame(r, PLAYER_X), 1);
+  jumpRunner(s);
+  let sawOpen = false;
+  for (let i = 0; i < 120 && s.bounces === 0; i++) {
+    stepRunner(s, 1 / 120);
+    if (hippoFrame(r, s.distance + PLAYER_X) === 2) sawOpen = true;
+  }
+  assert.ok(sawOpen); assert.equal(s.bounces, 1); assert.equal(hippoFrame(r, s.distance + PLAYER_X), 3);
+  advance(s, 0.5); assert.equal(r.bounceLeft, 0);
+});
+
+test('bird coconut falls first, then bounces toward the player; cherries do not rebound', () => {
+  for (const gift of ['drop', 'cherry'] as const) {
+    const s = active(); s.invincible = 10; s.birds = [{ x: 620, y: 70, gift, dropped: false }];
+    stepRunner(s, 1 / 120); const item = s.items[0]; const initialX = item.x;
+    assert.ok((s.birds[0].releaseLeft ?? 0) > 0);
+    advance(s, 0.5); assert.equal(item.kind, gift); assert.equal(item.x, initialX);
+    advance(s, 0.5);
+    if (gift === 'drop') { assert.equal(item.kind, 'bouncing'); assert.ok(item.x < initialX); assert.ok(item.y < FLOOR - 20); }
+    else { assert.equal(item.kind, 'cherry'); assert.equal(item.x, initialX); assert.equal(item.y, FLOOR - 20); }
+  }
+});
+
+test('jumping or releasing cancels dash, and diving has no midair speed boost', () => {
+  const s = active(); duckRunner(s, true); advance(s, 0.1); jumpRunner(s);
+  assert.equal(dashBoost(s), 0);
+  advance(s, 0.1); duckRunner(s, false); duckRunner(s, true);
+  assert.equal(dashBoost(s), 0); assert.ok(s.vy >= 650);
+  advance(s, 0.3); assert.ok(dashBoost(s) > 0);
+  duckRunner(s, false); assert.equal(dashBoost(s), 0);
+});
+
+test('rolling coconuts approach and rotate; bouncing coconuts repeatedly land and rebound', () => {
+  const s = active(); s.invincible = 10;
+  const roll = { x: 700, y: FLOOR - 20, kind: 'rolling' as const, rotation: 0 };
+  const bounce = { x: 750, y: FLOOR - 20, kind: 'bouncing' as const, vy: -360, rotation: 0 };
+  s.items = [roll, bounce]; advance(s, 0.35);
+  assert.ok(roll.x < 700); assert.ok(roll.rotation < 0); assert.equal(roll.y, FLOOR - 20);
+  assert.ok(bounce.y < FLOOR - 60); advance(s, 0.55);
+  assert.ok(bounce.vy < 0); assert.ok(bounce.y <= FLOOR - 20);
+});
+
+for (const kind of ['rolling', 'bouncing'] as const) {
+  test(`${kind} coconut can hit but can also be cleared with a jump`, () => {
+    const hit = active(); hit.items = [{ x: PLAYER_X + 2, y: FLOOR - 20, kind, vy: -360 }];
+    advance(hit, 0.02); assert.equal(hit.lives, 2);
+    const dodge = active(); jumpRunner(dodge); advance(dodge, 0.2);
+    dodge.items = [{ x: dodge.distance + PLAYER_X + 10, y: FLOOR - 20, kind, vy: -360 }];
+    advance(dodge, 0.3); assert.equal(dodge.lives, 3);
+  });
+}
