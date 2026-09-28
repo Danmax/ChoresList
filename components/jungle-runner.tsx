@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react';
-import { createRunner, duckRunner, FLOOR, jumpRunner, PLAYER_X, stepRunner, type Runner } from '@/lib/jungle-runner';
+import { createRunner, duckRunner, FLOOR, jumpRunner, LEVELS, LEVEL_SECONDS, PLAYER_X, runnerScore, stepRunner, type Runner } from '@/lib/jungle-runner';
 
 function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElement) {
   const W = 800, H = 400;
   ctx.clearRect(0, 0, W, H);
   const sky = ctx.createLinearGradient(0, 0, 0, H);
-  sky.addColorStop(0, '#8de3e5'); sky.addColorStop(1, '#ecf8b4');
+  sky.addColorStop(0, LEVELS[s.level].sky); sky.addColorStop(1, LEVELS[s.level].mist);
   ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = '#fff5b6'; ctx.beginPath(); ctx.arc(650, 65, 38, 0, Math.PI * 2); ctx.fill();
   // Three independent speeds create depth without moving the collision plane.
@@ -46,15 +46,28 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     ctx.font = '58px sans-serif'; ctx.fillText('🦛', hx, FLOOR + 5);
     ctx.fillStyle = '#fef08a'; ctx.font = 'bold 13px sans-serif'; ctx.fillText('BOUNCE', hx, FLOOR - 33);
   }
+  for (const bird of s.birds) {
+    const x = bird.x - s.distance;
+    const y = bird.y + Math.sin(s.elapsed * 7) * 5;
+    ctx.font = '36px sans-serif'; ctx.fillText('🦜', x, y);
+    ctx.strokeStyle = bird.gift === 'cherry' ? '#ffec9c' : '#914d26'; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.moveTo(x - 10, y); ctx.lineTo(x - 33, y - 12 + Math.sin(s.elapsed * 15) * 12); ctx.stroke();
+    if (!bird.dropped) { ctx.font = '22px sans-serif'; ctx.fillText(bird.gift === 'cherry' ? '🍒' : '🥥', x, y + 25); }
+  }
   for (const item of s.items) {
     const x = item.x - s.distance;
     if (x < -40 || x > 850) continue;
-    ctx.font = item.kind === 'banana' ? '27px sans-serif' : '38px sans-serif';
-    ctx.fillText(item.kind === 'banana' ? '🍌' : '🥥', x, item.y);
-    if (item.kind !== 'banana') {
+    const collectible = ['banana', 'golden', 'cherry'].includes(item.kind);
+    if (item.kind === 'golden') {
+      ctx.fillStyle = '#ffe663'; ctx.beginPath(); ctx.arc(x, item.y, 23 + Math.sin(s.elapsed * 6) * 2, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#593700'; ctx.font = 'bold 12px sans-serif'; ctx.fillText('DOUBLE ↑', x, item.y - 33);
+    }
+    ctx.font = collectible ? '27px sans-serif' : '38px sans-serif';
+    ctx.fillText(item.kind === 'cherry' ? '🍒' : collectible ? '🍌' : item.kind === 'snake' ? '🐍' : '🥥', x, item.y);
+    if (!collectible) {
       ctx.fillStyle = '#fff'; ctx.fillRect(x - 29, item.y - 43, 58, 19);
       ctx.fillStyle = '#174d35'; ctx.font = 'bold 12px sans-serif';
-      ctx.fillText(item.kind === 'low' ? 'JUMP' : item.kind === 'high' ? 'DUCK' : 'RUN', x, item.y - 33);
+      ctx.fillText(['low', 'snake', 'drop'].includes(item.kind) ? 'JUMP' : item.kind === 'high' ? 'DUCK' : 'RUN', x, item.y - 33);
     }
   }
   const knocked = s.stun > 0 || s.phase === 'over';
@@ -93,13 +106,13 @@ export function JungleVineSwing({ onExit, onFinish }: {
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const world = useRef(createRunner());
-  const [hud, setHud] = useState({ phase: 'ready', lives: 3, bananas: 0, seconds: 60, paused: false });
+  const [hud, setHud] = useState({ phase: 'ready', lives: 3, bananas: 0, seconds: 60, paused: false, level: 0, score: 0, golden: 0, cherries: 0, slide: 0 });
   const paused = useRef(false);
   const saved = useRef(false);
   const duckSources = useRef(new Set<string>());
   const publish = () => {
     const s = world.current;
-    setHud({ phase: s.phase, lives: s.lives, bananas: s.bananas, seconds: Math.max(0, Math.ceil(60 - s.elapsed)), paused: paused.current });
+    setHud({ phase: s.phase, lives: s.lives, bananas: s.bananas, seconds: Math.max(0, Math.ceil((s.level + 1) * LEVEL_SECONDS - s.elapsed)), paused: paused.current, level: s.level, score: runnerScore(s), golden: s.golden, cherries: s.cherries, slide: s.slideLeft });
   };
   function jump() { if (!paused.current) { duckSources.current.clear(); jumpRunner(world.current); } }
   function duck(source: string, down: boolean) {
@@ -148,16 +161,17 @@ export function JungleVineSwing({ onExit, onFinish }: {
   return <section className="fixed inset-0 z-50 flex flex-col justify-center overflow-auto bg-emerald-950 p-3 text-white sm:p-6" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
     <div className="mx-auto w-full max-w-4xl">
       <header className="mb-2 flex items-center justify-between gap-2"><h2 className="font-black">Jungle Runner</h2><div className="flex gap-2"><button onClick={pause} disabled={hud.phase !== 'playing'} className="rounded-xl bg-white/10 px-3 py-2 disabled:opacity-40">{hud.paused ? 'Resume' : 'Pause'}</button><button onClick={onExit} className="rounded-xl bg-white/10 px-3 py-2">Exit</button></div></header>
-      <div className="mb-2 flex justify-between gap-2 text-sm font-black"><span>🍌 {hud.bananas} <small className="block text-yellow-200">{hud.bananas % 100}/100 → +1 life</small></span><span>❤️ {hud.lives} lives</span><span>{hud.seconds}s · {hud.bananas * 10} pts</span></div>
+      <div className="mb-2 flex justify-between gap-2 text-sm font-black"><span>🍌 {hud.bananas} <small className="block text-yellow-200">{hud.bananas % 100}/100 → +1 life</small></span><span>❤️ {hud.lives} lives</span><span>{hud.seconds}s · {hud.score} pts</span></div>
+      <p className="mb-2 text-xs font-bold text-yellow-200">Level {hud.level + 1}/{LEVELS.length} · {LEVELS[hud.level].name} · ⭐ {hud.golden} gold · 🍒 {hud.cherries}</p>
       <div className="relative overflow-hidden rounded-2xl border-2 border-emerald-700">
         <canvas ref={canvas} width={800} height={400} aria-label="Jungle runner: jump low coconuts, duck middle coconuts, run under overhead coconuts, bounce on hippos across rivers" className="block aspect-[2/1] w-full" />
-        {(hud.phase === 'ready' || ended || hud.paused) && <div className="absolute inset-0 flex items-center justify-center bg-emerald-950/75 p-3"><div className="max-w-md text-center"><h3 className="text-lg font-black sm:text-2xl">{hud.paused ? 'Taking a breather' : ended ? hud.phase === 'victory' ? 'Jungle victory!' : 'Run complete!' : 'Find your jungle rhythm'}</h3><p className="my-2 text-xs sm:text-sm">{ended ? `${hud.bananas} bananas · ${hud.bananas * 10} points` : 'Tap Jump twice for a double jump. Hold Duck to dive, then release to run. Land on a hippo to bounce over the river!'}</p>{hud.paused ? <button onClick={pause} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Resume</button> : ended ? <button onClick={() => { if (saved.current) return; saved.current = true; const s = world.current; onFinish(s.bananas * 10, Math.max(1, Math.round(s.elapsed)), { bananas: s.bananas, hits: s.hits, hippoBounces: s.bounces, extraLives: Math.floor(s.bananas / 100) }); }} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Save run</button> : <button onClick={start} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Let’s run</button>}</div></div>}
+        {(hud.phase === 'ready' || ended || hud.paused) && <div className="absolute inset-0 flex items-center justify-center bg-emerald-950/75 p-3"><div className="max-w-md text-center"><h3 className="text-lg font-black sm:text-2xl">{hud.paused ? 'Taking a breather' : ended ? hud.phase === 'victory' ? 'Jungle victory!' : 'Run complete!' : 'Find your jungle rhythm'}</h3><p className="my-2 text-xs sm:text-sm">{ended ? `${hud.bananas} banana coins · ${hud.golden} gold · ${hud.cherries} cherries · ${hud.score} points` : 'Three jungle levels! Double jump for gold (+10 coins). Slide lasts 1.5s. Jump snakes and coconuts; catch bird cherries (+50 points).'}</p>{hud.paused ? <button onClick={pause} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Resume</button> : ended ? <button onClick={() => { if (saved.current) return; saved.current = true; const s = world.current; onFinish(runnerScore(s), Math.max(1, Math.round(s.elapsed)), { bananas: s.bananas, goldenBananas: s.golden, cherries: s.cherries, levelsCompleted: s.phase === 'victory' ? LEVELS.length : s.level, hits: s.hits, hippoBounces: s.bounces, extraLives: Math.floor(s.bananas / 100) }); }} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Save run</button> : <button onClick={start} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Let’s run</button>}</div></div>}
       </div>
       <div className="mt-3 grid grid-cols-2 gap-3">
         <button disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); jump(); }} onClick={e => { if (e.detail === 0) jump(); }} className="min-h-14 touch-none select-none rounded-2xl bg-yellow-300 p-3 font-black text-emerald-950 disabled:opacity-40">JUMP <small className="block">Tap again: double jump</small></button>
-        <button disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); duck(`pointer-${e.pointerId}`, true); }} onPointerUp={e => duck(`pointer-${e.pointerId}`, false)} onPointerCancel={e => duck(`pointer-${e.pointerId}`, false)} onLostPointerCapture={e => duck(`pointer-${e.pointerId}`, false)} onKeyDown={e => { if (e.key === 'Enter') duck('enter', true); }} onKeyUp={e => { if (e.key === 'Enter') duck('enter', false); }} className="min-h-14 touch-none select-none rounded-2xl bg-emerald-600 p-3 font-black disabled:opacity-40">HOLD DUCK <small className="block">Cancel jump · release to run</small></button>
+        <button disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); duck(`pointer-${e.pointerId}`, true); }} onPointerUp={e => duck(`pointer-${e.pointerId}`, false)} onPointerCancel={e => duck(`pointer-${e.pointerId}`, false)} onLostPointerCapture={e => duck(`pointer-${e.pointerId}`, false)} onKeyDown={e => { if (e.key === 'Enter') duck('enter', true); }} onKeyUp={e => { if (e.key === 'Enter') duck('enter', false); }} className="min-h-14 touch-none select-none rounded-2xl bg-emerald-600 p-3 font-black disabled:opacity-40">SLIDE {hud.slide > 0 ? `${hud.slide.toFixed(1)}s` : ''} <small className="block">1.5s max · release to reset</small></button>
       </div>
-      <p className="mt-2 text-center text-xs text-emerald-200">Space / ↑: jump twice · Hold ↓: dive / duck · Release: run</p>
+      <p className="mt-2 text-center text-xs text-emerald-200">Space / ↑: double jump · ↓: dive / slide (1.5s) · Release before sliding again</p>
     </div>
   </section>;
 }

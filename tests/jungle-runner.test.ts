@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createRunner, duckRunner, FLOOR, jumpRunner, PLAYER_X, stepRunner } from '../lib/jungle-runner';
+import { createRunner, duckRunner, FLOOR, jumpRunner, PLAYER_X, runnerScore, stepRunner } from '../lib/jungle-runner';
 
 function active() { const s = createRunner(); s.phase = 'playing'; s.items = []; s.nextSection = 100000; return s; }
 function advance(s: ReturnType<typeof active>, seconds: number, fps = 120) { for (let i = 0; i < seconds * fps; i++) stepRunner(s, 1 / fps); }
@@ -40,8 +40,52 @@ test('movement is consistent at different update rates', () => {
 });
 
 test('hippo remains reachable at maximum running speed', () => {
-  const s = active(); s.elapsed = 58; s.rivers = [{ x: PLAYER_X + 10, width: 250 }]; jumpRunner(s);
+  const s = active(); s.elapsed = 178; s.level = 2; s.rivers = [{ x: PLAYER_X + 10, width: 250 }]; jumpRunner(s);
   advance(s, 1.7); assert.ok(s.bounces >= 1); assert.equal(s.lives, 3);
+});
+
+test('slide times out even while held and requires release to restart', () => {
+  const s = active(); duckRunner(s, true); advance(s, 1.6);
+  assert.equal(s.duck, false); duckRunner(s, true); assert.equal(s.duck, false);
+  duckRunner(s, false); duckRunner(s, true); assert.equal(s.duck, true);
+});
+
+test('gold is above single-jump reach but reachable with a double jump', () => {
+  const single = active(); jumpRunner(single);
+  for (let i = 0; i < 100; i++) {
+    single.items = [{ x: single.distance + PLAYER_X, y: FLOOR - 215, kind: 'golden' }];
+    stepRunner(single, 1 / 120);
+  }
+  assert.equal(single.golden, 0);
+  const double = active(); jumpRunner(double); advance(double, 0.3); jumpRunner(double); advance(double, 0.3);
+  double.bananas = 95;
+  double.items = [{ x: double.distance + PLAYER_X, y: FLOOR - 215, kind: 'golden' }];
+  advance(double, 0.02); assert.equal(double.golden, 1); assert.equal(double.bananas, 105); assert.equal(double.lives, 4);
+});
+
+test('birds release one visible falling gift; cherries reward and coconuts hurt', () => {
+  for (const gift of ['drop', 'cherry'] as const) {
+    const s = active(); s.birds = [{ x: 620, y: 70, gift, dropped: false }];
+    stepRunner(s, 1 / 120); assert.equal(s.items.length, 1); assert.equal(s.birds[0].dropped, true);
+    const y = s.items[0].y; advance(s, 0.2); assert.ok(s.items[0].y > y);
+    advance(s, 2.3);
+    assert.equal(s.birds.length, 1);
+    if (gift === 'cherry') { assert.equal(s.cherries, 1); assert.equal(runnerScore(s), 50); assert.equal(s.lives, 3); }
+    else assert.equal(s.lives, 2);
+  }
+});
+
+test('snakes hurt on the ground and can be jumped', () => {
+  const s = active(); s.items = [{ x: PLAYER_X, y: FLOOR - 18, kind: 'snake' }]; advance(s, 0.02); assert.equal(s.lives, 2);
+  const jumping = active(); jumpRunner(jumping); advance(jumping, 0.2);
+  jumping.items = [{ x: jumping.distance + PLAYER_X, y: FLOOR - 18, kind: 'snake' }]; advance(jumping, 0.02); assert.equal(jumping.lives, 3);
+});
+
+test('levels advance without resetting earned coins or lives and victory follows level three', () => {
+  const s = active(); s.bananas = 110; s.lives = 4; s.elapsed = 59.99;
+  advance(s, 0.03); assert.equal(s.level, 1); assert.equal(s.phase, 'playing');
+  s.elapsed = 119.99; advance(s, 0.03); assert.equal(s.level, 2);
+  s.elapsed = 179.99; advance(s, 0.03); assert.equal(s.phase, 'victory'); assert.equal(s.bananas, 110); assert.equal(s.lives, 4);
 });
 
 test('authored sections always leave clear recovery space after hazards and rivers', () => {

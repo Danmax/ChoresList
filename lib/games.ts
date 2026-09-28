@@ -94,11 +94,11 @@ export const GAME_DEFINITIONS: GameDefinition[] = [
   {
     key: "jungle-vine-swing",
     title: "Jungle Runner",
-    description: "Run, double jump, and duck through the jungle. Collect bananas and bounce across rivers on hippos.",
+    description: "Explore three jungle levels: double jump for gold, slide past hazards, dodge snakes, and catch cherries from birds.",
     icon: "TreePine",
     ageMin: 5,
     ageMax: 14,
-    playTime: "1 min",
+    playTime: "3 min",
     color: "#15803d",
     bg: "#dcfce7",
   },
