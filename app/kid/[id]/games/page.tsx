@@ -7,6 +7,7 @@ import { ArrowLeft, BookOpen, CheckCircle2, ChefHat, Circle, FileText, Gamepad2,
 import { toast } from "sonner";
 import { MemberAvatar } from "@/components/member-avatar";
 import { JungleVineSwing } from "@/components/jungle-runner";
+import { createTriviaRound, type TriviaLevel } from "@/lib/bible-trivia";
 
 type Member = {
   id: string;
@@ -66,46 +67,6 @@ const RPS_CHOICES = [
   { key: "paper", label: "Paper", color: "text-blue-700", bg: "bg-blue-50", beats: "rock" },
   { key: "scissors", label: "Scissors", color: "text-red-700", bg: "bg-red-50", beats: "paper" },
 ] as const;
-type TriviaLevel = "Explorer" | "Adventurer" | "Scholar";
-type TriviaQuestion = { question: string; choices: string[]; answer: string };
-const TRIVIA_BY_LEVEL: Record<TriviaLevel, TriviaQuestion[]> = {
-  Explorer: [
-    { question: "Who built the ark?", choices: ["Noah", "Moses", "David", "Peter"], answer: "Noah" },
-    { question: "Where was Jesus born?", choices: ["Bethlehem", "Jericho", "Nazareth", "Rome"], answer: "Bethlehem" },
-    { question: "What did David use against Goliath?", choices: ["A sling and stone", "A net", "A trumpet", "A staff"], answer: "A sling and stone" },
-    { question: "Who was swallowed by a great fish?", choices: ["Jonah", "Joseph", "Daniel", "Samuel"], answer: "Jonah" },
-    { question: "Who was protected in the lions’ den?", choices: ["Daniel", "Noah", "Peter", "Isaac"], answer: "Daniel" },
-    { question: "Who led God’s people through the Red Sea?", choices: ["Moses", "David", "Paul", "Abraham"], answer: "Moses" },
-    { question: "What is the first book of the Bible?", choices: ["Genesis", "Matthew", "Psalms", "Exodus"], answer: "Genesis" },
-    { question: "How many disciples did Jesus choose?", choices: ["12", "7", "10", "20"], answer: "12" },
-    { question: "What was the name of Jesus’ mother?", choices: ["Mary", "Ruth", "Esther", "Martha"], answer: "Mary" },
-    { question: "What did Jesus turn water into?", choices: ["Wine", "Milk", "Oil", "Juice"], answer: "Wine" },
-  ],
-  Adventurer: [
-    { question: "Which king was known for asking God for wisdom?", choices: ["Solomon", "Saul", "Ahab", "Herod"], answer: "Solomon" },
-    { question: "Whose walls fell after Israel marched around them?", choices: ["Jericho", "Bethlehem", "Nineveh", "Damascus"], answer: "Jericho" },
-    { question: "Who was Ruth’s mother-in-law?", choices: ["Naomi", "Hannah", "Miriam", "Deborah"], answer: "Naomi" },
-    { question: "Who received a special coat from his father?", choices: ["Joseph", "Joshua", "Jacob", "Jonathan"], answer: "Joseph" },
-    { question: "What was connected to Samson’s great strength?", choices: ["His uncut hair", "His sandals", "His shield", "His crown"], answer: "His uncut hair" },
-    { question: "Which disciple had been a tax collector?", choices: ["Matthew", "Andrew", "John", "Thomas"], answer: "Matthew" },
-    { question: "Where did Jesus teach the Beatitudes?", choices: ["On a mountainside", "In a palace", "On a ship", "In Rome"], answer: "On a mountainside" },
-    { question: "Who interpreted Pharaoh’s dreams in Egypt?", choices: ["Joseph", "Aaron", "Samuel", "Elijah"], answer: "Joseph" },
-    { question: "Which queen bravely spoke up for her people?", choices: ["Esther", "Jezebel", "Bathsheba", "Candace"], answer: "Esther" },
-    { question: "What happened when Paul and Silas sang in prison?", choices: ["An earthquake opened the doors", "It began to rain", "The lights went out", "A ship arrived"], answer: "An earthquake opened the doors" },
-  ],
-  Scholar: [
-    { question: "On what road did Saul encounter Jesus?", choices: ["The road to Damascus", "The road to Jericho", "The Emmaus road", "The Appian Way"], answer: "The road to Damascus" },
-    { question: "Which book lists the fruit of the Spirit?", choices: ["Galatians", "Genesis", "Hebrews", "Revelation"], answer: "Galatians" },
-    { question: "Who was chosen to replace Judas among the twelve?", choices: ["Matthias", "Barnabas", "Silas", "Timothy"], answer: "Matthias" },
-    { question: "On which island did John receive the Revelation?", choices: ["Patmos", "Crete", "Cyprus", "Malta"], answer: "Patmos" },
-    { question: "Who is remembered as the first Christian martyr?", choices: ["Stephen", "James", "Philip", "Mark"], answer: "Stephen" },
-    { question: "Lydia was a seller of what?", choices: ["Purple cloth", "Olive oil", "Spices", "Pottery"], answer: "Purple cloth" },
-    { question: "Who was Priscilla’s husband?", choices: ["Aquila", "Apollos", "Festus", "Titus"], answer: "Aquila" },
-    { question: "Which king ordered Daniel into the lions’ den?", choices: ["Darius", "Solomon", "Herod", "Josiah"], answer: "Darius" },
-    { question: "In which letter is the armor of God described?", choices: ["Ephesians", "Romans", "Philippians", "Colossians"], answer: "Ephesians" },
-    { question: "Who explained the Scriptures to the Ethiopian official?", choices: ["Philip", "Peter", "Luke", "Barnabas"], answer: "Philip" },
-  ],
-};
 
 function shuffle<T>(items: T[]) {
   return [...items].sort(() => Math.random() - 0.5);
@@ -486,7 +447,7 @@ function BibleTrivia({
   onFinish: (score: number, durationSeconds: number, metadata: Record<string, unknown>) => void;
 }) {
   const level: TriviaLevel = age <= 8 ? "Explorer" : age <= 12 ? "Adventurer" : "Scholar";
-  const questions = useMemo(() => shuffle(TRIVIA_BY_LEVEL[level]).slice(0, 8), [level]);
+  const questions = useMemo(() => createTriviaRound(level), [level]);
   const [index, setIndex] = useState(0);
   const [correct, setCorrect] = useState(0);
   const [selected, setSelected] = useState("");
