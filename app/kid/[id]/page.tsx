@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, ArrowRight, BookOpen, Camera, CheckCircle2, ChevronRight, Gamepad2, Gift, GraduationCap, Lightbulb, ListChecks, Plus, Shield, Trophy, Wrench } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, Camera, CheckCircle2, ChevronRight, Clock3, Gamepad2, Gift, GraduationCap, Lightbulb, ListChecks, Plus, Shield, Trophy, Wrench } from "lucide-react";
 import { getLevelFromPoints, getLevelTitle, getPointsForNextLevel } from "@/lib/points";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -87,6 +87,8 @@ type HouseProject = {
   rewardEmoji: string;
   pointsBonus: number;
   status: string;
+  progressPercent: number;
+  workLogs: { id: string; note?: string | null; minutesWorked: number; progressPercent?: number | null; photoUrl?: string | null; createdAt: string }[];
 };
 
 function formatDate(value?: string | null) {
@@ -115,6 +117,9 @@ export default function KidPage() {
   const [completionProject, setCompletionProject] = useState<HouseProject | null>(null);
   const [projectReaction, setProjectReaction] = useState("");
   const [projectNote, setProjectNote] = useState("");
+  const [updatingProject, setUpdatingProject] = useState<HouseProject | null>(null);
+  const [projectUpdate, setProjectUpdate] = useState({ note: "", hoursWorked: "", progressPercent: "", photo: null as File | null });
+  const [savingProjectUpdate, setSavingProjectUpdate] = useState(false);
   const [academyEnabled, setAcademyEnabled] = useState(false);
   const [educationAssignments, setEducationAssignments] = useState<EducationAssignment[]>([]);
   const [educationProjects, setEducationProjects] = useState<EducationProject[]>([]);
@@ -127,7 +132,7 @@ export default function KidPage() {
     const [membersRes, assignRes, projRes, educationRes] = await Promise.all([
       fetch("/api/members"),
       fetch(`/api/assignments?memberId=${id}`),
-      fetch(`/api/projects?memberId=${id}&status=open`),
+      fetch(`/api/projects?memberId=${id}`),
       fetch(`/api/education/kid?memberId=${id}`),
     ]);
     const membersData = await membersRes.json().catch(() => []);
@@ -135,7 +140,7 @@ export default function KidPage() {
     const found = members.find((m) => m.id === id);
     setMember(found ?? null);
     setAssignments(await assignRes.json());
-    if (projRes.ok) setProjects(await projRes.json());
+    if (projRes.ok) setProjects((await projRes.json()).filter((project: HouseProject) => project.status !== "completed"));
     if (educationRes.ok) {
       const data = await educationRes.json().catch(() => null);
       setAcademyEnabled(true);
@@ -168,6 +173,26 @@ export default function KidPage() {
     setProjectReaction("");
     setProjectNote("");
     loadData();
+  }
+
+  async function saveProjectUpdate() {
+    if (!updatingProject) return;
+    const payload = new FormData();
+    payload.set("memberId", id);
+    payload.set("note", projectUpdate.note);
+    payload.set("minutesWorked", projectUpdate.hoursWorked ? String(Math.round(Number(projectUpdate.hoursWorked) * 60)) : "");
+    payload.set("progressPercent", projectUpdate.progressPercent);
+    if (projectUpdate.photo) payload.set("photo", projectUpdate.photo);
+    setSavingProjectUpdate(true);
+    try {
+      const response = await fetch(`/api/projects/${updatingProject.id}/updates`, { method: "POST", body: payload });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) return toast.error(data.error ?? "Could not save project update");
+      toast.success("Project update saved");
+      setUpdatingProject(null);
+      setProjectUpdate({ note: "", hoursWorked: "", progressPercent: "", photo: null });
+      await loadData();
+    } finally { setSavingProjectUpdate(false); }
   }
 
   useEffect(() => {
@@ -777,28 +802,38 @@ export default function KidPage() {
                   <span className="text-4xl">{p.emoji}</span>
                   <div className="min-w-0 flex-1">
                     <p className="font-black text-slate-800">{p.title}</p>
+                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-orange-100"><div className="h-full rounded-full bg-orange-500 transition-all" style={{ width: `${p.progressPercent}%` }} /></div>
+                    <p className="mt-1 text-xs font-black text-orange-600">{p.status === "in-progress" ? "In progress" : "Ready to start"} · {p.progressPercent}%</p>
                     <div className="flex items-center gap-2 mt-1 bg-amber-50 border border-amber-200 rounded-xl px-2 py-1 w-fit">
                       <span className="text-base">{p.rewardEmoji}</span>
                       <span className="text-xs font-black text-amber-700">Earn: {p.rewardTitle}</span>
                     </div>
                     <p className="text-xs text-slate-400 font-semibold mt-1">⭐ +{p.pointsBonus} bonus pts</p>
                   </div>
-                  <button
-                    onClick={() => {
-                      setCompletionProject(p);
-                      setProjectReaction("");
-                      setProjectNote("");
-                    }}
-                    className="w-full rounded-2xl bg-orange-500 px-4 py-2.5 text-sm font-black text-white transition-colors hover:bg-orange-600 sm:w-auto"
-                  >
-                    Done! ✅
-                  </button>
+                  <div className="flex w-full gap-2 sm:w-auto">
+                    <button onClick={() => { setUpdatingProject(p); setProjectUpdate({ note: "", hoursWorked: "", progressPercent: String(p.progressPercent), photo: null }); }} className="flex-1 rounded-2xl bg-orange-100 px-3 py-2.5 text-sm font-black text-orange-700 sm:flex-none">Update</button>
+                    <button onClick={() => { setCompletionProject(p); setProjectReaction(""); setProjectNote(""); }} className="flex-1 rounded-2xl bg-orange-500 px-3 py-2.5 text-sm font-black text-white transition-colors hover:bg-orange-600 sm:flex-none">Done! ✅</button>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         </div>
       )}
+
+      <Dialog open={!!updatingProject} onOpenChange={(open) => !open && setUpdatingProject(null)}>
+        <DialogContent className="max-w-sm rounded-3xl">
+          <DialogHeader><DialogTitle className="font-black">{updatingProject?.emoji} Add project update</DialogTitle></DialogHeader>
+          <p className="text-sm font-semibold text-slate-500">Share what you worked on so your family can follow the project.</p>
+          <textarea value={projectUpdate.note} onChange={(event) => setProjectUpdate((current) => ({ ...current, note: event.target.value }))} maxLength={2000} rows={4} placeholder="What did you get done?" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold outline-none focus:border-orange-300" />
+          <div className="grid grid-cols-2 gap-3">
+            <label className="text-sm font-black text-slate-700">Hours worked<input type="number" min="0" max="24" step="0.25" value={projectUpdate.hoursWorked} onChange={(event) => setProjectUpdate((current) => ({ ...current, hoursWorked: event.target.value }))} placeholder="0" className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" /></label>
+            <label className="text-sm font-black text-slate-700">Progress %<input type="number" min="0" max="100" value={projectUpdate.progressPercent} onChange={(event) => setProjectUpdate((current) => ({ ...current, progressPercent: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" /></label>
+          </div>
+          <label className="text-sm font-black text-slate-700">Photo (optional)<input type="file" accept="image/*" capture="environment" onChange={(event) => setProjectUpdate((current) => ({ ...current, photo: event.target.files?.[0] ?? null }))} className="mt-1 block w-full text-sm text-slate-500" /></label>
+          <button type="button" disabled={savingProjectUpdate} onClick={() => void saveProjectUpdate()} className="flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500 py-3 font-black text-white disabled:opacity-40"><Clock3 size={18} /> {savingProjectUpdate ? "Saving…" : "Save update"}</button>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!completionProject} onOpenChange={(open) => !open && setCompletionProject(null)}>
         <DialogContent className="max-w-sm rounded-3xl">

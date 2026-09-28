@@ -14,10 +14,11 @@ interface Member { id: string; name: string; avatar: string; color: string; role
 interface Project {
   id: string; title: string; description: string | null; category: string;
   emoji: string; rewardTitle: string; rewardEmoji: string; pointsBonus: number;
-  assignedTo: string | null; status: string; dueDate: string | null;
+  assignedTo: string | null; status: string; progressPercent: number; dueDate: string | null;
   assignee: Member | null;
   participants: { id: string; completedAt: string | null; reactionEmoji: string | null; completionNote: string | null; member: Member }[];
   tickets: { id: string; member: Member; status: string }[];
+  workLogs: { id: string; note: string | null; minutesWorked: number; progressPercent: number | null; photoUrl: string | null; createdAt: string; member: Pick<Member, "id" | "name" | "avatar" | "color"> }[];
 }
 
 const BLANK = {
@@ -136,7 +137,7 @@ export default function ProjectsPage() {
 
       {/* Status filter */}
       <div className="flex flex-wrap gap-2 mb-6">
-        {[["open","Open"],["completed","Done"],["all","All"]].map(([v,l]) => (
+        {[["open","Open"],["in-progress","In Progress"],["completed","Done"],["all","All"]].map(([v,l]) => (
           <button key={v} onClick={() => setFilterStatus(v)}
             className={`px-4 py-2 rounded-full font-bold text-sm transition-colors ${filterStatus === v ? "bg-slate-800 text-white" : "bg-white text-slate-600"}`}
           >{l}</button>
@@ -156,6 +157,10 @@ export default function ProjectsPage() {
                   )}
                 </div>
                 {p.description && <p className="text-slate-500 text-sm mt-0.5">{p.description}</p>}
+                <div className="mt-3 rounded-2xl bg-slate-50 p-3">
+                  <div className="flex items-center justify-between text-xs font-black text-slate-600"><span>{p.status === "in-progress" ? "In progress" : p.status === "completed" ? "Complete" : "Ready to start"}</span><span>{p.progressPercent}% · {(p.workLogs.reduce((total, log) => total + log.minutesWorked, 0) / 60).toLocaleString(undefined, { maximumFractionDigits: 2 })} hrs</span></div>
+                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-orange-500" style={{ width: `${p.progressPercent}%` }} /></div>
+                </div>
                 <div className="flex flex-wrap gap-2 mt-2 text-xs font-semibold">
                   <span className="bg-orange-50 text-orange-600 px-2 py-1 rounded-lg">
                     {PROJECT_CATEGORIES.find((c) => c.value === p.category)?.emoji} {p.category}
@@ -203,9 +208,22 @@ export default function ProjectsPage() {
                     ))}
                   </div>
                 )}
+                {p.workLogs.length > 0 && (
+                  <div className="mt-3 border-t border-slate-100 pt-3">
+                    <p className="mb-2 text-xs font-black uppercase tracking-wide text-slate-400">Work updates</p>
+                    <div className="space-y-2">
+                      {p.workLogs.slice(0, 4).map((log) => (
+                        <div key={log.id} className="flex gap-3 rounded-2xl bg-orange-50 p-3 text-sm">
+                          {log.photoUrl && <img src={log.photoUrl} alt={`Project update from ${log.member.name}`} className="h-16 w-16 rounded-xl object-cover" />}
+                          <div className="min-w-0 flex-1"><p className="font-black text-slate-700">{log.member.avatar} {log.member.name} <span className="font-semibold text-slate-400">· {new Date(log.createdAt).toLocaleDateString()}</span></p>{log.note && <p className="mt-0.5 text-xs font-semibold text-slate-600">{log.note}</p>}<p className="mt-1 text-xs font-black text-orange-700">{log.minutesWorked > 0 && `${(log.minutesWorked / 60).toLocaleString(undefined, { maximumFractionDigits: 2 })} hrs`}{log.minutesWorked > 0 && log.progressPercent !== null && " · "}{log.progressPercent !== null && `${log.progressPercent}% progress`}</p></div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="flex flex-col gap-2 shrink-0">
-                {p.status === "open" && (
+                {p.status !== "completed" && (
                   <>
                     <button onClick={() => { setAssigningProject(p); setAssignmentIds(p.participants.length ? p.participants.map((participant) => participant.member.id) : p.assignee ? [p.assignee.id] : []); }} className="rounded-xl bg-orange-50 px-3 py-1.5 text-xs font-black text-orange-700">Assign</button>
                     <button

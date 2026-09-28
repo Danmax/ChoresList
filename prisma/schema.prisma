@@ -85,6 +85,7 @@ model Household {
   giftLists                GiftList[]
   houseProjects            HouseProject[]
   projectParticipants      HouseProjectParticipant[]
+  projectWorkLogs          ProjectWorkLog[]
   rewardTickets            RewardTicket[]
   events                   FamilyEvent[]
   devices                  HouseholdDevice[]
@@ -215,6 +216,7 @@ model FamilyMember {
   giftLists             GiftList[]
   houseProjects         HouseProject[]            @relation("ProjectAssignee")
   projectParticipations HouseProjectParticipant[]
+  projectWorkLogs       ProjectWorkLog[]
   rewardTickets         RewardTicket[]
   devices               HouseholdDevice[]
   pairingCodes          DevicePairingCode[]
@@ -759,13 +761,34 @@ model HouseProject {
   pointsBonus Int       @default(50)
   assignedTo  String?   @db.Char(36)
   status      String    @default("open") @db.VarChar(64)
+  progressPercent Int   @default(0)
   dueDate     DateTime?
   createdAt   DateTime  @default(now())
 
   assignee     FamilyMember?             @relation("ProjectAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
   participants HouseProjectParticipant[]
+  workLogs     ProjectWorkLog[]
   tickets      RewardTicket[]
   household    Household                 @relation(fields: [householdId], references: [id], onDelete: Cascade)
+}
+
+model ProjectWorkLog {
+  id              String    @id @default(uuid()) @db.Char(36)
+  householdId     String    @db.Char(36)
+  projectId       String    @db.Char(36)
+  memberId        String    @db.Char(36)
+  note            String?   @db.Text
+  minutesWorked   Int       @default(0)
+  progressPercent Int?
+  photoUrl        String?   @db.VarChar(512)
+  createdAt       DateTime  @default(now())
+
+  household Household    @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  project   HouseProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  member    FamilyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, createdAt])
+  @@index([householdId, memberId])
 }
 
 model HouseProjectParticipant {

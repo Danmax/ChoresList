@@ -51,6 +51,10 @@ export const GET = withErrors(async (req: NextRequest) => {
         orderBy: { createdAt: "asc" },
       },
       tickets: { include: { member: { select: { id: true, name: true, avatar: true } } } },
+      workLogs: {
+        include: { member: { select: { id: true, name: true, avatar: true, color: true } } },
+        orderBy: { createdAt: "desc" },
+      },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -175,7 +179,7 @@ export const PUT = withErrors(async (req: NextRequest) => {
       });
       const project = await tx.houseProject.update({
         where: { id: existing.id, householdId },
-        data: { status: remaining === 0 ? "completed" : "open" },
+        data: { status: remaining === 0 ? "completed" : "in-progress", progressPercent: remaining === 0 ? 100 : existing.progressPercent },
         include: { participants: { include: { member: true } }, tickets: true },
       });
       return { project, tickets };
@@ -187,7 +191,7 @@ export const PUT = withErrors(async (req: NextRequest) => {
   if (body.action === "assign") {
     const project = await prisma.houseProject.findFirst({ where: { id: body.id, householdId }, include: { participants: true } });
     if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
-    if (project.status !== "open" || project.participants.some((participant) => participant.completedAt)) {
+    if (project.status === "completed" || project.participants.some((participant) => participant.completedAt)) {
       return NextResponse.json({ error: "Completed projects cannot be reassigned" }, { status: 409 });
     }
     const assignedMemberIds = memberIds(body.assignedMemberIds);
