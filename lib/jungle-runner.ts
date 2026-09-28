@@ -206,7 +206,6 @@ function addSection(s: Runner) {
     s.bats.push(...createBats(x)); recovery = 800;
   } else if (type === 12) {
     s.herds.push({ x, age: 0, charging: false, warned: false });
-    s.lemmings.push({ x: x + 75, y: FLOOR - 112, endX: x + 680, age: 0, used: false });
   } else if (type === 13) {
     s.spiders.push({ x, phase: s.section * 1.7 });
   } else if (type === 10) {
