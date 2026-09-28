@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createRunner, duckRunner, FLOOR, jumpRunner, PLAYER_X, runnerScore, stepRunner } from '../lib/jungle-runner';
+import { createRunner, createPredator, duckRunner, FLOOR, jumpRunner, LEVELS, PLAYER_X, runnerScore, runnerSpeed, stepRunner } from '../lib/jungle-runner';
 
 function active() { const s = createRunner(); s.phase = 'playing'; s.items = []; s.nextSection = 100000; return s; }
 function advance(s: ReturnType<typeof active>, seconds: number, fps = 120) { for (let i = 0; i < seconds * fps; i++) stepRunner(s, 1 / fps); }
@@ -40,7 +40,7 @@ test('movement is consistent at different update rates', () => {
 });
 
 test('hippo remains reachable at maximum running speed', () => {
-  const s = active(); s.elapsed = 178; s.level = 2; s.rivers = [{ x: PLAYER_X + 10, width: 250 }]; jumpRunner(s);
+  const s = active(); s.elapsed = 238; s.level = 3; s.rivers = [{ x: PLAYER_X + 10, width: runnerSpeed(s) * 1.05 }]; jumpRunner(s);
   advance(s, 1.7); assert.ok(s.bounces >= 1); assert.equal(s.lives, 3);
 });
 
@@ -81,12 +81,47 @@ test('snakes hurt on the ground and can be jumped', () => {
   jumping.items = [{ x: jumping.distance + PLAYER_X, y: FLOOR - 18, kind: 'snake' }]; advance(jumping, 0.02); assert.equal(jumping.lives, 3);
 });
 
-test('levels advance without resetting earned coins or lives and victory follows level three', () => {
+test('levels advance without resetting earned coins or lives and victory follows level four', () => {
   const s = active(); s.bananas = 110; s.lives = 4; s.elapsed = 59.99;
   advance(s, 0.03); assert.equal(s.level, 1); assert.equal(s.phase, 'playing');
   s.elapsed = 119.99; advance(s, 0.03); assert.equal(s.level, 2);
-  s.elapsed = 179.99; advance(s, 0.03); assert.equal(s.phase, 'victory'); assert.equal(s.bananas, 110); assert.equal(s.lives, 4);
+  s.elapsed = 179.99; advance(s, 0.03); assert.equal(s.level, 3); assert.equal(s.phase, 'playing');
+  s.elapsed = 239.99; advance(s, 0.03); assert.equal(s.phase, 'victory'); assert.equal(s.bananas, 110); assert.equal(s.lives, 4);
 });
+
+test('every level starts faster than the previous level finishes', () => {
+  for (let level = 1; level < LEVELS.length; level++) {
+    const s = active(); s.level = level - 1; s.elapsed = level * 60 - 0.01; const before = runnerSpeed(s);
+    s.level = level; s.elapsed = level * 60; assert.ok(runnerSpeed(s) > before + 40);
+  }
+});
+
+for (let level = 0; level < LEVELS.length; level++) {
+  test(`level ${level + 1}: reactive snake catches a single jump but double jump clears it`, () => {
+    for (const double of [false, true]) {
+      const s = active(); s.level = level; s.elapsed = level * 60 + 10;
+      s.predators = [createPredator('snake', PLAYER_X + runnerSpeed(s) * 0.8)];
+      jumpRunner(s);
+      for (let i = 0; i < 180; i++) { if (double && i === 32) jumpRunner(s); stepRunner(s, 1 / 120); }
+      assert.equal(s.lives, double ? 3 : 2);
+    }
+  });
+  test(`level ${level + 1}: tiger warns before appearing, leaps, and can be ducked`, () => {
+    for (const dodge of [false, true]) {
+      const s = active(); s.level = level; s.elapsed = level * 60 + 10;
+      const tiger = createPredator('tiger', PLAYER_X + runnerSpeed(s) * 2.5); s.predators = [tiger];
+      advance(s, 0.1); assert.equal(tiger.state, 'warning'); assert.equal(s.lives, 3);
+      advance(s, 0.6); assert.equal(tiger.state, 'warning');
+      advance(s, 0.3); assert.equal(tiger.state, 'crouch');
+      let attacked = false;
+      for (let i = 0; i < 360; i++) {
+        if (!attacked && tiger.state === 'attack') { attacked = true; if (dodge) duckRunner(s, true); }
+        stepRunner(s, 1 / 120);
+      }
+      assert.ok(attacked); assert.equal(s.lives, dodge ? 3 : 2);
+    }
+  });
+}
 
 test('authored sections always leave clear recovery space after hazards and rivers', () => {
   const s = createRunner(); s.phase = 'playing';
