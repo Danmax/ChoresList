@@ -94,11 +94,11 @@ export const GAME_DEFINITIONS: GameDefinition[] = [
   {
     key: "jungle-vine-swing",
     title: "Jungle Runner",
-    description: "Flip over coconuts, swing across crocodile pits, dodge unpredictable tigers, and escape charging black panthers.",
+    description: "Survive stampeding elephants, leaping tigers, and prowling panthers, then brave swinging spiders in the moonlit jungle.",
     icon: "TreePine",
     ageMin: 5,
     ageMax: 14,
-    playTime: "4 min",
+    playTime: "5 min",
     color: "#15803d",
     bg: "#dcfce7",
   },

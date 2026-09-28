@@ -5,11 +5,19 @@ export const LEVELS = [
   { name: 'Snake River', sky: '#a7b9f3', mist: '#bce9d0', speed: 265 },
   { name: 'Sunset Canopy', sky: '#edaf8f', mist: '#ffe9a2', speed: 325 },
   { name: 'Tiger Territory', sky: '#7d83c4', mist: '#e7bbde', speed: 385 },
+  { name: 'Moonlit Webs', sky: '#090e29', mist: '#33496b', speed: 445 },
 ] as const;
 export const LEVEL_SECONDS = 60;
 export const SLIDE_SECONDS = 1.5;
 export const FLIP_SECONDS = 0.5;
 export type RunnerItem = { x: number; y: number; kind: 'banana' | 'golden' | 'cherry' | 'drop' | 'low' | 'high' | 'canopy' | 'rolling' | 'bouncing'; collected?: boolean; vy?: number; rotation?: number };
+export type Herd = { x: number; age: number; charging: boolean; warned: boolean };
+export type Spider = { x: number; phase: number };
+export const ELEPHANT_TOP = FLOOR - 112;
+export function spiderPosition(spider: Spider, elapsed: number) {
+  const angle = Math.sin(elapsed * 2.5 + spider.phase) * 0.52;
+  return { x: spider.x + Math.sin(angle) * 222, y: 25 + Math.cos(angle) * 222 };
+}
 export type Bird = { x: number; y: number; gift: 'drop' | 'cherry'; dropped: boolean; releaseLeft?: number };
 export type River = { x: number; width: number; vine?: boolean; used?: boolean; bounced?: boolean; bounceLeft?: number; snapLeft?: number[]; snapped?: boolean[] };
 export function birdHeight(bird: Bird, elapsed: number) { return bird.y + Math.sin(elapsed * 7) * 5; }
@@ -49,6 +57,7 @@ export function createRunner() {
     lives: 3, bananas: 0, hits: 0, bounces: 0, stun: 0, invincible: 0,
     message: '', messageTime: 0, nextSection: 950, section: 0,
     items: Array.from({ length: 12 }, (_, i): RunnerItem => ({ x: 380 + i * 42, y: FLOOR - 30, kind: 'banana' })),
+    herds: [] as Herd[], spiders: [] as Spider[], elephantBounces: 0,
     rivers: [] as River[], birds: [] as Bird[], birdsSpawned: 0, predators: [] as Predator[],
   };
 }
@@ -99,9 +108,13 @@ function hurt(s: Runner, message: string) {
 // of screen size. Every challenge is followed by a long, safe coin trail.
 function addSection(s: Runner) {
   const x = s.nextSection;
-  const patterns = [[8, 1, 10, 11, 4, 3, 7, 6], [5, 9, 10, 11, 4, 3, 7, 6, 8], [7, 11, 5, 10, 9, 4, 1, 3, 8, 6], [7, 11, 10, 9, 5, 8, 7, 3, 6, 5, 4, 1]][s.level];
+  const patterns = [[8, 1, 10, 11, 12, 4, 3, 7, 6], [12, 5, 9, 10, 11, 4, 3, 7, 6, 8], [7, 12, 11, 5, 10, 9, 4, 1, 3, 8, 6], [7, 11, 12, 10, 9, 5, 8, 7, 3, 6, 5, 4, 1], [13, 11, 13, 12, 10, 7, 13, 4, 8]][s.level];
   const type = patterns[s.section++ % patterns.length];
-  if (type === 10) {
+  if (type === 12) {
+    s.herds.push({ x, age: 0, charging: false, warned: false });
+  } else if (type === 13) {
+    s.spiders.push({ x, phase: s.section * 1.7 });
+  } else if (type === 10) {
     s.rivers.push({ x, width: 680, vine: true });
   } else if (type === 11) {
     s.predators.push(createPredator('panther', x));
@@ -124,8 +137,8 @@ function addSection(s: Runner) {
   } else {
     s.items.push({ x, y: type === 0 ? FLOOR - 22 : type === 1 ? FLOOR - 64 : FLOOR - 118, kind: type === 0 ? 'low' : type === 1 ? 'high' : 'canopy' });
   }
-  for (let i = 0; i < 10; i++) s.items.push({ x: x + (type === 10 ? 820 : 470) + i * 40, y: FLOOR - 28, kind: 'banana' });
-  s.nextSection += type === 10 ? 1450 : 1100;
+  for (let i = 0; i < 10; i++) s.items.push({ x: x + (type === 10 || type === 12 ? 820 : 470) + i * 40, y: FLOOR - 28, kind: 'banana' });
+  s.nextSection += type === 10 || type === 12 ? 1450 : 1100;
 }
 
 export function stepRunner(s: Runner, dt: number) {
@@ -143,7 +156,7 @@ export function stepRunner(s: Runner, dt: number) {
   s.elapsed += dt;
   if (s.elapsed >= LEVEL_SECONDS * LEVELS.length) { s.phase = 'victory'; return; }
   const level = Math.floor(s.elapsed / LEVEL_SECONDS);
-  if (level !== s.level) { s.level = level; s.message = `LEVEL ${level + 1}: ${LEVELS[level].name}`; s.messageTime = 3; }
+  if (level !== s.level) { s.level = level; s.section = 0; s.message = `LEVEL ${level + 1}: ${LEVELS[level].name}`; s.messageTime = 3; }
   const speed = runnerSpeed(s);
   const boost = dashBoost(s) + airBoost(s);
   if (!s.swing) s.distance += (speed + boost) * dt;
@@ -232,7 +245,29 @@ export function stepRunner(s: Runner, dt: number) {
   } else if (s.y >= FLOOR) {
     s.y = FLOOR; s.vy = 0; s.jumps = 0;
   }
+  for (const herd of s.herds) {
+    const ahead = herd.x - worldX;
+    if (!herd.warned && ahead < 780) {
+      herd.warned = true; s.message = 'STAMPEDE! Double jump onto backs!'; s.messageTime = 2;
+    }
+    if (herd.warned) herd.age += dt;
+    if (herd.age > 0.85) herd.charging = true;
+    if (herd.charging) herd.x -= 135 * dt;
+    for (let i = 0; i < 3; i++) {
+      if (Math.abs(worldX - (herd.x + i * 175)) > 65) continue;
+      if (s.vy > 0 && previousY <= ELEPHANT_TOP && s.y >= ELEPHANT_TOP) {
+        s.y = ELEPHANT_TOP; s.vy = -460; s.jumps = 1; s.duck = false; s.slideLeft = 0; s.flipLeft = 0;
+        s.elephantBounces++; s.message = 'HERD HOP!'; s.messageTime = 0.7;
+      } else if (s.y > ELEPHANT_TOP + 8) hurt(s, 'TRAMPLED! Double jump onto backs!');
+    }
+  }
+  s.herds = s.herds.filter(h => h.x + 440 > s.distance - 80);
   const height = s.duck && s.y >= FLOOR - 1 ? 30 : 76;
+  for (const spider of s.spiders) {
+    const pos = spiderPosition(spider, s.elapsed);
+    if (Math.abs(pos.x - worldX) < 43 && pos.y + 23 >= s.y - height && pos.y - 23 <= s.y - 4) hurt(s, 'SPIDER SWING! Slide under!');
+  }
+  s.spiders = s.spiders.filter(p => p.x > s.distance - 200);
   for (const p of s.predators) {
     const ahead = p.x - worldX;
     p.age += dt;
@@ -263,9 +298,9 @@ export function stepRunner(s: Runner, dt: number) {
       else if (p.state === 'warning' && p.age >= 0.9) { p.state = 'crouch'; p.age = 0; }
       else if (p.state === 'crouch' && ahead < speed * (0.75 + p.temperament * 0.4)) { p.state = 'attack'; p.age = 0; }
       if (p.state === 'attack') {
-        p.x -= speed * (0.35 + p.temperament * 0.4) * dt;
-        p.y = FLOOR - 42 - (50 + p.temperament * 25) * Math.sin(Math.min(1, p.age / 1.2) * Math.PI);
-        if (p.age >= 1.2) { p.state = 'recover'; p.age = 0; }
+        p.x -= speed * (0.6 + p.temperament * 0.45) * dt;
+        p.y = FLOOR - 42 - (95 + p.temperament * 30) * Math.sin(Math.min(1, p.age / 0.95) * Math.PI);
+        if (p.age >= 0.95) { p.state = 'recover'; p.age = 0; }
       }
     }
     const visible = p.kind !== 'tiger' || !['waiting', 'warning'].includes(p.state);
