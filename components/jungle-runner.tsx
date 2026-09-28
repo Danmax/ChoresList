@@ -4,7 +4,7 @@ import { drawInsectGrove, drawInsects, drawReaction } from '@/lib/jungle-insect-
 import { pantherPaw } from '@/lib/jungle-motion';
 import { drawWaterLife, drawOrangutan, drawPineapple } from '@/lib/jungle-water-art';
 import { useEffect, useRef, useState } from 'react';
-import { RUNNER_DIFFICULTIES, type RunnerDifficulty, GEMS, spiderPosition, airBoost, FLIP_SECONDS, vinePosition, birdHeight, crocodileFrame, hippoFrame, createRunner, dashBoost, duckRunner, FLOOR, jumpRunner, LEVELS, LEVEL_SECONDS, PLAYER_X, runnerScore, travelSpeed, stepRunner, type Runner } from '@/lib/jungle-runner';
+import { RUNNER_DIFFICULTIES, type RunnerDifficulty, GEMS, spiderPosition, slothPosition, airBoost, FLIP_SECONDS, vinePosition, birdHeight, crocodileFrame, hippoFrame, createRunner, dashBoost, duckRunner, FLOOR, jumpRunner, LEVELS, LEVEL_SECONDS, PLAYER_X, runnerScore, travelSpeed, stepRunner, type Runner } from '@/lib/jungle-runner';
 
 // Canvas artwork keeps shells and moving limbs crisp at every display density.
 function coconut(ctx: CanvasRenderingContext2D, x: number, y: number, rotation = 0, split = 0) {
@@ -110,6 +110,22 @@ function spiderArt(ctx: CanvasRenderingContext2D, x: number, y: number, age: num
   ctx.fillStyle = '#17182e'; ctx.beginPath(); ctx.arc(0, 13, 12, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#ffcb73'; for (const eye of [-5, 5]) { ctx.beginPath(); ctx.arc(eye, 14, 3, 0, Math.PI * 2); ctx.fill(); }
   ctx.restore();
+}
+
+function slothArt(ctx: CanvasRenderingContext2D, x: number, y: number) {
+  ctx.save(); ctx.translate(x, y);
+  ctx.strokeStyle = '#735244'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(0, -y - 12); ctx.quadraticCurveTo(12, -y / 2, 1, -18); ctx.stroke();
+  ctx.fillStyle = '#8d7562'; ctx.beginPath(); ctx.ellipse(0, 0, 19, 25, 0.15, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#d5c4a5'; ctx.beginPath(); ctx.ellipse(-5, -7, 13, 12, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#352b32'; ctx.beginPath(); ctx.ellipse(-7, -8, 5, 7, 0.2, 0, Math.PI * 2); ctx.ellipse(2, -8, 5, 7, -0.2, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#18131a'; ctx.beginPath(); ctx.arc(-7, -8, 1.5, 0, Math.PI * 2); ctx.arc(2, -8, 1.5, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+}
+
+function lemmingArt(ctx: CanvasRenderingContext2D, x: number, y: number, age: number) {
+  ctx.save(); ctx.translate(x, y + Math.abs(Math.sin(age * 8)) * -14); ctx.fillStyle = '#87705c';
+  ctx.beginPath(); ctx.ellipse(0, 0, 20, 12, 0, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(-16, -5, 9, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#f3dfb5'; ctx.beginPath(); ctx.ellipse(-20, -2, 5, 4, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#231b20'; ctx.beginPath(); ctx.arc(-19, -8, 2, 0, Math.PI * 2); ctx.fill(); ctx.restore();
 }
 
 function hogArt(ctx: CanvasRenderingContext2D, x: number, y: number, age: number, jumping: boolean, preparing: boolean) {
@@ -228,11 +244,12 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     drawWaterLife(ctx, r, cameraDistance);
     if (r.vine) {
       for (let i = 1; i < 5; i++) animal(0, Math.floor(s.elapsed * 5 + i) % 4, x + r.width * i / 5, FLOOR + 12, 112, 76, i % 2 === 0);
-      const tip = vinePosition(r, s.elapsed, s.swing?.river === r ? s.swing.progress : undefined);
+      const riverSwing = s.swing && 'river' in s.swing && s.swing.river === r ? s.swing : null;
+      const tip = vinePosition(r, s.elapsed, riverSwing?.progress);
       ctx.strokeStyle = '#334925'; ctx.lineWidth = 9; ctx.beginPath(); ctx.moveTo(x + r.width / 2, -80); ctx.lineTo(tip.x - cameraDistance, tip.y); ctx.stroke();
       ctx.strokeStyle = '#8dbf4b'; ctx.lineWidth = 3; ctx.stroke();
       ctx.fillStyle = '#fef08a'; ctx.beginPath(); ctx.arc(tip.x - cameraDistance, tip.y, 9, 0, Math.PI * 2); ctx.fill();
-      ctx.font = 'bold 14px sans-serif'; ctx.fillText(s.swing?.river === r ? 'JUMP TO RELEASE' : 'JUMP & CATCH THE VINE', s.swing?.river === r ? playerX + 130 : x + 70, FLOOR - 115);
+      ctx.font = 'bold 14px sans-serif'; ctx.fillText(riverSwing ? 'JUMP TO RELEASE' : 'JUMP & CATCH THE VINE', riverSwing ? playerX + 130 : x + 70, FLOOR - 115);
       continue;
     }
     ctx.fillStyle = '#fff5b6'; ctx.fillRect(x - 65, FLOOR - 80, 62, 23);
@@ -288,12 +305,25 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     const y = birdHeight(bird, s.elapsed);
     const wingFrame = (bird.releaseLeft ?? 0) > 0 ? 3 : [0, 1, 2, 1][Math.floor(s.elapsed * 10) % 4];
     animal(2, wingFrame, x, y - 40, 78, 70);
-    if (!bird.dropped) { if (bird.gift === 'drop') coconut(ctx, x, y + 25); else { ctx.font = '22px sans-serif'; ctx.fillText('🍒', x, y + 25); } }
+    if (!bird.dropped) { if (bird.gift === 'drop') coconut(ctx, x, y + 25); else { ctx.font = '22px sans-serif'; ctx.fillText(bird.gift === 'heart' ? '❤️' : bird.gift === 'star' ? '⭐' : bird.gift === 'fruit' ? '🍍' : '🍒', x, y + 25); } }
+  }
+  for (const sloth of s.sloths) {
+    const pos = slothPosition(sloth), x = pos.x - cameraDistance;
+    if (x < -80 || x > 880) continue;
+    slothArt(ctx, x, pos.y);
+    ctx.fillStyle = '#fff4b4'; ctx.font = 'bold 12px sans-serif'; ctx.fillText('SLOTH GIFT', x, pos.y - 38);
+  }
+  for (const lemming of s.lemmings) {
+    const x = lemming.x - cameraDistance;
+    if (x < -80 || x > 880) continue;
+    ctx.strokeStyle = '#9e7041'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, lemming.y - 16); ctx.stroke();
+    lemmingArt(ctx, x, lemming.y, lemming.age);
+    ctx.fillStyle = '#fff4b4'; ctx.font = 'bold 12px sans-serif'; ctx.fillText('JUMP: LEMMING SWING', x + 30, lemming.y - 48);
   }
   for (const item of s.items) {
     const x = item.x - cameraDistance;
     if (x < -40 || x > 850) continue;
-    const collectible = ['banana', 'golden', 'cherry', 'gem'].includes(item.kind);
+    const collectible = ['banana', 'golden', 'cherry', 'heart', 'fruit', 'star', 'gem'].includes(item.kind);
     if (item.kind === 'gem') {
       const gem = GEMS[item.level ?? s.level];
       gemArt(ctx, x, item.y, gem.color, s.elapsed);
@@ -315,7 +345,7 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     ctx.save(); ctx.translate(x, item.y);
     if (movingCoconut) ctx.rotate(item.rotation ?? 0);
     ctx.font = collectible ? '27px sans-serif' : '38px sans-serif';
-    if (collectible) ctx.fillText(item.kind === 'cherry' ? '🍒' : '🍌', 0, 0); else coconut(ctx, 0, 0);
+    if (collectible) ctx.fillText(item.kind === 'cherry' ? '🍒' : item.kind === 'heart' ? '❤️' : item.kind === 'fruit' ? '🍍' : item.kind === 'star' ? '⭐' : '🍌', 0, 0); else coconut(ctx, 0, 0);
     ctx.restore();
     if (!collectible) {
       const labelY = item.kind === 'drop' ? item.y + 34 : item.y - 33;
@@ -407,7 +437,7 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
   }
   ctx.restore();
   drawReaction(ctx, s, playerX);
-  if (s.swing) {
+  if (s.swing && 'river' in s.swing) {
     const tip = vinePosition(s.swing.river, s.elapsed, s.swing.progress);
     ctx.strokeStyle = '#713a1d'; ctx.lineWidth = 9; ctx.lineCap = 'round';
     ctx.beginPath(); ctx.moveTo(playerX + 8, s.y - 40); ctx.lineTo(tip.x - cameraDistance, tip.y); ctx.stroke();
@@ -517,8 +547,8 @@ export function JungleVineSwing({ onExit, onFinish }: {
       <div className="mb-2 flex justify-between gap-2 text-sm font-black"><span>🍌 {hud.bananas} <small className="block text-yellow-200">{hud.bananas % 100}/100 → +1 life</small></span><span>❤️ {hud.lives} lives</span><span>{hud.seconds}s · {hud.score} pts</span></div>
       <p className="mb-2 text-xs font-bold text-yellow-200">{RUNNER_DIFFICULTIES[difficulty].label} · Level {hud.level + 1}/{LEVELS.length} · {LEVELS[hud.level].name} · {hud.speed.toFixed(1)}× pace · ⭐ {hud.golden} gold · 🍒 {hud.cherries} · 💎 {hud.gems}/{LEVELS.length} · {GEMS[hud.level].name}: {hud.levelGem ? "collected" : "find it!"}</p>
       <div className="relative overflow-hidden rounded-2xl border-2 border-emerald-700">
-        <canvas ref={canvas} width={800} height={400} aria-label="Jungle runner: flip over coconuts and panthers, slide under tiger pounces, catch vines over crocodile pits, jump onto stampeding elephant backs, jump over six-hog herds, avoid jumping piranhas and eel shocks, dodge pineapples from dancing orangutans, collect one gem per level, slide under spiders and diving bat waves in the moonlit fifth level, and dodge giant insects and bounce on jewel caterpillars in level six" className="block aspect-[2/1] w-full" />
-        {(hud.phase === 'ready' || ended || hud.paused) && <div className="absolute inset-0 flex items-start justify-center overflow-y-auto bg-emerald-950/75 p-3"><div className="my-auto max-w-md text-center"><h3 className="text-lg font-black sm:text-2xl">{hud.paused ? 'Taking a breather' : ended ? hud.phase === 'victory' ? 'Jungle victory!' : 'Run complete!' : 'Find your jungle rhythm'}</h3><p className="my-2 text-xs sm:text-sm">{ended ? `${hud.bananas} banana coins · ${hud.golden} gold · ${hud.cherries} cherries · ${hud.gems}/${LEVELS.length} gems · ${hud.score} points` : 'Double jump to front flip and dash! Catch a moving vine over wide croc pits; jump again to release or ride to the far bank. Read tiger tells: slide under high pounces, jump low charges, and dive from air hunts. Slide under high-leaping panthers. Double jump onto elephant backs during stampedes. Hog herds have four runners and two random jumpers—jump or bounce over them. At night, slide under spiders and diving bat waves. Watch for piranha leaps and electric water. Slide under pineapples from the dancing orangutan! In Giant Insect Grove, jump rolling centipedes and fire ants, slide under flying stingers and leaf katydids, dodge worker-ant rocks, and bounce from the friendly Jewel Caterpillar to the Peridot gem!'}</p>{hud.paused ? <button onClick={pause} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Resume</button> : ended ? <button onClick={() => { if (saved.current) return; saved.current = true; const s = world.current; onFinish(runnerScore(s), Math.max(1, Math.round(s.elapsed)), { difficulty: s.difficulty, bananas: s.bananas, goldenBananas: s.golden, cherries: s.cherries, gems: s.gems, gemLevels: s.gemCollected, levelsCompleted: s.phase === 'victory' ? LEVELS.length : s.level, hits: s.hits, hippoBounces: s.bounces, elephantBounces: s.elephantBounces, caterpillarBounces: s.caterpillarBounces, extraLives: Math.floor(s.bananas / 100) }); }} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Save run</button> : <button onClick={start} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Let’s run</button>}</div></div>}
+        <canvas ref={canvas} width={800} height={400} aria-label="Jungle runner: flip over coconuts and panthers, slide under tiger pounces, catch vines over crocodile pits, and jump to catch lemming swings over stampeding elephants and hog herds. Sloths lower hearts, fruit, and rare stars that grant twelve seconds of invincibility; birds can also drop these helpful gifts." className="block aspect-[2/1] w-full" />
+        {(hud.phase === 'ready' || ended || hud.paused) && <div className="absolute inset-0 flex items-start justify-center overflow-y-auto bg-emerald-950/75 p-3"><div className="my-auto max-w-md text-center"><h3 className="text-lg font-black sm:text-2xl">{hud.paused ? 'Taking a breather' : ended ? hud.phase === 'victory' ? 'Jungle victory!' : 'Run complete!' : 'Find your jungle rhythm'}</h3><p className="my-2 text-xs sm:text-sm">{ended ? `${hud.bananas} banana coins · ${hud.golden} gold · ${hud.cherries} cherries · ${hud.gems}/${LEVELS.length} gems · ${hud.score} points` : 'Double jump to front flip and dash! Sloths slide down vines with a heart (+1 life), fruit (+5 coins), or a rare star (12 seconds of invincibility); friendly birds can drop those gifts too. Jump into a hopping lemming’s vine to swing safely over hog and elephant herds. Catch moving vines over wide croc pits; jump again to release or ride to the far bank. Read tiger tells: slide under high pounces, jump low charges, and dive from air hunts. At night, slide under spiders and diving bat waves. Slide under pineapples from the dancing orangutan!'}</p>{hud.paused ? <button onClick={pause} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Resume</button> : ended ? <button onClick={() => { if (saved.current) return; saved.current = true; const s = world.current; onFinish(runnerScore(s), Math.max(1, Math.round(s.elapsed)), { difficulty: s.difficulty, bananas: s.bananas, goldenBananas: s.golden, cherries: s.cherries, gems: s.gems, gemLevels: s.gemCollected, levelsCompleted: s.phase === 'victory' ? LEVELS.length : s.level, hits: s.hits, hippoBounces: s.bounces, elephantBounces: s.elephantBounces, caterpillarBounces: s.caterpillarBounces, extraLives: Math.floor(s.bananas / 100) }); }} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Save run</button> : <button onClick={start} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Let’s run</button>}</div></div>}
       </div>
       <div className="mt-3 grid grid-cols-2 gap-3">
         <button disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); jump(); }} onClick={e => { if (e.detail === 0) jump(); }} className="min-h-14 touch-none select-none rounded-2xl bg-yellow-300 p-3 font-black text-emerald-950 disabled:opacity-40">JUMP <small className="block">Tap again: flip / release vine</small></button>

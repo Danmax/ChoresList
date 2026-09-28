@@ -19,7 +19,7 @@ export const LEVEL_SECONDS = 60;
 export const SLIDE_SECONDS = 1.5;
 export const FLIP_SECONDS = 0.5;
 export const GEM_Y = FLOOR - 235;
-export type RunnerItem = { x: number; y: number; kind: 'banana' | 'golden' | 'cherry' | 'gem' | 'drop' | 'low' | 'high' | 'canopy' | 'rolling' | 'bouncing'; collected?: boolean; level?: number; vy?: number; rotation?: number };
+export type RunnerItem = { x: number; y: number; kind: 'banana' | 'golden' | 'cherry' | 'heart' | 'fruit' | 'star' | 'gem' | 'drop' | 'low' | 'high' | 'canopy' | 'rolling' | 'bouncing'; collected?: boolean; level?: number; vy?: number; rotation?: number };
 export const GEMS = [
   { name: 'Emerald', color: '#4cf7ae' }, { name: 'Sapphire', color: '#6fbaff' },
   { name: 'Ruby', color: '#ff6e97' }, { name: 'Amber', color: '#ffcb56' },
@@ -41,7 +41,9 @@ export function spiderPosition(spider: Spider, elapsed: number) {
   const angle = Math.sin(elapsed * 2.5 + spider.phase) * 0.52;
   return { x: spider.x + Math.sin(angle) * 222, y: 25 + Math.cos(angle) * 222 };
 }
-export type Bird = { x: number; y: number; gift: 'drop' | 'cherry'; dropped: boolean; releaseLeft?: number };
+export type Bird = { x: number; y: number; gift: 'drop' | 'cherry' | 'heart' | 'fruit' | 'star'; dropped: boolean; releaseLeft?: number };
+export type Sloth = { x: number; y: number; targetY: number; age: number; reward: 'heart' | 'fruit' | 'star'; dropped: boolean };
+export type Lemming = { x: number; y: number; endX: number; age: number; used: boolean };
 export type River = { resident?: 'piranha' | 'eel'; waterAge?: number; x: number; width: number; vine?: boolean; used?: boolean; bounced?: boolean; bounceLeft?: number; snapLeft?: number[]; snapped?: boolean[] };
 export type Orangutan = { x: number; age: number; state: 'dance' | 'windup' | 'throw' | 'recover'; throws: number };
 export type Pineapple = { x: number; y: number; vx: number; vy: number; rotation: number };
@@ -64,6 +66,7 @@ export function eelPhase(r: River) {
   return t < 0.85 ? 'charge' : t < 1.4 ? 'shock' : 'swim';
 }
 export function birdHeight(bird: Bird, elapsed: number) { return bird.y + Math.sin(elapsed * 7) * 5; }
+export function slothPosition(sloth: Sloth) { return { x: sloth.x, y: Math.min(sloth.targetY, sloth.y + sloth.age * 52) }; }
 export function crocodileFrame(remaining: number) {
   if (remaining <= 0) return 0;
   const age = 0.6 - remaining;
@@ -97,7 +100,7 @@ export function createRunner(difficulty: RunnerDifficulty = 'medium') {
     reaction: 'bonk' as HitReaction, reactionLeft: 0,
     phase: 'ready' as 'ready' | 'playing' | 'over' | 'victory',
     distance: 0, elapsed: 0, level: 0, y: FLOOR, vy: 0, jumps: 0, duck: false, duckHeld: false, slideLeft: 0, cameraLead: 0,
-    flipLeft: 0, swing: null as { river: River; progress: number } | null,
+    flipLeft: 0, swing: null as ({ river: River; progress: number } | { lemming: Lemming; progress: number }) | null,
     cracks: [] as { x: number; y: number; age: number }[],
     golden: 0, cherries: 0, bonusScore: 0, gems: 0,
     gemSpawned: LEVELS.map(() => false), gemCollected: LEVELS.map(() => false),
@@ -107,7 +110,7 @@ export function createRunner(difficulty: RunnerDifficulty = 'medium') {
     orangutans: [] as Orangutan[], pineapples: [] as Pineapple[], splats: [] as { x: number; y: number; age: number }[],
     hogs: [] as Hog[], bats: [] as Bat[],
     herds: [] as Herd[], spiders: [] as Spider[], elephantBounces: 0,
-    rivers: [] as River[], birds: [] as Bird[], birdsSpawned: 0, predators: [] as Predator[],
+    rivers: [] as River[], birds: [] as Bird[], birdsSpawned: 0, sloths: [] as Sloth[], lemmings: [] as Lemming[], predators: [] as Predator[],
   };
 }
 
@@ -185,11 +188,13 @@ function addSection(s: Runner) {
     s.orangutans.push(createOrangutan(x)); recovery = 800;
   } else if (type === 14) {
     const hogs = createHogs(x, runnerSpeed(s)); s.hogs.push(...hogs);
+    s.lemmings.push({ x: x + 90, y: FLOOR - 112, endX: hogs[5].x + 230, age: 0, used: false });
     recovery = hogs[5].x - x + 400;
   } else if (type === 15) {
     s.bats.push(...createBats(x)); recovery = 800;
   } else if (type === 12) {
     s.herds.push({ x, age: 0, charging: false, warned: false });
+    s.lemmings.push({ x: x + 75, y: FLOOR - 112, endX: x + 680, age: 0, used: false });
   } else if (type === 13) {
     s.spiders.push({ x, phase: s.section * 1.7 });
   } else if (type === 10) {
@@ -207,13 +212,20 @@ function addSection(s: Runner) {
   } else if (type === 5) {
     s.predators.push(createPredator('snake', x));
   } else if (type === 6) {
-    s.birds.push({ x, y: 70, gift: s.birdsSpawned++ % 2 === 0 ? 'cherry' : 'drop', dropped: false });
+    const gifts: Bird['gift'][] = ['cherry', 'fruit', 'heart', 'star', 'drop'];
+    s.birds.push({ x, y: 70, gift: gifts[s.birdsSpawned++ % gifts.length], dropped: false });
   } else if (type === 7) {
     s.predators.push(createPredator('tiger', x));
   } else if (type === 8 || type === 9) {
     s.items.push({ x, y: FLOOR - 20, kind: type === 8 ? 'rolling' : 'bouncing', vy: type === 9 ? -360 : undefined, rotation: 0 });
   } else {
     s.items.push({ x, y: type === 0 ? FLOOR - 22 : type === 1 ? FLOOR - 64 : FLOOR - 118, kind: type === 0 ? 'low' : type === 1 ? 'high' : 'canopy' });
+  }
+  // A sloth lowers one helpful gift into every few clearings. Its deliberately
+  // slow descent makes the reward readable rather than a surprise pickup.
+  if (s.section % 3 === 0) {
+    const rewards: Sloth['reward'][] = ['heart', 'fruit', 'star'];
+    s.sloths.push({ x: x + recovery * 0.55, y: 22, targetY: FLOOR - 92, age: 0, reward: rewards[(s.section / 3 - 1) % rewards.length], dropped: false });
   }
   for (let i = 0; i < 10; i++) s.items.push({ x: x + recovery + i * 40, y: FLOOR - 28, kind: 'banana' });
   if (!s.gemSpawned[s.level]) {
@@ -243,7 +255,7 @@ export function stepRunner(s: Runner, dt: number) {
   const level = Math.floor(s.elapsed / LEVEL_SECONDS);
   if (level !== s.level) {
     if (level === 5) {
-      s.items = []; s.rivers = []; s.predators = []; s.hogs = []; s.bats = []; s.herds = []; s.spiders = []; s.orangutans = []; s.pineapples = []; s.birds = [];
+      s.items = []; s.rivers = []; s.predators = []; s.hogs = []; s.bats = []; s.herds = []; s.spiders = []; s.orangutans = []; s.pineapples = []; s.birds = []; s.sloths = []; s.lemmings = [];
       s.swing = null; s.nextSection = s.distance + 1100;
     }
     s.level = level; s.section = 0; s.items = s.items.filter(i => i.kind !== 'gem'); s.message = `LEVEL ${level + 1}: ${LEVELS[level].name}`; s.messageTime = 3; }
@@ -264,6 +276,22 @@ export function stepRunner(s: Runner, dt: number) {
     }
   }
   s.birds = s.birds.filter(b => b.x > s.distance - 80);
+  for (const sloth of s.sloths) {
+    sloth.age += dt;
+    if (!sloth.dropped && slothPosition(sloth).y >= sloth.targetY) {
+      sloth.dropped = true;
+      s.items.push({ x: sloth.x, y: sloth.targetY + 18, kind: sloth.reward });
+    }
+  }
+  s.sloths = s.sloths.filter(sloth => sloth.x > s.distance - 100 && !sloth.dropped);
+  for (const lemming of s.lemmings) {
+    lemming.age += dt;
+    if (lemming.used || s.swing || s.jumps === 0) continue;
+    if (Math.abs(lemming.x - (s.distance + PLAYER_X)) < 52 && Math.abs(lemming.y - (s.y - 55)) < 72) {
+      lemming.used = true; s.swing = { lemming, progress: 0 };
+      s.flipLeft = 0; s.message = 'LEMMING LIFT! Swing over the herd!'; s.messageTime = 1.7;
+    }
+  }
   for (const item of s.items) {
     if (item.kind === 'rolling' || item.kind === 'bouncing') {
       // Activate on approach so moving hazards cannot drift into earlier sections.
@@ -292,9 +320,18 @@ export function stepRunner(s: Runner, dt: number) {
   }
   const previousY = s.y;
   if (s.swing) {
-    s.swing.progress = Math.min(1, s.swing.progress + dt * speed * 1.25 / (s.swing.river.width + 90));
-    const tip = vinePosition(s.swing.river, s.elapsed, s.swing.progress);
-    s.distance = tip.x - PLAYER_X; s.y = tip.y + 55; s.vy = 0;
+    if ('river' in s.swing) {
+      s.swing.progress = Math.min(1, s.swing.progress + dt * speed * 1.25 / (s.swing.river.width + 90));
+      const tip = vinePosition(s.swing.river, s.elapsed, s.swing.progress);
+      s.distance = tip.x - PLAYER_X; s.y = tip.y + 55;
+    } else {
+      s.swing.progress = Math.min(1, s.swing.progress + dt * 1.25);
+      const { lemming } = s.swing;
+      const arc = Math.sin(s.swing.progress * Math.PI) * 118;
+      s.distance = lemming.x + (lemming.endX - lemming.x) * s.swing.progress - PLAYER_X;
+      s.y = FLOOR - 92 - arc;
+    }
+    s.vy = 0;
     if (s.swing.progress >= 1) { s.swing = null; s.jumps = 0; jumpRunner(s); }
   } else { s.vy += 1500 * dt; s.y += s.vy * dt; }
   for (const r of s.rivers) {
@@ -405,6 +442,7 @@ export function stepRunner(s: Runner, dt: number) {
     }
   }
   s.hogs = s.hogs.filter(h => h.x > s.distance - 120);
+  s.lemmings = s.lemmings.filter(l => !l.used && l.endX > s.distance - 120);
   for (const bat of s.bats) {
     bat.age += dt;
     if (bat.state === 'flying') {
@@ -479,7 +517,7 @@ export function stepRunner(s: Runner, dt: number) {
   stepInsects(s, dt, speed + boost, previousY, (message, reaction) => hurt(s, message, reaction));
   s.predators = s.predators.filter(p => p.x > s.distance - 120);
   for (const item of s.items) {
-    const collectible = ['banana', 'golden', 'cherry', 'gem'].includes(item.kind);
+    const collectible = ['banana', 'golden', 'cherry', 'heart', 'fruit', 'star', 'gem'].includes(item.kind);
     if (item.collected || Math.abs(item.x - worldX) > (item.kind === 'gem' ? 22 : collectible ? 30 : 33)) continue;
     const radius = item.kind === 'gem' ? 10 : collectible ? 14 : 20;
     if (item.y + radius < s.y - height || item.y - radius > s.y - 4) continue;
@@ -492,7 +530,10 @@ export function stepRunner(s: Runner, dt: number) {
           s.gemCollected[gemLevel] = true; s.gems++; s.bonusScore += 250;
           s.message = `${GEMS[gemLevel].name.toUpperCase()}! +250 POINTS`; s.messageTime = 2;
         }
-      } else if (item.kind === 'cherry') { s.cherries++; s.bonusScore += 50; s.message = 'SWEET! +50 POINTS'; s.messageTime = 1; }
+      } else if (item.kind === 'heart') { s.lives++; s.message = 'SLOTH HEART! +1 LIFE'; s.messageTime = 1.5; }
+      else if (item.kind === 'fruit') { s.bananas += 5; s.bonusScore += 25; s.message = 'FRUIT FEAST! +5 COINS'; s.messageTime = 1.5; }
+      else if (item.kind === 'star') { s.invincible = Math.max(s.invincible, 12); s.message = 'RARE STAR! 12s INVINCIBLE'; s.messageTime = 2; }
+      else if (item.kind === 'cherry') { s.cherries++; s.bonusScore += 50; s.message = 'SWEET! +50 POINTS'; s.messageTime = 1; }
       else { s.bananas += item.kind === 'golden' ? 10 : 1; if (item.kind === 'golden') { s.golden++; s.message = 'GOLDEN BANANA! +10 COINS'; s.messageTime = 1; } }
       if (Math.floor(s.bananas / 100) > Math.floor(previous / 100)) { s.lives++; s.message = '100 BANANAS! +1 LIFE'; s.messageTime = 2; }
     } else if (s.invincible <= 0) { item.collected = true; s.cracks.push({ x: item.x, y: item.y, age: 0 }); hurt(s, 'CRACK!'); break; }

@@ -50,6 +50,22 @@ test('each 100 bananas grants exactly one additional life, even at full health',
   advance(s, 0.5); assert.equal(s.lives, 4);
 });
 
+test('ally gifts grant a heart, fruit bonus, and a full twelve seconds of star protection', () => {
+  const heart = active(); heart.items = [{ x: PLAYER_X, y: FLOOR - 32, kind: 'heart' }]; advance(heart, 0.02);
+  assert.equal(heart.lives, 4);
+  const fruit = active(); fruit.items = [{ x: PLAYER_X, y: FLOOR - 32, kind: 'fruit' }]; advance(fruit, 0.02);
+  assert.equal(fruit.bananas, 5); assert.equal(fruit.bonusScore, 25);
+  const star = active(); star.items = [{ x: PLAYER_X, y: FLOOR - 32, kind: 'star' }]; advance(star, 0.02);
+  assert.ok(star.invincible > 11.9); advance(star, 11.5); assert.ok(star.invincible > 0); advance(star, 0.6); assert.equal(star.invincible, 0);
+});
+
+test('a jumping monkey can catch a lemming lift and swing safely past a herd', () => {
+  const s = active(); s.lemmings = [{ x: PLAYER_X + 10, y: FLOOR - 112, endX: PLAYER_X + 700, age: 0, used: false }];
+  jumpRunner(s); advance(s, 0.25);
+  assert.ok(s.swing && 'lemming' in s.swing);
+  advance(s, 1); assert.equal(s.swing, null); assert.ok(s.distance > 500);
+});
+
 test('river has a reachable hippo bounce and running into water costs a life', () => {
   const s = active(); s.rivers = [{ x: PLAYER_X + 10, width: 250 }]; jumpRunner(s);
   advance(s, 1.7); assert.ok(s.bounces >= 1); assert.equal(s.lives, 3);
