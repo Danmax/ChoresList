@@ -33,7 +33,27 @@ export function spiderPosition(spider: Spider, elapsed: number) {
   return { x: spider.x + Math.sin(angle) * 222, y: 25 + Math.cos(angle) * 222 };
 }
 export type Bird = { x: number; y: number; gift: 'drop' | 'cherry'; dropped: boolean; releaseLeft?: number };
-export type River = { x: number; width: number; vine?: boolean; used?: boolean; bounced?: boolean; bounceLeft?: number; snapLeft?: number[]; snapped?: boolean[] };
+export type River = { resident?: 'piranha' | 'eel'; waterAge?: number; x: number; width: number; vine?: boolean; used?: boolean; bounced?: boolean; bounceLeft?: number; snapLeft?: number[]; snapped?: boolean[] };
+export type Orangutan = { x: number; age: number; state: 'dance' | 'windup' | 'throw' | 'recover'; throws: number };
+export type Pineapple = { x: number; y: number; vx: number; vy: number; rotation: number };
+export function createOrangutan(x: number): Orangutan { return { x, age: 0, state: 'dance', throws: 0 }; }
+export function orangutanHand(o: Orangutan) {
+  const t = Math.min(1, o.age / 0.55);
+  if (o.state === 'windup') return { x: o.x + 20 + t * 22, y: FLOOR - 130 - t * 40 };
+  if (o.state === 'throw') return { x: o.x - 55, y: FLOOR - 145 };
+  return { x: o.x + 42, y: FLOOR - 100 + Math.sin(o.age * 7) * 15 };
+}
+export function piranhaPosition(r: River, index: number) {
+  const t = ((r.waterAge ?? 0) + index * 0.7) % 2.2;
+  const jumping = t >= 0.45 && t < 1.45;
+  // In wide pits the fish breach below the safe vine arc.
+  const arc = jumping ? (t - 0.45) : 0;
+  return { x: r.x + r.width * (index === 0 ? 0.26 : 0.8) + (jumping ? (arc - 0.5) * 55 : 0), y: FLOOR + 25 - (jumping ? Math.sin(arc * Math.PI) * (r.vine ? 60 : 112) : 0), jumping, warning: t < 0.45, angle: jumping ? -0.9 + arc * 1.8 : 0 };
+}
+export function eelPhase(r: River) {
+  const t = (r.waterAge ?? 0) % 3;
+  return t < 0.85 ? 'charge' : t < 1.4 ? 'shock' : 'swim';
+}
 export function birdHeight(bird: Bird, elapsed: number) { return bird.y + Math.sin(elapsed * 7) * 5; }
 export function crocodileFrame(remaining: number) {
   if (remaining <= 0) return 0;
@@ -72,6 +92,7 @@ export function createRunner() {
     lives: 3, bananas: 0, hits: 0, bounces: 0, stun: 0, invincible: 0,
     message: '', messageTime: 0, nextSection: 950, section: 0,
     items: Array.from({ length: 12 }, (_, i): RunnerItem => ({ x: 380 + i * 42, y: FLOOR - 30, kind: 'banana' })),
+    orangutans: [] as Orangutan[], pineapples: [] as Pineapple[], splats: [] as { x: number; y: number; age: number }[],
     hogs: [] as Hog[], bats: [] as Bat[],
     herds: [] as Herd[], spiders: [] as Spider[], elephantBounces: 0,
     rivers: [] as River[], birds: [] as Bird[], birdsSpawned: 0, predators: [] as Predator[],
@@ -124,10 +145,12 @@ function hurt(s: Runner, message: string) {
 // of screen size. Every challenge is followed by a long, safe coin trail.
 function addSection(s: Runner) {
   const x = s.nextSection;
-  const patterns = [[8, 14, 10, 11, 12, 4, 3, 7, 6], [12, 14, 5, 9, 10, 11, 4, 3, 7, 6, 8], [7, 14, 12, 11, 5, 10, 9, 4, 1, 3, 8, 6], [7, 11, 14, 12, 10, 9, 5, 8, 7, 3, 6, 5, 4, 1], [13, 15, 14, 11, 13, 12, 15, 10, 7, 13, 4, 8]][s.level];
+  const patterns = [[8, 16, 10, 14, 3, 11, 12, 4, 7, 6], [16, 3, 12, 14, 5, 9, 10, 11, 4, 7, 6, 8], [7, 16, 14, 12, 11, 5, 10, 9, 4, 1, 3, 8, 6], [16, 7, 11, 14, 12, 10, 9, 5, 8, 7, 3, 6, 5, 4, 1], [13, 15, 16, 14, 11, 13, 12, 15, 10, 7, 3, 13, 4, 8]][s.level];
   const type = patterns[s.section++ % patterns.length];
   let recovery = type === 10 || type === 12 ? 820 : 470;
-  if (type === 14) {
+  if (type === 16) {
+    s.orangutans.push(createOrangutan(x)); recovery = 800;
+  } else if (type === 14) {
     const hogs = createHogs(x, runnerSpeed(s)); s.hogs.push(...hogs);
     recovery = hogs[5].x - x + 400;
   } else if (type === 15) {
@@ -137,12 +160,12 @@ function addSection(s: Runner) {
   } else if (type === 13) {
     s.spiders.push({ x, phase: s.section * 1.7 });
   } else if (type === 10) {
-    s.rivers.push({ x, width: 680, vine: true });
+    s.rivers.push({ x, width: 680, vine: true, resident: (s.level + s.section) % 2 ? 'piranha' : 'eel', waterAge: 0 });
   } else if (type === 11) {
     s.predators.push(createPredator('panther', x));
   } else if (type === 3) {
     // Wider rivers at higher speeds preserve the hippo landing window.
-    s.rivers.push({ x, width: Math.max(250, runnerSpeed(s) * 1.05) });
+    s.rivers.push({ x, width: Math.max(250, runnerSpeed(s) * 1.05), resident: (s.level + s.section) % 2 ? 'eel' : 'piranha', waterAge: 0 });
     for (let i = 0; i < 7; i++) s.items.push({ x: x + i * 40, y: FLOOR - 110, kind: 'banana' });
   } else if (type === 4) {
     // A single jump reaches ~97px; these prizes require the second air jump.
@@ -169,6 +192,8 @@ function addSection(s: Runner) {
 
 export function stepRunner(s: Runner, dt: number) {
   if (s.phase !== 'playing') return;
+  for (const splat of s.splats) splat.age += dt;
+  s.splats = s.splats.filter(p => p.age < 0.65);
   for (const crack of s.cracks) crack.age += dt;
   s.cracks = s.cracks.filter(c => c.age < 0.75);
   s.flipLeft = Math.max(0, s.flipLeft - dt);
@@ -243,6 +268,7 @@ export function stepRunner(s: Runner, dt: number) {
   }
   const worldX = s.distance + PLAYER_X;
   for (const r of s.rivers) {
+    if (r.resident && r.x - worldX < 700) r.waterAge = (r.waterAge ?? 0) + dt;
     r.bounceLeft = Math.max(0, (r.bounceLeft ?? 0) - dt);
     r.snapLeft ??= [0, 0]; r.snapped ??= [false, false];
     for (let i = 0; i < 2; i++) {
@@ -267,7 +293,7 @@ export function stepRunner(s: Runner, dt: number) {
       river.bounced = true;
       river.bounceLeft = 0.45;
       s.message = 'HIPPO BOUNCE!'; s.messageTime = 1;
-    } else if (s.y > FLOOR + 55) hurt(s, 'SPLASH! Watch the crocodiles!');
+    } else if (s.y > FLOOR + 55) hurt(s, river.resident === 'eel' && eelPhase(river) === 'shock' ? 'ZAP! Electric water!' : 'SPLASH! Stay above the water!');
   } else if (s.y >= FLOOR) {
     s.y = FLOOR; s.vy = 0; s.jumps = 0;
   }
@@ -289,6 +315,36 @@ export function stepRunner(s: Runner, dt: number) {
   }
   s.herds = s.herds.filter(h => h.x + 440 > s.distance - 80);
   const height = s.duck && s.y >= FLOOR - 1 ? 30 : 76;
+  for (const r of s.rivers) {
+    if (r.resident === 'piranha') for (let i = 0; i < 2; i++) {
+      const fish = piranhaPosition(r, i);
+      if (fish.jumping && Math.abs(fish.x - worldX) < 37 && fish.y + 17 >= s.y - height && fish.y - 17 <= s.y - 4) hurt(s, 'PIRANHA LEAP! Double jump!');
+    }
+    if (r.resident === 'eel' && eelPhase(r) === 'shock' && Math.abs(worldX - (r.x + r.width * 0.3)) < 70 && s.y > FLOOR - 28) hurt(s, 'ZAP! Jump above the electric water!');
+  }
+  for (const o of s.orangutans) {
+    const ahead = o.x - worldX;
+    o.age += dt;
+    if (o.state === 'dance' && o.age > 0.3 && ahead < 720 && ahead > 180 && o.throws < 3) { o.state = 'windup'; o.age = 0; }
+    else if (o.state === 'windup' && o.age >= 0.55) {
+      o.state = 'throw'; o.age = 0; o.throws++;
+      const hand = orangutanHand(o), vx = -240 - s.level * 15;
+      const flight = Math.max(0.25, (hand.x - worldX) / (travelSpeed(s) - vx));
+      s.pineapples.push({ ...hand, vx, vy: (FLOOR - 68 - hand.y - 325 * flight ** 2) / flight, rotation: 0 });
+    } else if (o.state === 'throw' && o.age >= 0.25) { o.state = 'recover'; o.age = 0; }
+    else if (o.state === 'recover' && o.age >= 0.55) { o.state = 'dance'; o.age = 0; }
+  }
+  s.orangutans = s.orangutans.filter(o => o.x > s.distance - 140);
+  s.pineapples = s.pineapples.filter(p => {
+    p.x += p.vx * dt; p.vy += 650 * dt; p.y += p.vy * dt; p.rotation += dt * 7;
+    const contact = Math.abs(p.x - worldX) < 34 && p.y + 19 >= s.y - height && p.y - 19 <= s.y - 4;
+    if (contact || p.y > FLOOR - 15) {
+      s.splats.push({ x: p.x, y: p.y, age: 0 });
+      if (contact) hurt(s, 'PINEAPPLE BONK! Slide under the throw!');
+      return false;
+    }
+    return p.x > s.distance - 120 && p.x < s.distance + 1200;
+  });
   for (const hog of s.hogs) {
     const ahead = hog.x - worldX;
     if (!hog.active && ahead < 780) { hog.active = true; }

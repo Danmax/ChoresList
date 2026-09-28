@@ -94,7 +94,7 @@ export const GAME_DEFINITIONS: GameDefinition[] = [
   {
     key: "jungle-vine-swing",
     title: "Jungle Runner",
-    description: "Collect a special gem in every level, dodge wild hog herds and stampeding elephants, then brave spiders and diving bats in the moonlit jungle.",
+    description: "Collect gems, dodge dancing orangutans’ pineapples, cross piranha and electric-eel waters, and brave wild herds and moonlit bats.",
     icon: "TreePine",
     ageMin: 5,
     ageMax: 14,

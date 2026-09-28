@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createHogs, createBats, GEMS, spiderPosition, ELEPHANT_TOP, crocodileFrame, hippoFrame, createRunner, createPredator, dashBoost, duckRunner, FLOOR, jumpRunner, LEVELS, PLAYER_X, runnerScore, runnerSpeed, stepRunner, travelSpeed } from '../lib/jungle-runner';
+import { createOrangutan, orangutanHand, piranhaPosition, eelPhase, createHogs, createBats, GEMS, spiderPosition, ELEPHANT_TOP, crocodileFrame, hippoFrame, createRunner, createPredator, dashBoost, duckRunner, FLOOR, jumpRunner, LEVELS, PLAYER_X, runnerScore, runnerSpeed, stepRunner, travelSpeed } from '../lib/jungle-runner';
 
 function active() { const s = createRunner(); s.phase = 'playing'; s.items = []; s.nextSection = 100000; return s; }
 function advance(s: ReturnType<typeof active>, seconds: number, fps = 120) { for (let i = 0; i < seconds * fps; i++) stepRunner(s, 1 / fps); }
@@ -392,4 +392,87 @@ test('airborne hogs can be ducked, and jumpers do not launch at point-blank rang
   const near = active(); near.invincible = 5;
   const jumper = createHogs(PLAYER_X, 205)[4]; jumper.x = PLAYER_X + 80; jumper.jumpIn = 0; near.hogs = [jumper];
   advance(near, 0.1); assert.equal(jumper.y, FLOOR - 25);
+});
+
+
+test('piranhas signal with bubbles, jump out of the water, and splash back down', () => {
+  const r = { x: 400, width: 350, waterAge: 0 };
+  assert.equal(piranhaPosition(r, 0).warning, true);
+  r.waterAge = 0.95; const peak = piranhaPosition(r, 0);
+  assert.equal(peak.jumping, true); assert.ok(peak.y < FLOOR - 80);
+  r.waterAge = 1.6; assert.equal(piranhaPosition(r, 0).jumping, false); assert.ok(piranhaPosition(r, 0).y > FLOOR);
+});
+
+test('eel charges before a short shock and recovers; only the electric surface patch hurts', () => {
+  const r = { x: 0, width: 500, waterAge: 0, resident: 'eel' as const };
+  assert.equal(eelPhase(r), 'charge'); r.waterAge = 1; assert.equal(eelPhase(r), 'shock');
+  r.waterAge = 1.5; assert.equal(eelPhase(r), 'swim');
+  for (const airborne of [false, true]) {
+    const s = active(); s.rivers = [{ ...r, waterAge: 1 }];
+    if (airborne) { s.y = FLOOR - 85; s.jumps = 1; }
+    stepRunner(s, 1 / 120); assert.equal(s.hits, airborne ? 0 : 1);
+  }
+});
+
+for (let level = 0; level < LEVELS.length; level++) {
+  for (const resident of ['piranha', 'eel'] as const) {
+    test(`level ${level + 1}: ${resident} river has a safe timed jump route`, () => {
+      let safe = false;
+      for (let delay = 0; delay < 1 && !safe; delay += 0.025) {
+        const s = active(); s.level = level; s.elapsed = level * 60;
+        const r = { x: PLAYER_X + 180, width: Math.max(250, runnerSpeed(s) * 1.05), resident, waterAge: 0 }; s.rivers = [r];
+        advance(s, delay); jumpRunner(s); advance(s, 0.3); jumpRunner(s); advance(s, 2.5);
+        safe = s.hits === 0 && s.distance + PLAYER_X > r.x + r.width;
+      }
+      assert.ok(safe);
+    });
+  }
+  test(`level ${level + 1}: orangutan telegraphs a throw that can be slid under`, () => {
+    for (const dodge of [false, true]) {
+      const s = active(); s.level = level; s.elapsed = level * 60;
+      const o = createOrangutan(PLAYER_X + 650); s.orangutans = [o];
+      let warned = false, threw = false;
+      for (let i = 0; i < 3 * 120; i++) {
+        warned ||= o.state === 'windup';
+        if (!threw && s.pineapples.length) { threw = true; if (dodge) duckRunner(s, true); }
+        stepRunner(s, 1 / 120);
+      }
+      assert.ok(warned && threw); assert.equal(s.hits, dodge ? 0 : 1);
+    }
+  });
+}
+
+test('pineapple leaves the throwing hand, rotates, and bursts once on impact', () => {
+  const s = active(); const o = createOrangutan(700); o.state = 'windup'; o.age = 0.55; s.orangutans = [o];
+  stepRunner(s, 1 / 120); assert.equal(o.state, 'throw'); assert.equal(o.throws, 1); assert.equal(s.pineapples.length, 1);
+  const p = s.pineapples[0], hand = orangutanHand(o); assert.ok(Math.abs(p.x - hand.x) < 5); assert.ok(p.rotation > 0);
+  s.orangutans = []; s.pineapples = [{ x: s.distance + PLAYER_X, y: FLOOR - 40, vx: 0, vy: 0, rotation: 0 }];
+  stepRunner(s, 1 / 120); assert.equal(s.hits, 1); assert.equal(s.splats.length, 1); assert.equal(s.pineapples.length, 0);
+  advance(s, 0.7); assert.equal(s.splats.length, 0); assert.equal(s.hits, 1);
+});
+
+for (const resident of ['piranha', 'eel'] as const) {
+  test(`vine crossings remain reachable above ${resident} water at every speed`, () => {
+    for (let level = 0; level < LEVELS.length; level++) {
+      let safe = false;
+      for (let delay = 0; delay < 1.8 && !safe; delay += 0.025) {
+        const s = active(); s.level = level; s.elapsed = level * 60;
+        const r = { x: PLAYER_X + 260, width: 680, vine: true, resident, waterAge: 0 }; s.rivers = [r];
+        advance(s, delay); jumpRunner(s); let caught = false;
+        for (let i = 0; i < 6 * 120; i++) { stepRunner(s, 1 / 120); caught ||= s.swing !== null; }
+        safe = caught && s.hits === 0 && s.distance + PLAYER_X > r.x + r.width;
+      }
+      assert.ok(safe, `level ${level + 1} needs a safe vine route`);
+    }
+  });
+}
+
+test('a complete run includes both aquatic hazards and orangutan encounters', () => {
+  const s = createRunner(); s.phase = 'playing'; const residents = new Set<string>(); let dancer = false;
+  for (let i = 0; i < 300 * 120; i++) {
+    s.invincible = 5; stepRunner(s, 1 / 120);
+    for (const r of s.rivers) if (r.resident) residents.add(r.resident);
+    dancer ||= s.orangutans.length > 0;
+  }
+  assert.deepEqual([...residents].sort(), ['eel', 'piranha']); assert.ok(dancer);
 });
