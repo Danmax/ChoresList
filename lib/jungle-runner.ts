@@ -73,7 +73,7 @@ export function stepRunner(s: Runner, dt: number) {
   const worldX = s.distance + PLAYER_X;
   const river = s.rivers.find(r => worldX > r.x && worldX < r.x + r.width);
   if (river && s.invincible <= 0) {
-    const hippoX = river.x + river.width / 2;
+    const hippoX = river.x + river.width * 0.6;
     const hippoTop = FLOOR - 12;
     if (Math.abs(worldX - hippoX) < 44 && s.vy > 0 && previousY <= hippoTop && s.y >= hippoTop) {
       s.y = hippoTop;

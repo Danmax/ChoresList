@@ -39,6 +39,11 @@ test('movement is consistent at different update rates', () => {
   assert.ok(Math.abs(a.distance - b.distance) < 0.1); assert.equal(a.y, b.y);
 });
 
+test('hippo remains reachable at maximum running speed', () => {
+  const s = active(); s.elapsed = 58; s.rivers = [{ x: PLAYER_X + 10, width: 250 }]; jumpRunner(s);
+  advance(s, 1.7); assert.ok(s.bounces >= 1); assert.equal(s.lives, 3);
+});
+
 test('authored sections always leave clear recovery space after hazards and rivers', () => {
   const s = createRunner(); s.phase = 'playing';
   for (let i = 0; i < 40 * 120; i++) { s.invincible = 5; stepRunner(s, 1 / 120); }

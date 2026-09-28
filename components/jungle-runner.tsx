@@ -39,7 +39,9 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     ctx.fillStyle = '#69d9db'; ctx.fillRect(x, FLOOR + 40, r.width, 50);
     ctx.fillStyle = '#5b3f30'; ctx.fillRect(x - 6, FLOOR, 6, 90); ctx.fillRect(x + r.width, FLOOR, 6, 90);
     ctx.font = '38px sans-serif'; ctx.fillText('🐊', x + 35, 372); ctx.fillText('🐊', x + r.width - 35, 372);
-    const hx = x + r.width / 2;
+    ctx.fillStyle = '#fff5b6'; ctx.fillRect(x - 65, FLOOR - 80, 62, 23);
+    ctx.fillStyle = '#174d35'; ctx.font = 'bold 12px sans-serif'; ctx.fillText('CLIFF ↑', x - 34, FLOOR - 68);
+    const hx = x + r.width * 0.6;
     ctx.fillStyle = '#9284a4'; ctx.beginPath(); ctx.ellipse(hx, FLOOR + 8, 44, 20, 0, 0, Math.PI * 2); ctx.fill();
     ctx.font = '58px sans-serif'; ctx.fillText('🦛', hx, FLOOR + 5);
     ctx.fillStyle = '#fef08a'; ctx.font = 'bold 13px sans-serif'; ctx.fillText('BOUNCE', hx, FLOOR - 33);

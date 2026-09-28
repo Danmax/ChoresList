@@ -59,7 +59,7 @@ function gameLabel(key: string) {
   if (key === "codebreaker-quest") return "Codebreaker Quest";
   if (key === "tic-tac-toe") return "Tic-Tac-Toe";
   if (key === "burger-rush") return "Burger Rush";
-  if (key === "jungle-vine-swing") return "Jungle Vine Swing";
+  if (key === "jungle-vine-swing") return "Jungle Runner";
   return key;
 }
 
