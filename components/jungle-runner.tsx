@@ -63,11 +63,11 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
       ctx.fillStyle = '#593700'; ctx.font = 'bold 12px sans-serif'; ctx.fillText('DOUBLE ↑', x, item.y - 33);
     }
     ctx.font = collectible ? '27px sans-serif' : '38px sans-serif';
-    ctx.fillText(item.kind === 'cherry' ? '🍒' : collectible ? '🍌' : item.kind === 'snake' ? '🐍' : '🥥', x, item.y);
+    ctx.fillText(item.kind === 'cherry' ? '🍒' : collectible ? '🍌' : '🥥', x, item.y);
     if (!collectible) {
       ctx.fillStyle = '#fff'; ctx.fillRect(x - 29, item.y - 43, 58, 19);
       ctx.fillStyle = '#174d35'; ctx.font = 'bold 12px sans-serif';
-      ctx.fillText(['low', 'snake', 'drop'].includes(item.kind) ? 'JUMP' : item.kind === 'high' ? 'DUCK' : 'RUN', x, item.y - 33);
+      ctx.fillText(['low', 'drop'].includes(item.kind) ? 'JUMP' : item.kind === 'high' ? 'DUCK' : 'RUN', x, item.y - 33);
     }
   }
   for (const p of s.predators) {

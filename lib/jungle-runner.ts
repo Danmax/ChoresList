@@ -8,7 +8,7 @@ export const LEVELS = [
 ] as const;
 export const LEVEL_SECONDS = 60;
 export const SLIDE_SECONDS = 1.5;
-export type RunnerItem = { x: number; y: number; kind: 'banana' | 'golden' | 'cherry' | 'snake' | 'drop' | 'low' | 'high' | 'canopy'; collected?: boolean; vy?: number };
+export type RunnerItem = { x: number; y: number; kind: 'banana' | 'golden' | 'cherry' | 'drop' | 'low' | 'high' | 'canopy'; collected?: boolean; vy?: number };
 export type Bird = { x: number; y: number; gift: 'drop' | 'cherry'; dropped: boolean };
 export type River = { x: number; width: number; bounced?: boolean };
 export type Predator = { kind: 'snake' | 'tiger'; x: number; y: number; state: 'waiting' | 'warning' | 'crouch' | 'attack' | 'recover'; age: number; hit: boolean };
@@ -184,7 +184,7 @@ export function stepRunner(s: Runner, dt: number) {
       if (item.kind === 'cherry') { s.cherries++; s.bonusScore += 50; s.message = 'SWEET! +50 POINTS'; s.messageTime = 1; }
       else { s.bananas += item.kind === 'golden' ? 10 : 1; if (item.kind === 'golden') { s.golden++; s.message = 'GOLDEN BANANA! +10 COINS'; s.messageTime = 1; } }
       if (Math.floor(s.bananas / 100) > Math.floor(previous / 100)) { s.lives++; s.message = '100 BANANAS! +1 LIFE'; s.messageTime = 2; }
-    } else if (s.invincible <= 0) { item.collected = true; hurt(s, item.kind === 'snake' ? 'OUCH! Jump over snakes!' : 'BONK!'); break; }
+    } else if (s.invincible <= 0) { item.collected = true; hurt(s, 'BONK!'); break; }
   }
   s.items = s.items.filter(i => i.x > s.distance - 60 && !i.collected);
   s.rivers = s.rivers.filter(r => r.x + r.width > s.distance - 60);

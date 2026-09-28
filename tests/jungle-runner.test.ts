@@ -75,10 +75,9 @@ test('birds release one visible falling gift; cherries reward and coconuts hurt'
   }
 });
 
-test('snakes hurt on the ground and can be jumped', () => {
-  const s = active(); s.items = [{ x: PLAYER_X, y: FLOOR - 18, kind: 'snake' }]; advance(s, 0.02); assert.equal(s.lives, 2);
-  const jumping = active(); jumpRunner(jumping); advance(jumping, 0.2);
-  jumping.items = [{ x: jumping.distance + PLAYER_X, y: FLOOR - 18, kind: 'snake' }]; advance(jumping, 0.02); assert.equal(jumping.lives, 3);
+test('waiting snakes hurt on the ground and invulnerability prevents repeat damage', () => {
+  const s = active(); s.predators = [createPredator('snake', PLAYER_X)]; advance(s, 0.02); assert.equal(s.lives, 2);
+  advance(s, 1); assert.equal(s.lives, 2);
 });
 
 test('levels advance without resetting earned coins or lives and victory follows level four', () => {
