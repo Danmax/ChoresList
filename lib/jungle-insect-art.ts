@@ -1,5 +1,7 @@
 import type { Runner } from './jungle-runner';
 
+const FLOOR = 310;
+
 export function drawInsectGrove(ctx: CanvasRenderingContext2D, distance: number, elapsed: number) {
   for (let i = -1; i < 7; i++) {
     const x = i * 180 - distance * 0.3 % 180;
@@ -20,6 +22,15 @@ export function drawInsects(ctx: CanvasRenderingContext2D, s: Runner, atlas: HTM
   for (const bug of s.insects) {
     const x = bug.x - camera;
     if (x < -180 || x > 980) continue;
+    if (bug.kind === 'mud-pit') {
+      ctx.save(); ctx.translate(x, FLOOR - 8);
+      ctx.fillStyle = '#4a2b27'; ctx.beginPath(); ctx.ellipse(0, 0, 76, 19, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#7b4b36'; ctx.beginPath(); ctx.ellipse(0, -3, 64, 12, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#b9794f';
+      for (const ripple of [-34, 0, 34]) { ctx.beginPath(); ctx.arc(ripple, -4, 10, 0.2, Math.PI - 0.2); ctx.strokeStyle = '#c88b5d'; ctx.lineWidth = 2; ctx.stroke(); }
+      ctx.fillStyle = '#fff5ac'; ctx.font = 'bold 11px sans-serif'; ctx.fillText('MUD PIT! JUMP!', 0, -35); ctx.restore();
+      continue;
+    }
     const rolling = bug.kind === 'centipede' && bug.state === 'attack';
     const frame = rolling ? 1 : cells[bug.kind];
     // Tight, measured artwork bounds preserve proportions and transparent gutters.
@@ -27,9 +38,14 @@ export function drawInsects(ctx: CanvasRenderingContext2D, s: Runner, atlas: HTM
     const [sx, sy, sw, sh] = bounds;
     const width = bug.kind === 'caterpillar' ? 100 : bug.kind === 'centipede' && !rolling ? 95 : bug.kind === 'fire-ant' ? 60 : 85;
     const height = width * sh / sw;
-    const centerY = bug.kind === 'caterpillar' ? 284 : bug.y;
+    const stackLift = bug.kind === 'fire-ant' ? (bug.stack ?? 0) * 27 : 0;
+    const centerY = (bug.kind === 'caterpillar' ? 284 : bug.y) - stackLift;
     ctx.save(); ctx.translate(x, centerY);
-    if (rolling) ctx.rotate(-bug.age * 7);
+    if (bug.kind === 'centipede' && bug.state === 'recover') {
+      const burst = 1 + bug.age * 2.5;
+      ctx.shadowColor = '#ffe55b'; ctx.shadowBlur = 22; ctx.globalAlpha = Math.max(0, 1 - bug.age * 2);
+      ctx.scale(burst, burst); ctx.rotate(bug.age * 18);
+    } else if (rolling) ctx.rotate(-bug.age * 7);
     else if (bug.kind === 'stinger') ctx.rotate(Math.sin(bug.age * 40) * 0.08);
     else if (bug.kind === 'caterpillar') ctx.scale(1, bug.used ? 0.8 + Math.sin(s.elapsed * 8) * 0.08 : 1 + Math.sin(s.elapsed * 5) * 0.06);
     else ctx.rotate(Math.sin(bug.age * 9) * 0.035);
@@ -42,6 +58,11 @@ export function drawInsects(ctx: CanvasRenderingContext2D, s: Runner, atlas: HTM
       ctx.fillStyle = '#b8f275'; ctx.beginPath(); ctx.ellipse(0, 0, width / 3, height / 3, 0, 0, Math.PI * 2); ctx.fill();
     }
     ctx.restore();
+    if (bug.kind === 'centipede' && bug.state === 'recover') {
+      ctx.save(); ctx.translate(x, centerY - 30); ctx.strokeStyle = '#ffed70'; ctx.lineWidth = 4; ctx.shadowColor = '#ff8d4d'; ctx.shadowBlur = 12;
+      for (let ray = 0; ray < 8; ray++) { const a = ray * Math.PI / 4 + bug.age * 7; ctx.beginPath(); ctx.moveTo(Math.cos(a) * 16, Math.sin(a) * 16); ctx.lineTo(Math.cos(a) * 45, Math.sin(a) * 45); ctx.stroke(); }
+      ctx.restore();
+    }
     if (bug.state === 'warning' || bug.kind === 'caterpillar') {
       ctx.fillStyle = '#142f35'; ctx.fillRect(x - 80, centerY - 78, 160, 22);
       ctx.fillStyle = '#fff5ac'; ctx.font = 'bold 11px sans-serif';

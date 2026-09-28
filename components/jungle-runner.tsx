@@ -456,16 +456,9 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
       const py = (y: number) => -dh + 8 + (y - sy) / sh * dh;
       ctx.beginPath(); ctx.moveTo(px(716), py(130)); ctx.lineTo(px(1073), py(130)); ctx.lineTo(px(1073), py(345)); ctx.lineTo(px(1045), py(345)); ctx.lineTo(px(1045), py(590)); ctx.lineTo(px(716), py(590)); ctx.closePath(); ctx.clip();
     }
-    if (frame === 1) {
-      // Both original running poses have the same leading leg. Keep the second
-      // pose's face, arms and tail, and reverse only its legs from that image.
-      ctx.save(); ctx.beginPath(); ctx.rect(-dw / 2, -dh, dw, dh - 25); ctx.clip();
-      ctx.drawImage(sprite, sx * scale, sy * scale, sw * scale, sh * scale, -dw / 2, -dh + 8, dw, dh);
-      ctx.restore();
-      ctx.save(); ctx.beginPath(); ctx.rect(-dw / 2, -25, dw, 35); ctx.clip(); ctx.scale(-1, 1);
-      ctx.drawImage(sprite, sx * scale, sy * scale, sw * scale, sh * scale, -dw / 2, -dh + 8, dw, dh);
-      ctx.restore();
-    } else ctx.drawImage(sprite, sx * scale, sy * scale, sw * scale, sh * scale, -dw / 2, -dh + 8, dw, dh);
+    // Each pose comes directly from the corrected sprite sheet. In particular,
+    // do not mirror individual limbs between the two authored running frames.
+    ctx.drawImage(sprite, sx * scale, sy * scale, sw * scale, sh * scale, -dw / 2, -dh + 8, dw, dh);
     ctx.restore();
   } else fallbackMonkey(ctx, frame, s.elapsed);
   ctx.restore();

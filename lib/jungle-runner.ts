@@ -163,23 +163,22 @@ function hurt(s: Runner, message: string, reaction: HitReaction = 'bonk') {
 function addSection(s: Runner) {
   const x = s.nextSection;
   if (s.level === 5) {
-    // Easy mode finishes in the friendly caterpillar grove instead of adding
-    // the fast insect patterns from the higher difficulties.
-    if (s.difficulty === 'easy') {
-      s.section++;
-      s.insects.push(createInsect('caterpillar', x));
-      for (let i = 0; i < 8; i++) s.items.push({ x: x + 90 + i * 42, y: FLOOR - 125, kind: 'banana' });
-      s.nextSection += 1100;
-      return;
-    }
     const finale = s.elapsed % levelSeconds(s) >= levelSeconds(s) - 20;
     const kind = finale && !s.gemSpawned[5] ? 'caterpillar' : INSECT_KINDS[s.section % INSECT_KINDS.length];
     s.section++;
     s.insects.push(createInsect(kind, x));
     if (kind === 'fire-ant') {
-      const count = { easy: 2, medium: 3, hard: 4 }[s.difficulty];
-      for (let i = 1; i < count; i++) s.insects.push(createInsect(kind, x + i * 65));
+      const count = { easy: 3, medium: 4, hard: 5 }[s.difficulty];
+      // One compact column reads as a climbing ant tower, with every ant
+      // snapping forward as the monkey approaches.
+      for (let i = 1; i < count; i++) s.insects.push(createInsect(kind, x, i));
     }
+    if (kind === 'stinger') {
+      const count = { easy: 2, medium: 3, hard: 4 }[s.difficulty];
+      for (let i = 1; i < count; i++) s.insects.push(createInsect(kind, x + i * 115));
+    }
+    if (kind === 'centipede') s.insects.push(createInsect('mud-pit', x + 250));
+    if (kind === 'mud-pit') s.insects.push(createInsect('stinger', x + 185));
     if (kind === 'caterpillar') {
       for (let i = 0; i < 5; i++) s.items.push({ x: x + 80 + i * 45, y: FLOOR - 160, kind: 'banana' });
       if (finale && !s.gemSpawned[5]) {
