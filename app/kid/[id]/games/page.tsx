@@ -1050,7 +1050,7 @@ function BurgerRush({
   );
 }
 
-type JungleItem = { id: number; kind: "banana" | "golden" | "coconut"; x: number; y: number };
+type JungleItem = { id: number; kind: "banana" | "coconut"; lane?: "low" | "high"; x: number; y: number };
 
 function JungleVineSwing({
   onExit,
@@ -1063,33 +1063,24 @@ function JungleVineSwing({
   const [items, setItems] = useState<JungleItem[]>([]);
   const [score, setScore] = useState(0);
   const [bananas, setBananas] = useState(0);
-  const [combo, setCombo] = useState(0);
   const [hits, setHits] = useState(0);
   const [timeLeft, setTimeLeft] = useState(45);
-  const [playerX, setPlayerX] = useState(50);
   const [jumping, setJumping] = useState(false);
+  const [ducking, setDucking] = useState(false);
+  const [runFrame, setRunFrame] = useState(false);
+  const [lifeBonus, setLifeBonus] = useState(false);
   const itemId = useRef(0);
-  const playerXRef = useRef(50);
   const jumpingRef = useRef(false);
+  const duckingRef = useRef(false);
   const scoreRef = useRef(0);
   const bananasRef = useRef(0);
-  const comboRef = useRef(0);
   const hitsRef = useRef(0);
 
   const monkeyY = jumping ? 45 : 68;
-  const spriteFrame = status === "knocked" ? 2 : status === "victory" ? 3 : jumping ? 1 : 0;
-
-  function move(direction: -1 | 1) {
-    if (status !== "playing") return;
-    setPlayerX((value) => {
-      const next = Math.max(10, Math.min(90, value + direction * 10));
-      playerXRef.current = next;
-      return next;
-    });
-  }
+  const spriteFrame = status === "knocked" ? 4 : status === "victory" ? 5 : ducking ? 3 : jumping ? 2 : runFrame ? 1 : 0;
 
   function jump() {
-    if (status !== "playing" || jumpingRef.current) return;
+    if (status !== "playing" || jumpingRef.current || duckingRef.current) return;
     jumpingRef.current = true;
     setJumping(true);
     window.setTimeout(() => {
@@ -1098,29 +1089,38 @@ function JungleVineSwing({
     }, 650);
   }
 
+  function duck() {
+    if (status !== "playing" || jumpingRef.current || duckingRef.current) return;
+    duckingRef.current = true;
+    setDucking(true);
+    window.setTimeout(() => {
+      duckingRef.current = false;
+      setDucking(false);
+    }, 700);
+  }
+
   function startRun() {
     scoreRef.current = 0;
     bananasRef.current = 0;
-    comboRef.current = 0;
     hitsRef.current = 0;
-    playerXRef.current = 50;
     jumpingRef.current = false;
+    duckingRef.current = false;
     setScore(0);
     setBananas(0);
-    setCombo(0);
     setHits(0);
     setTimeLeft(45);
-    setPlayerX(50);
     setJumping(false);
+    setDucking(false);
+    setRunFrame(false);
+    setLifeBonus(false);
     setItems([]);
     setStatus("playing");
   }
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "ArrowLeft" || event.key.toLowerCase() === "a") { event.preventDefault(); move(-1); }
-      if (event.key === "ArrowRight" || event.key.toLowerCase() === "d") { event.preventDefault(); move(1); }
       if (event.key === "ArrowUp" || event.key === " " || event.key.toLowerCase() === "w") { event.preventDefault(); jump(); }
+      if (event.key === "ArrowDown" || event.key.toLowerCase() === "s") { event.preventDefault(); duck(); }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -1129,7 +1129,8 @@ function JungleVineSwing({
   useEffect(() => {
     if (status !== "playing") return;
     const ticker = window.setInterval(() => {
-      const monkeyX = playerXRef.current;
+      setRunFrame((frame) => !frame);
+      const monkeyX = 30;
       const monkeyY = jumpingRef.current ? 45 : 68;
 
       setItems((current) => {
@@ -1137,12 +1138,12 @@ function JungleVineSwing({
         const remaining: JungleItem[] = [];
         for (const item of current) {
           const next = { ...item, x: item.x - speed };
-          if (Math.abs(next.x - monkeyX) < 7 && Math.abs(next.y - monkeyY) < 10) {
+          const dodged = next.kind === "coconut" && ((next.lane === "low" && jumpingRef.current) || (next.lane === "high" && duckingRef.current));
+          const isHighCoconutCollision = next.kind === "coconut" && next.lane === "high" && Math.abs(next.x - monkeyX) < 7;
+          if (!dodged && (isHighCoconutCollision || (Math.abs(next.x - monkeyX) < 7 && Math.abs(next.y - monkeyY) < 10))) {
             if (next.kind === "coconut") {
               hitsRef.current += 1;
-              comboRef.current = 0;
               setHits(hitsRef.current);
-              setCombo(0);
               setItems([]);
               if (hitsRef.current >= 3) {
                 setStatus("over");
@@ -1151,26 +1152,30 @@ function JungleVineSwing({
                 window.setTimeout(() => setStatus("playing"), 1050);
               }
             } else {
-              const nextCombo = comboRef.current + 1;
-              const points = next.kind === "golden" ? 50 : 10 + Math.min(50, nextCombo * 5);
-              comboRef.current = nextCombo;
               bananasRef.current += 1;
-              scoreRef.current += points;
-              setCombo(nextCombo);
+              scoreRef.current += 10;
               setBananas(bananasRef.current);
               setScore(scoreRef.current);
+              if (bananasRef.current % 100 === 0) {
+                hitsRef.current -= 1;
+                setHits(hitsRef.current);
+                setLifeBonus(true);
+                window.setTimeout(() => setLifeBonus(false), 1600);
+              }
             }
           } else if (next.x > -10) {
             remaining.push(next);
           }
         }
-        if (Math.random() < 0.32 && remaining.length < 7) {
+        if (Math.random() < 0.42 && remaining.length < 7) {
           const roll = Math.random();
+          const lane = roll > 0.78 ? (Math.random() > 0.5 ? "low" : "high") : undefined;
           remaining.push({
             id: itemId.current++,
-            kind: roll < 0.68 ? "banana" : roll < 0.78 ? "golden" : "coconut",
+            kind: lane ? "coconut" : "banana",
+            lane,
             x: 108,
-            y: 25 + Math.random() * 50,
+            y: lane === "low" ? 68 : lane === "high" ? 55 : Math.random() > 0.45 ? 64 : 42,
           });
         }
         return remaining;
@@ -1193,7 +1198,7 @@ function JungleVineSwing({
 
   const finishRun = () => {
     const duration = Math.max(1, 45 - timeLeft);
-    onFinish(score, duration, { bananas, coconutHits: hits, bestCombo: combo, remainingSeconds: timeLeft });
+    onFinish(score, duration, { bananas, coconutHits: hits, coinProgress: bananas % 100, remainingSeconds: timeLeft });
   };
 
   return (
@@ -1201,15 +1206,15 @@ function JungleVineSwing({
       <div className="mb-3 flex items-center justify-between gap-3 sm:mb-5">
         <div>
           <h2 className="flex items-center gap-2 text-xl font-black text-emerald-950 sm:text-2xl"><TreePine className="text-emerald-600" /> Jungle Vine Swing</h2>
-          <p className="text-xs font-bold text-emerald-800 sm:text-sm">Move left and right · jump over coconuts · collect every banana</p>
+          <p className="text-xs font-bold text-emerald-800 sm:text-sm">Run automatically · jump low coconuts · duck high coconuts</p>
         </div>
         <button type="button" onClick={onExit} className="rounded-2xl bg-slate-100 px-4 py-2 text-sm font-black text-slate-600">Exit</button>
       </div>
 
       <div className="mb-3 grid grid-cols-3 gap-2 sm:mb-4 sm:gap-3">
-        <div className="rounded-2xl bg-yellow-100 px-3 py-2 text-center"><p className="text-[10px] font-black uppercase text-yellow-700">Score</p><p className="text-lg font-black text-yellow-950">🍌 {score}</p></div>
-        <div className="rounded-2xl bg-emerald-100 px-3 py-2 text-center"><p className="text-[10px] font-black uppercase text-emerald-700">Combo</p><p className="text-lg font-black text-emerald-950">×{combo}</p></div>
-        <div className="rounded-2xl bg-orange-100 px-3 py-2 text-center"><p className="text-[10px] font-black uppercase text-orange-700">Coconuts</p><p className="text-lg font-black text-orange-950">{"🥥".repeat(Math.max(0, 3 - hits))}</p></div>
+        <div className="rounded-2xl bg-yellow-100 px-3 py-2 text-center"><p className="text-[10px] font-black uppercase text-yellow-700">Score</p><p className="text-lg font-black text-yellow-950">{score}</p></div>
+        <div className="rounded-2xl bg-emerald-100 px-3 py-2 text-center"><p className="text-[10px] font-black uppercase text-emerald-700">Banana coins</p><p className="text-lg font-black text-emerald-950">🍌 {bananas % 100}/100</p></div>
+        <div className="rounded-2xl bg-orange-100 px-3 py-2 text-center"><p className="text-[10px] font-black uppercase text-orange-700">Lives</p><p className="text-lg font-black text-orange-950">{"❤️".repeat(Math.max(0, 3 - hits))}</p></div>
       </div>
 
       <div
@@ -1226,30 +1231,31 @@ function JungleVineSwing({
         <div
           className={`absolute z-20 h-32 w-28 -translate-x-1/2 -translate-y-1/2 bg-no-repeat drop-shadow-lg transition-[left,top] duration-150 ${status === "knocked" ? "animate-pulse" : jumping ? "scale-110" : ""}`}
           style={{
-            left: `${playerX}%`,
+            left: "30%",
             top: `${monkeyY}%`,
-            backgroundImage: "url('/games/jungle-monkey-sprites.png')",
-            backgroundSize: "400% 100%",
-            backgroundPosition: `${spriteFrame * (100 / 3)}% center`,
+            backgroundImage: "url('/games/jungle-monkey-runner-sprites-v2.png')",
+            backgroundSize: "600% 100%",
+            backgroundPosition: `${spriteFrame * (100 / 5)}% center`,
           }}
           aria-label={status === "knocked" ? "Dizzy monkey" : jumping ? "Jumping monkey" : status === "victory" ? "Victorious monkey" : "Running monkey"}
         />
 
         {items.map((item) => (
           <div key={item.id} className={`absolute z-10 -translate-x-1/2 -translate-y-1/2 text-4xl ${item.kind === "coconut" ? "animate-bounce" : ""}`} style={{ left: `${item.x}%`, top: `${item.y}%` }}>
-            {item.kind === "banana" ? "🍌" : item.kind === "golden" ? "🌟🍌" : "🥥"}
+            {item.kind === "banana" ? "🍌" : item.lane === "high" ? "🥥💨" : "🥥"}
           </div>
         ))}
 
         <div className="absolute inset-x-0 bottom-3 z-30 flex items-center justify-between px-4 text-xs font-black text-white drop-shadow"><span>{timeLeft}s left</span><span>{bananas} bananas collected</span></div>
 
         {status === "knocked" && <div className="absolute inset-0 z-30 flex items-center justify-center bg-red-900/20"><p className="animate-bounce rounded-2xl bg-red-500 px-5 py-3 text-2xl font-black text-white shadow-xl">BONK! 💥</p></div>}
+        {lifeBonus && <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center"><p className="animate-bounce rounded-2xl bg-pink-500 px-5 py-3 text-2xl font-black text-white shadow-xl">100 BANANAS! +1 LIFE ❤️</p></div>}
 
         {status === "ready" && (
           <div className="absolute inset-0 z-40 flex items-center justify-center bg-emerald-950/35 p-5 text-center">
             <div className="max-w-sm rounded-3xl bg-white p-5 shadow-xl">
-              <p className="text-4xl">🐒🍌🥥</p><h3 className="mt-2 text-2xl font-black text-emerald-950">Ready to swing?</h3>
-              <p className="mt-2 text-sm font-bold text-slate-600">Bananas score 10+ combo points. Golden bananas score 50. Avoid three coconuts!</p>
+              <p className="text-4xl">🐒🍌🥥</p><h3 className="mt-2 text-2xl font-black text-emerald-950">Ready to run?</h3>
+              <p className="mt-2 text-sm font-bold text-slate-600">Jump low coconuts, duck high ones, and collect 100 bananas to restore one life.</p>
               <button type="button" onClick={startRun} className="mt-4 w-full rounded-2xl bg-emerald-600 px-5 py-3 font-black text-white shadow-lg">Start jungle run</button>
             </div>
           </div>
@@ -1261,12 +1267,11 @@ function JungleVineSwing({
         )}
       </div>
 
-      <div className="mt-3 grid grid-cols-3 gap-2 sm:mx-auto sm:max-w-md">
-        <button type="button" disabled={status !== "playing"} onClick={() => move(-1)} className="rounded-2xl bg-emerald-100 px-4 py-4 text-2xl font-black text-emerald-900 disabled:opacity-50" aria-label="Move left">←</button>
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:mx-auto sm:max-w-md">
         <button type="button" disabled={status !== "playing"} onClick={jump} className="rounded-2xl bg-yellow-400 px-4 py-4 text-sm font-black text-yellow-950 shadow-sm disabled:opacity-50">JUMP</button>
-        <button type="button" disabled={status !== "playing"} onClick={() => move(1)} className="rounded-2xl bg-emerald-100 px-4 py-4 text-2xl font-black text-emerald-900 disabled:opacity-50" aria-label="Move right">→</button>
+        <button type="button" disabled={status !== "playing"} onClick={duck} className="rounded-2xl bg-emerald-700 px-4 py-4 text-sm font-black text-white shadow-sm disabled:opacity-50">DUCK</button>
       </div>
-      <p className="mt-2 text-center text-xs font-bold text-slate-500">Keyboard: ← / → to move · Space or ↑ to jump</p>
+      <p className="mt-2 text-center text-xs font-bold text-slate-500">Keyboard: Space / ↑ to jump · ↓ to duck</p>
     </section>
   );
 }
