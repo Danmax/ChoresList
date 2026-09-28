@@ -74,6 +74,7 @@ model Household {
   parents                  ParentAccount[]
   members                  FamilyMember[]
   chores                   Chore[]
+  teenTaskProposals        TeenTaskProposal[]
   assignments              ChoreAssignment[]
   completions              TaskCompletion[]
   skillCategories          SkillCategory[]
@@ -193,6 +194,7 @@ model FamilyMember {
   avatar                    String   @default("🧒") @db.VarChar(32)
   avatarConfig              Json?
   avatarImageUrl            String?  @db.VarChar(512)
+  teenTaskProposals         TeenTaskProposal[]
   color                     String   @default("#a78bfa") @db.VarChar(32)
   totalPoints               Int      @default(0)
   level                     Int      @default(1)
@@ -457,6 +459,32 @@ model Chore {
   skillLinks   ChoreSkill[]
   instructions ChoreInstructions?
   household    Household          @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  teenTaskProposals TeenTaskProposal[]
+}
+
+// Tasks selected or proposed by a teen remain here until a parent turns them
+// into a real chore assignment. This avoids putting unreviewed work on a list.
+model TeenTaskProposal {
+  id          String   @id @default(uuid()) @db.Char(36)
+  householdId String   @db.Char(36)
+  memberId    String   @db.Char(36)
+  choreId     String?  @db.Char(36)
+  title       String   @db.VarChar(120)
+  description String?  @db.Text
+  icon        String   @default("✅") @db.VarChar(32)
+  category    String   @default("other") @db.VarChar(64)
+  frequency   String   @default("weekly") @db.VarChar(64)
+  status      String   @default("pending") @db.VarChar(32)
+  parentNote  String?  @db.VarChar(500)
+  reviewedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  household Household    @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  member    FamilyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  chore     Chore?       @relation(fields: [choreId], references: [id], onDelete: SetNull)
+
+  @@index([householdId, status])
+  @@index([memberId, status])
 }
 
 model ChoreAssignment {

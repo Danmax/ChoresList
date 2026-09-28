@@ -1,0 +1,21 @@
+CREATE TABLE `TeenTaskProposal` (
+  `id` CHAR(36) NOT NULL,
+  `householdId` CHAR(36) NOT NULL,
+  `memberId` CHAR(36) NOT NULL,
+  `choreId` CHAR(36) NULL,
+  `title` VARCHAR(120) NOT NULL,
+  `description` TEXT NULL,
+  `icon` VARCHAR(32) NOT NULL DEFAULT '✅',
+  `category` VARCHAR(64) NOT NULL DEFAULT 'other',
+  `frequency` VARCHAR(64) NOT NULL DEFAULT 'weekly',
+  `status` VARCHAR(32) NOT NULL DEFAULT 'pending',
+  `parentNote` VARCHAR(500) NULL,
+  `reviewedAt` DATETIME(3) NULL,
+  `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  INDEX `TeenTaskProposal_householdId_status_idx` (`householdId`, `status`),
+  INDEX `TeenTaskProposal_memberId_status_idx` (`memberId`, `status`),
+  CONSTRAINT `TeenTaskProposal_householdId_fkey` FOREIGN KEY (`householdId`) REFERENCES `Household`(`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `TeenTaskProposal_memberId_fkey` FOREIGN KEY (`memberId`) REFERENCES `FamilyMember`(`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `TeenTaskProposal_choreId_fkey` FOREIGN KEY (`choreId`) REFERENCES `Chore`(`id`) ON DELETE SET NULL ON UPDATE CASCADE
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

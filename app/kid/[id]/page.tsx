@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, ArrowRight, BookOpen, Camera, CheckCircle2, ChevronRight, Gamepad2, Gift, GraduationCap, Lightbulb, ListChecks, Shield, Trophy, Wrench } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, Camera, CheckCircle2, ChevronRight, Gamepad2, Gift, GraduationCap, Lightbulb, ListChecks, Plus, Shield, Trophy, Wrench } from "lucide-react";
 import { getLevelFromPoints, getLevelTitle, getPointsForNextLevel } from "@/lib/points";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -48,6 +48,9 @@ interface Member {
   level: number;
   age: number;
 }
+
+interface TeenTask { id: string; name: string; icon: string; description?: string | null; category: string; pointsValue: number }
+interface TeenProposal { id: string; title: string; icon: string; frequency: string; status: string; parentNote?: string | null }
 
 type EducationAssignment = {
   id: string;
@@ -115,6 +118,10 @@ export default function KidPage() {
   const [academyEnabled, setAcademyEnabled] = useState(false);
   const [educationAssignments, setEducationAssignments] = useState<EducationAssignment[]>([]);
   const [educationProjects, setEducationProjects] = useState<EducationProject[]>([]);
+  const [teenTasks, setTeenTasks] = useState<TeenTask[]>([]);
+  const [teenProposals, setTeenProposals] = useState<TeenProposal[]>([]);
+  const [taskDraft, setTaskDraft] = useState({ title: "", description: "", icon: "✅", frequency: "weekly" });
+  const [sendingTask, setSendingTask] = useState(false);
 
   const loadData = useCallback(async () => {
     const [membersRes, assignRes, projRes, educationRes] = await Promise.all([
@@ -166,6 +173,33 @@ export default function KidPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const loadTeenTasks = useCallback(async () => {
+    if (!member || member.age < 12 || member.age > 18) return;
+    const [tasksResponse, proposalsResponse] = await Promise.all([
+      fetch(`/api/chores?age=${member.age}`),
+      fetch(`/api/teen-tasks?memberId=${member.id}`),
+    ]);
+    if (tasksResponse.ok) setTeenTasks(await tasksResponse.json());
+    if (proposalsResponse.ok) setTeenProposals(await proposalsResponse.json());
+  }, [member]);
+
+  useEffect(() => { void loadTeenTasks(); }, [loadTeenTasks]);
+
+  async function requestTeenTask(chore?: TeenTask) {
+    setSendingTask(true);
+    try {
+      const response = await fetch("/api/teen-tasks", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(chore ? { memberId: id, choreId: chore.id, frequency: taskDraft.frequency } : { memberId: id, ...taskDraft }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) return toast.error(data.error ?? "Could not send task request");
+      setTaskDraft({ title: "", description: "", icon: "✅", frequency: "weekly" });
+      toast.success("Sent to your parent for approval");
+      await loadTeenTasks();
+    } finally { setSendingTask(false); }
+  }
 
   async function markDone(assignment: Assignment, reactionEmoji: string) {
     if (assignment.chore.requiresPhoto && !proofPhoto) {
@@ -441,6 +475,29 @@ export default function KidPage() {
           </div>
         )}
       </section>
+
+      {member.age >= 12 && member.age <= 18 && (
+        <section className="mb-8 rounded-3xl border-2 border-indigo-100 bg-indigo-50/60 p-5 shadow-sm">
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div><h2 className="flex items-center gap-2 text-xl font-black text-indigo-950"><ListChecks size={21} /> My task choices</h2><p className="mt-1 text-sm font-bold text-indigo-700">Choose an approved household task or suggest one of your own. A parent checks every request first.</p></div>
+            <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-indigo-700">Ages 12–18</span>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {teenTasks.slice(0, 9).map((task) => <button key={task.id} type="button" disabled={sendingTask || teenProposals.some((proposal) => proposal.status === "pending" && proposal.title === task.name)} onClick={() => void requestTeenTask(task)} className="rounded-2xl border border-indigo-100 bg-white p-3 text-left shadow-sm transition hover:border-indigo-300 disabled:opacity-50"><span className="text-2xl">{task.icon}</span><span className="ml-2 font-black text-slate-800">{task.name}</span><span className="mt-1 block text-xs font-bold text-slate-500">Request as {taskDraft.frequency}</span></button>)}
+          </div>
+          <div className="mt-4 rounded-2xl bg-white p-4">
+            <p className="font-black text-slate-800">Suggest your own task</p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-[64px_1fr_150px]">
+              <input aria-label="Task icon" value={taskDraft.icon} onChange={(event) => setTaskDraft((draft) => ({ ...draft, icon: event.target.value.slice(0, 4) || "✅" }))} className="rounded-xl border border-slate-200 px-3 py-2 text-center" />
+              <input aria-label="Task name" value={taskDraft.title} onChange={(event) => setTaskDraft((draft) => ({ ...draft, title: event.target.value }))} placeholder="Example: Organize the garage shelf" className="rounded-xl border border-slate-200 px-3 py-2 font-semibold" />
+              <select value={taskDraft.frequency} onChange={(event) => setTaskDraft((draft) => ({ ...draft, frequency: event.target.value }))} className="rounded-xl border border-slate-200 px-3 py-2 font-semibold"><option value="daily">Daily</option><option value="weekly">Weekly</option></select>
+            </div>
+            <input aria-label="Task details" value={taskDraft.description} onChange={(event) => setTaskDraft((draft) => ({ ...draft, description: event.target.value }))} placeholder="What does success look like?" className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+            <button type="button" disabled={!taskDraft.title.trim() || sendingTask} onClick={() => void requestTeenTask()} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-black text-white disabled:opacity-40"><Plus size={16} /> Send for parent approval</button>
+          </div>
+          {teenProposals.length > 0 && <div className="mt-4 flex flex-wrap gap-2">{teenProposals.slice(0, 5).map((proposal) => <span key={proposal.id} className={`rounded-xl px-3 py-2 text-xs font-black ${proposal.status === "approved" ? "bg-emerald-100 text-emerald-700" : proposal.status === "declined" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>{proposal.icon} {proposal.title} · {proposal.status}{proposal.parentNote ? `: ${proposal.parentNote}` : ""}</span>)}</div>}
+        </section>
+      )}
 
       {assignments.length === 0 && (
         <div className="text-center py-16">

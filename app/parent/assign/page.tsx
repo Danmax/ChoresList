@@ -31,6 +31,7 @@ interface Assignment {
   member: Member;
   completions?: { id: string }[];
 }
+interface TeenProposal { id: string; title: string; description?: string | null; icon: string; frequency: string; member: Member; createdAt: string }
 
 function isDueToday(assignment: Assignment) {
   const today = new Date();
@@ -53,29 +54,48 @@ export default function AssignPage() {
   const [completionAssignment, setCompletionAssignment] = useState<Assignment | null>(null);
   const [completionProofPhoto, setCompletionProofPhoto] = useState<File | null>(null);
   const [completingId, setCompletingId] = useState<string | null>(null);
+  const [teenProposals, setTeenProposals] = useState<TeenProposal[]>([]);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [form, setForm] = useState({
     memberId: "", choreIds: [] as string[], frequency: "daily", dueDate: "", dayOfWeeks: ["1"], monthlyCompletionTarget: 1,
   });
 
   const load = useCallback(async () => {
-    const [mRes, cRes, aRes] = await Promise.all([
+    const [mRes, cRes, aRes, proposalRes] = await Promise.all([
       fetch("/api/members"),
       fetch("/api/chores"),
       fetch("/api/assignments?scope=all"),
+      fetch("/api/teen-tasks"),
     ]);
-    const [membersData, choresData, assignmentsData] = await Promise.all([
+    const [membersData, choresData, assignmentsData, proposalsData] = await Promise.all([
       mRes.json().catch(() => []),
       cRes.json().catch(() => []),
       aRes.json().catch(() => []),
+      proposalRes.json().catch(() => []),
     ]);
     const nextMembers = Array.isArray(membersData) ? membersData : Array.isArray(membersData?.members) ? membersData.members : [];
     if (!Array.isArray(membersData) && !Array.isArray(membersData?.members)) toast.error(membersData.error ?? "Could not load members");
     setMembers(nextMembers);
     setChores(Array.isArray(choresData) ? choresData : []);
     setAssignments(Array.isArray(assignmentsData) ? assignmentsData : []);
+    setTeenProposals(Array.isArray(proposalsData) ? proposalsData.filter((proposal) => proposal.status === "pending") : []);
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  async function reviewTeenTask(proposal: TeenProposal, action: "approve" | "decline") {
+    setReviewingId(proposal.id);
+    try {
+      const response = await fetch("/api/teen-tasks", {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: proposal.id, action, frequency: proposal.frequency, pointsValue: 20 }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) return toast.error(data.error ?? "Could not review task request");
+      toast.success(action === "approve" ? `${proposal.title} added to ${proposal.member.name}'s list` : "Task request declined");
+      await load();
+    } finally { setReviewingId(null); }
+  }
 
   async function assign() {
     if (!form.memberId || form.choreIds.length === 0) { toast.error("Select a member and at least one chore"); return; }
@@ -237,6 +257,8 @@ export default function AssignPage() {
           </button>
         ))}
       </div>
+
+      {teenProposals.length > 0 && <section className="mb-6 rounded-2xl border-2 border-amber-200 bg-amber-50 p-4"><div className="mb-3"><h2 className="font-black text-amber-900">Teen task approvals</h2><p className="text-sm font-semibold text-amber-800">Approve to create the task and add it to the teen’s chore list.</p></div><div className="space-y-2">{teenProposals.map((proposal) => <div key={proposal.id} className="flex flex-col gap-3 rounded-xl bg-white p-3 sm:flex-row sm:items-center"><span className="text-2xl">{proposal.icon}</span><div className="min-w-0 flex-1"><p className="font-black text-slate-800">{proposal.title} <span className="font-semibold text-slate-500">for {proposal.member.name}</span></p><p className="text-xs font-semibold text-slate-500">{proposal.frequency}{proposal.description ? ` · ${proposal.description}` : ""}</p></div><div className="flex gap-2"><button disabled={reviewingId === proposal.id} onClick={() => void reviewTeenTask(proposal, "approve")} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-black text-white disabled:opacity-40">Approve</button><button disabled={reviewingId === proposal.id} onClick={() => void reviewTeenTask(proposal, "decline")} className="rounded-lg bg-rose-100 px-3 py-2 text-xs font-black text-rose-700 disabled:opacity-40">Decline</button></div></div>)}</div></section>}
 
       {filteredAssignments.length === 0 && (
         <div className="text-center py-16">
