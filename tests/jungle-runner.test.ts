@@ -103,13 +103,13 @@ test('waiting snakes hurt on the ground and invulnerability prevents repeat dama
   advance(s, 1); assert.equal(s.lives, 2);
 });
 
-test('levels advance without resetting earned coins or lives and victory follows the moonlit fifth level', () => {
+test('levels advance without resetting earned coins or lives and victory follows the insect sixth level', () => {
   const s = active(); s.bananas = 110; s.lives = 4; s.elapsed = 59.99;
   advance(s, 0.03); assert.equal(s.level, 1); assert.equal(s.phase, 'playing');
   s.elapsed = 119.99; advance(s, 0.03); assert.equal(s.level, 2);
   s.elapsed = 179.99; advance(s, 0.03); assert.equal(s.level, 3); assert.equal(s.phase, 'playing');
   s.elapsed = 239.99; advance(s, 0.03); assert.equal(s.phase, 'playing'); assert.equal(s.level, 4);
-  s.elapsed = 299.99; advance(s, 0.03); assert.equal(s.phase, 'victory'); assert.equal(s.bananas, 110); assert.equal(s.lives, 4);
+  s.elapsed = 359.99; advance(s, 0.03); assert.equal(s.phase, 'victory'); assert.equal(s.bananas, 110); assert.equal(s.lives, 4);
 });
 
 test('every level starts faster than the previous level finishes', () => {
@@ -372,12 +372,12 @@ for (let level = 0; level < LEVELS.length; level++) {
 test('full run spawns exactly one gem per level and bats only at night', () => {
   const s = createRunner(); s.phase = 'playing';
   const seen = new Set<object>(), counts = GEMS.map(() => 0); let nightBats = false;
-  for (let i = 0; i < 301 * 120; i++) {
+  for (let i = 0; i < 361 * 120; i++) {
     s.invincible = 5; stepRunner(s, 1 / 120);
     for (const item of s.items) if (item.kind === 'gem' && !seen.has(item)) { seen.add(item); counts[item.level!]++; }
     if (s.bats.length) { assert.equal(s.level, 4); nightBats = true; }
   }
-  assert.deepEqual(counts, [1, 1, 1, 1, 1]); assert.ok(nightBats); assert.equal(s.phase, 'victory');
+  assert.deepEqual(counts, [1, 1, 1, 1, 1, 1]); assert.ok(nightBats); assert.equal(s.phase, 'victory');
 });
 
 test('gem collection awards 250 points once per level, and restart clears progress', () => {
@@ -389,8 +389,8 @@ test('gem collection awards 250 points once per level, and restart clears progre
       stepRunner(s, 1 / 120);
     }
   }
-  assert.equal(s.gems, 5); assert.equal(runnerScore(s), 1250); assert.equal(s.bananas, 0);
-  assert.deepEqual(s.gemCollected, [true, true, true, true, true]); assert.equal(createRunner().gems, 0);
+  assert.equal(s.gems, 6); assert.equal(runnerScore(s), 1500); assert.equal(s.bananas, 0);
+  assert.deepEqual(s.gemCollected, [true, true, true, true, true, true]); assert.equal(createRunner().gems, 0);
 });
 
 test('high gems require a timed double jump, not a single jump', () => {

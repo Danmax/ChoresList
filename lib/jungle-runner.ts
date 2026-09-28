@@ -1,3 +1,4 @@
+import { createInsect, INSECT_KINDS, stepInsects, type Insect, type AntRock, type HitReaction } from './jungle-insects';
 export const FLOOR = 310;
 export const PLAYER_X = 150;
 export const RUNNER_DIFFICULTIES = {
@@ -12,6 +13,7 @@ export const LEVELS = [
   { name: 'Sunset Canopy', sky: '#edaf8f', mist: '#ffe9a2', speed: 325 },
   { name: 'Tiger Territory', sky: '#7d83c4', mist: '#e7bbde', speed: 385 },
   { name: 'Moonlit Webs', sky: '#090e29', mist: '#33496b', speed: 445 },
+  { name: 'Giant Insect Grove', sky: '#542b79', mist: '#b4efd0', speed: 505 },
 ] as const;
 export const LEVEL_SECONDS = 60;
 export const SLIDE_SECONDS = 1.5;
@@ -21,7 +23,7 @@ export type RunnerItem = { x: number; y: number; kind: 'banana' | 'golden' | 'ch
 export const GEMS = [
   { name: 'Emerald', color: '#4cf7ae' }, { name: 'Sapphire', color: '#6fbaff' },
   { name: 'Ruby', color: '#ff6e97' }, { name: 'Amber', color: '#ffcb56' },
-  { name: 'Moonstone', color: '#d2b7ff' },
+  { name: 'Moonstone', color: '#d2b7ff' }, { name: 'Peridot', color: '#c4ff57' },
 ] as const;
 export type Hog = { herdX: number; x: number; y: number; vy: number; age: number; jumper: boolean; jumpIn: number; active: boolean };
 export function createHogs(x: number, speed: number, random = Math.random): Hog[] {
@@ -91,6 +93,8 @@ export function vinePosition(r: River, elapsed: number, progress?: number) {
 export function createRunner(difficulty: RunnerDifficulty = 'medium') {
   return {
     difficulty,
+    insects: [] as Insect[], antRocks: [] as AntRock[], caterpillarBounces: 0,
+    reaction: 'bonk' as HitReaction, reactionLeft: 0,
     phase: 'ready' as 'ready' | 'playing' | 'over' | 'victory',
     distance: 0, elapsed: 0, level: 0, y: FLOOR, vy: 0, jumps: 0, duck: false, duckHeld: false, slideLeft: 0, cameraLead: 0,
     flipLeft: 0, swing: null as { river: River; progress: number } | null,
@@ -131,13 +135,14 @@ export function duckRunner(s: Runner, held: boolean) {
 
 export function runnerScore(s: Runner) { return s.bananas * 10 + s.bonusScore; }
 
-function hurt(s: Runner, message: string) {
+function hurt(s: Runner, message: string, reaction: HitReaction = 'bonk') {
   if (s.invincible > 0) return;
   s.swing = null;
   s.flipLeft = 0;
   s.lives--;
   s.hits++;
   s.stun = 0.65;
+  s.reaction = reaction; s.reactionLeft = 0.9;
   s.invincible = RUNNER_DIFFICULTIES[s.difficulty].protection;
   s.message = message;
   s.messageTime = 1.3;
@@ -153,6 +158,26 @@ function hurt(s: Runner, message: string) {
 // of screen size. Every challenge is followed by a long, safe coin trail.
 function addSection(s: Runner) {
   const x = s.nextSection;
+  if (s.level === 5) {
+    const finale = s.elapsed % LEVEL_SECONDS >= 40;
+    const kind = finale && !s.gemSpawned[5] ? 'caterpillar' : INSECT_KINDS[s.section % INSECT_KINDS.length];
+    s.section++;
+    s.insects.push(createInsect(kind, x));
+    if (kind === 'fire-ant') {
+      const count = { easy: 2, medium: 3, hard: 4 }[s.difficulty];
+      for (let i = 1; i < count; i++) s.insects.push(createInsect(kind, x + i * 65));
+    }
+    if (kind === 'caterpillar') {
+      for (let i = 0; i < 5; i++) s.items.push({ x: x + 80 + i * 45, y: FLOOR - 160, kind: 'banana' });
+      if (finale && !s.gemSpawned[5]) {
+        s.gemSpawned[5] = true;
+        s.items.push({ x: x + runnerSpeed(s) * 0.4, y: GEM_Y, kind: 'gem', level: 5 });
+      }
+    }
+    for (let i = 0; i < 8; i++) s.items.push({ x: x + 650 + i * 40, y: FLOOR - 28, kind: 'banana' });
+    s.nextSection += Math.max(1400, runnerSpeed(s) * 3.1);
+    return;
+  }
   const patterns = [[8, 16, 10, 14, 3, 11, 12, 4, 7, 6], [16, 3, 12, 14, 5, 9, 10, 11, 4, 7, 6, 8], [7, 16, 14, 12, 11, 5, 10, 9, 4, 1, 3, 8, 6], [16, 7, 11, 14, 12, 10, 9, 5, 8, 7, 3, 6, 5, 4, 1], [13, 15, 16, 14, 11, 13, 12, 15, 10, 7, 3, 13, 4, 8]][s.level];
   const type = patterns[s.section++ % patterns.length];
   let recovery = type === 10 || type === 12 ? 820 : 470;
@@ -199,6 +224,7 @@ function addSection(s: Runner) {
 }
 
 export function stepRunner(s: Runner, dt: number) {
+  s.reactionLeft = Math.max(0, s.reactionLeft - dt);
   if (s.phase !== 'playing') return;
   for (const splat of s.splats) splat.age += dt;
   s.splats = s.splats.filter(p => p.age < 0.65);
@@ -215,7 +241,12 @@ export function stepRunner(s: Runner, dt: number) {
   s.elapsed += dt;
   if (s.elapsed >= LEVEL_SECONDS * LEVELS.length) { s.phase = 'victory'; return; }
   const level = Math.floor(s.elapsed / LEVEL_SECONDS);
-  if (level !== s.level) { s.level = level; s.section = 0; s.items = s.items.filter(i => i.kind !== 'gem'); s.message = `LEVEL ${level + 1}: ${LEVELS[level].name}`; s.messageTime = 3; }
+  if (level !== s.level) {
+    if (level === 5) {
+      s.items = []; s.rivers = []; s.predators = []; s.hogs = []; s.bats = []; s.herds = []; s.spiders = []; s.orangutans = []; s.pineapples = []; s.birds = [];
+      s.swing = null; s.nextSection = s.distance + 1100;
+    }
+    s.level = level; s.section = 0; s.items = s.items.filter(i => i.kind !== 'gem'); s.message = `LEVEL ${level + 1}: ${LEVELS[level].name}`; s.messageTime = 3; }
   const speed = runnerSpeed(s);
   const boost = dashBoost(s) + airBoost(s);
   if (!s.swing) s.distance += (speed + boost) * dt;
@@ -301,7 +332,7 @@ export function stepRunner(s: Runner, dt: number) {
       river.bounced = true;
       river.bounceLeft = 0.45;
       s.message = 'HIPPO BOUNCE!'; s.messageTime = 1;
-    } else if (s.y > FLOOR + 55) hurt(s, river.resident === 'eel' && eelPhase(river) === 'shock' ? 'ZAP! Electric water!' : 'SPLASH! Stay above the water!');
+    } else if (s.y > FLOOR + 55) hurt(s, river.resident === 'eel' && eelPhase(river) === 'shock' ? 'ZAP! Electric water!' : 'SPLASH! Stay above the water!', river.resident === 'eel' && eelPhase(river) === 'shock' ? 'zap' : 'bonk');
   } else if (s.y >= FLOOR) {
     s.y = FLOOR; s.vy = 0; s.jumps = 0;
   }
@@ -318,7 +349,7 @@ export function stepRunner(s: Runner, dt: number) {
       if (s.vy > 0 && previousY <= ELEPHANT_TOP && s.y >= ELEPHANT_TOP) {
         s.y = ELEPHANT_TOP; s.vy = -460; s.jumps = 1; s.duck = false; s.slideLeft = 0; s.flipLeft = 0;
         s.elephantBounces++; s.message = 'HERD HOP!'; s.messageTime = 0.7;
-      } else if (s.y > ELEPHANT_TOP + 8) hurt(s, 'TRAMPLED! Double jump onto backs!');
+      } else if (s.y > ELEPHANT_TOP + 8) hurt(s, 'TRAMPLED! Double jump onto backs!', 'flatten');
     }
   }
   s.herds = s.herds.filter(h => h.x + 440 > s.distance - 80);
@@ -328,7 +359,7 @@ export function stepRunner(s: Runner, dt: number) {
       const fish = piranhaPosition(r, i);
       if (fish.jumping && Math.abs(fish.x - worldX) < 37 && fish.y + 17 >= s.y - height && fish.y - 17 <= s.y - 4) hurt(s, 'PIRANHA LEAP! Double jump!');
     }
-    if (r.resident === 'eel' && eelPhase(r) === 'shock' && Math.abs(worldX - (r.x + r.width * 0.3)) < 70 && s.y > FLOOR - 28) hurt(s, 'ZAP! Jump above the electric water!');
+    if (r.resident === 'eel' && eelPhase(r) === 'shock' && Math.abs(worldX - (r.x + r.width * 0.3)) < 70 && s.y > FLOOR - 28) hurt(s, 'ZAP! Jump above the electric water!', 'zap');
   }
   for (const o of s.orangutans) {
     const ahead = o.x - worldX;
@@ -441,10 +472,11 @@ export function stepRunner(s: Runner, dt: number) {
     const radiusY = p.kind === 'snake' ? 25 : 28;
     if (visible && !p.hit && s.invincible <= 0 && Math.abs(p.x - worldX) < radiusX + 16 && p.y + radiusY >= s.y - height && p.y - radiusY <= s.y - 4) {
       p.hit = true;
-      hurt(s, p.kind === 'snake' ? 'SNAKE STRIKE! Double jump!' : p.kind === 'panther' ? 'PANTHER CHARGE! Jump over it!' : p.attackStyle === 'rush' ? 'TIGER CHARGE! Jump over!' : 'TIGER POUNCE! Slide beneath!');
+      hurt(s, p.kind === 'snake' ? 'SNAKE STRIKE! Double jump!' : p.kind === 'panther' ? 'PANTHER CHARGE! Jump over it!' : p.attackStyle === 'rush' ? 'TIGER CHARGE! Jump over!' : 'TIGER POUNCE! Slide beneath!', p.kind === 'snake' ? 'bonk' : 'tussle');
       break;
     }
   }
+  stepInsects(s, dt, speed + boost, previousY, (message, reaction) => hurt(s, message, reaction));
   s.predators = s.predators.filter(p => p.x > s.distance - 120);
   for (const item of s.items) {
     const collectible = ['banana', 'golden', 'cherry', 'gem'].includes(item.kind);

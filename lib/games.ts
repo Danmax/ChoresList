@@ -94,11 +94,11 @@ export const GAME_DEFINITIONS: GameDefinition[] = [
   {
     key: "jungle-vine-swing",
     title: "Jungle Runner",
-    description: "Collect gems, dodge dancing orangutans’ pineapples, cross piranha and electric-eel waters, and brave wild herds and moonlit bats.",
+    description: "Collect gems, dodge dancing orangutans’ pineapples, cross piranha and electric-eel waters, brave moonlit bats, and bounce through Giant Insect Grove.",
     icon: "TreePine",
     ageMin: 5,
     ageMax: 14,
-    playTime: "5 min",
+    playTime: "6 min",
     color: "#15803d",
     bg: "#dcfce7",
   },

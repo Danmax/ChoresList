@@ -1,0 +1,11 @@
+# Giant Insect Grove sprite atlas
+
+Generated with the built-in imagegen tool, then edited with the same tool to remove the background and separate all eight sprites. Final PNG has an alpha channel. Measured source rectangles live in `lib/jungle-insect-art.ts`; do not assume exact grid alignment or stretch the sprites.
+
+## Generation prompt
+
+Use case: stylized-concept. Asset type: production 2D side-scrolling children's jungle game sprite atlas. Create ONE transparent PNG sprite sheet, exactly 4 columns by 2 rows of equally sized cells. Each cell contains ONE fully isolated colorful cartoon insect, centered with generous transparent padding on ALL sides (at least 15% cell width), no parts crossing cells. No background, no shadows outside characters, no text, no borders. Bright polished hand-painted game art, bold readable silhouettes, cute expressive eyes, side view facing LEFT. Row 1 left to right: (1) turquoise and orange giant slithering centipede with segmented body and many tiny purple feet, (2) same centipede curled into a circular rolling wheel, (3) round iridescent violet and cyan bouncy beetle with gold horns, (4) amber worker ant carrying a green leaf bundle and holding a gray throwing pebble. Row 2 left to right: (1) scarlet red fire ant with glowing orange antennae, (2) yellow and teal flying stinging insect with translucent wings, (3) friendly plump translucent jewel caterpillar with luminous lime emerald and pink crystal-like body segments, (4) vivid green leaf-mimic katydid with leaf-shaped wings and long bent jumping legs. Strict regular grid 4 columns 2 rows. Entire characters fit inside their cells, transparent gutters. Landscape 1536x1024 if possible.
+
+## Final edit prompt
+
+Edit this game sprite atlas. Remove ALL background including every dark gradient and colored glow behind insects. Output a genuinely transparent alpha background, NOT black or checkerboard. Preserve these exact 8 colorful insect designs. Reposition and SHRINK to fit a STRICT uniform 4 column by 2 row grid, each fully isolated in the center of its cell, at least 15% transparent padding on each side. The long centipede MUST shrink to fit its own first cell entirely, not overlap second cell. No text or dividers. Sprite atlas for canvas rendering. Preserve colors and complete legs and antennae.
