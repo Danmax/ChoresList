@@ -1,5 +1,11 @@
 export const FLOOR = 310;
 export const PLAYER_X = 150;
+export const RUNNER_DIFFICULTIES = {
+  easy: { label: 'Easy', speed: 0.8, lives: 5, protection: 3.5, description: 'Slower pace · 5 lives · longer hit protection' },
+  medium: { label: 'Medium', speed: 1, lives: 3, protection: 2.5, description: 'Classic pace · 3 lives · standard hit protection' },
+  hard: { label: 'Hard', speed: 1.2, lives: 2, protection: 1.5, description: 'Faster pace · 2 lives · shorter hit protection' },
+} as const;
+export type RunnerDifficulty = keyof typeof RUNNER_DIFFICULTIES;
 export const LEVELS = [
   { name: 'Banana Grove', sky: '#8de3e5', mist: '#ecf8b4', speed: 205 },
   { name: 'Snake River', sky: '#a7b9f3', mist: '#bce9d0', speed: 265 },
@@ -71,7 +77,7 @@ export function createPredator(kind: Predator['kind'], x: number, temperament = 
   return { kind, x, y: FLOOR - 22, state: 'waiting', age: 0, hit: false, temperament, homeX: x, facing: -1, attackStyle: 'leap', attackSpeed: 0, leapHeight: 0 };
 }
 export type Runner = ReturnType<typeof createRunner>;
-export function runnerSpeed(s: Runner) { return LEVELS[s.level].speed + (s.elapsed % LEVEL_SECONDS) * 0.3; }
+export function runnerSpeed(s: Runner) { return (LEVELS[s.level].speed + (s.elapsed % LEVEL_SECONDS) * 0.3) * RUNNER_DIFFICULTIES[s.difficulty].speed; }
 export function dashBoost(s: Runner) {
   return s.duck && s.y >= FLOOR - 1 && s.stun <= 0 ? 180 * (s.slideLeft / SLIDE_SECONDS) ** 2 : 0;
 }
@@ -82,15 +88,16 @@ export function vinePosition(r: River, elapsed: number, progress?: number) {
   return { x: r.x - 45 + (r.width + 90) * t, y: 160 + Math.sin(t * Math.PI) * 45 };
 }
 
-export function createRunner() {
+export function createRunner(difficulty: RunnerDifficulty = 'medium') {
   return {
+    difficulty,
     phase: 'ready' as 'ready' | 'playing' | 'over' | 'victory',
     distance: 0, elapsed: 0, level: 0, y: FLOOR, vy: 0, jumps: 0, duck: false, duckHeld: false, slideLeft: 0, cameraLead: 0,
     flipLeft: 0, swing: null as { river: River; progress: number } | null,
     cracks: [] as { x: number; y: number; age: number }[],
     golden: 0, cherries: 0, bonusScore: 0, gems: 0,
     gemSpawned: LEVELS.map(() => false), gemCollected: LEVELS.map(() => false),
-    lives: 3, bananas: 0, hits: 0, bounces: 0, stun: 0, invincible: 0,
+    lives: Number(RUNNER_DIFFICULTIES[difficulty].lives), bananas: 0, hits: 0, bounces: 0, stun: 0, invincible: 0,
     message: '', messageTime: 0, nextSection: 950, section: 0,
     items: Array.from({ length: 12 }, (_, i): RunnerItem => ({ x: 380 + i * 42, y: FLOOR - 30, kind: 'banana' })),
     orangutans: [] as Orangutan[], pineapples: [] as Pineapple[], splats: [] as { x: number; y: number; age: number }[],
@@ -131,7 +138,7 @@ function hurt(s: Runner, message: string) {
   s.lives--;
   s.hits++;
   s.stun = 0.65;
-  s.invincible = 2.5;
+  s.invincible = RUNNER_DIFFICULTIES[s.difficulty].protection;
   s.message = message;
   s.messageTime = 1.3;
   s.y = FLOOR;

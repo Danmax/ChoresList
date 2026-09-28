@@ -6,6 +6,28 @@ import { GEM_Y, createOrangutan, orangutanHand, piranhaPosition, eelPhase, creat
 function active() { const s = createRunner(); s.phase = 'playing'; s.items = []; s.nextSection = 100000; return s; }
 function advance(s: ReturnType<typeof active>, seconds: number, fps = 120) { for (let i = 0; i < seconds * fps; i++) stepRunner(s, 1 / fps); }
 
+test('difficulty changes pace, starting lives, and protection after collisions', () => {
+  assert.deepEqual(createRunner(), createRunner('medium'));
+  const results = (['easy', 'medium', 'hard'] as const).map((difficulty) => {
+    const s = createRunner(difficulty);
+    s.phase = 'playing';
+    s.nextSection = 100000;
+    s.items = [];
+    advance(s, 1);
+    const distance = s.distance;
+    const lives = s.lives;
+    s.items = [{ x: s.distance + PLAYER_X, y: FLOOR - 64, kind: 'high' }];
+    stepRunner(s, 1 / 120);
+    assert.equal(s.lives, lives - 1);
+    assert.equal(s.hits, 1);
+    return { distance, lives, protection: s.invincible };
+  });
+  assert.deepEqual(results.map((result) => result.lives), [5, 3, 2]);
+  assert.deepEqual(results.map((result) => result.protection), [3.5, 2.5, 1.5]);
+  assert.ok(results[0].distance < results[1].distance);
+  assert.ok(results[1].distance < results[2].distance);
+});
+
 test('jump follows an arc, permits one air jump, and duck cancels upward motion', () => {
   const s = active(); jumpRunner(s); advance(s, 0.15);
   assert.ok(s.y < FLOOR); jumpRunner(s); assert.equal(s.jumps, 2);
