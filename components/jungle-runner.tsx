@@ -4,7 +4,7 @@ import { drawInsectGrove, drawInsects, drawReaction } from '@/lib/jungle-insect-
 import { pantherPaw } from '@/lib/jungle-motion';
 import { drawWaterLife, drawOrangutan, drawPineapple } from '@/lib/jungle-water-art';
 import { useEffect, useRef, useState } from 'react';
-import { RUNNER_DIFFICULTIES, type RunnerDifficulty, GEMS, spiderPosition, slothPosition, airBoost, FLIP_SECONDS, vinePosition, birdHeight, crocodileFrame, hippoFrame, createRunner, dashBoost, duckRunner, FLOOR, jumpRunner, LEVELS, LEVEL_SECONDS, PLAYER_X, runnerScore, travelSpeed, stepRunner, type Runner } from '@/lib/jungle-runner';
+import { RUNNER_DIFFICULTIES, type RunnerDifficulty, GEMS, spiderPosition, slothPosition, airBoost, FLIP_SECONDS, vinePosition, birdHeight, crocodileFrame, hippoFrame, createRunner, dashBoost, duckRunner, FLOOR, jumpRunner, LEVELS, levelSeconds, PLAYER_X, runnerScore, travelSpeed, stepRunner, type Runner } from '@/lib/jungle-runner';
 
 // Canvas artwork keeps shells and moving limbs crisp at every display density.
 function coconut(ctx: CanvasRenderingContext2D, x: number, y: number, rotation = 0, split = 0) {
@@ -112,20 +112,36 @@ function spiderArt(ctx: CanvasRenderingContext2D, x: number, y: number, age: num
   ctx.restore();
 }
 
-function slothArt(ctx: CanvasRenderingContext2D, x: number, y: number) {
-  ctx.save(); ctx.translate(x, y);
-  ctx.strokeStyle = '#735244'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(0, -y - 12); ctx.quadraticCurveTo(12, -y / 2, 1, -18); ctx.stroke();
-  ctx.fillStyle = '#8d7562'; ctx.beginPath(); ctx.ellipse(0, 0, 19, 25, 0.15, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#d5c4a5'; ctx.beginPath(); ctx.ellipse(-5, -7, 13, 12, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#352b32'; ctx.beginPath(); ctx.ellipse(-7, -8, 5, 7, 0.2, 0, Math.PI * 2); ctx.ellipse(2, -8, 5, 7, -0.2, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#18131a'; ctx.beginPath(); ctx.arc(-7, -8, 1.5, 0, Math.PI * 2); ctx.arc(2, -8, 1.5, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+function slothArt(ctx: CanvasRenderingContext2D, x: number, y: number, age: number) {
+  const sway = Math.sin(age * 1.8) * 0.18, blink = Math.sin(age * 1.25) > 0.96;
+  ctx.save(); ctx.translate(x, y); ctx.rotate(sway);
+  // Slow, independently swaying arms make the sloth feel heavy on the vine.
+  ctx.strokeStyle = '#735244'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+  for (const side of [-1, 1]) { const arm = Math.sin(age * 1.8 + side) * 9; ctx.beginPath(); ctx.moveTo(side * 12, -10); ctx.quadraticCurveTo(side * 28, 4 + arm, side * 19, 23 + arm); ctx.stroke(); }
+  ctx.fillStyle = '#8d7562'; ctx.beginPath(); ctx.ellipse(0, 1, 19, 25, 0.15, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#d5c4a5'; ctx.beginPath(); ctx.ellipse(-5, -8, 13, 12, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#352b32'; ctx.beginPath(); ctx.ellipse(-7, -9, 5, blink ? 1 : 7, 0.2, 0, Math.PI * 2); ctx.ellipse(2, -9, 5, blink ? 1 : 7, -0.2, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#18131a'; if (!blink) { ctx.beginPath(); ctx.arc(-7, -9, 1.5, 0, Math.PI * 2); ctx.arc(2, -9, 1.5, 0, Math.PI * 2); ctx.fill(); }
+  ctx.strokeStyle = '#4c3734'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(-3, 0, 5, 0.1, Math.PI - 0.1); ctx.stroke(); ctx.restore();
 }
 
 function lemmingArt(ctx: CanvasRenderingContext2D, x: number, y: number, age: number) {
-  ctx.save(); ctx.translate(x, y + Math.abs(Math.sin(age * 8)) * -14); ctx.fillStyle = '#87705c';
+  const hop = Math.abs(Math.sin(age * 8)) * -14, step = Math.sin(age * 16) * 5;
+  ctx.save(); ctx.translate(x, y + hop); ctx.fillStyle = '#87705c';
+  ctx.strokeStyle = '#5b463c'; ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(15, 1); ctx.quadraticCurveTo(33, -5 + step, 34, 7); ctx.stroke();
   ctx.beginPath(); ctx.ellipse(0, 0, 20, 12, 0, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(-16, -5, 9, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#513f36'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-5, 9); ctx.lineTo(-2 + step, 17); ctx.moveTo(8, 9); ctx.lineTo(12 - step, 17); ctx.stroke();
   ctx.fillStyle = '#f3dfb5'; ctx.beginPath(); ctx.ellipse(-20, -2, 5, 4, 0, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#231b20'; ctx.beginPath(); ctx.arc(-19, -8, 2, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+}
+
+function fallbackMonkey(ctx: CanvasRenderingContext2D, frame: number) {
+  const stride = frame === 3 ? 0 : Math.sin(frame * Math.PI) * 10;
+  ctx.strokeStyle = '#6f3e27'; ctx.lineWidth = 9; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(22, -51); ctx.quadraticCurveTo(59, -66, 48, -22); ctx.quadraticCurveTo(40, -8, 27, -21); ctx.stroke();
+  ctx.strokeStyle = '#4a291e'; ctx.lineWidth = 8; ctx.beginPath(); ctx.moveTo(-12, -15); ctx.lineTo(-21 + stride, 0); ctx.moveTo(12, -15); ctx.lineTo(20 - stride, 0); ctx.stroke();
+  ctx.fillStyle = '#a76539'; ctx.beginPath(); ctx.ellipse(0, -34, 24, 31, 0, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(-12, -65, 20, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#f0c18a'; ctx.beginPath(); ctx.ellipse(-16, -59, 13, 15, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#241713'; ctx.beginPath(); ctx.arc(-22, -65, 2.5, 0, Math.PI * 2); ctx.fill();
 }
 
 function hogArt(ctx: CanvasRenderingContext2D, x: number, y: number, age: number, jumping: boolean, preparing: boolean) {
@@ -310,13 +326,14 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
   for (const sloth of s.sloths) {
     const pos = slothPosition(sloth), x = pos.x - cameraDistance;
     if (x < -80 || x > 880) continue;
-    slothArt(ctx, x, pos.y);
+    ctx.strokeStyle = '#735244'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(x + Math.sin(sloth.age * 1.8) * 8, 0); ctx.quadraticCurveTo(x - 18, pos.y * 0.5, x, pos.y - 20); ctx.stroke();
+    slothArt(ctx, x, pos.y, sloth.age);
     ctx.fillStyle = '#fff4b4'; ctx.font = 'bold 12px sans-serif'; ctx.fillText('SLOTH GIFT', x, pos.y - 38);
   }
   for (const lemming of s.lemmings) {
     const x = lemming.x - cameraDistance;
     if (x < -80 || x > 880) continue;
-    ctx.strokeStyle = '#9e7041'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, lemming.y - 16); ctx.stroke();
+    ctx.strokeStyle = '#9e7041'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(x + Math.sin(lemming.age * 2) * 12, 0); ctx.quadraticCurveTo(x - 20, lemming.y * 0.55, x, lemming.y - 16); ctx.stroke();
     lemmingArt(ctx, x, lemming.y, lemming.age);
     ctx.fillStyle = '#fff4b4'; ctx.font = 'bold 12px sans-serif'; ctx.fillText('JUMP: LEMMING SWING', x + 30, lemming.y - 48);
   }
@@ -434,7 +451,7 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     }
     ctx.drawImage(sprite, sx * scale, sy * scale, sw * scale, sh * scale, -dw / 2, -dh + 8, dw, dh);
     ctx.restore();
-  }
+  } else fallbackMonkey(ctx, frame);
   ctx.restore();
   drawReaction(ctx, s, playerX);
   if (s.swing && 'river' in s.swing) {
@@ -442,6 +459,10 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     ctx.strokeStyle = '#713a1d'; ctx.lineWidth = 9; ctx.lineCap = 'round';
     ctx.beginPath(); ctx.moveTo(playerX + 8, s.y - 40); ctx.lineTo(tip.x - cameraDistance, tip.y); ctx.stroke();
     ctx.fillStyle = '#efb568'; ctx.beginPath(); ctx.arc(tip.x - cameraDistance, tip.y, 6, 0, Math.PI * 2); ctx.fill();
+  }
+  if (s.swing && 'lemming' in s.swing) {
+    const guideX = s.swing.lemming.x - cameraDistance;
+    ctx.strokeStyle = '#9e7041'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(guideX, 0); ctx.quadraticCurveTo(guideX + 65, 85, playerX + 8, s.y - 40); ctx.stroke();
   }
   if (knocked) {
     ctx.font = '24px sans-serif';
@@ -472,7 +493,7 @@ export function JungleVineSwing({ onExit, onFinish }: {
   const duckSources = useRef(new Set<string>());
   const publish = () => {
     const s = world.current;
-    setHud({ phase: s.phase, lives: s.lives, bananas: s.bananas, seconds: Math.max(0, Math.ceil((s.level + 1) * LEVEL_SECONDS - s.elapsed)), paused: paused.current, level: s.level, score: runnerScore(s), golden: s.golden, cherries: s.cherries, gems: s.gems, levelGem: s.gemCollected[s.level], slide: s.slideLeft, speed: travelSpeed(s) / LEVELS[0].speed });
+    setHud({ phase: s.phase, lives: s.lives, bananas: s.bananas, seconds: Math.max(0, Math.ceil((s.level + 1) * levelSeconds(s) - s.elapsed)), paused: paused.current, level: s.level, score: runnerScore(s), golden: s.golden, cherries: s.cherries, gems: s.gems, levelGem: s.gemCollected[s.level], slide: s.slideLeft, speed: travelSpeed(s) / LEVELS[0].speed });
   };
   function selectDifficulty(value: RunnerDifficulty) {
     if (world.current.phase !== 'ready') return;

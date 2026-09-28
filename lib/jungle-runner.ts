@@ -2,9 +2,9 @@ import { createInsect, INSECT_KINDS, stepInsects, type Insect, type AntRock, typ
 export const FLOOR = 310;
 export const PLAYER_X = 150;
 export const RUNNER_DIFFICULTIES = {
-  easy: { label: 'Easy', speed: 0.8, lives: 5, protection: 3.5, description: 'Slower pace · 5 lives · longer hit protection' },
-  medium: { label: 'Medium', speed: 1, lives: 3, protection: 2.5, description: 'Classic pace · 3 lives · standard hit protection' },
-  hard: { label: 'Hard', speed: 1.2, lives: 2, protection: 1.5, description: 'Faster pace · 2 lives · shorter hit protection' },
+  easy: { label: 'Easy', speed: 0.8, lives: 5, protection: 3.5, seconds: 42, description: '42-second levels · 5 lives · gentler obstacles' },
+  medium: { label: 'Medium', speed: 1, lives: 3, protection: 2.5, seconds: 51, description: '51-second levels · 3 lives · classic adventure' },
+  hard: { label: 'Hard', speed: 1.2, lives: 2, protection: 1.5, seconds: 60, description: '60-second levels · 2 lives · every challenge' },
 } as const;
 export type RunnerDifficulty = keyof typeof RUNNER_DIFFICULTIES;
 export const LEVELS = [
@@ -82,7 +82,8 @@ export function createPredator(kind: Predator['kind'], x: number, temperament = 
   return { kind, x, y: FLOOR - 22, state: 'waiting', age: 0, hit: false, temperament, homeX: x, facing: -1, attackStyle: 'leap', attackSpeed: 0, leapHeight: 0 };
 }
 export type Runner = ReturnType<typeof createRunner>;
-export function runnerSpeed(s: Runner) { return (LEVELS[s.level].speed + (s.elapsed % LEVEL_SECONDS) * 0.3) * RUNNER_DIFFICULTIES[s.difficulty].speed; }
+export function levelSeconds(s: Pick<Runner, 'difficulty'>) { return RUNNER_DIFFICULTIES[s.difficulty].seconds; }
+export function runnerSpeed(s: Runner) { return (LEVELS[s.level].speed + (s.elapsed % levelSeconds(s)) * 0.3) * RUNNER_DIFFICULTIES[s.difficulty].speed; }
 export function dashBoost(s: Runner) {
   return s.duck && s.y >= FLOOR - 1 && s.stun <= 0 ? 180 * (s.slideLeft / SLIDE_SECONDS) ** 2 : 0;
 }
@@ -162,7 +163,16 @@ function hurt(s: Runner, message: string, reaction: HitReaction = 'bonk') {
 function addSection(s: Runner) {
   const x = s.nextSection;
   if (s.level === 5) {
-    const finale = s.elapsed % LEVEL_SECONDS >= 40;
+    // Easy mode finishes in the friendly caterpillar grove instead of adding
+    // the fast insect patterns from the higher difficulties.
+    if (s.difficulty === 'easy') {
+      s.section++;
+      s.insects.push(createInsect('caterpillar', x));
+      for (let i = 0; i < 8; i++) s.items.push({ x: x + 90 + i * 42, y: FLOOR - 125, kind: 'banana' });
+      s.nextSection += 1100;
+      return;
+    }
+    const finale = s.elapsed % levelSeconds(s) >= levelSeconds(s) - 20;
     const kind = finale && !s.gemSpawned[5] ? 'caterpillar' : INSECT_KINDS[s.section % INSECT_KINDS.length];
     s.section++;
     s.insects.push(createInsect(kind, x));
@@ -182,12 +192,15 @@ function addSection(s: Runner) {
     return;
   }
   const patterns = [[8, 16, 10, 14, 3, 11, 12, 4, 7, 6], [16, 3, 12, 14, 5, 9, 10, 11, 4, 7, 6, 8], [7, 16, 14, 12, 11, 5, 10, 9, 4, 1, 3, 8, 6], [16, 7, 11, 14, 12, 10, 9, 5, 8, 7, 3, 6, 5, 4, 1], [13, 15, 16, 14, 11, 13, 12, 15, 10, 7, 3, 13, 4, 8]][s.level];
-  const type = patterns[s.section++ % patterns.length];
+  const easyPatterns = [[0, 1, 3, 4, 6, 14, 1, 12, 4, 3], [1, 3, 4, 6, 14, 0, 12, 1, 4, 3], [4, 0, 3, 14, 6, 1, 12, 4, 3, 0], [1, 4, 12, 3, 14, 6, 0, 4, 1, 3], [0, 1, 3, 4, 6, 14, 12, 1, 4, 3]][s.level];
+  const source = s.difficulty === 'easy' ? easyPatterns : patterns;
+  const type = source[s.section++ % source.length];
   let recovery = type === 10 || type === 12 ? 820 : 470;
   if (type === 16) {
     s.orangutans.push(createOrangutan(x)); recovery = 800;
   } else if (type === 14) {
     const hogs = createHogs(x, runnerSpeed(s)); s.hogs.push(...hogs);
+    if (s.difficulty === 'easy') hogs.forEach(hog => { hog.jumper = false; });
     s.lemmings.push({ x: x + 90, y: FLOOR - 112, endX: hogs[5].x + 230, age: 0, used: false });
     recovery = hogs[5].x - x + 400;
   } else if (type === 15) {
@@ -203,7 +216,7 @@ function addSection(s: Runner) {
     s.predators.push(createPredator('panther', x));
   } else if (type === 3) {
     // Wider rivers at higher speeds preserve the hippo landing window.
-    s.rivers.push({ x, width: Math.max(250, runnerSpeed(s) * 1.05), resident: (s.level + s.section) % 2 ? 'eel' : 'piranha', waterAge: 0 });
+    s.rivers.push({ x, width: Math.max(250, runnerSpeed(s) * 1.05), resident: s.difficulty === 'easy' ? undefined : (s.level + s.section) % 2 ? 'eel' : 'piranha', waterAge: 0 });
     for (let i = 0; i < 7; i++) s.items.push({ x: x + i * 40, y: FLOOR - 110, kind: 'banana' });
   } else if (type === 4) {
     // A single jump reaches ~97px; these prizes require the second air jump.
@@ -251,8 +264,8 @@ export function stepRunner(s: Runner, dt: number) {
     if (s.slideLeft === 0) s.duck = false;
   }
   s.elapsed += dt;
-  if (s.elapsed >= LEVEL_SECONDS * LEVELS.length) { s.phase = 'victory'; return; }
-  const level = Math.floor(s.elapsed / LEVEL_SECONDS);
+  if (s.elapsed >= levelSeconds(s) * LEVELS.length) { s.phase = 'victory'; return; }
+  const level = Math.floor(s.elapsed / levelSeconds(s));
   if (level !== s.level) {
     if (level === 5) {
       s.items = []; s.rivers = []; s.predators = []; s.hogs = []; s.bats = []; s.herds = []; s.spiders = []; s.orangutans = []; s.pineapples = []; s.birds = []; s.sloths = []; s.lemmings = [];
