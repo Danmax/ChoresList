@@ -109,6 +109,7 @@ model Household {
   wellbeingCheckIns        WellbeingCheckIn[]
   gameSettings             GameSetting[]
   gameSessions             GameSession[]
+  familyChessMatches       FamilyChessMatch[]
 }
 
 model HouseholdPlugin {
@@ -229,6 +230,8 @@ model FamilyMember {
   educationAttempts     EducationAttempt[]
   educationProjects     EducationProject[]
   gameSessions          GameSession[]
+  whiteChessMatches     FamilyChessMatch[] @relation("FamilyChessWhite")
+  blackChessMatches     FamilyChessMatch[] @relation("FamilyChessBlack")
 
   @@index([householdId, role])
 }
@@ -270,6 +273,45 @@ model GameSession {
 
   @@index([householdId, playedAt])
   @@index([memberId, gameKey, playedAt])
+}
+
+model FamilyChessMatch {
+  id            String   @id @default(uuid()) @db.Char(36)
+  householdId   String   @db.Char(36)
+  whiteMemberId String   @db.Char(36)
+  blackMemberId String   @db.Char(36)
+  currentTurn   String   @default("white") @db.VarChar(16)
+  status        String   @default("active") @db.VarChar(32)
+  fen           String   @db.VarChar(128)
+  result        String?  @db.VarChar(32)
+  lastMoveAt    DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  household Household    @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  white     FamilyMember @relation("FamilyChessWhite", fields: [whiteMemberId], references: [id], onDelete: Cascade)
+  black     FamilyMember @relation("FamilyChessBlack", fields: [blackMemberId], references: [id], onDelete: Cascade)
+  moves     FamilyChessMove[]
+
+  @@index([householdId, status, lastMoveAt])
+  @@index([whiteMemberId, blackMemberId, status])
+}
+
+model FamilyChessMove {
+  id        String   @id @default(uuid()) @db.Char(36)
+  matchId   String   @db.Char(36)
+  memberId  String   @db.Char(36)
+  ply       Int
+  san       String   @db.VarChar(32)
+  from      String   @db.VarChar(2)
+  to        String   @db.VarChar(2)
+  promotion String?  @db.VarChar(8)
+  fen       String   @db.VarChar(128)
+  createdAt DateTime @default(now())
+
+  match FamilyChessMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, ply])
 }
 
 model WellbeingCheckIn {
