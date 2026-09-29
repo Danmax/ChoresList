@@ -4,7 +4,7 @@ import { drawInsectGrove, drawInsects, drawReaction } from '@/lib/jungle-insect-
 import { pantherPaw } from '@/lib/jungle-motion';
 import { drawWaterLife, drawOrangutan, drawPineapple } from '@/lib/jungle-water-art';
 import { useEffect, useRef, useState } from 'react';
-import { RUNNER_DIFFICULTIES, type RunnerDifficulty, GEMS, spiderPosition, slothPosition, airBoost, FLIP_SECONDS, vinePosition, birdHeight, crocodileFrame, hippoFrame, createRunner, dashBoost, duckRunner, FLOOR, heroMove, isAirAttack, jumpRunner, kickRunner, LEVELS, levelSeconds, PLAYER_X, punchRunner, runnerScore, STRONG_DIVE_SECONDS, travelSpeed, stepRunner, type Runner } from '@/lib/jungle-runner';
+import { RUNNER_DIFFICULTIES, type RunnerDifficulty, GEMS, spiderPosition, slothPosition, airBoost, FLIP_SECONDS, vinePosition, birdHeight, crocodileFrame, hippoFrame, createRunner, dashBoost, duckRunner, FLOOR, forwardDashRunner, heroMove, isAirAttack, jumpRunner, kickRunner, KI_MAX, LEVELS, levelSeconds, PLAYER_X, punchRunner, runnerScore, specialRunner, STRONG_DIVE_SECONDS, travelSpeed, stepRunner, type Runner } from '@/lib/jungle-runner';
 
 // Canvas artwork keeps shells and moving limbs crisp at every display density.
 function coconut(ctx: CanvasRenderingContext2D, x: number, y: number, rotation = 0, split = 0) {
@@ -505,6 +505,11 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     ctx.beginPath(); ctx.arc(20, -54, 42, -2.2, 0.9); ctx.stroke();
     ctx.fillStyle = '#fff4a3'; ctx.font = 'bold 13px sans-serif'; ctx.fillText('STRIKE!', -25, -122);
   }
+  if (s.specialLeft > 0 && !knocked) {
+    ctx.strokeStyle = '#bcf5ff'; ctx.shadowColor = '#7d75ff'; ctx.shadowBlur = 22; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.arc(0, -52, 62 + Math.sin(s.elapsed * 32) * 6, 0, Math.PI * 2); ctx.stroke();
+    ctx.shadowBlur = 0; ctx.fillStyle = '#f4e8ff'; ctx.font = 'bold 15px sans-serif'; ctx.fillText('KI BURST!', -34, -130);
+  }
   if (s.flipLeft > 0 && !knocked) { ctx.translate(0, -46); ctx.rotate((1 - s.flipLeft / FLIP_SECONDS) * Math.PI * 2); ctx.translate(0, 46); }
   else if (!grounded && !knocked) ctx.rotate(Math.max(-0.12, Math.min(0.12, s.vy / 4500)));
   if (s.starPower > 0 && !knocked) { ctx.shadowColor = '#ffe363'; ctx.shadowBlur = 24; }
@@ -591,13 +596,13 @@ export function JungleVineSwing({ onExit, onFinish }: {
   const canvas = useRef<HTMLCanvasElement>(null);
   const world = useRef(createRunner());
   const [difficulty, setDifficulty] = useState<RunnerDifficulty>('medium');
-  const [hud, setHud] = useState({ phase: 'ready', lives: 3, bananas: 0, seconds: 60, paused: false, level: 0, score: 0, golden: 0, cherries: 0, gems: 0, levelGem: false, slide: 0, attack: 0, move: 'run', speed: 1 });
+  const [hud, setHud] = useState({ phase: 'ready', lives: 3, bananas: 0, seconds: 60, paused: false, level: 0, score: 0, golden: 0, cherries: 0, gems: 0, levelGem: false, slide: 0, attack: 0, move: 'run', ki: 0, special: 0, speed: 1 });
   const paused = useRef(false);
   const saved = useRef(false);
   const duckSources = useRef(new Set<string>());
   const publish = () => {
     const s = world.current;
-    setHud({ phase: s.phase, lives: s.lives, bananas: s.bananas, seconds: Math.max(0, Math.ceil((s.level + 1) * levelSeconds(s) - s.elapsed)), paused: paused.current, level: s.level, score: runnerScore(s), golden: s.golden, cherries: s.cherries, gems: s.gems, levelGem: s.gemCollected[s.level], slide: s.slideLeft, attack: isAirAttack(s) ? s.attackLeft : 0, move: heroMove(s), speed: travelSpeed(s) / LEVELS[0].speed });
+    setHud({ phase: s.phase, lives: s.lives, bananas: s.bananas, seconds: Math.max(0, Math.ceil((s.level + 1) * levelSeconds(s) - s.elapsed)), paused: paused.current, level: s.level, score: runnerScore(s), golden: s.golden, cherries: s.cherries, gems: s.gems, levelGem: s.gemCollected[s.level], slide: s.slideLeft, attack: isAirAttack(s) ? s.attackLeft : 0, move: heroMove(s), ki: s.ki, special: s.specialLeft, speed: travelSpeed(s) / LEVELS[0].speed });
   };
   function selectDifficulty(value: RunnerDifficulty) {
     if (world.current.phase !== 'ready') return;
@@ -612,6 +617,8 @@ export function JungleVineSwing({ onExit, onFinish }: {
   }
   function punch() { if (!paused.current) punchRunner(world.current); }
   function kick() { if (!paused.current) kickRunner(world.current); }
+  function forwardDash() { if (!paused.current) forwardDashRunner(world.current); }
+  function special() { if (!paused.current) specialRunner(world.current); }
   function pause() { paused.current = !paused.current; duckSources.current.clear(); duckRunner(world.current, false); publish(); }
   function start() { world.current = createRunner(difficulty); world.current.phase = 'playing'; paused.current = false; saved.current = false; duckSources.current.clear(); publish(); }
 
@@ -649,10 +656,10 @@ export function JungleVineSwing({ onExit, onFinish }: {
     frame = requestAnimationFrame(tick);
     const down = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement)?.closest('input, textarea, select')) return;
-      if (['Space', 'ArrowUp', 'KeyW', 'ArrowDown', 'KeyS', 'KeyJ', 'KeyK'].includes(e.code)) {
+      if (['Space', 'ArrowUp', 'KeyW', 'ArrowDown', 'KeyS', 'ArrowRight', 'KeyD', 'KeyJ', 'KeyK', 'KeyE'].includes(e.code)) {
         e.preventDefault();
         if (e.repeat) return;
-        if (['ArrowDown', 'KeyS'].includes(e.code)) duck(e.code, true); else if (e.code === 'KeyJ') punch(); else if (e.code === 'KeyK') kick(); else jump();
+        if (['ArrowDown', 'KeyS'].includes(e.code)) duck(e.code, true); else if (['ArrowRight', 'KeyD'].includes(e.code)) forwardDash(); else if (e.code === 'KeyJ') punch(); else if (e.code === 'KeyK') kick(); else if (e.code === 'KeyE') special(); else jump();
       }
     };
     const up = (e: KeyboardEvent) => { if (['ArrowDown', 'KeyS'].includes(e.code)) { e.preventDefault(); duck(e.code, false); } };
@@ -682,17 +689,26 @@ export function JungleVineSwing({ onExit, onFinish }: {
       )}
       <div className="mb-2 flex justify-between gap-2 text-sm font-black"><span>🍌 {hud.bananas} <small className="block text-yellow-200">{hud.bananas % 100}/100 → +1 life</small></span><span>❤️ {hud.lives} lives</span><span>{hud.seconds}s · {hud.score} pts</span></div>
       <p className="mb-2 text-xs font-bold text-yellow-200">{RUNNER_DIFFICULTIES[difficulty].label} · Level {hud.level + 1}/{LEVELS.length} · {LEVELS[hud.level].name} · {hud.move.toUpperCase()} · {hud.speed.toFixed(1)}× pace · ⭐ {hud.golden} gold · 🍒 {hud.cherries} · 💎 {hud.gems}/{LEVELS.length} · {GEMS[hud.level].name}: {hud.levelGem ? "collected" : "find it!"}</p>
+      <div className="mb-3 flex items-center gap-3 rounded-xl border border-cyan-300/50 bg-cyan-950/50 px-3 py-2">
+        <span className="shrink-0 text-xs font-black tracking-wide text-cyan-100">KI {Math.round(hud.ki)}%</span>
+        <div className="h-3 flex-1 overflow-hidden rounded-full border border-cyan-100/70 bg-slate-950">
+          <div className={`h-full rounded-full transition-all ${hud.ki >= KI_MAX ? 'bg-gradient-to-r from-cyan-300 via-white to-violet-300 animate-pulse' : 'bg-gradient-to-r from-cyan-500 to-violet-400'}`} style={{ width: `${hud.ki}%` }} />
+        </div>
+        <span className="text-xs font-black text-cyan-100">{hud.special > 0 ? 'BURST!' : hud.ki >= KI_MAX ? 'E: READY' : 'COUNTER TO CHARGE'}</span>
+      </div>
       <div className="relative overflow-hidden rounded-2xl border-2 border-emerald-700">
         <canvas ref={canvas} width={800} height={400} aria-label="Jungle runner: flip over coconuts and panthers, slide under tiger pounces, catch vines over crocodile pits, and jump to catch lemming swings over hog herds. Sloths lower hearts, fruit, and rare stars that grant ten seconds of invincibility; birds can also drop these helpful gifts." className="block aspect-[2/1] w-full" />
         {(hud.phase === 'ready' || ended || hud.paused) && <div className="absolute inset-0 flex items-start justify-center overflow-y-auto bg-emerald-950/75 p-3"><div className="my-auto max-w-md text-center"><h3 className="text-lg font-black sm:text-2xl">{hud.paused ? 'Taking a breather' : ended ? hud.phase === 'victory' ? hud.gems === LEVELS.length ? 'Emerald Crown Victory!' : 'Jungle victory!' : 'Run complete!' : 'Find your jungle rhythm'}</h3><p className="my-2 text-xs sm:text-sm">{ended ? `${hud.gems === LEVELS.length && hud.phase === 'victory' ? '✦ All special emeralds captured — the Jungle Crown is yours! ✦ ' : ''}${hud.bananas} banana coins · ${hud.golden} gold · ${hud.cherries} cherries · ${hud.gems}/${LEVELS.length} gems · ${hud.score} points` : 'Double jump to front flip and dash! Sloths slide down vines with a heart (+1 life), fruit (+5 coins), or a rare star (10 seconds of invincibility); friendly birds can drop those gifts too. Jump into a hopping lemming’s vine to swing safely over hog herds. Catch moving vines over wide croc pits; jump again to release or ride to the far bank. Read tiger tells: slide under high pounces, jump low charges, and dive from air hunts. At night, slide under spiders and diving bat waves. Slide under pineapples from the dancing orangutan! In the Insect Grove, bounce on caterpillars in mud pits. Double jump over the Scorpion King’s claws or slide under his electric tail whip!'}</p>{hud.paused ? <button onClick={pause} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Resume</button> : ended ? <button onClick={() => { if (saved.current) return; saved.current = true; const s = world.current; onFinish(runnerScore(s), Math.max(1, Math.round(s.elapsed)), { difficulty: s.difficulty, bananas: s.bananas, goldenBananas: s.golden, cherries: s.cherries, gems: s.gems, gemLevels: s.gemCollected, levelsCompleted: s.phase === 'victory' ? LEVELS.length : s.level, hits: s.hits, hippoBounces: s.bounces, elephantBounces: s.elephantBounces, caterpillarBounces: s.caterpillarBounces, extraLives: Math.floor(s.bananas / 100) }); }} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Save run</button> : <button onClick={start} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Let’s run</button>}</div></div>}
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
         <button disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); jump(); }} onClick={e => { if (e.detail === 0) jump(); }} className="min-h-14 touch-none select-none rounded-2xl bg-yellow-300 p-3 font-black text-emerald-950 disabled:opacity-40">JUMP <small className="block">Tap again: flip / release vine</small></button>
         <button disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); duck(`pointer-${e.pointerId}`, true); }} onPointerUp={e => duck(`pointer-${e.pointerId}`, false)} onPointerCancel={e => duck(`pointer-${e.pointerId}`, false)} onLostPointerCapture={e => duck(`pointer-${e.pointerId}`, false)} onKeyDown={e => { if (e.key === 'Enter') duck('enter', true); }} onKeyUp={e => { if (e.key === 'Enter') duck('enter', false); }} className="min-h-14 touch-none select-none rounded-2xl bg-emerald-600 p-3 font-black disabled:opacity-40">{hud.attack > 0 ? `STRIKE ${hud.attack.toFixed(2)}s` : `SLIDE ${hud.slide > 0 ? `${hud.slide.toFixed(1)}s` : ''}`} <small className="block">In air: 0.42s dive strike</small></button>
         <button disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); punch(); }} onClick={e => { if (e.detail === 0) punch(); }} className="min-h-14 touch-none select-none rounded-2xl bg-orange-400 p-3 font-black text-orange-950 disabled:opacity-40">PUNCH <small className="block">J · close strike</small></button>
         <button disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); kick(); }} onClick={e => { if (e.detail === 0) kick(); }} className="min-h-14 touch-none select-none rounded-2xl bg-rose-400 p-3 font-black text-rose-950 disabled:opacity-40">KICK <small className="block">K · longer reach</small></button>
+        <button disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); forwardDash(); }} onClick={e => { if (e.detail === 0) forwardDash(); }} className="min-h-14 touch-none select-none rounded-2xl bg-sky-400 p-3 font-black text-sky-950 disabled:opacity-40">FORWARD DASH <small className="block">→ · counter charge</small></button>
+        <button disabled={hud.phase !== 'playing' || hud.paused || hud.ki < KI_MAX} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); special(); }} onClick={e => { if (e.detail === 0) special(); }} className="min-h-14 touch-none select-none rounded-2xl bg-violet-400 p-3 font-black text-violet-950 disabled:opacity-40">KI BURST <small className="block">E · full meter</small></button>
       </div>
-      <p className="mt-2 text-center text-xs text-emerald-200">Run is automatic · Space / ↑: jump / flip · ↓: dive / dash · J: punch · K: kick. Dive while airborne to strike for {STRONG_DIVE_SECONDS}s; after a hit, punch or kick within 0.20s to counter.</p>
+      <p className="mt-2 text-center text-xs text-emerald-200">Run is automatic · Space / ↑: jump / flip · ↓: slide dash · →: forward dash · J: punch · K: kick · E: Ki Burst. Punch, kick, and dash can counter pineapples and foes; each counter charges Ki.</p>
     </div>
   </section>;
 }

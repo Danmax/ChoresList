@@ -1,4 +1,4 @@
-import { starKnockout, type Runner } from './jungle-runner';
+import { gainKi, heroAttackReach, isHeroAttack, starKnockout, type Runner } from './jungle-runner';
 
 const FLOOR = 310;
 export const INSECT_KINDS = ['centipede', 'beetle', 'worker', 'fire-ant', 'stinger', 'katydid', 'caterpillar', 'mud-pit', 'scorpion'] as const;
@@ -46,17 +46,33 @@ export function stepInsects(s: Runner, dt: number, speed: number, previousY: num
         continue;
       }
     }
+    // Punches, kicks, dives, and forward dashes can interrupt ordinary jungle
+    // foes instead of forcing every encounter into a pure dodge.
+    if (bug.kind !== 'mud-pit' && bug.kind !== 'scorpion' && isHeroAttack(s)) {
+      const lift = bug.kind === 'fire-ant' ? (bug.stack ?? 0) * 27 : 0;
+      const top = bug.y - lift - 34;
+      const bottom = bug.y - lift + 34;
+      if (Math.abs(ahead) < heroAttackReach(s) && bottom >= s.y - height && top <= s.y - 4) {
+        if (bug.kind === 'fire-ant') {
+          for (const ant of s.insects) if (ant.kind === 'fire-ant' && Math.abs(ant.x - bug.x) < 10) ant.used = true;
+        } else bug.used = true;
+        gainKi(s, 12);
+        starKnockout(s, bug.x, bug.y - lift, bug.kind.toUpperCase());
+        continue;
+      }
+    }
     if (bug.kind === 'scorpion') {
       bug.age += dt;
       bug.hitCooldown = Math.max(0, (bug.hitCooldown ?? 0) - dt);
-      const move = s.attackLeft > 0 ? 'dive' : s.combatLeft > 0 ? s.combatMove : 'run';
-      const reach = move === 'kick' ? 178 : move === 'punch' ? 142 : move === 'dive' ? 155 : 0;
+      const move = s.specialLeft > 0 ? 'special' : s.attackLeft > 0 ? 'dive' : s.combatLeft > 0 ? s.combatMove : 'run';
+      const reach = heroAttackReach(s);
       // The King paces at a deliberate standoff. A landed hit sends him back
       // into that zone, making the finale a battle instead of body contact.
       if (ahead < 135) bug.x += Math.min(210, 135 - ahead) + 105 * dt;
       else if (ahead > 355 && bug.state !== 'attack') bug.x -= Math.min(55 * dt, ahead - 300);
       if (move !== 'run' && reach > 0 && (bug.hitCooldown ?? 0) === 0 && ahead > -10 && ahead < reach && s.y > FLOOR - 160) {
         bug.hits = (bug.hits ?? 0) + 1;
+        if (move === 'special') bug.hits += 2;
         bug.hitCooldown = 0.16;
         bug.x += 185;
         bug.state = 'recover'; bug.age = 0;
@@ -67,6 +83,7 @@ export function stepInsects(s: Runner, dt: number, speed: number, previousY: num
         } else {
           s.message = `${move.toUpperCase()} HIT! ${bug.hits}/${bug.hitPoints} — KEEP YOUR DISTANCE!`;
         }
+        gainKi(s, 16);
         s.messageTime = 1;
         continue;
       }
