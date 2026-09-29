@@ -52,6 +52,7 @@ model ParentAccount {
   communitySurveySubmissions  CommunitySurveySubmission[]    @relation("CommunitySurveyRespondent")
   createdSecretSantaExchanges CommunitySecretSantaExchange[] @relation("SecretSantaCreator")
   communitySocialProfiles     CommunityParentProfile[]
+  appNotifications            AppNotification[]
 }
 
 model Household {
@@ -1087,6 +1088,27 @@ model EmailNotification {
   @@index([status, scheduledFor])
   @@index([eventId, recipientParentId])
   @@index([groupId, type])
+}
+
+// An in-app inbox is independent from email delivery preferences. It keeps
+// actionable activity visible even when a parent turns off email or misses it.
+model AppNotification {
+  id                String    @id @default(uuid()) @db.Char(36)
+  recipientParentId String    @db.Char(36)
+  type              String    @db.VarChar(64)
+  title             String    @db.VarChar(255)
+  body              String?   @db.Text
+  url               String?   @db.VarChar(1024)
+  groupId           String?   @db.Char(36)
+  dedupeKey         String    @unique @db.VarChar(255)
+  scheduledFor      DateTime  @default(now())
+  readAt            DateTime?
+  createdAt         DateTime  @default(now())
+
+  recipient ParentAccount @relation(fields: [recipientParentId], references: [id], onDelete: Cascade)
+
+  @@index([recipientParentId, scheduledFor])
+  @@index([recipientParentId, readAt])
 }
 
 model CommunityEvent {

@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sendNotificationEmail } from "@/lib/email";
 import { isPluginActive } from "@/lib/plugins/registry";
+import { createAppNotification } from "@/lib/app-notifications";
 
 type Payload = Record<string, unknown>;
 
@@ -52,7 +53,7 @@ export async function enqueueNotification(input: {
 }) {
   const existing = await prisma.emailNotification.findUnique({ where: { dedupeKey: input.dedupeKey }, select: { id: true, status: true } });
   if (existing?.status === "sent") return existing;
-  return prisma.emailNotification.upsert({
+  const notification = await prisma.emailNotification.upsert({
     where: { dedupeKey: input.dedupeKey },
     create: { ...input, scheduledFor: input.scheduledFor ?? new Date(), payload: input.payload as Prisma.InputJsonValue },
     update: {
@@ -60,6 +61,22 @@ export async function enqueueNotification(input: {
       payload: input.payload as Prisma.InputJsonValue, status: "pending", lastError: null, lockedAt: null,
     },
   });
+  if (input.recipientParentId) {
+    const title = input.type.startsWith("event-reminder-")
+      ? Number(input.payload.daysBefore) === 0 ? `Today: ${String(input.payload.title ?? "Community event")}` : `${String(input.payload.title ?? "Community event")} is coming up`
+      : input.type === "item-assigned" ? `You were assigned ${String(input.payload.item ?? "an item")}`
+      : input.type === "rsvp-confirmation" ? `RSVP updated: ${String(input.payload.title ?? "Community event")}`
+      : input.type === "registration-confirmation" ? `Registration confirmed: ${String(input.payload.title ?? "Community event")}`
+      : input.type === "manager-weekly-summary" ? `Weekly summary: ${String(input.payload.groupName ?? "Community")}`
+      : "Community update";
+    await createAppNotification({
+      recipientParentId: input.recipientParentId, type: input.type, title,
+      body: input.type.startsWith("event-reminder-") ? `${String(input.payload.title ?? "This event")} is scheduled for ${formatEventDate(input.payload)}.` : null,
+      url: typeof input.payload.url === "string" ? input.payload.url : null,
+      groupId: input.groupId, dedupeKey: `app:${input.dedupeKey}`, scheduledFor: input.scheduledFor,
+    });
+  }
+  return notification;
 }
 
 async function eligibleMembership(groupId: string, parentId: string) {

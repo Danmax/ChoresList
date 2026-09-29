@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BarChart2,
+  Bell,
   CalendarDays,
   CheckCircle2,
   ChefHat,
@@ -61,6 +62,7 @@ const BASE_NAV = [
   { href: "/parent/tickets", icon: Ticket, label: "Tickets", roles: ["owner", "parent", "grandparent"] },
   { href: "/parent/devices", icon: MonitorSmartphone, label: "Devices", roles: ["owner", "parent"] },
   { href: "/parent/wishlist", icon: Gift, label: "Gift Lists", roles: ["owner", "parent", "grandparent"] },
+  { href: "/parent/notifications", icon: Bell, label: "Notifications", roles: ["owner", "parent", "grandparent"] },
   { href: "/parent/settings", icon: Settings, label: "Settings", roles: ["owner", "parent", "grandparent"] },
 ];
 
