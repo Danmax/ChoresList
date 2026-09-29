@@ -18,6 +18,7 @@ export const LEVELS = [
 export const LEVEL_SECONDS = 60;
 export const SLIDE_SECONDS = 1.5;
 export const STRONG_DIVE_SECONDS = 0.42;
+export const COUNTER_ATTACK_SECONDS = 0.20;
 export const FLIP_SECONDS = 0.5;
 export const GEM_Y = FLOOR - 235;
 export type RunnerItem = { x: number; y: number; kind: 'banana' | 'golden' | 'cherry' | 'heart' | 'fruit' | 'star' | 'gem' | 'drop' | 'low' | 'high' | 'canopy' | 'rolling' | 'bouncing' | 'barrel'; collected?: boolean; level?: number; vy?: number; vx?: number; previousX?: number; reflected?: boolean; bossAmmo?: boolean; rotation?: number };
@@ -121,6 +122,10 @@ export function travelSpeed(s: Runner) { return runnerSpeed(s) + dashBoost(s) + 
 // monkey's attack. It intentionally shares the existing control on touch and
 // keyboard so the move is equally available on every device.
 export function isAirAttack(s: Runner) { return s.attackLeft > 0 && s.stun <= 0; }
+export function heroMove(s: Runner) {
+  if (s.attackLeft > 0) return 'dive' as const;
+  return s.combatLeft > 0 ? s.combatMove : 'run' as const;
+}
 export function vinePosition(r: River, elapsed: number, progress?: number) {
   const t = progress ?? (0.5 + Math.sin(elapsed * 2.2 + r.x * 0.001) * 0.5);
   return { x: r.x - 45 + (r.width + 90) * t, y: 160 + Math.sin(t * Math.PI) * 45 };
@@ -132,7 +137,7 @@ export function createRunner(difficulty: RunnerDifficulty = 'medium') {
     insects: [] as Insect[], antRocks: [] as AntRock[], caterpillarBounces: 0,
     reaction: 'bonk' as HitReaction, reactionLeft: 0,
     phase: 'ready' as 'ready' | 'playing' | 'over' | 'victory',
-    distance: 0, elapsed: 0, level: 0, y: FLOOR, vy: 0, jumps: 0, duck: false, duckHeld: false, slideLeft: 0, strongDiveLeft: 0, attackLeft: 0, cameraLead: 0,
+    distance: 0, elapsed: 0, level: 0, y: FLOOR, vy: 0, jumps: 0, duck: false, duckHeld: false, slideLeft: 0, strongDiveLeft: 0, attackLeft: 0, combatMove: 'run' as 'run' | 'punch' | 'kick', combatLeft: 0, counterLeft: 0, cameraLead: 0,
     flipLeft: 0, swing: null as ({ river: River; progress: number } | { lemming: Lemming; progress: number }) | null,
     cracks: [] as { x: number; y: number; age: number; kind?: 'coconut' | 'barrel' }[],
     golden: 0, cherries: 0, bonusScore: 0, gems: 0,
@@ -177,6 +182,17 @@ export function duckRunner(s: Runner, held: boolean) {
   }
 }
 
+function startCombatMove(s: Runner, move: 'punch' | 'kick') {
+  if (s.phase !== 'playing' || s.swing || (s.stun > 0 && s.counterLeft <= 0)) return;
+  s.duck = false;
+  s.slideLeft = 0;
+  s.strongDiveLeft = 0;
+  s.combatMove = move;
+  s.combatLeft = move === 'punch' ? 0.28 : 0.36;
+}
+export function punchRunner(s: Runner) { startCombatMove(s, 'punch'); }
+export function kickRunner(s: Runner) { startCombatMove(s, 'kick'); }
+
 export function runnerScore(s: Runner) { return s.bananas * 10 + s.bonusScore; }
 
 export function starKnockout(s: Runner, x: number, y: number, label: string) {
@@ -203,6 +219,9 @@ function hurt(s: Runner, message: string, reaction: HitReaction = 'bonk') {
   s.slideLeft = 0;
   s.strongDiveLeft = 0;
   s.attackLeft = 0;
+  // Getting tagged does not erase the player's next action: they have a tiny,
+  // intentional counter window to punch or kick their way back into the fight.
+  s.counterLeft = COUNTER_ATTACK_SECONDS;
   if (s.lives <= 0) s.phase = 'over';
 }
 
@@ -318,10 +337,20 @@ export function stepRunner(s: Runner, dt: number) {
   s.knockouts = s.knockouts.filter(k => k.age < 0.8);
   s.flipLeft = Math.max(0, s.flipLeft - dt);
   s.attackLeft = Math.max(0, s.attackLeft - dt);
+  s.combatLeft = Math.max(0, s.combatLeft - dt);
+  s.counterLeft = Math.max(0, s.counterLeft - dt);
+  if (s.combatLeft === 0) s.combatMove = 'run';
   s.messageTime = Math.max(0, s.messageTime - dt);
   s.invincible = Math.max(0, s.invincible - dt);
   s.starPower = Math.max(0, s.starPower - dt);
-  if (s.stun > 0) { s.stun = Math.max(0, s.stun - dt); return; }
+  if (s.stun > 0) {
+    s.stun = Math.max(0, s.stun - dt);
+    // Keep only combat resolution alive during hit stun. That enables the
+    // short counter window without advancing hazards or the world beneath a
+    // knocked-back hero.
+    stepInsects(s, 0, runnerSpeed(s), s.y, () => {});
+    return;
+  }
   if (s.duck) {
     s.slideLeft = Math.max(0, s.slideLeft - dt);
     s.strongDiveLeft = Math.max(0, s.strongDiveLeft - dt);

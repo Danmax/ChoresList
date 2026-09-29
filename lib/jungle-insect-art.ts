@@ -33,6 +33,11 @@ export function drawInsects(ctx: CanvasRenderingContext2D, s: Runner, atlas: HTM
       } else { ctx.font = '80px sans-serif'; ctx.fillText('🦂', 0, -15); }
       ctx.textAlign = 'center'; ctx.font = 'bold 12px sans-serif'; ctx.fillStyle = '#fff2ab';
       ctx.fillText(bug.state === 'warning' ? bug.stack === 1 ? 'TAIL WHIP! SLIDE!' : 'CLAW SNAP! DOUBLE JUMP!' : bug.x < s.distance + 150 ? 'SCORPION CHASE!' : 'SCORPION KING', 0, -195);
+      const totalHits = bug.hitPoints ?? 3;
+      for (let hit = 0; hit < totalHits; hit++) {
+        ctx.fillStyle = hit < (bug.hits ?? 0) ? '#ff7a42' : '#fff2ab';
+        ctx.beginPath(); ctx.arc(-(totalHits - 1) * 8 + hit * 16, -212, 5, 0, Math.PI * 2); ctx.fill();
+      }
       if (bug.state === 'attack' && bug.age < 0.45) {
         ctx.strokeStyle = bug.stack === 1 ? '#71faff' : '#ffc963'; ctx.lineWidth = 5;
         ctx.beginPath(); ctx.moveTo(-20, -90);

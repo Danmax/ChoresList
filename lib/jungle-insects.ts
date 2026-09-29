@@ -3,7 +3,7 @@ import { starKnockout, type Runner } from './jungle-runner';
 const FLOOR = 310;
 export const INSECT_KINDS = ['centipede', 'beetle', 'worker', 'fire-ant', 'stinger', 'katydid', 'caterpillar', 'mud-pit', 'scorpion'] as const;
 export type InsectKind = typeof INSECT_KINDS[number];
-export type Insect = { kind: InsectKind; x: number; y: number; age: number; state: 'waiting' | 'warning' | 'attack' | 'recover'; used: boolean; targetX: number; stack?: number };
+export type Insect = { kind: InsectKind; x: number; y: number; age: number; state: 'waiting' | 'warning' | 'attack' | 'recover'; used: boolean; targetX: number; stack?: number; hits?: number; hitPoints?: number; hitCooldown?: number };
 export type AntRock = { x: number; y: number; vx: number; vy: number };
 export type HitReaction = 'bonk' | 'zap' | 'flatten' | 'tussle' | 'sting' | 'snap';
 export const MUD_RADIUS = 170;
@@ -14,7 +14,7 @@ export function scorpionFrame(bug: Insect) {
   return bug.state === 'warning' ? 1 + Math.floor(bug.age * 8) % 2 : 3;
 }
 export function createInsect(kind: InsectKind, x: number, stack?: number): Insect {
-  return { kind, x, y: kind === 'stinger' ? 125 : FLOOR - 25, age: 0, state: 'waiting', used: false, targetX: 0, stack };
+  return { kind, x, y: kind === 'stinger' ? 125 : FLOOR - 25, age: 0, state: 'waiting', used: false, targetX: 0, stack, ...(kind === 'scorpion' ? { hits: 0, hitPoints: 3, hitCooldown: 0 } : {}) };
 }
 export function insectWarning(difficulty: Runner['difficulty']) { return { easy: 1.05, medium: 0.75, hard: 0.5 }[difficulty]; }
 
@@ -48,9 +48,28 @@ export function stepInsects(s: Runner, dt: number, speed: number, previousY: num
     }
     if (bug.kind === 'scorpion') {
       bug.age += dt;
-      // Once the monkey slips past, the king pursues to the right. He gains
-      // ground slowly enough to leave time to return the bouncing fruit.
-      if (ahead < -20) bug.x += (speed + 120) * dt;
+      bug.hitCooldown = Math.max(0, (bug.hitCooldown ?? 0) - dt);
+      const move = s.attackLeft > 0 ? 'dive' : s.combatLeft > 0 ? s.combatMove : 'run';
+      const reach = move === 'kick' ? 178 : move === 'punch' ? 142 : move === 'dive' ? 155 : 0;
+      // The King paces at a deliberate standoff. A landed hit sends him back
+      // into that zone, making the finale a battle instead of body contact.
+      if (ahead < 135) bug.x += Math.min(210, 135 - ahead) + 105 * dt;
+      else if (ahead > 355 && bug.state !== 'attack') bug.x -= Math.min(55 * dt, ahead - 300);
+      if (move !== 'run' && reach > 0 && (bug.hitCooldown ?? 0) === 0 && ahead > -10 && ahead < reach && s.y > FLOOR - 160) {
+        bug.hits = (bug.hits ?? 0) + 1;
+        bug.hitCooldown = 0.16;
+        bug.x += 185;
+        bug.state = 'recover'; bug.age = 0;
+        if (bug.hits >= (bug.hitPoints ?? 3)) {
+          bug.used = true;
+          starKnockout(s, bug.x, FLOOR - 100, 'SCORPION KING');
+          s.message = `${move.toUpperCase()} FINISH! SCORPION KING DOWN!`;
+        } else {
+          s.message = `${move.toUpperCase()} HIT! ${bug.hits}/${bug.hitPoints} — KEEP YOUR DISTANCE!`;
+        }
+        s.messageTime = 1;
+        continue;
+      }
       if (bug.state === 'waiting' && ahead < speed * (warning + 0.45) + 100) { bug.state = 'warning'; bug.age = 0; }
       if (bug.state === 'warning' && bug.age >= warning) { bug.state = 'attack'; bug.age = 0; }
       if (bug.state === 'recover' && bug.age >= 0.75 && Math.abs(ahead) < 250) { bug.state = 'warning'; bug.age = 0; }

@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { pantherPaw } from '../lib/jungle-motion';
-import { GEM_Y, createOrangutan, orangutanHand, piranhaPosition, eelPhase, createHogs, createBats, GEMS, hasAllGems, spiderPosition, ELEPHANT_TOP, crocodileFrame, hippoFrame, createRunner, createPredator, dashBoost, duckRunner, FLOOR, isAirAttack, jumpRunner, LEVELS, levelSeconds, PLAYER_X, runnerScore, runnerSpeed, stepRunner, STRONG_DIVE_SECONDS, travelSpeed } from '../lib/jungle-runner';
+import { createInsect } from '../lib/jungle-insects';
+import { COUNTER_ATTACK_SECONDS, GEM_Y, createOrangutan, orangutanHand, piranhaPosition, eelPhase, createHogs, createBats, GEMS, hasAllGems, spiderPosition, ELEPHANT_TOP, crocodileFrame, hippoFrame, createRunner, createPredator, dashBoost, duckRunner, FLOOR, isAirAttack, jumpRunner, kickRunner, LEVELS, levelSeconds, PLAYER_X, punchRunner, runnerScore, runnerSpeed, stepRunner, STRONG_DIVE_SECONDS, travelSpeed } from '../lib/jungle-runner';
 
 function active() { const s = createRunner(); s.phase = 'playing'; s.items = []; s.nextSection = 100000; return s; }
 function advance(s: ReturnType<typeof active>, seconds: number, fps = 120) { for (let i = 0; i < seconds * fps; i++) stepRunner(s, 1 / fps); }
@@ -280,6 +281,28 @@ test('air strikes defeat snakes and panthers with level-scaled 1–3 hit pips', 
   assert.equal(panther.hits, 3);
   assert.equal(panther.knocked, true);
   assert.match(s.message, /PANTHER STRIKE/);
+});
+
+test('punches and kicks drive the Scorpion King back into battle space', () => {
+  const s = active();
+  const king = createInsect('scorpion', PLAYER_X + 100);
+  king.state = 'recover';
+  s.insects = [king];
+  punchRunner(s); stepRunner(s, 1 / 120);
+  assert.equal(king.hits, 1); assert.ok(king.x - (s.distance + PLAYER_X) > 250);
+  king.hitCooldown = 0; king.x = s.distance + PLAYER_X + 120;
+  kickRunner(s); stepRunner(s, 1 / 120);
+  assert.equal(king.hits, 2);
+});
+
+test('a hit leaves a 0.20-second punch or kick counter window', () => {
+  const s = active();
+  s.items = [{ x: PLAYER_X, y: FLOOR - 64, kind: 'high' }];
+  stepRunner(s, 1 / 120);
+  assert.equal(s.lives, 2); assert.ok(s.counterLeft > COUNTER_ATTACK_SECONDS - 0.02);
+  punchRunner(s); assert.equal(s.combatMove, 'punch'); assert.ok(s.combatLeft > 0);
+  advance(s, COUNTER_ATTACK_SECONDS + 0.03);
+  s.combatLeft = 0; punchRunner(s); assert.equal(s.combatLeft, 0);
 });
 
 test('strong dive smashes coconuts and barrels, then leaves them dangerous', () => {
