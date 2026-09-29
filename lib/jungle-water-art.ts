@@ -24,7 +24,7 @@ export function drawOrangutan(ctx: CanvasRenderingContext2D, o: Orangutan, camer
     // throw poses, then three celebratory dance poses. Crop the active cell
     // rather than squeezing the entire sheet into one character.
     const cellWidth = sprite.naturalWidth / 7;
-    const frame = o.state === 'dance'
+    const frame = o.stunned !== undefined ? 6 : o.state === 'dance'
       ? 4 + Math.floor(o.age * 6) % 3
       : o.state === 'windup'
         ? (o.age < 0.28 ? 0 : 1)
@@ -44,7 +44,8 @@ export function drawOrangutan(ctx: CanvasRenderingContext2D, o: Orangutan, camer
       drawPineapple(ctx, hand.x - camera, hand.y - 8, 0, 0.75);
     }
     ctx.fillStyle = '#fff0bc'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText(o.state === 'windup' ? 'PINEAPPLE WIND-UP!' : o.state === 'throw' ? 'SLIDE UNDER!' : 'DANCING ORANGUTAN', x, FLOOR - 202);
+    ctx.fillText(o.stunned !== undefined ? 'DIZZY ORANGUTAN!' : o.state === 'windup' ? 'PINEAPPLE WIND-UP!' : o.state === 'throw' ? 'SLIDE UNDER!' : 'DANCING ORANGUTAN', x, FLOOR - 202);
+    if (o.stunned !== undefined) { ctx.font = '24px sans-serif'; ctx.fillText('★  ★', x, FLOOR - 225 + Math.sin(o.stunned * 8) * 5); }
     if (dancing) { ctx.font = '22px sans-serif'; ctx.fillText('♪', x - 57, FLOOR - 160 + beat * 9); ctx.fillText('♫', x + 57, FLOOR - 188 - beat * 8); }
     return;
   }
@@ -100,6 +101,7 @@ export function drawWaterLife(ctx: CanvasRenderingContext2D, r: River, camera: n
   const age = r.waterAge ?? 0;
   if (r.resident === 'piranha') {
     for (let i = 0; i < 2; i++) {
+      if (r.piranhasKnocked?.[i]) continue;
       const fish = piranhaPosition(r, i), x = fish.x - camera;
       ctx.strokeStyle = '#baf4f5'; ctx.lineWidth = 2;
       if (fish.warning || fish.jumping) {
@@ -122,6 +124,7 @@ export function drawWaterLife(ctx: CanvasRenderingContext2D, r: River, camera: n
     const x = r.x + r.width * 0.3 - camera, phase = eelPhase(r);
     if (eelSprite?.complete && eelSprite.naturalWidth) {
       ctx.save(); ctx.translate(x, FLOOR + 32 + Math.sin(age * 6) * 4); ctx.rotate(Math.sin(age * 6) * 0.06);
+      if (r.eelStun && r.eelStun > 0) ctx.globalAlpha = 0.35;
       ctx.drawImage(eelSprite, -80, -36, 160, 72); ctx.restore();
     } else {
       ctx.strokeStyle = phase === 'swim' ? '#34598c' : '#90d5df'; ctx.lineWidth = 15; ctx.beginPath();
@@ -130,7 +133,7 @@ export function drawWaterLife(ctx: CanvasRenderingContext2D, r: River, camera: n
       ctx.fillStyle = '#527f9f'; ctx.beginPath(); ctx.ellipse(x - 67, FLOOR + 31 + Math.sin(age * 6) * 9, 17, 10, 0, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#ffff96'; ctx.beginPath(); ctx.arc(x - 74, FLOOR + 28 + Math.sin(age * 6) * 9, 3, 0, Math.PI * 2); ctx.fill();
     }
-    if (phase !== 'swim') {
+    if (phase !== 'swim' && !(r.eelStun && r.eelStun > 0)) {
       ctx.fillStyle = phase === 'shock' ? '#95edff44' : '#c4edff18'; ctx.fillRect(x - 70, FLOOR - 28, 140, 76);
       ctx.strokeStyle = phase === 'shock' ? '#e8ffff' : '#8ac8e4'; ctx.lineWidth = phase === 'shock' ? 3 : 1.5;
       ctx.shadowColor = '#74d8ff'; ctx.shadowBlur = phase === 'shock' ? 12 : 4;

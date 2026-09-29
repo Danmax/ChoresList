@@ -320,7 +320,7 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     ctx.fillStyle = '#2e2447'; ctx.fillRect(230, 103, 350, 26); ctx.fillStyle = '#f1dcff'; ctx.font = 'bold 14px sans-serif'; ctx.fillText('DIVING BAT WAVE — SLIDE UNDER!', 405, 116);
   }
   for (const herd of s.herds) {
-    for (let i = 2; i >= 0; i--) elephant(ctx, herd.x + i * 175 - cameraDistance, herd.age + i * 0.4, herd.charging);
+    for (let i = 2; i >= 0; i--) if (!herd.knocked?.[i]) elephant(ctx, herd.x + i * 175 - cameraDistance, herd.age + i * 0.4, herd.charging);
     if (herd.warned && herd.x + 350 > s.distance + PLAYER_X) {
       ctx.fillStyle = '#ffebaa'; ctx.fillRect(235, 103, 350, 26); ctx.fillStyle = '#543728'; ctx.font = 'bold 14px sans-serif'; ctx.fillText('STAMPEDE — DOUBLE JUMP ONTO BACKS!', 410, 116);
     }
@@ -400,6 +400,18 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     for (let i = 0; i < 7; i++) { const a = i * Math.PI * 2 / 7; ctx.beginPath(); ctx.arc(crack.x - cameraDistance + Math.cos(a) * crack.age * 110, crack.y + Math.sin(a) * crack.age * 80, 3, 0, Math.PI * 2); ctx.fill(); }
     ctx.restore();
   }
+  for (const knockout of s.knockouts) {
+    const x = knockout.x - cameraDistance, y = knockout.y - knockout.age * 58;
+    if (x < -80 || x > 880) continue;
+    ctx.save(); ctx.globalAlpha = 1 - knockout.age / 0.8;
+    ctx.fillStyle = '#fff4a6'; ctx.shadowColor = '#ffdf48'; ctx.shadowBlur = 16;
+    for (let i = 0; i < 8; i++) {
+      const angle = i * Math.PI / 4 + knockout.age * 5;
+      const radius = 12 + knockout.age * 52;
+      ctx.beginPath(); ctx.arc(x + Math.cos(angle) * radius, y + Math.sin(angle) * radius, 3.5, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.shadowBlur = 0; ctx.font = 'bold 14px sans-serif'; ctx.fillText(`${knockout.label} +25`, x, y - 40); ctx.restore();
+  }
   for (const p of s.predators) {
     if (p.kind === 'tiger' && ['waiting', 'warning'].includes(p.state)) continue;
     const x = p.x - cameraDistance;
@@ -453,7 +465,8 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
   ctx.translate(playerX + (knocked ? Math.sin(s.stun * 70) * 6 : 0), s.y + bob);
   if (s.flipLeft > 0 && !knocked) { ctx.translate(0, -46); ctx.rotate((1 - s.flipLeft / FLIP_SECONDS) * Math.PI * 2); ctx.translate(0, 46); }
   else if (!grounded && !knocked) ctx.rotate(Math.max(-0.12, Math.min(0.12, s.vy / 4500)));
-  if (s.invincible > 0 && !knocked) ctx.globalAlpha = 0.65 + Math.sin(s.elapsed * 30) * 0.25;
+  if (s.starPower > 0 && !knocked) { ctx.shadowColor = '#ffe363'; ctx.shadowBlur = 24; }
+  else if (s.invincible > 0 && !knocked) ctx.globalAlpha = 0.65 + Math.sin(s.elapsed * 30) * 0.25;
   if (sprite.complete && sprite.naturalWidth) {
     // This sheet is not a uniform grid: the slide extends across an old cell
     // boundary. Explicit artwork bounds prevent neighboring tails/feet bleeding.
@@ -510,6 +523,11 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
   if (s.messageTime > 0) {
     ctx.fillStyle = '#173e32'; ctx.fillRect(200, 58, 400, 38);
     ctx.fillStyle = '#fff4a3'; ctx.font = 'bold 20px sans-serif'; ctx.fillText(s.message, 400, 78);
+  }
+  if (s.starPower > 0) {
+    ctx.fillStyle = '#4d3906'; ctx.fillRect(287, 10, 226, 29);
+    ctx.fillStyle = '#ffe363'; ctx.font = 'bold 16px sans-serif';
+    ctx.fillText(`⭐ KNOCKOUT POWER ${s.starPower.toFixed(1)}s`, 400, 25);
   }
 }
 

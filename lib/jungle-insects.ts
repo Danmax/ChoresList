@@ -1,4 +1,4 @@
-import type { Runner } from './jungle-runner';
+import { starKnockout, type Runner } from './jungle-runner';
 
 const FLOOR = 310;
 export const INSECT_KINDS = ['centipede', 'beetle', 'worker', 'fire-ant', 'stinger', 'katydid', 'caterpillar', 'mud-pit', 'scorpion'] as const;
@@ -22,8 +22,30 @@ export function stepInsects(s: Runner, dt: number, speed: number, previousY: num
   const worldX = s.distance + 150;
   const height = s.duck && s.y >= FLOOR - 1 ? 30 : 76;
   for (const bug of s.insects) {
+    if (bug.used && bug.kind !== 'caterpillar') continue;
     const ahead = bug.x - worldX;
     const warning = insectWarning(s.difficulty);
+    if (bug.kind === 'caterpillar') {
+      const top = FLOOR - 48;
+      if (!bug.used && Math.abs(ahead) < 65 && s.vy > 0 && previousY <= top && s.y >= top) {
+        bug.used = true; s.y = top; s.vy = -700; s.jumps = 1; s.duck = false; s.slideLeft = 0; s.flipLeft = 0;
+        s.caterpillarBounces++; s.message = 'JEWEL BOUNCE! Reach for the Peridot!'; s.messageTime = 1.5;
+      }
+      continue;
+    }
+    if (bug.kind !== 'mud-pit' && s.starPower > 0) {
+      const radius = bug.kind === 'scorpion' ? 70 : bug.kind === 'centipede' ? 44 : 32;
+      const lift = bug.kind === 'fire-ant' ? (bug.stack ?? 0) * 27 : 0;
+      const top = bug.kind === 'scorpion' ? FLOOR - 170 : bug.y - lift - 28;
+      const bottom = bug.kind === 'scorpion' ? FLOOR : bug.y - lift + 28;
+      if (Math.abs(ahead) < radius && bottom >= s.y - height && top <= s.y - 4) {
+        if (bug.kind === 'fire-ant') {
+          for (const ant of s.insects) if (ant.kind === 'fire-ant' && Math.abs(ant.x - bug.x) < 10) ant.used = true;
+        } else bug.used = true;
+        starKnockout(s, bug.x, bug.y - lift, bug.kind === 'fire-ant' ? 'ANT TOWER' : bug.kind === 'scorpion' ? 'SCORPION KING' : bug.kind.toUpperCase());
+        continue;
+      }
+    }
     if (bug.kind === 'scorpion') {
       bug.age += dt;
       if (bug.state === 'waiting' && ahead < speed * (warning + 0.45) + 100) { bug.state = 'warning'; bug.age = 0; }
@@ -71,16 +93,11 @@ export function stepInsects(s: Runner, dt: number, speed: number, previousY: num
       if (bug.kind === 'centipede' && bug.age > 1.05) { bug.state = 'recover'; bug.age = 0; }
     }
     if (bug.kind === 'stinger' && bug.state === 'recover') bug.y -= 130 * dt;
-    if (bug.kind === 'caterpillar') {
-      const top = FLOOR - 48;
-      if (!bug.used && Math.abs(ahead) < 65 && s.vy > 0 && previousY <= top && s.y >= top) {
-        bug.used = true; s.y = top; s.vy = -700; s.jumps = 1; s.duck = false; s.slideLeft = 0; s.flipLeft = 0;
-        s.caterpillarBounces++; s.message = 'JEWEL BOUNCE! Reach for the Peridot!'; s.messageTime = 1.5;
-      }
-      continue;
-    }
     if (bug.kind === 'centipede' && bug.state === 'recover') {
-      if (bug.age < 0.42 && Math.abs(bug.x - worldX) < 72 && s.y >= FLOOR - 95) hit('CENTIPEDE BURST! Jump clear!', 'flatten');
+      if (bug.age < 0.42 && Math.abs(bug.x - worldX) < 72 && s.y >= FLOOR - 95) {
+        if (s.starPower > 0) { bug.used = true; starKnockout(s, bug.x, bug.y, 'CENTIPEDE'); }
+        else hit('CENTIPEDE BURST! Jump clear!', 'flatten');
+      }
       if (bug.age >= 0.42) bug.used = true;
       continue;
     }
@@ -94,7 +111,10 @@ export function stepInsects(s: Runner, dt: number, speed: number, previousY: num
   s.antRocks = s.antRocks.filter(rock => {
     rock.x += rock.vx * dt; rock.vy += 800 * dt; rock.y += rock.vy * dt;
     const contact = Math.abs(rock.x - worldX) < 26 && rock.y + 12 >= s.y - height && rock.y - 12 <= s.y - 4;
-    if (contact) hit('ROCK BONK! Watch the worker ant!', 'bonk');
+    if (contact) {
+      if (s.starPower > 0) starKnockout(s, rock.x, rock.y, 'ROCK');
+      else hit('ROCK BONK! Watch the worker ant!', 'bonk');
+    }
     return !contact && rock.y < FLOOR && rock.x > s.distance - 100;
   });
   s.insects = s.insects.filter(bug => (!bug.used || bug.kind === 'caterpillar') && bug.x > s.distance - 180 && bug.y > -100);
