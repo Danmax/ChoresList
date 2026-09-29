@@ -1,4 +1,5 @@
 import type { Runner } from './jungle-runner';
+import { MUD_RADIUS, scorpionFrame } from './jungle-insects';
 
 const FLOOR = 310;
 
@@ -17,15 +18,34 @@ export function drawInsectGrove(ctx: CanvasRenderingContext2D, distance: number,
   ctx.globalAlpha = 1;
 }
 
-export function drawInsects(ctx: CanvasRenderingContext2D, s: Runner, atlas: HTMLImageElement, camera: number) {
+export function drawInsects(ctx: CanvasRenderingContext2D, s: Runner, atlas: HTMLImageElement, camera: number, scorpion?: HTMLImageElement) {
   const cells = { centipede: 0, beetle: 2, worker: 3, 'fire-ant': 4, stinger: 5, caterpillar: 6, katydid: 7 };
   for (const bug of s.insects) {
     const x = bug.x - camera;
     if (x < -180 || x > 980) continue;
+    if (bug.kind === 'scorpion') {
+      ctx.save(); ctx.translate(x, FLOOR);
+      const frame = scorpionFrame(bug);
+      if (scorpion?.complete && scorpion.naturalWidth) {
+        const w = scorpion.naturalWidth / 4, h = scorpion.naturalHeight / 2;
+        const width = 190 * w / h;
+        ctx.drawImage(scorpion, frame % 4 * w, Math.floor(frame / 4) * h, w, h, -width / 2, -190, width, 190);
+      } else { ctx.font = '80px sans-serif'; ctx.fillText('🦂', 0, -15); }
+      ctx.textAlign = 'center'; ctx.font = 'bold 12px sans-serif'; ctx.fillStyle = '#fff2ab';
+      ctx.fillText(bug.state === 'warning' ? bug.stack === 1 ? 'TAIL WHIP! SLIDE!' : 'CLAW SNAP! DOUBLE JUMP!' : 'SCORPION KING', 0, -195);
+      if (bug.state === 'attack' && bug.age < 0.45) {
+        ctx.strokeStyle = bug.stack === 1 ? '#71faff' : '#ffc963'; ctx.lineWidth = 5;
+        ctx.beginPath(); ctx.moveTo(-20, -90);
+        if (bug.stack === 1) { ctx.lineTo(-60, -120); ctx.lineTo(-80, -65); ctx.lineTo(-150, -95); }
+        else { ctx.lineTo(-150, -42); ctx.lineTo(-70, -18); }
+        ctx.stroke();
+      }
+      ctx.restore(); continue;
+    }
     if (bug.kind === 'mud-pit') {
       ctx.save(); ctx.translate(x, FLOOR - 8);
-      ctx.fillStyle = '#4a2b27'; ctx.beginPath(); ctx.ellipse(0, 0, 76, 19, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#7b4b36'; ctx.beginPath(); ctx.ellipse(0, -3, 64, 12, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#4a2b27'; ctx.beginPath(); ctx.ellipse(0, 0, MUD_RADIUS, 19, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#7b4b36'; ctx.beginPath(); ctx.ellipse(0, -3, MUD_RADIUS - 12, 12, 0, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#b9794f';
       for (const ripple of [-34, 0, 34]) { ctx.beginPath(); ctx.arc(ripple, -4, 10, 0.2, Math.PI - 0.2); ctx.strokeStyle = '#c88b5d'; ctx.lineWidth = 2; ctx.stroke(); }
       ctx.fillStyle = '#fff5ac'; ctx.font = 'bold 11px sans-serif'; ctx.fillText('MUD PIT! JUMP!', 0, -35); ctx.restore();
@@ -101,6 +121,6 @@ export function drawReaction(ctx: CanvasRenderingContext2D, s: Runner, x: number
     ctx.strokeStyle = '#ff8eae'; ctx.beginPath(); ctx.arc(0, 0, 30 + t * 28, 0, Math.PI * 2); ctx.stroke();
   }
   ctx.shadowBlur = 0; ctx.fillStyle = '#fff5a3'; ctx.font = 'bold 17px sans-serif';
-  ctx.fillText({ zap: 'ZAP!', flatten: 'SQUISH!', tussle: 'YOW!', sting: 'OUCH!', bonk: 'BONK!' }[s.reaction], 0, -70);
+  ctx.fillText({ zap: 'ZAP!', flatten: 'SQUISH!', tussle: 'YOW!', sting: 'OUCH!', bonk: 'BONK!', snap: 'SNAP!' }[s.reaction], 0, -70);
   ctx.restore();
 }

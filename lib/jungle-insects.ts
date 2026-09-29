@@ -1,11 +1,18 @@
 import type { Runner } from './jungle-runner';
 
 const FLOOR = 310;
-export const INSECT_KINDS = ['centipede', 'beetle', 'worker', 'fire-ant', 'stinger', 'katydid', 'caterpillar', 'mud-pit'] as const;
+export const INSECT_KINDS = ['centipede', 'beetle', 'worker', 'fire-ant', 'stinger', 'katydid', 'caterpillar', 'mud-pit', 'scorpion'] as const;
 export type InsectKind = typeof INSECT_KINDS[number];
 export type Insect = { kind: InsectKind; x: number; y: number; age: number; state: 'waiting' | 'warning' | 'attack' | 'recover'; used: boolean; targetX: number; stack?: number };
 export type AntRock = { x: number; y: number; vx: number; vy: number };
-export type HitReaction = 'bonk' | 'zap' | 'flatten' | 'tussle' | 'sting';
+export type HitReaction = 'bonk' | 'zap' | 'flatten' | 'tussle' | 'sting' | 'snap';
+export const MUD_RADIUS = 170;
+export function scorpionFrame(bug: Insect) {
+  if (bug.state === 'waiting') return 0;
+  if (bug.state === 'recover') return 7;
+  if (bug.stack === 1) return bug.state === 'warning' ? 4 : 5;
+  return bug.state === 'warning' ? 1 + Math.floor(bug.age * 8) % 2 : 3;
+}
 export function createInsect(kind: InsectKind, x: number, stack?: number): Insect {
   return { kind, x, y: kind === 'stinger' ? 125 : FLOOR - 25, age: 0, state: 'waiting', used: false, targetX: 0, stack };
 }
@@ -17,8 +24,22 @@ export function stepInsects(s: Runner, dt: number, speed: number, previousY: num
   for (const bug of s.insects) {
     const ahead = bug.x - worldX;
     const warning = insectWarning(s.difficulty);
+    if (bug.kind === 'scorpion') {
+      bug.age += dt;
+      if (bug.state === 'waiting' && ahead < speed * (warning + 0.45) + 100) { bug.state = 'warning'; bug.age = 0; }
+      if (bug.state === 'warning' && bug.age >= warning) { bug.state = 'attack'; bug.age = 0; }
+      if (bug.state === 'attack') {
+        const tail = bug.stack === 1;
+        if (bug.age < 0.45 && ahead > -65 && ahead < 150 &&
+          (tail ? s.y - height < FLOOR - 42 && s.y > FLOOR - 155 : s.y > FLOOR - 100)) {
+          hit(tail ? 'TAIL ZAP! Slide beneath the whip!' : 'CLAW SNAP! Double jump over!', tail ? 'zap' : 'snap');
+        }
+        if (bug.age >= 0.45) { bug.state = 'recover'; bug.age = 0; }
+      }
+      continue;
+    }
     if (bug.kind === 'mud-pit') {
-      const inPit = Math.abs(ahead) < 74 && s.y >= FLOOR - 8;
+      const inPit = Math.abs(ahead) < MUD_RADIUS && s.y >= FLOOR - 8;
       if (inPit) hit('MUD PIT! Jump clear!', 'flatten');
       continue;
     }
@@ -76,5 +97,5 @@ export function stepInsects(s: Runner, dt: number, speed: number, previousY: num
     if (contact) hit('ROCK BONK! Watch the worker ant!', 'bonk');
     return !contact && rock.y < FLOOR && rock.x > s.distance - 100;
   });
-  s.insects = s.insects.filter(bug => !bug.used && bug.x > s.distance - 180 && bug.y > -100);
+  s.insects = s.insects.filter(bug => (!bug.used || bug.kind === 'caterpillar') && bug.x > s.distance - 180 && bug.y > -100);
 }

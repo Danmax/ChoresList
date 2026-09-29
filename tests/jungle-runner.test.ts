@@ -54,13 +54,13 @@ test('each 100 bananas grants exactly one additional life, even at full health',
   advance(s, 0.5); assert.equal(s.lives, 4);
 });
 
-test('ally gifts grant a heart, fruit bonus, and a full twelve seconds of star protection', () => {
+test('ally gifts grant a heart, fruit bonus, and a full ten seconds of star protection', () => {
   const heart = active(); heart.items = [{ x: PLAYER_X, y: FLOOR - 32, kind: 'heart' }]; advance(heart, 0.02);
   assert.equal(heart.lives, 4);
   const fruit = active(); fruit.items = [{ x: PLAYER_X, y: FLOOR - 32, kind: 'fruit' }]; advance(fruit, 0.02);
   assert.equal(fruit.bananas, 5); assert.equal(fruit.bonusScore, 25);
   const star = active(); star.items = [{ x: PLAYER_X, y: FLOOR - 32, kind: 'star' }]; advance(star, 0.02);
-  assert.ok(star.invincible > 11.9); advance(star, 11.5); assert.ok(star.invincible > 0); advance(star, 0.6); assert.equal(star.invincible, 0);
+  assert.ok(star.invincible > 9.9); advance(star, 9.5); assert.ok(star.invincible > 0); advance(star, 0.6); assert.equal(star.invincible, 0);
 });
 
 test('sloths wait for the approaching monkey, lower a gift, then climb back up', () => {

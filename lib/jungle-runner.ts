@@ -186,7 +186,7 @@ function addSection(s: Runner) {
     const finale = s.elapsed % levelSeconds(s) >= levelSeconds(s) - 20;
     const kind = finale && !s.gemSpawned[5] ? 'caterpillar' : nextInsectEncounter(s);
     s.section++;
-    s.insects.push(createInsect(kind, x));
+    s.insects.push(createInsect(kind, x, kind === 'scorpion' ? Math.floor(Math.random() * 2) : undefined));
     if (kind === 'fire-ant') {
       const count = { easy: 3, medium: 4, hard: 5 }[s.difficulty];
       // One compact column reads as a climbing ant tower, with every ant
@@ -197,8 +197,9 @@ function addSection(s: Runner) {
       const count = { easy: 2, medium: 3, hard: 4 }[s.difficulty];
       for (let i = 1; i < count; i++) s.insects.push(createInsect(kind, x + i * 115));
     }
-    if (kind === 'centipede') s.insects.push(createInsect('mud-pit', x + 250));
-    if (kind === 'mud-pit') s.insects.push(createInsect('stinger', x + 185));
+    if (kind === 'centipede') s.insects.push(createInsect('mud-pit', x + 420), createInsect('caterpillar', x + 420));
+    if (kind === 'mud-pit') s.insects.push(createInsect('caterpillar', x));
+    if (kind === 'caterpillar') s.insects.unshift(createInsect('mud-pit', x));
     if (kind === 'caterpillar') {
       for (let i = 0; i < 5; i++) s.items.push({ x: x + 80 + i * 45, y: FLOOR - 160, kind: 'banana' });
       if (finale && !s.gemSpawned[5]) {
@@ -574,7 +575,7 @@ export function stepRunner(s: Runner, dt: number) {
         }
       } else if (item.kind === 'heart') { s.lives++; s.message = 'SLOTH HEART! +1 LIFE'; s.messageTime = 1.5; }
       else if (item.kind === 'fruit') { s.bananas += 5; s.bonusScore += 25; s.message = 'FRUIT FEAST! +5 COINS'; s.messageTime = 1.5; }
-      else if (item.kind === 'star') { s.invincible = Math.max(s.invincible, 12); s.message = 'RARE STAR! 12s INVINCIBLE'; s.messageTime = 2; }
+      else if (item.kind === 'star') { s.invincible = Math.max(s.invincible, 10); s.message = 'RARE STAR! 10s INVINCIBLE'; s.messageTime = 2; }
       else if (item.kind === 'cherry') { s.cherries++; s.bonusScore += 50; s.message = 'SWEET! +50 POINTS'; s.messageTime = 1; }
       else { s.bananas += item.kind === 'golden' ? 10 : 1; if (item.kind === 'golden') { s.golden++; s.message = 'GOLDEN BANANA! +10 COINS'; s.messageTime = 1; } }
       if (Math.floor(s.bananas / 100) > Math.floor(previous / 100)) { s.lives++; s.message = '100 BANANAS! +1 LIFE'; s.messageTime = 2; }

@@ -210,7 +210,7 @@ function emeraldCelebration(ctx: CanvasRenderingContext2D, s: Runner) {
   ctx.shadowBlur = 0; ctx.fillStyle = '#f4ffe5'; ctx.font = 'bold 15px sans-serif'; ctx.fillText('JUNGLE CROWN CELEBRATION', 400, 101); ctx.restore();
 }
 
-function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElement, predators: HTMLImageElement, wildlife: HTMLImageElement, insects: HTMLImageElement, allySprites: { orangutan: HTMLImageElement; eel: HTMLImageElement; sloth: HTMLImageElement; lemming: HTMLImageElement }) {
+function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElement, predators: HTMLImageElement, wildlife: HTMLImageElement, insects: HTMLImageElement, allySprites: { orangutan: HTMLImageElement; eel: HTMLImageElement; sloth: HTMLImageElement; lemming: HTMLImageElement; scorpion: HTMLImageElement }) {
   const W = 800, H = 400;
   const night = s.level === 4;
   const cameraDistance = s.distance - s.cameraLead;
@@ -437,7 +437,7 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     ctx.fillStyle = '#762f27'; ctx.fillRect(230, 12, 350, 34);
     ctx.fillStyle = '#fff6af'; ctx.font = 'bold 18px sans-serif'; ctx.fillText('⚡ DANGER SENSE — TIGER AHEAD!', 405, 29);
   }
-  drawInsects(ctx, s, insects, cameraDistance);
+  drawInsects(ctx, s, insects, cameraDistance, allySprites.scorpion);
   const knocked = s.reactionLeft > 0 || s.stun > 0 || s.phase === 'over';
   const grounded = s.y >= FLOOR - 1;
   const frame = knocked ? 4 : s.phase === 'victory' ? 5 : s.duck && grounded ? 3 : !grounded ? 2 : Math.floor(s.elapsed * 9) % 2;
@@ -473,7 +473,15 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     }
     // Each pose comes directly from the corrected sprite sheet. In particular,
     // do not mirror individual limbs between the two authored running frames.
-    ctx.drawImage(sprite, sx * scale, sy * scale, sw * scale, sh * scale, -dw / 2, -dh + 8, dw, dh);
+    if (s.reaction === 'snap' && s.reactionLeft > 0) {
+      // A bloodless cartoon split springs back together as the reaction ends.
+      const gap = Math.sin(Math.min(1, (0.9 - s.reactionLeft) / 0.9) * Math.PI) * 18;
+      for (const side of [-1, 1]) {
+        ctx.save(); ctx.translate(side * gap, side < 0 ? -gap : 0);
+        ctx.beginPath(); ctx.rect(-dw / 2, side < 0 ? -dh + 8 : -dh / 2 + 8, dw, dh / 2); ctx.clip();
+        ctx.drawImage(sprite, sx * scale, sy * scale, sw * scale, sh * scale, -dw / 2, -dh + 8, dw, dh); ctx.restore();
+      }
+    } else ctx.drawImage(sprite, sx * scale, sy * scale, sw * scale, sh * scale, -dw / 2, -dh + 8, dw, dh);
     ctx.restore();
   } else fallbackMonkey(ctx, frame, s.elapsed);
   ctx.restore();
@@ -540,9 +548,10 @@ export function JungleVineSwing({ onExit, onFinish }: {
     const insects = new Image(); insects.src = '/games/jungle-insects-v1.png';
     const wildlife = new Image(); wildlife.src = '/games/jungle-wildlife-v1.png';
     const allySprites = {
-      orangutan: new Image(), eel: new Image(), sloth: new Image(), lemming: new Image(),
+      orangutan: new Image(), eel: new Image(), sloth: new Image(), lemming: new Image(), scorpion: new Image(),
     };
     allySprites.orangutan.src = '/games/jungle-orangutan-v2.png';
+    allySprites.scorpion.src = '/games/jungle-scorpion-king-v1.png';
     allySprites.eel.src = '/games/jungle-electric-eel-v2.png';
     allySprites.sloth.src = '/games/jungle-sloth-v2.png';
     allySprites.lemming.src = '/games/jungle-lemming-v2.png';
@@ -600,8 +609,8 @@ export function JungleVineSwing({ onExit, onFinish }: {
       <div className="mb-2 flex justify-between gap-2 text-sm font-black"><span>🍌 {hud.bananas} <small className="block text-yellow-200">{hud.bananas % 100}/100 → +1 life</small></span><span>❤️ {hud.lives} lives</span><span>{hud.seconds}s · {hud.score} pts</span></div>
       <p className="mb-2 text-xs font-bold text-yellow-200">{RUNNER_DIFFICULTIES[difficulty].label} · Level {hud.level + 1}/{LEVELS.length} · {LEVELS[hud.level].name} · {hud.speed.toFixed(1)}× pace · ⭐ {hud.golden} gold · 🍒 {hud.cherries} · 💎 {hud.gems}/{LEVELS.length} · {GEMS[hud.level].name}: {hud.levelGem ? "collected" : "find it!"}</p>
       <div className="relative overflow-hidden rounded-2xl border-2 border-emerald-700">
-        <canvas ref={canvas} width={800} height={400} aria-label="Jungle runner: flip over coconuts and panthers, slide under tiger pounces, catch vines over crocodile pits, and jump to catch lemming swings over hog herds. Sloths lower hearts, fruit, and rare stars that grant twelve seconds of invincibility; birds can also drop these helpful gifts." className="block aspect-[2/1] w-full" />
-        {(hud.phase === 'ready' || ended || hud.paused) && <div className="absolute inset-0 flex items-start justify-center overflow-y-auto bg-emerald-950/75 p-3"><div className="my-auto max-w-md text-center"><h3 className="text-lg font-black sm:text-2xl">{hud.paused ? 'Taking a breather' : ended ? hud.phase === 'victory' ? hud.gems === LEVELS.length ? 'Emerald Crown Victory!' : 'Jungle victory!' : 'Run complete!' : 'Find your jungle rhythm'}</h3><p className="my-2 text-xs sm:text-sm">{ended ? `${hud.gems === LEVELS.length && hud.phase === 'victory' ? '✦ All special emeralds captured — the Jungle Crown is yours! ✦ ' : ''}${hud.bananas} banana coins · ${hud.golden} gold · ${hud.cherries} cherries · ${hud.gems}/${LEVELS.length} gems · ${hud.score} points` : 'Double jump to front flip and dash! Sloths slide down vines with a heart (+1 life), fruit (+5 coins), or a rare star (12 seconds of invincibility); friendly birds can drop those gifts too. Jump into a hopping lemming’s vine to swing safely over hog herds. Catch moving vines over wide croc pits; jump again to release or ride to the far bank. Read tiger tells: slide under high pounces, jump low charges, and dive from air hunts. At night, slide under spiders and diving bat waves. Slide under pineapples from the dancing orangutan!'}</p>{hud.paused ? <button onClick={pause} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Resume</button> : ended ? <button onClick={() => { if (saved.current) return; saved.current = true; const s = world.current; onFinish(runnerScore(s), Math.max(1, Math.round(s.elapsed)), { difficulty: s.difficulty, bananas: s.bananas, goldenBananas: s.golden, cherries: s.cherries, gems: s.gems, gemLevels: s.gemCollected, levelsCompleted: s.phase === 'victory' ? LEVELS.length : s.level, hits: s.hits, hippoBounces: s.bounces, elephantBounces: s.elephantBounces, caterpillarBounces: s.caterpillarBounces, extraLives: Math.floor(s.bananas / 100) }); }} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Save run</button> : <button onClick={start} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Let’s run</button>}</div></div>}
+        <canvas ref={canvas} width={800} height={400} aria-label="Jungle runner: flip over coconuts and panthers, slide under tiger pounces, catch vines over crocodile pits, and jump to catch lemming swings over hog herds. Sloths lower hearts, fruit, and rare stars that grant ten seconds of invincibility; birds can also drop these helpful gifts." className="block aspect-[2/1] w-full" />
+        {(hud.phase === 'ready' || ended || hud.paused) && <div className="absolute inset-0 flex items-start justify-center overflow-y-auto bg-emerald-950/75 p-3"><div className="my-auto max-w-md text-center"><h3 className="text-lg font-black sm:text-2xl">{hud.paused ? 'Taking a breather' : ended ? hud.phase === 'victory' ? hud.gems === LEVELS.length ? 'Emerald Crown Victory!' : 'Jungle victory!' : 'Run complete!' : 'Find your jungle rhythm'}</h3><p className="my-2 text-xs sm:text-sm">{ended ? `${hud.gems === LEVELS.length && hud.phase === 'victory' ? '✦ All special emeralds captured — the Jungle Crown is yours! ✦ ' : ''}${hud.bananas} banana coins · ${hud.golden} gold · ${hud.cherries} cherries · ${hud.gems}/${LEVELS.length} gems · ${hud.score} points` : 'Double jump to front flip and dash! Sloths slide down vines with a heart (+1 life), fruit (+5 coins), or a rare star (10 seconds of invincibility); friendly birds can drop those gifts too. Jump into a hopping lemming’s vine to swing safely over hog herds. Catch moving vines over wide croc pits; jump again to release or ride to the far bank. Read tiger tells: slide under high pounces, jump low charges, and dive from air hunts. At night, slide under spiders and diving bat waves. Slide under pineapples from the dancing orangutan! In the Insect Grove, bounce on caterpillars in mud pits. Double jump over the Scorpion King’s claws or slide under his electric tail whip!'}</p>{hud.paused ? <button onClick={pause} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Resume</button> : ended ? <button onClick={() => { if (saved.current) return; saved.current = true; const s = world.current; onFinish(runnerScore(s), Math.max(1, Math.round(s.elapsed)), { difficulty: s.difficulty, bananas: s.bananas, goldenBananas: s.golden, cherries: s.cherries, gems: s.gems, gemLevels: s.gemCollected, levelsCompleted: s.phase === 'victory' ? LEVELS.length : s.level, hits: s.hits, hippoBounces: s.bounces, elephantBounces: s.elephantBounces, caterpillarBounces: s.caterpillarBounces, extraLives: Math.floor(s.bananas / 100) }); }} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Save run</button> : <button onClick={start} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Let’s run</button>}</div></div>}
       </div>
       <div className="mt-3 grid grid-cols-2 gap-3">
         <button disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); jump(); }} onClick={e => { if (e.detail === 0) jump(); }} className="min-h-14 touch-none select-none rounded-2xl bg-yellow-300 p-3 font-black text-emerald-950 disabled:opacity-40">JUMP <small className="block">Tap again: flip / release vine</small></button>
