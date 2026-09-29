@@ -1457,6 +1457,14 @@ export default function CommunityGroupPage() {
             )}
             {role && (
               <Link
+                href={`/community/${groupId}/friends`}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-3 font-black text-white shadow-sm hover:bg-indigo-700"
+              >
+                <Users size={17} /> Parent Connections
+              </Link>
+            )}
+            {role && (
+              <Link
                 href={`/community/${groupId}/secret-santa`}
                 className="inline-flex items-center justify-center gap-2 rounded-2xl bg-rose-500 px-4 py-3 font-black text-white shadow-sm hover:bg-rose-600"
               >

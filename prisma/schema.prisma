@@ -51,6 +51,7 @@ model ParentAccount {
   createdCommunitySurveys     CommunitySurvey[]              @relation("CommunitySurveyCreator")
   communitySurveySubmissions  CommunitySurveySubmission[]    @relation("CommunitySurveyRespondent")
   createdSecretSantaExchanges CommunitySecretSantaExchange[] @relation("SecretSantaCreator")
+  communitySocialProfiles     CommunityParentProfile[]
 }
 
 model Household {
@@ -945,6 +946,10 @@ model CommunityGroup {
   skillTests           SkillTest[]
   surveys              CommunitySurvey[]
   secretSantaExchanges CommunitySecretSantaExchange[]
+  socialProfiles       CommunityParentProfile[]
+  socialConnections    CommunityParentConnection[]
+  childFriendships     CommunityChildFriendship[]
+  chessMatches         CommunityChessMatch[]
 }
 
 model CommunityMember {
@@ -964,6 +969,101 @@ model CommunityMember {
   parent ParentAccount  @relation(fields: [parentId], references: [id], onDelete: Cascade)
 
   @@unique([groupId, parentId])
+}
+
+// Social discovery is deliberately scoped to a single community group. Children
+// never have public profiles: parents choose which minimal details can be used
+// after a parent-to-parent connection has been accepted.
+model CommunityParentProfile {
+  id                  String   @id @default(uuid()) @db.Char(36)
+  groupId             String   @db.Char(36)
+  parentId            String   @db.Char(36)
+  displayName         String   @db.VarChar(80)
+  avatar              String   @default("👋") @db.VarChar(32)
+  bio                 String?  @db.VarChar(280)
+  isDiscoverable      Boolean  @default(false)
+  childSocialEnabled  Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  group  CommunityGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  parent ParentAccount  @relation(fields: [parentId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, parentId])
+  @@index([groupId, isDiscoverable])
+}
+
+model CommunityParentConnection {
+  id                String   @id @default(uuid()) @db.Char(36)
+  groupId           String   @db.Char(36)
+  requesterParentId String   @db.Char(36)
+  recipientParentId String   @db.Char(36)
+  status            String   @default("pending") @db.VarChar(32)
+  blockedByParentId String?  @db.Char(36)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  group CommunityGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, requesterParentId, recipientParentId])
+  @@index([groupId, recipientParentId, status])
+}
+
+model CommunityChildFriendship {
+  id                String   @id @default(uuid()) @db.Char(36)
+  groupId           String   @db.Char(36)
+  childAId          String   @db.Char(36)
+  childBId          String   @db.Char(36)
+  requesterParentId String   @db.Char(36)
+  recipientParentId String   @db.Char(36)
+  status            String   @default("pending") @db.VarChar(32)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  group        CommunityGroup        @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  chessMatches CommunityChessMatch[]
+
+  @@unique([groupId, childAId, childBId])
+  @@index([groupId, recipientParentId, status])
+}
+
+model CommunityChessMatch {
+  id             String   @id @default(uuid()) @db.Char(36)
+  groupId        String   @db.Char(36)
+  friendshipId   String   @db.Char(36)
+  whiteMemberId  String   @db.Char(36)
+  blackMemberId  String   @db.Char(36)
+  currentTurn    String   @default("white") @db.VarChar(16)
+  status         String   @default("active") @db.VarChar(32)
+  fen            String   @db.VarChar(128)
+  result         String?  @db.VarChar(32)
+  lastMoveAt     DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  group      CommunityGroup           @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  friendship CommunityChildFriendship @relation(fields: [friendshipId], references: [id], onDelete: Cascade)
+  moves      CommunityChessMove[]
+
+  @@index([groupId, status, lastMoveAt])
+  @@index([whiteMemberId, blackMemberId, status])
+}
+
+model CommunityChessMove {
+  id        String   @id @default(uuid()) @db.Char(36)
+  matchId   String   @db.Char(36)
+  memberId  String   @db.Char(36)
+  ply       Int
+  san       String   @db.VarChar(32)
+  from      String   @db.VarChar(2)
+  to        String   @db.VarChar(2)
+  promotion String?  @db.VarChar(8)
+  fen       String   @db.VarChar(128)
+  createdAt DateTime @default(now())
+
+  match CommunityChessMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, ply])
 }
 
 model EmailNotification {
