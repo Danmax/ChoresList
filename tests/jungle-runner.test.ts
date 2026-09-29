@@ -706,3 +706,15 @@ test('hog spacing is compact while preserving four runners and two jumpers', () 
     assert.equal(herd.filter(h => h.jumper).length, 2);
   }
 });
+
+test('cave spikes release one at a time and guardian projectiles travel toward Johnny', () => {
+  const s = active();
+  const delayedSpike = { x: PLAYER_X + 700, y: 12, kind: 'cave-spike' as const, vy: 40, fallDelay: 0.3, scale: 1.75 };
+  const arrow = { x: PLAYER_X + 500, y: FLOOR - 112, kind: 'arrow' as const, vx: -360 };
+  const dart = { x: PLAYER_X + 600, y: FLOOR - 72, kind: 'dart' as const, vx: -430 };
+  s.items = [delayedSpike, arrow, dart];
+  advance(s, 0.1);
+  assert.equal(delayedSpike.y, 12); assert.ok(arrow.x < PLAYER_X + 500); assert.ok(dart.x < PLAYER_X + 600);
+  advance(s, 0.25);
+  assert.ok(delayedSpike.y > 12);
+});

@@ -392,6 +392,14 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     } else lemmingArt(ctx, x, lemming.y, lemming.age);
     ctx.fillStyle = '#fff4b4'; ctx.font = 'bold 12px sans-serif'; ctx.fillText('JUMP: LEMMING SWING', x + 30, lemming.y - 48);
   }
+  // Cave encounters read as one overhead space, while each stalactite releases in sequence.
+  for (const spike of s.items.filter(item => item.kind === 'cave-spike')) {
+    const spikeX = spike.x - cameraDistance;
+    if (spikeX < -90 || spikeX > 890) continue;
+    ctx.fillStyle = '#1c2634'; ctx.fillRect(spikeX - 50, 0, 100, 33);
+    ctx.fillStyle = '#304252';
+    for (let tooth = -46; tooth < 48; tooth += 18) { ctx.beginPath(); ctx.moveTo(spikeX + tooth, 31); ctx.lineTo(spikeX + tooth + 9, 47); ctx.lineTo(spikeX + tooth + 18, 31); ctx.fill(); }
+  }
   for (const item of s.items) {
     const x = item.x - cameraDistance;
     if (x < -40 || x > 850) continue;
@@ -419,17 +427,19 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     ctx.font = collectible ? '27px sans-serif' : '38px sans-serif';
     if (collectible) ctx.fillText(item.kind === 'cherry' ? '🍒' : item.kind === 'heart' ? '❤️' : item.kind === 'fruit' ? '🍍' : item.kind === 'star' ? '⭐' : '🍌', 0, 0);
     else if (item.kind === 'barrel') barrel(ctx, 0, 0);
-    else if (item.kind === 'boulder') { ctx.fillStyle = '#66717a'; ctx.strokeStyle = '#263541'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(0, 0, 38, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.strokeStyle = '#aeb9bd'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-17, -13); ctx.lineTo(7, -25); ctx.lineTo(22, -3); ctx.moveTo(-24, 9); ctx.lineTo(5, 23); ctx.stroke(); }
-    else if (item.kind === 'cave-spike') { ctx.fillStyle = '#c9d5df'; ctx.strokeStyle = '#465b6b'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-18, -35); ctx.lineTo(18, -35); ctx.lineTo(0, 30); ctx.closePath(); ctx.fill(); ctx.stroke(); }
-    else if (item.kind === 'spike-pit') { ctx.fillStyle = '#202d3a'; ctx.fillRect(-105, -8, 210, 19); ctx.fillStyle = '#d9e6ee'; for (let spike = -90; spike <= 90; spike += 24) { ctx.beginPath(); ctx.moveTo(spike, -8); ctx.lineTo(spike + 10, -40); ctx.lineTo(spike + 20, -8); ctx.fill(); } }
+    else if (item.kind === 'boulder') { const scale = item.scale ?? 1; ctx.scale(scale, scale); ctx.fillStyle = '#66717a'; ctx.strokeStyle = '#263541'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(0, 0, 38, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.strokeStyle = '#aeb9bd'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-17, -13); ctx.lineTo(7, -25); ctx.lineTo(22, -3); ctx.moveTo(-24, 9); ctx.lineTo(5, 23); ctx.stroke(); }
+    else if (item.kind === 'cave-spike') { const length = 30 * (item.scale ?? 1); ctx.fillStyle = '#c9d5df'; ctx.strokeStyle = '#465b6b'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-18, -length); ctx.lineTo(18, -length); ctx.lineTo(0, length); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+    else if (item.kind === 'spike-pit') { ctx.fillStyle = '#315d50'; ctx.beginPath(); ctx.ellipse(0, 0, 108, 19, 0, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#88b06b'; ctx.lineWidth = 2; for (let ripple = -62; ripple <= 62; ripple += 40) { ctx.beginPath(); ctx.arc(ripple, -3, 12, 0.2, Math.PI - 0.2); ctx.stroke(); } ctx.fillStyle = '#8aa44e'; for (let reed = -92; reed <= 92; reed += 22) { ctx.fillRect(reed, -34 - (Math.abs(reed) % 3) * 5, 3, 31); } ctx.strokeStyle = '#b5a05d'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(-26, -5); ctx.bezierCurveTo(-6, -27, 20, 18, 39, -7); ctx.stroke(); ctx.fillStyle = '#c9b66f'; ctx.beginPath(); ctx.arc(42, -8, 8, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#3a2a1d'; ctx.beginPath(); ctx.arc(45, -10, 2, 0, Math.PI * 2); ctx.fill(); }
+    else if (item.kind === 'arrow' || item.kind === 'dart') { const dart = item.kind === 'dart'; ctx.strokeStyle = dart ? '#64c98b' : '#ddb66b'; ctx.lineWidth = dart ? 4 : 3; ctx.beginPath(); ctx.moveTo(-28, 0); ctx.lineTo(24, 0); ctx.stroke(); ctx.fillStyle = dart ? '#c8f1b6' : '#e5e7de'; ctx.beginPath(); ctx.moveTo(24, 0); ctx.lineTo(13, -6); ctx.lineTo(13, 6); ctx.closePath(); ctx.fill(); ctx.fillStyle = dart ? '#2e744d' : '#a86e3e'; ctx.fillRect(-28, -5, 10, 10); }
     else if (item.kind === 'bear') coffeeBearArt(ctx, 0, 0, s.elapsed);
     else coconut(ctx, 0, 0);
     ctx.restore();
     if (!collectible) {
       const labelY = item.kind === 'drop' ? item.y + 34 : item.y - 33;
-      ctx.fillStyle = '#fff'; ctx.fillRect(x - (item.bossAmmo ? 65 : 29), labelY - 10, item.bossAmmo ? 130 : 58, 19);
-      ctx.fillStyle = '#174d35'; ctx.font = item.bossAmmo ? 'bold 10px sans-serif' : 'bold 12px sans-serif';
-      ctx.fillText(item.bossAmmo ? 'BOUNCE TO STRIKE' : item.kind === 'bear' ? 'COFFEE BEAR! STRIKE!' : item.kind === 'spike-pit' ? 'SPIKE PIT! JUMP!' : item.kind === 'cave-spike' ? 'FALLING SPIKES!' : item.kind === 'boulder' ? 'GIANT BOULDER! DASH!' : item.kind === 'barrel' ? 'DIVE / JUMP' : movingCoconut || ['low', 'drop'].includes(item.kind) ? 'JUMP / DIVE' : item.kind === 'high' ? 'DUCK' : 'RUN', x, labelY);
+      const label = item.bossAmmo ? 'BOUNCE TO STRIKE' : item.kind === 'bear' ? 'COFFEE BEAR! STRIKE!' : item.kind === 'spike-pit' ? 'RATTLESNAKE SWAMP! JUMP!' : item.kind === 'cave-spike' ? 'SEQUENTIAL CAVE SPIKES!' : item.kind === 'arrow' ? 'GUARDIAN ARROW! SLIDE!' : item.kind === 'dart' ? 'SCOUT DART! DUCK!' : item.kind === 'boulder' ? (item.scale && item.scale > 1.4 ? 'BOULDER DAD! DASH!' : item.scale && item.scale > 1 ? 'BIG BROTHER BOULDER!' : 'LITTLE BOULDER!') : item.kind === 'barrel' ? 'DIVE / JUMP' : movingCoconut || ['low', 'drop'].includes(item.kind) ? 'JUMP / DIVE' : item.kind === 'high' ? 'DUCK' : 'RUN';
+      ctx.font = item.bossAmmo ? 'bold 10px sans-serif' : 'bold 12px sans-serif'; const labelWidth = Math.max(item.bossAmmo ? 130 : 58, ctx.measureText(label).width + 14);
+      ctx.fillStyle = '#fff'; ctx.fillRect(x - labelWidth / 2, labelY - 10, labelWidth, 19);
+      ctx.fillStyle = '#174d35'; ctx.fillText(label, x, labelY);
     }
   }
   for (const crack of s.cracks) {

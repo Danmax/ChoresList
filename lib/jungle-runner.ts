@@ -22,7 +22,7 @@ export const COUNTER_ATTACK_SECONDS = 0.20;
 export const KI_MAX = 100;
 export const FLIP_SECONDS = 0.5;
 export const GEM_Y = FLOOR - 235;
-export type RunnerItem = { x: number; y: number; kind: 'banana' | 'golden' | 'cherry' | 'heart' | 'fruit' | 'star' | 'gem' | 'drop' | 'low' | 'high' | 'canopy' | 'rolling' | 'bouncing' | 'barrel' | 'boulder' | 'cave-spike' | 'spike-pit' | 'bear'; collected?: boolean; level?: number; vy?: number; vx?: number; previousX?: number; reflected?: boolean; bossAmmo?: boolean; rotation?: number };
+export type RunnerItem = { x: number; y: number; kind: 'banana' | 'golden' | 'cherry' | 'heart' | 'fruit' | 'star' | 'gem' | 'drop' | 'low' | 'high' | 'canopy' | 'rolling' | 'bouncing' | 'barrel' | 'boulder' | 'cave-spike' | 'spike-pit' | 'bear' | 'arrow' | 'dart'; collected?: boolean; level?: number; vy?: number; vx?: number; previousX?: number; reflected?: boolean; bossAmmo?: boolean; rotation?: number; scale?: number; fallDelay?: number };
 export const GEMS = [
   { name: 'Emerald', color: '#4cf7ae' }, { name: 'Sapphire', color: '#6fbaff' },
   { name: 'Ruby', color: '#ff6e97' }, { name: 'Amber', color: '#ffcb56' },
@@ -127,7 +127,7 @@ export function travelSpeed(s: Runner) { return runnerSpeed(s) + dashBoost(s) + 
 // monkey's attack. It intentionally shares the existing control on touch and
 // keyboard so the move is equally available on every device.
 export function isAirAttack(s: Runner) { return s.attackLeft > 0 && s.stun <= 0; }
-export function isHeroAttack(s: Runner) { return isAirAttack(s) || s.combatLeft > 0 || s.forwardDashLeft > 0 || s.specialLeft > 0; }
+export function isHeroAttack(s: Runner) { return isAirAttack(s) || s.strongDiveLeft > 0 || s.combatLeft > 0 || s.forwardDashLeft > 0 || s.specialLeft > 0; }
 export function heroAttackReach(s: Runner) {
   if (s.specialLeft > 0) return 300;
   if (s.forwardDashLeft > 0) return 165;
@@ -299,7 +299,7 @@ function addSection(s: Runner) {
     s.nextSection += Math.max(1400, runnerSpeed(s) * 3.1);
     return;
   }
-  const patterns = [[8, 16, 10, 14, 3, 11, 12, 4, 7, 6, 17, 18], [16, 3, 12, 14, 5, 9, 10, 11, 4, 7, 6, 8, 17, 19], [7, 16, 14, 12, 11, 5, 10, 9, 4, 1, 3, 8, 6, 17, 20], [16, 7, 11, 14, 12, 10, 9, 5, 8, 7, 3, 6, 5, 4, 1, 17, 21], [13, 15, 16, 14, 11, 13, 12, 15, 10, 7, 3, 13, 4, 8, 17, 18, 19, 20, 21]][s.level];
+  const patterns = [[8, 16, 10, 14, 3, 11, 12, 4, 7, 6, 17, 18], [16, 3, 12, 14, 5, 9, 10, 11, 4, 7, 6, 8, 17, 19, 22], [7, 16, 14, 12, 11, 5, 10, 9, 4, 1, 3, 8, 6, 17, 20, 23], [16, 7, 11, 14, 12, 10, 9, 5, 8, 7, 3, 6, 5, 4, 1, 17, 21, 22, 23], [13, 15, 16, 14, 11, 13, 12, 15, 10, 7, 3, 13, 4, 8, 17, 18, 19, 20, 21, 22, 23]][s.level];
   const easyPatterns = [[0, 1, 3, 4, 6, 14, 1, 12, 4, 3, 17], [1, 3, 4, 6, 14, 0, 12, 1, 4, 3, 17], [4, 0, 3, 14, 6, 1, 12, 4, 3, 0, 17], [1, 4, 12, 3, 14, 6, 0, 4, 1, 3, 17], [0, 1, 3, 4, 6, 14, 12, 1, 4, 3, 17]][s.level];
   const source = s.difficulty === 'easy' ? easyPatterns : patterns;
   const type = nextEncounter(s, source);
@@ -342,14 +342,20 @@ function addSection(s: Runner) {
   } else if (type === 17) {
     s.items.push({ x, y: FLOOR - 28, kind: 'barrel' });
   } else if (type === 18) {
-    s.items.push({ x, y: FLOOR - 32, kind: 'boulder', rotation: 0 }); recovery = 700;
+    // Little Boulder, Big Brother, and Dad Boulder thunder down together.
+    for (const [offset, scale] of [[0, 0.75], [140, 1.15], [310, 1.65]] as const) s.items.push({ x: x + offset, y: FLOOR - 32 * scale, kind: 'boulder', rotation: 0, scale });
+    recovery = 900;
   } else if (type === 19) {
-    for (let i = 0; i < 3; i++) s.items.push({ x: x + i * 78, y: 18, kind: 'cave-spike', vy: 40 });
+    for (let i = 0; i < 4; i++) s.items.push({ x: x + i * 84, y: 12, kind: 'cave-spike', vy: 40, scale: 1.15 + i * 0.2, fallDelay: i * 0.32 });
     recovery = 680;
   } else if (type === 20) {
     s.items.push({ x, y: FLOOR - 8, kind: 'spike-pit' }); recovery = 730;
   } else if (type === 21) {
     s.items.push({ x, y: FLOOR - 26, kind: 'bear' }); recovery = 760;
+  } else if (type === 22) {
+    s.items.push({ x, y: FLOOR - 112, kind: 'arrow', vx: -360, rotation: 0 }); recovery = 650;
+  } else if (type === 23) {
+    s.items.push({ x, y: FLOOR - 72, kind: 'dart', vx: -430, rotation: 0 }); recovery = 650;
   } else {
     s.items.push({ x, y: type === 0 ? FLOOR - 22 : type === 1 ? FLOOR - 64 : FLOOR - 118, kind: type === 0 ? 'low' : type === 1 ? 'high' : 'canopy' });
   }
@@ -456,6 +462,14 @@ export function stepRunner(s: Runner, dt: number) {
     }
   }
   for (const item of s.items) {
+    if (item.kind === 'cave-spike' && (item.fallDelay ?? 0) > 0) {
+      item.fallDelay = Math.max(0, (item.fallDelay ?? 0) - dt);
+      continue;
+    }
+    if (item.kind === 'arrow' || item.kind === 'dart') {
+      if (item.x - s.distance < 850) { item.previousX = item.x; item.x += (item.vx ?? -360) * dt; }
+      continue;
+    }
     if (item.kind === 'rolling' || item.kind === 'bouncing' || item.kind === 'boulder') {
       item.previousX = item.x;
       if (item.reflected) {
@@ -770,9 +784,10 @@ export function stepRunner(s: Runner, dt: number) {
   s.predators = s.predators.filter(p => !p.knocked && p.x > s.distance - 120);
   for (const item of s.items) {
     const collectible = ['banana', 'golden', 'cherry', 'heart', 'fruit', 'star', 'gem'].includes(item.kind);
-    const hazardWidth = item.kind === 'spike-pit' ? 105 : item.kind === 'boulder' ? 48 : item.kind === 'bear' ? 54 : item.kind === 'cave-spike' ? 24 : 33;
+    const scale = item.scale ?? 1;
+    const hazardWidth = item.kind === 'spike-pit' ? 105 : item.kind === 'boulder' ? 48 * scale : item.kind === 'bear' ? 54 : item.kind === 'cave-spike' ? 24 * scale : item.kind === 'arrow' || item.kind === 'dart' ? 32 : 33;
     if (item.collected || Math.abs(item.x - worldX) > (item.kind === 'gem' ? 22 : collectible ? 30 : hazardWidth)) continue;
-    const radius = item.kind === 'gem' ? 10 : collectible ? 14 : item.kind === 'boulder' ? 43 : item.kind === 'bear' ? 42 : 20;
+    const radius = item.kind === 'gem' ? 10 : collectible ? 14 : item.kind === 'boulder' ? 43 * scale : item.kind === 'bear' ? 42 : item.kind === 'cave-spike' ? 28 * scale : 20;
     if (item.y + radius < s.y - height || item.y - radius > s.y - 4) continue;
     if (collectible) {
       item.collected = true;
@@ -803,7 +818,7 @@ export function stepRunner(s: Runner, dt: number) {
     } else if (!item.reflected && s.invincible <= 0) {
       item.collected = true;
       s.cracks.push({ x: item.x, y: item.y, age: 0 });
-      hurt(s, item.kind === 'spike-pit' ? 'SPIKE PIT! Jump the chasm!' : item.kind === 'cave-spike' ? 'CAVE SPIKE! Keep moving!' : item.kind === 'bear' ? 'COFFEE BEAR! Dash or strike!' : item.kind === 'boulder' ? 'BOULDER ROLL! Dash through!' : 'CRACK!');
+      hurt(s, item.kind === 'spike-pit' ? 'RATTLESNAKE SWAMP! Jump the bog!' : item.kind === 'cave-spike' ? 'CAVE SPIKE! Keep moving!' : item.kind === 'arrow' ? 'GUARDIAN ARROW! Slide low!' : item.kind === 'dart' ? 'SCOUT DART! Duck it!' : item.kind === 'bear' ? 'COFFEE BEAR! Dash or strike!' : item.kind === 'boulder' ? 'BOULDER AVALANCHE! Dash through!' : 'CRACK!');
       break;
     }
   }
