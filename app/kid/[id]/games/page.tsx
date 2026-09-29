@@ -95,6 +95,7 @@ function settingText(setting?: GameSetting) {
 export default function KidGamesPage() {
   const { id } = useParams<{ id: string }>();
   const [member, setMember] = useState<Member | null>(null);
+  const [familyMembers, setFamilyMembers] = useState<Member[]>([]);
   const [games, setGames] = useState<Game[]>([]);
   const [settings, setSettings] = useState<Record<string, GameSetting>>({});
   const [availability, setAvailability] = useState<Availability>({});
@@ -111,6 +112,7 @@ export default function KidGamesPage() {
     ]);
     const membersData = await membersRes.json().catch(() => null);
     const members = Array.isArray(membersData) ? membersData : Array.isArray(membersData?.members) ? membersData.members : [];
+    setFamilyMembers(members);
     setMember(members.find((item: Member) => item.id === id) ?? null);
 
     const gamesData = await gamesRes.json().catch(() => null);
@@ -207,7 +209,12 @@ export default function KidGamesPage() {
       ) : activeGame === "jungle-vine-swing" ? (
         <JungleVineSwing onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("jungle-vine-swing", score, duration, metadata)} />
       ) : activeGame === "chess-quest" ? (
-        <ChessQuest onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("chess-quest", score, duration, metadata)} />
+        <ChessQuest
+          playerName={member.name}
+          opponents={familyMembers.filter((familyMember) => familyMember.id !== id).map((familyMember) => ({ id: familyMember.id, name: familyMember.name }))}
+          onExit={() => setActiveGame(null)}
+          onFinish={(score, duration, metadata) => recordSession("chess-quest", score, duration, metadata)}
+        />
       ) : (
         <section className="grid gap-4 sm:grid-cols-2">
           {[...games].sort((a, b) => Number(b.key === "jungle-vine-swing") - Number(a.key === "jungle-vine-swing")).map((game) => {
