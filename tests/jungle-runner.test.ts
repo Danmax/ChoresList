@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { pantherPaw } from '../lib/jungle-motion';
-import { GEM_Y, createOrangutan, orangutanHand, piranhaPosition, eelPhase, createHogs, createBats, GEMS, spiderPosition, ELEPHANT_TOP, crocodileFrame, hippoFrame, createRunner, createPredator, dashBoost, duckRunner, FLOOR, jumpRunner, LEVELS, levelSeconds, PLAYER_X, runnerScore, runnerSpeed, stepRunner, travelSpeed } from '../lib/jungle-runner';
+import { GEM_Y, createOrangutan, orangutanHand, piranhaPosition, eelPhase, createHogs, createBats, GEMS, hasAllGems, spiderPosition, ELEPHANT_TOP, crocodileFrame, hippoFrame, createRunner, createPredator, dashBoost, duckRunner, FLOOR, jumpRunner, LEVELS, levelSeconds, PLAYER_X, runnerScore, runnerSpeed, stepRunner, travelSpeed } from '../lib/jungle-runner';
 
 function active() { const s = createRunner(); s.phase = 'playing'; s.items = []; s.nextSection = 100000; return s; }
 function advance(s: ReturnType<typeof active>, seconds: number, fps = 120) { for (let i = 0; i < seconds * fps; i++) stepRunner(s, 1 / fps); }
@@ -423,6 +423,8 @@ test('gem collection awards 250 points once per level, and restart clears progre
   }
   assert.equal(s.gems, 6); assert.equal(runnerScore(s), 1500); assert.equal(s.bananas, 0);
   assert.deepEqual(s.gemCollected, [true, true, true, true, true, true]); assert.equal(createRunner().gems, 0);
+  assert.equal(hasAllGems(s), true);
+  s.phase = 'victory'; stepRunner(s, 0.5); assert.equal(s.celebrationTime, 0.5);
 });
 
 test('high gems require a timed double jump, not a single jump', () => {

@@ -25,6 +25,7 @@ export const GEMS = [
   { name: 'Ruby', color: '#ff6e97' }, { name: 'Amber', color: '#ffcb56' },
   { name: 'Moonstone', color: '#d2b7ff' }, { name: 'Peridot', color: '#c4ff57' },
 ] as const;
+export function hasAllGems(s: Pick<Runner, 'gemCollected'>) { return s.gemCollected.every(Boolean); }
 export type Hog = { herdX: number; x: number; y: number; vy: number; age: number; jumper: boolean; jumpIn: number; active: boolean };
 export function createHogs(x: number, speed: number, random = Math.random): Hog[] {
   const gap = (speed + 105) * 0.46;
@@ -123,7 +124,7 @@ export function createRunner(difficulty: RunnerDifficulty = 'medium') {
     flipLeft: 0, swing: null as ({ river: River; progress: number } | { lemming: Lemming; progress: number }) | null,
     cracks: [] as { x: number; y: number; age: number }[],
     golden: 0, cherries: 0, bonusScore: 0, gems: 0,
-    gemSpawned: LEVELS.map(() => false), gemCollected: LEVELS.map(() => false),
+    gemSpawned: LEVELS.map(() => false), gemCollected: LEVELS.map(() => false), celebrationTime: 0,
     lives: Number(RUNNER_DIFFICULTIES[difficulty].lives), bananas: 0, hits: 0, bounces: 0, stun: 0, invincible: 0,
     message: '', messageTime: 0, nextSection: 950, section: 0, encounterDeck: [] as number[], insectDeck: [] as InsectKind[],
     items: Array.from({ length: 12 }, (_, i): RunnerItem => ({ x: 380 + i * 42, y: FLOOR - 30, kind: 'banana' })),
@@ -268,7 +269,10 @@ function addSection(s: Runner) {
 
 export function stepRunner(s: Runner, dt: number) {
   s.reactionLeft = Math.max(0, s.reactionLeft - dt);
-  if (s.phase !== 'playing') return;
+  if (s.phase !== 'playing') {
+    if (s.phase === 'victory' && hasAllGems(s)) s.celebrationTime += dt;
+    return;
+  }
   for (const splat of s.splats) splat.age += dt;
   s.splats = s.splats.filter(p => p.age < 0.65);
   for (const crack of s.cracks) crack.age += dt;
