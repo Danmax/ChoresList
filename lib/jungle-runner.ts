@@ -19,7 +19,7 @@ export const LEVEL_SECONDS = 60;
 export const SLIDE_SECONDS = 1.5;
 export const FLIP_SECONDS = 0.5;
 export const GEM_Y = FLOOR - 235;
-export type RunnerItem = { x: number; y: number; kind: 'banana' | 'golden' | 'cherry' | 'heart' | 'fruit' | 'star' | 'gem' | 'drop' | 'low' | 'high' | 'canopy' | 'rolling' | 'bouncing'; collected?: boolean; level?: number; vy?: number; rotation?: number };
+export type RunnerItem = { x: number; y: number; kind: 'banana' | 'golden' | 'cherry' | 'heart' | 'fruit' | 'star' | 'gem' | 'drop' | 'low' | 'high' | 'canopy' | 'rolling' | 'bouncing'; collected?: boolean; level?: number; vy?: number; vx?: number; previousX?: number; reflected?: boolean; rotation?: number };
 export const GEMS = [
   { name: 'Emerald', color: '#4cf7ae' }, { name: 'Sapphire', color: '#6fbaff' },
   { name: 'Ruby', color: '#ff6e97' }, { name: 'Amber', color: '#ffcb56' },
@@ -47,7 +47,7 @@ export type Sloth = { x: number; y: number; homeY: number; targetY: number; age:
 export type Lemming = { x: number; y: number; endX: number; age: number; used: boolean };
 export type River = { resident?: 'piranha' | 'eel'; waterAge?: number; x: number; width: number; vine?: boolean; used?: boolean; bounced?: boolean; bounceLeft?: number; snapLeft?: number[]; snapped?: boolean[]; piranhasKnocked?: boolean[]; eelStun?: number; eelScored?: boolean };
 export type Orangutan = { x: number; age: number; state: 'dance' | 'windup' | 'throw' | 'recover'; throws: number; stunned?: number };
-export type Pineapple = { x: number; y: number; vx: number; vy: number; rotation: number };
+export type Pineapple = { x: number; y: number; vx: number; vy: number; rotation: number; bounceAmmo?: boolean; reflected?: boolean; previousX?: number };
 export function createOrangutan(x: number): Orangutan { return { x, age: 0, state: 'dance', throws: 0 }; }
 export function orangutanHand(o: Orangutan) {
   const t = Math.min(1, o.age / 0.55);
@@ -194,6 +194,12 @@ function addSection(s: Runner) {
     const kind = finale && !s.gemSpawned[5] ? 'caterpillar' : nextInsectEncounter(s);
     s.section++;
     s.insects.push(createInsect(kind, x, kind === 'scorpion' ? Math.floor(Math.random() * 2) : undefined));
+    if (kind === 'scorpion') {
+      // Both targets arrive before the boss, giving the player a chance to
+      // bounce them forward instead of receiving a free automatic knockout.
+      s.pineapples.push({ x: x - 550, y: FLOOR - 90, vx: 0, vy: 0, rotation: 0, bounceAmmo: true });
+      s.items.push({ x: x - 360, y: FLOOR - 20, kind: 'bouncing', vy: -360, rotation: 0 });
+    }
     if (kind === 'fire-ant') {
       const count = { easy: 3, medium: 4, hard: 5 }[s.difficulty];
       // One compact column reads as a climbing ant tower, with every ant
@@ -350,6 +356,15 @@ export function stepRunner(s: Runner, dt: number) {
   }
   for (const item of s.items) {
     if (item.kind === 'rolling' || item.kind === 'bouncing') {
+      item.previousX = item.x;
+      if (item.reflected) {
+        item.x += (item.vx ?? 1350) * dt;
+        item.vy = (item.vy ?? -330) + 900 * dt;
+        item.y += item.vy * dt;
+        if (item.y >= FLOOR - 20) { item.y = FLOOR - 20; item.vy = -300; }
+        item.rotation = (item.rotation ?? 0) + 12 * dt;
+        continue;
+      }
       // Activate on approach so moving hazards cannot drift into earlier sections.
       if (item.x - s.distance > 860) continue;
       const rollSpeed = 75 + s.level * 12;
@@ -486,9 +501,15 @@ export function stepRunner(s: Runner, dt: number) {
   }
   s.orangutans = s.orangutans.filter(o => o.x > s.distance - 140);
   s.pineapples = s.pineapples.filter(p => {
-    p.x += p.vx * dt; p.vy += 650 * dt; p.y += p.vy * dt; p.rotation += dt * 7;
+    p.previousX = p.x;
+    p.x += p.vx * dt; p.vy += 650 * dt; p.y += p.vy * dt; p.rotation += dt * (p.reflected ? 14 : 7);
+    if (p.bounceAmmo && p.y >= FLOOR - 26) { p.y = FLOOR - 26; p.vy = -350; }
     const contact = Math.abs(p.x - worldX) < 34 && p.y + 19 >= s.y - height && p.y - 19 <= s.y - 4;
-    if (contact || p.y > FLOOR - 15) {
+    if (contact && p.bounceAmmo && !p.reflected && s.vy > 0 && previousY <= p.y - 12 && s.y >= p.y - 12) {
+      s.y = p.y - 12; s.vy = -470; s.jumps = 1;
+      p.reflected = true; p.vx = 1350; p.vy = -300;
+      s.message = 'PINEAPPLE RETURN! HIT THE SCORPION!'; s.messageTime = 1.2;
+    } else if ((contact && !p.reflected) || (!p.bounceAmmo && p.y > FLOOR - 15)) {
       s.splats.push({ x: p.x, y: p.y, age: 0 });
       if (contact) {
         if (s.starPower > 0) starKnockout(s, p.x, p.y, 'PINEAPPLE');
@@ -496,7 +517,7 @@ export function stepRunner(s: Runner, dt: number) {
       }
       return false;
     }
-    return p.x > s.distance - 120 && p.x < s.distance + 1200;
+    return p.x > s.distance - 120 && p.x < s.distance + 1500;
   });
   for (const hog of s.hogs) {
     const ahead = hog.x - worldX;
@@ -604,6 +625,20 @@ export function stepRunner(s: Runner, dt: number) {
     }
   }
   stepInsects(s, dt, speed + boost, previousY, (message, reaction) => hurt(s, message, reaction));
+  for (const bug of s.insects) {
+    if (bug.kind !== 'scorpion' || bug.used) continue;
+    const struck = s.items.find(item => item.reflected && (item.kind === 'rolling' || item.kind === 'bouncing') &&
+      Math.max(item.previousX ?? item.x, item.x) >= bug.x - 74 && Math.min(item.previousX ?? item.x, item.x) <= bug.x + 74 && item.y > FLOOR - 115);
+    const fruit = s.pineapples.find(p => p.reflected && Math.max(p.previousX ?? p.x, p.x) >= bug.x - 74 &&
+      Math.min(p.previousX ?? p.x, p.x) <= bug.x + 74 && p.y > FLOOR - 115);
+    if (!struck && !fruit) continue;
+    bug.used = true;
+    if (struck) struck.collected = true;
+    if (fruit) { s.splats.push({ x: fruit.x, y: fruit.y, age: 0 }); s.pineapples = s.pineapples.filter(p => p !== fruit); }
+    starKnockout(s, bug.x, FLOOR - 100, 'SCORPION KING');
+    s.message = `${struck ? 'COCONUT' : 'PINEAPPLE'} KNOCKOUT! +25`; s.messageTime = 2;
+  }
+  s.insects = s.insects.filter(bug => !bug.used || bug.kind === 'caterpillar');
   s.predators = s.predators.filter(p => !p.knocked && p.x > s.distance - 120);
   for (const item of s.items) {
     const collectible = ['banana', 'golden', 'cherry', 'heart', 'fruit', 'star', 'gem'].includes(item.kind);
@@ -625,7 +660,11 @@ export function stepRunner(s: Runner, dt: number) {
       else if (item.kind === 'cherry') { s.cherries++; s.bonusScore += 50; s.message = 'SWEET! +50 POINTS'; s.messageTime = 1; }
       else { s.bananas += item.kind === 'golden' ? 10 : 1; if (item.kind === 'golden') { s.golden++; s.message = 'GOLDEN BANANA! +10 COINS'; s.messageTime = 1; } }
       if (Math.floor(s.bananas / 100) > Math.floor(previous / 100)) { s.lives++; s.message = '100 BANANAS! +1 LIFE'; s.messageTime = 2; }
-    } else if (s.invincible <= 0) { item.collected = true; s.cracks.push({ x: item.x, y: item.y, age: 0 }); hurt(s, 'CRACK!'); break; }
+    } else if ((item.kind === 'rolling' || item.kind === 'bouncing') && !item.reflected && s.vy > 0 && previousY <= item.y - 10 && s.y >= item.y - 10) {
+      s.y = item.y - 10; s.vy = -470; s.jumps = 1;
+      item.reflected = true; item.vx = 1350; item.vy = -300;
+      s.message = 'COCONUT RETURN! HIT THE SCORPION!'; s.messageTime = 1.2;
+    } else if (!item.reflected && s.invincible <= 0) { item.collected = true; s.cracks.push({ x: item.x, y: item.y, age: 0 }); hurt(s, 'CRACK!'); break; }
   }
   s.items = s.items.filter(i => i.x > s.distance - 60 && !i.collected);
   s.rivers = s.rivers.filter(r => r.x + r.width > s.distance - 60);
