@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, BookOpen, Bot, Crown, Lightbulb, RotateCcw, Sparkles, Swords } from "lucide-react";
 import { Chess, type Square as ChessSquare } from "chess.js";
 
@@ -101,21 +101,41 @@ function BoardView({ board, selected, targets, onSquare, disabled }: { board: Bo
 
 type Opponent = { id: string; name: string };
 
+function clockLabel(milliseconds: number) {
+  const seconds = Math.max(0, Math.ceil(milliseconds / 1000));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
 export function ChessQuest({ playerName, opponents, onExit, onFinish }: { playerName: string; opponents: Opponent[]; onExit: () => void; onFinish: (score: number, durationSeconds: number, metadata: Record<string, unknown>) => void }) {
   const [mode, setMode] = useState<"home" | "lesson" | "match">("home");
-  const [lesson, setLesson] = useState(0); const [board, setBoard] = useState<Board>(() => PUZZLES[0].board); const [selected, setSelected] = useState<number | null>(null); const [message, setMessage] = useState(""); const [solved, setSolved] = useState(0); const [turn, setTurn] = useState<Color>("white"); const [startedAt, setStartedAt] = useState(0); const [moves, setMoves] = useState(0); const [matchType, setMatchType] = useState<"ai" | "family">("ai"); const [opponentId, setOpponentId] = useState(""); const [difficulty, setDifficulty] = useState<Difficulty>("easy");
+  const [lesson, setLesson] = useState(0); const [board, setBoard] = useState<Board>(() => PUZZLES[0].board); const [selected, setSelected] = useState<number | null>(null); const [message, setMessage] = useState(""); const [solved, setSolved] = useState(0); const [turn, setTurn] = useState<Color>("white"); const [startedAt, setStartedAt] = useState(0); const [moves, setMoves] = useState(0); const [matchType, setMatchType] = useState<"ai" | "family">("ai"); const [opponentId, setOpponentId] = useState(""); const [difficulty, setDifficulty] = useState<Difficulty>("easy"); const [whiteMs, setWhiteMs] = useState(10 * 60_000); const [blackMs, setBlackMs] = useState(10 * 60_000);
   const moveSound = useRef<HTMLAudioElement | null>(null);
   const chess = useRef(new Chess());
   const opponent = opponents.find((item) => item.id === opponentId) ?? null;
   const blackName = matchType === "family" && opponent ? opponent.name : "Castle Guide";
   const activePlayer = turn === "white" ? playerName : blackName;
-  const maxMoves = matchType === "family" ? 40 : 20;
+  const timedOut = whiteMs <= 0 || blackMs <= 0;
+  // No move cap: a match ends only by normal chess rules or either player's
+  // ten-minute clock reaching zero. The legacy cap expression below becomes
+  // true only after a timeout, which also locks the board and shows Finish.
+  const maxMoves = timedOut ? 0 : Number.POSITIVE_INFINITY;
   const targets = useMemo(() => selected === null ? [] : (mode === "lesson" ? pseudoMoves(board, selected) : chess.current.moves({ square: label(selected) as ChessSquare, verbose: true }).map((move) => at(move.to[0], Number(move.to[1])))), [board, selected, mode]);
   function playMoveSound() { const sound = moveSound.current ?? new Audio("/games/chess-move.wav"); moveSound.current = sound; sound.currentTime = 0; void sound.play().catch(() => undefined); }
   function beginLesson() { setLesson(0); setBoard(PUZZLES[0].board); setMode("lesson"); setSelected(null); setMessage(PUZZLES[0].prompt); setSolved(0); setStartedAt(Date.now()); }
-  function beginMatch(type: "ai" | "family", nextDifficulty: Difficulty = difficulty) { chess.current = new Chess(); setBoard(boardFromChess(chess.current)); setMode("match"); setMatchType(type); setDifficulty(nextDifficulty); setSelected(null); setMessage(type === "family" ? `${playerName} is White. Take the first move!` : `${nextDifficulty[0].toUpperCase() + nextDifficulty.slice(1)} castle guide: your turn!`); setTurn("white"); setMoves(0); setStartedAt(Date.now()); }
+  function beginMatch(type: "ai" | "family", nextDifficulty: Difficulty = difficulty) { chess.current = new Chess(); setBoard(boardFromChess(chess.current)); setMode("match"); setMatchType(type); setDifficulty(nextDifficulty); setSelected(null); setMessage(type === "family" ? `${playerName} is White. Take the first move!` : `${nextDifficulty[0].toUpperCase() + nextDifficulty.slice(1)} castle guide: your turn!`); setTurn("white"); setMoves(0); setWhiteMs(10 * 60_000); setBlackMs(10 * 60_000); setStartedAt(Date.now()); }
   function finish(score: number, metadata: Record<string, unknown>) { onFinish(score, Math.max(1, Math.round((Date.now() - startedAt) / 1000)), metadata); }
   function gameMessage() { if (chess.current.isCheckmate()) return `Checkmate! ${chess.current.turn() === "w" ? blackName : playerName} wins!`; if (chess.current.isStalemate()) return "Stalemate — a draw!"; if (chess.current.isThreefoldRepetition()) return "Draw by repetition."; if (chess.current.isInsufficientMaterial()) return "Draw — not enough material to checkmate."; if (chess.current.isDraw()) return "Draw!"; return ""; }
+  useEffect(() => {
+    if (mode !== "match" || chess.current.isGameOver() || timedOut) return;
+    const timer = window.setInterval(() => {
+      if (turn === "white") setWhiteMs((value) => Math.max(0, value - 250));
+      else setBlackMs((value) => Math.max(0, value - 250));
+    }, 250);
+    return () => window.clearInterval(timer);
+  }, [mode, turn, timedOut]);
+  useEffect(() => {
+    if (mode === "match" && timedOut) setMessage(`${whiteMs <= 0 ? playerName : blackName} ran out of time.`);
+  }, [mode, timedOut, whiteMs, blackMs, playerName, blackName]);
   function aiMove() { const options = chess.current.moves({ verbose: true }); if (!options.length) { setMessage(gameMessage()); return; } const captures = options.filter((move) => move.captured); let choices = difficulty === "easy" ? options : (captures.length ? captures : options); if (difficulty === "hard") { const score = (move: typeof options[number]) => { const trial = new Chess(chess.current.fen()); trial.move({ from: move.from, to: move.to, promotion: move.promotion ?? "q" }); return trial.board().flat().reduce((total, item) => total + (item ? (item.color === "b" ? 1 : -1) * PIECE_VALUE[item.type] : 0), 0); }; const best = Math.max(...choices.map(score)); choices = choices.filter((move) => score(move) === best); } const pick = choices[Math.floor(Math.random() * choices.length)]; chess.current.move({ from: pick.from, to: pick.to, promotion: pick.promotion ?? "q" }); playMoveSound(); setBoard(boardFromChess(chess.current)); setTurn("white"); setMessage(chess.current.isGameOver() ? gameMessage() : chess.current.isCheck() ? "The guide gives check! Find a safe move." : "Your turn — look for a clever move."); }
   function clickSquare(square: number) {
     if (mode === "lesson") { const puzzle = PUZZLES[lesson]; if (selected === null) { if (board[square]?.color === "white") setSelected(square); return; } if (square === selected) { setSelected(null); return; } if (!targets.includes(square)) { setMessage("That piece cannot move there. Try the glowing path!"); return; } if (selected === puzzle.expected.from && square === puzzle.expected.to) { playMoveSound(); setBoard(applyMove(board, { from: selected, to: square })); setSelected(null); setSolved((value) => value + 1); setMessage(puzzle.win); } else { setSelected(null); setMessage("Good idea, but this quest has one special target. Try again!"); } return; }
@@ -125,7 +145,7 @@ export function ChessQuest({ playerName, opponents, onExit, onFinish }: { player
     if (!targets.includes(square)) { if (board[square]?.color === turn) setSelected(square); else { setSelected(null); setMessage("Choose one of the glowing legal moves."); } return; }
     const move = chess.current.move({ from: label(selected) as ChessSquare, to: label(square) as ChessSquare, promotion: "q" });
     if (!move) { setSelected(null); setMessage("That move is not legal — try a glowing square."); return; }
-    const nextMoves = moves + 1; const nextTurn: Color = chess.current.turn() === "w" ? "white" : "black"; playMoveSound(); setBoard(boardFromChess(chess.current)); setSelected(null); setMoves(nextMoves); setTurn(nextTurn); if (chess.current.isGameOver()) { setMessage(gameMessage()); return; } if (nextMoves >= maxMoves) { setMessage(matchType === "family" ? "Family match complete! What a battle." : "Practice match complete! You made 20 thoughtful moves."); return; } if (matchType === "ai") { window.setTimeout(aiMove, 420); } else { setMessage(`${nextTurn === "white" ? playerName : blackName}'s turn — pass the device!`); }
+    const nextMoves = moves + 1; const nextTurn: Color = chess.current.turn() === "w" ? "white" : "black"; playMoveSound(); setBoard(boardFromChess(chess.current)); setSelected(null); setMoves(nextMoves); setTurn(nextTurn); if (chess.current.isGameOver()) { setMessage(gameMessage()); return; } if (matchType === "ai") { window.setTimeout(aiMove, 420); } else { setMessage(`${nextTurn === "white" ? playerName : blackName}'s turn — pass the device!`); }
   }
   const puzzleDone = mode === "lesson" && solved > lesson;
   return <main className="mx-auto max-w-5xl pb-8"><div className="mb-5 flex items-center justify-between"><button type="button" onClick={mode === "home" ? onExit : () => setMode("home")} className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2 font-black text-slate-700 shadow-sm"><ArrowLeft size={18} /> {mode === "home" ? "Games" : "Quest map"}</button><span className="rounded-full bg-violet-100 px-4 py-2 text-sm font-black text-violet-700">♟ Chess Quest</span></div>{mode === "home" && <div className="mb-4 rounded-3xl bg-white p-4 shadow-sm"><p className="font-black text-slate-800">Play the castle guide</p><div className="mt-3 grid gap-2 sm:grid-cols-3"><button type="button" onClick={() => beginMatch("ai", "easy")} className="rounded-xl bg-emerald-100 px-4 py-3 text-left font-black text-emerald-800">Easy <span className="block text-xs font-bold">Friendly random moves</span></button><button type="button" onClick={() => beginMatch("ai", "medium")} className="rounded-xl bg-amber-100 px-4 py-3 text-left font-black text-amber-800">Medium <span className="block text-xs font-bold">Looks for captures</span></button><button type="button" onClick={() => beginMatch("ai", "hard")} className="rounded-xl bg-rose-100 px-4 py-3 text-left font-black text-rose-800">Hard <span className="block text-xs font-bold">Prefers strong material</span></button></div></div>}
