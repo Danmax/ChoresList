@@ -316,6 +316,18 @@ test('punches and forward dashes counter pineapples, while Ki Burst consumes a f
   assert.equal(burst.ki, 0); assert.ok(burst.specialLeft > 0);
 });
 
+test('boulders can be dashed through and spike pits require a jump', () => {
+  const boulder = active();
+  boulder.items = [{ x: PLAYER_X, y: FLOOR - 32, kind: 'boulder', rotation: 0 }];
+  forwardDashRunner(boulder); stepRunner(boulder, 1 / 120);
+  assert.equal(boulder.items.length, 0); assert.equal(boulder.lives, 3);
+  const pit = active(); pit.items = [{ x: PLAYER_X, y: FLOOR - 8, kind: 'spike-pit' }];
+  stepRunner(pit, 1 / 120); assert.equal(pit.lives, 2);
+  const jump = active(); jumpRunner(jump); advance(jump, 0.2);
+  jump.items = [{ x: jump.distance + PLAYER_X, y: FLOOR - 8, kind: 'spike-pit' }];
+  stepRunner(jump, 1 / 120); assert.equal(jump.lives, 3);
+});
+
 test('strong dive smashes coconuts and barrels, then leaves them dangerous', () => {
   for (const kind of ['rolling', 'barrel'] as const) {
     const smash = active(); duckRunner(smash, true);

@@ -22,7 +22,7 @@ export const COUNTER_ATTACK_SECONDS = 0.20;
 export const KI_MAX = 100;
 export const FLIP_SECONDS = 0.5;
 export const GEM_Y = FLOOR - 235;
-export type RunnerItem = { x: number; y: number; kind: 'banana' | 'golden' | 'cherry' | 'heart' | 'fruit' | 'star' | 'gem' | 'drop' | 'low' | 'high' | 'canopy' | 'rolling' | 'bouncing' | 'barrel'; collected?: boolean; level?: number; vy?: number; vx?: number; previousX?: number; reflected?: boolean; bossAmmo?: boolean; rotation?: number };
+export type RunnerItem = { x: number; y: number; kind: 'banana' | 'golden' | 'cherry' | 'heart' | 'fruit' | 'star' | 'gem' | 'drop' | 'low' | 'high' | 'canopy' | 'rolling' | 'bouncing' | 'barrel' | 'boulder' | 'cave-spike' | 'spike-pit' | 'bear'; collected?: boolean; level?: number; vy?: number; vx?: number; previousX?: number; reflected?: boolean; bossAmmo?: boolean; rotation?: number };
 export const GEMS = [
   { name: 'Emerald', color: '#4cf7ae' }, { name: 'Sapphire', color: '#6fbaff' },
   { name: 'Ruby', color: '#ff6e97' }, { name: 'Amber', color: '#ffcb56' },
@@ -39,7 +39,7 @@ export function createBats(x: number): Bat[] {
   return Array.from({ length: 4 }, (_, i) => ({ x: x + i * 100, y: 80 + i % 2 * 16, age: 0, state: 'flying' }));
 }
 export type Herd = { x: number; age: number; charging: boolean; warned: boolean; knocked?: boolean[] };
-export type Spider = { x: number; phase: number; knocked?: boolean };
+export type Spider = { x: number; phase: number; giant?: boolean; knocked?: boolean };
 export const ELEPHANT_TOP = FLOOR - 112;
 export function spiderPosition(spider: Spider, elapsed: number) {
   const angle = Math.sin(elapsed * 2.5 + spider.phase) * 0.52;
@@ -290,7 +290,7 @@ function addSection(s: Runner) {
     s.nextSection += Math.max(1400, runnerSpeed(s) * 3.1);
     return;
   }
-  const patterns = [[8, 16, 10, 14, 3, 11, 12, 4, 7, 6, 17], [16, 3, 12, 14, 5, 9, 10, 11, 4, 7, 6, 8, 17], [7, 16, 14, 12, 11, 5, 10, 9, 4, 1, 3, 8, 6, 17], [16, 7, 11, 14, 12, 10, 9, 5, 8, 7, 3, 6, 5, 4, 1, 17], [13, 15, 16, 14, 11, 13, 12, 15, 10, 7, 3, 13, 4, 8, 17]][s.level];
+  const patterns = [[8, 16, 10, 14, 3, 11, 12, 4, 7, 6, 17, 18], [16, 3, 12, 14, 5, 9, 10, 11, 4, 7, 6, 8, 17, 19], [7, 16, 14, 12, 11, 5, 10, 9, 4, 1, 3, 8, 6, 17, 20], [16, 7, 11, 14, 12, 10, 9, 5, 8, 7, 3, 6, 5, 4, 1, 17, 21], [13, 15, 16, 14, 11, 13, 12, 15, 10, 7, 3, 13, 4, 8, 17, 18, 19, 20, 21]][s.level];
   const easyPatterns = [[0, 1, 3, 4, 6, 14, 1, 12, 4, 3, 17], [1, 3, 4, 6, 14, 0, 12, 1, 4, 3, 17], [4, 0, 3, 14, 6, 1, 12, 4, 3, 0, 17], [1, 4, 12, 3, 14, 6, 0, 4, 1, 3, 17], [0, 1, 3, 4, 6, 14, 12, 1, 4, 3, 17]][s.level];
   const source = s.difficulty === 'easy' ? easyPatterns : patterns;
   const type = nextEncounter(s, source);
@@ -308,7 +308,7 @@ function addSection(s: Runner) {
   } else if (type === 12) {
     s.herds.push({ x, age: 0, charging: false, warned: false });
   } else if (type === 13) {
-    s.spiders.push({ x, phase: s.section * 1.7 });
+    s.spiders.push({ x, phase: s.section * 1.7, giant: s.level >= 4 && s.section % 2 === 0 });
   } else if (type === 10) {
     s.rivers.push({ x, width: 680, vine: true, resident: (s.level + s.section) % 2 ? 'piranha' : 'eel', waterAge: 0 });
   } else if (type === 11) {
@@ -332,6 +332,15 @@ function addSection(s: Runner) {
     s.items.push({ x, y: FLOOR - 20, kind: type === 8 ? 'rolling' : 'bouncing', vy: type === 9 ? -360 : undefined, rotation: 0 });
   } else if (type === 17) {
     s.items.push({ x, y: FLOOR - 28, kind: 'barrel' });
+  } else if (type === 18) {
+    s.items.push({ x, y: FLOOR - 32, kind: 'boulder', rotation: 0 }); recovery = 700;
+  } else if (type === 19) {
+    for (let i = 0; i < 3; i++) s.items.push({ x: x + i * 78, y: 18, kind: 'cave-spike', vy: 40 });
+    recovery = 680;
+  } else if (type === 20) {
+    s.items.push({ x, y: FLOOR - 8, kind: 'spike-pit' }); recovery = 730;
+  } else if (type === 21) {
+    s.items.push({ x, y: FLOOR - 26, kind: 'bear' }); recovery = 760;
   } else {
     s.items.push({ x, y: type === 0 ? FLOOR - 22 : type === 1 ? FLOOR - 64 : FLOOR - 118, kind: type === 0 ? 'low' : type === 1 ? 'high' : 'canopy' });
   }
@@ -437,7 +446,7 @@ export function stepRunner(s: Runner, dt: number) {
     }
   }
   for (const item of s.items) {
-    if (item.kind === 'rolling' || item.kind === 'bouncing') {
+    if (item.kind === 'rolling' || item.kind === 'bouncing' || item.kind === 'boulder') {
       item.previousX = item.x;
       if (item.reflected) {
         item.x += (item.vx ?? 1350) * dt;
@@ -449,7 +458,7 @@ export function stepRunner(s: Runner, dt: number) {
       }
       // Activate on approach so moving hazards cannot drift into earlier sections.
       if (item.x - s.distance > 860) continue;
-      const rollSpeed = 75 + s.level * 12;
+      const rollSpeed = item.kind === 'boulder' ? 175 + s.level * 16 : 75 + s.level * 12;
       item.x -= rollSpeed * dt;
       item.rotation = (item.rotation ?? 0) - rollSpeed / 20 * dt;
       if (item.kind === 'bouncing') {
@@ -460,8 +469,8 @@ export function stepRunner(s: Runner, dt: number) {
       continue;
     }
     if (item.vy === undefined) continue;
-    item.vy += 650 * dt;
-    item.y = Math.min(FLOOR - 20, item.y + item.vy * dt);
+    item.vy += item.kind === 'cave-spike' ? 1250 * dt : 650 * dt;
+    item.y = Math.min(FLOOR - (item.kind === 'cave-spike' ? 12 : 20), item.y + item.vy * dt);
     if (item.kind === 'drop') {
       item.rotation = (item.rotation ?? 0) - dt * 3;
       if (item.y >= FLOOR - 20) {
@@ -651,7 +660,8 @@ export function stepRunner(s: Runner, dt: number) {
   for (const spider of s.spiders) {
     if (spider.knocked) continue;
     const pos = spiderPosition(spider, s.elapsed);
-    if (Math.abs(pos.x - worldX) < 43 && pos.y + 23 >= s.y - height && pos.y - 23 <= s.y - 4) {
+    const scale = spider.giant ? 1.65 : 1;
+    if (Math.abs(pos.x - worldX) < 43 * scale && pos.y + 23 * scale >= s.y - height && pos.y - 23 * scale <= s.y - 4) {
       if (s.starPower > 0) { spider.knocked = true; starKnockout(s, pos.x, pos.y, 'SPIDER'); }
       else hurt(s, 'SPIDER SWING! Slide under!');
     }
@@ -748,8 +758,9 @@ export function stepRunner(s: Runner, dt: number) {
   s.predators = s.predators.filter(p => !p.knocked && p.x > s.distance - 120);
   for (const item of s.items) {
     const collectible = ['banana', 'golden', 'cherry', 'heart', 'fruit', 'star', 'gem'].includes(item.kind);
-    if (item.collected || Math.abs(item.x - worldX) > (item.kind === 'gem' ? 22 : collectible ? 30 : 33)) continue;
-    const radius = item.kind === 'gem' ? 10 : collectible ? 14 : 20;
+    const hazardWidth = item.kind === 'spike-pit' ? 105 : item.kind === 'boulder' ? 48 : item.kind === 'bear' ? 54 : item.kind === 'cave-spike' ? 24 : 33;
+    if (item.collected || Math.abs(item.x - worldX) > (item.kind === 'gem' ? 22 : collectible ? 30 : hazardWidth)) continue;
+    const radius = item.kind === 'gem' ? 10 : collectible ? 14 : item.kind === 'boulder' ? 43 : item.kind === 'bear' ? 42 : 20;
     if (item.y + radius < s.y - height || item.y - radius > s.y - 4) continue;
     if (collectible) {
       item.collected = true;
@@ -766,16 +777,23 @@ export function stepRunner(s: Runner, dt: number) {
       else if (item.kind === 'cherry') { s.cherries++; s.bonusScore += 50; s.message = 'SWEET! +50 POINTS'; s.messageTime = 1; }
       else { s.bananas += item.kind === 'golden' ? 10 : 1; gainKi(s, item.kind === 'golden' ? 8 : 2); if (item.kind === 'golden') { s.golden++; s.message = 'GOLDEN BANANA! +10 COINS'; s.messageTime = 1; } }
       if (Math.floor(s.bananas / 100) > Math.floor(previous / 100)) { s.lives++; s.message = '100 BANANAS! +1 LIFE'; s.messageTime = 2; }
+    } else if (isHeroAttack(s) && ['boulder', 'bear'].includes(item.kind)) {
+      item.collected = true; starKnockout(s, item.x, item.y, item.kind === 'bear' ? 'COFFEE BEAR' : 'BOULDER');
     } else if (item.bossAmmo && !item.reflected && s.vy > 0 && previousY <= item.y - 10 && s.y >= item.y - 10) {
       s.y = item.y - 10; s.vy = -470; s.jumps = 1;
       item.reflected = true; item.vx = 1350; item.vy = -300;
       s.message = 'COCONUT RETURN! HIT THE SCORPION!'; s.messageTime = 1.2;
-    } else if (!item.reflected && !item.bossAmmo && s.strongDiveLeft > 0 && ['rolling', 'bouncing', 'drop', 'barrel'].includes(item.kind)) {
+    } else if (!item.reflected && !item.bossAmmo && isHeroAttack(s) && ['rolling', 'bouncing', 'drop', 'barrel', 'boulder'].includes(item.kind)) {
       item.collected = true;
       s.cracks.push({ x: item.x, y: item.y, age: 0, kind: item.kind === 'barrel' ? 'barrel' : 'coconut' });
       s.bonusScore += 10;
       s.message = item.kind === 'barrel' ? 'BARREL SMASH! +10' : 'COCONUT SMASH! +10'; s.messageTime = 0.9;
-    } else if (!item.reflected && s.invincible <= 0) { item.collected = true; s.cracks.push({ x: item.x, y: item.y, age: 0 }); hurt(s, 'CRACK!'); break; }
+    } else if (!item.reflected && s.invincible <= 0) {
+      item.collected = true;
+      s.cracks.push({ x: item.x, y: item.y, age: 0 });
+      hurt(s, item.kind === 'spike-pit' ? 'SPIKE PIT! Jump the chasm!' : item.kind === 'cave-spike' ? 'CAVE SPIKE! Keep moving!' : item.kind === 'bear' ? 'COFFEE BEAR! Dash or strike!' : item.kind === 'boulder' ? 'BOULDER ROLL! Dash through!' : 'CRACK!');
+      break;
+    }
   }
   s.items = s.items.filter(i => i.x > s.distance - 60 && !i.collected);
   s.rivers = s.rivers.filter(r => r.x + r.width > s.distance - 60);

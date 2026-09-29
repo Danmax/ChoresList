@@ -92,7 +92,10 @@ export function stepInsects(s: Runner, dt: number, speed: number, previousY: num
       if (bug.state === 'recover' && bug.age >= 0.75 && Math.abs(ahead) < 250) { bug.state = 'warning'; bug.age = 0; }
       if (bug.state === 'attack') {
         const tail = bug.stack === 1;
-        if (bug.age < 0.45 && ahead > -65 && ahead < 150 &&
+        const laser = tail && bug.age >= 0.12 && bug.age < 0.42;
+        if (laser && ahead > 45 && ahead < 390 && s.y > FLOOR - 48) {
+          hit('SCORPION LASER! Jump over the beam!', 'zap');
+        } else if (bug.age < 0.45 && ahead > -65 && ahead < 150 &&
           (tail ? s.y - height < FLOOR - 42 && s.y > FLOOR - 155 : s.y > FLOOR - 100)) {
           hit(tail ? 'TAIL ZAP! Slide beneath the whip!' : 'CLAW SNAP! Double jump over!', tail ? 'zap' : 'snap');
         }

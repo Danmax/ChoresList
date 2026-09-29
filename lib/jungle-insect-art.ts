@@ -44,6 +44,12 @@ export function drawInsects(ctx: CanvasRenderingContext2D, s: Runner, atlas: HTM
         if (bug.stack === 1) { ctx.lineTo(-60, -120); ctx.lineTo(-80, -65); ctx.lineTo(-150, -95); }
         else { ctx.lineTo(-150, -42); ctx.lineTo(-70, -18); }
         ctx.stroke();
+        if (bug.stack === 1 && bug.age >= 0.12) {
+          ctx.strokeStyle = '#d7ffff'; ctx.shadowColor = '#56dcff'; ctx.shadowBlur = 16; ctx.lineWidth = 7;
+          ctx.beginPath(); ctx.moveTo(-76, -68); ctx.lineTo(-410, -68); ctx.stroke();
+          ctx.strokeStyle = '#65a8ff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-76, -68); ctx.lineTo(-410, -68); ctx.stroke();
+          ctx.shadowBlur = 0;
+        }
       }
       ctx.restore(); continue;
     }

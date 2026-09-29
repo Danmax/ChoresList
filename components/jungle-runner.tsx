@@ -127,6 +127,18 @@ function spiderArt(ctx: CanvasRenderingContext2D, x: number, y: number, age: num
   ctx.restore();
 }
 
+function coffeeBearArt(ctx: CanvasRenderingContext2D, x: number, y: number, age: number) {
+  const jitter = Math.sin(age * 19) * 2;
+  ctx.save(); ctx.translate(x, y + jitter); ctx.fillStyle = '#684237'; ctx.strokeStyle = '#2d1b20'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.ellipse(0, -28, 36, 44, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(-22, -66, 12, 0, Math.PI * 2); ctx.arc(22, -66, 12, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#d9a06f'; ctx.beginPath(); ctx.ellipse(0, -41, 22, 16, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#fff4d7'; ctx.beginPath(); ctx.arc(-11, -58, 7, 0, Math.PI * 2); ctx.arc(11, -58, 7, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#231820'; ctx.beginPath(); ctx.arc(-11, -58, 3, 0, Math.PI * 2); ctx.arc(11, -58, 3, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#d8f4ff'; ctx.fillRect(19, -28, 17, 22); ctx.fillStyle = '#60402f'; ctx.fillRect(21, -25, 13, 12);
+  ctx.fillStyle = '#fff4b4'; ctx.font = 'bold 11px sans-serif'; ctx.fillText('Zz? ☕', 0, -93); ctx.restore();
+}
+
 function slothArt(ctx: CanvasRenderingContext2D, x: number, y: number, age: number) {
   const sway = Math.sin(age * 1.8) * 0.18, blink = Math.sin(age * 1.25) > 0.96;
   ctx.save(); ctx.translate(x, y); ctx.rotate(sway);
@@ -349,8 +361,8 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
   for (const spider of s.spiders) {
     const pos = spiderPosition(spider, s.elapsed);
     ctx.strokeStyle = '#d6ddf0'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(spider.x - cameraDistance, 25); ctx.lineTo(pos.x - cameraDistance, pos.y); ctx.stroke();
-    spiderArt(ctx, pos.x - cameraDistance, pos.y, s.elapsed + spider.phase);
-    ctx.fillStyle = '#e3eaff'; ctx.font = 'bold 12px sans-serif'; ctx.fillText('SLIDE UNDER', pos.x - cameraDistance, pos.y - 42);
+    ctx.save(); if (spider.giant) ctx.scale(1.65, 1.65); spiderArt(ctx, (pos.x - cameraDistance) / (spider.giant ? 1.65 : 1), pos.y / (spider.giant ? 1.65 : 1), s.elapsed + spider.phase); ctx.restore();
+    ctx.fillStyle = '#e3eaff'; ctx.font = 'bold 12px sans-serif'; ctx.fillText(spider.giant ? 'GIANT SPIDER! SLIDE!' : 'SLIDE UNDER', pos.x - cameraDistance, pos.y - (spider.giant ? 68 : 42));
   }
   for (const bird of s.birds) {
     const x = bird.x - cameraDistance;
@@ -396,7 +408,7 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
       ctx.fillStyle = '#ffe663'; ctx.beginPath(); ctx.arc(x, item.y, 23 + Math.sin(s.elapsed * 6) * 2, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#593700'; ctx.font = 'bold 12px sans-serif'; ctx.fillText('DOUBLE ↑', x, item.y - 33);
     }
-    const movingCoconut = item.kind === 'rolling' || item.kind === 'bouncing' || item.kind === 'drop';
+    const movingCoconut = item.kind === 'rolling' || item.kind === 'bouncing' || item.kind === 'drop' || item.kind === 'boulder';
     if (movingCoconut) {
       ctx.fillStyle = '#153b3540'; ctx.beginPath(); ctx.ellipse(x, FLOOR - 2, 22, 4, 0, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = '#fff6c999'; ctx.lineWidth = 2;
@@ -407,13 +419,17 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     ctx.font = collectible ? '27px sans-serif' : '38px sans-serif';
     if (collectible) ctx.fillText(item.kind === 'cherry' ? '🍒' : item.kind === 'heart' ? '❤️' : item.kind === 'fruit' ? '🍍' : item.kind === 'star' ? '⭐' : '🍌', 0, 0);
     else if (item.kind === 'barrel') barrel(ctx, 0, 0);
+    else if (item.kind === 'boulder') { ctx.fillStyle = '#66717a'; ctx.strokeStyle = '#263541'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(0, 0, 38, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.strokeStyle = '#aeb9bd'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-17, -13); ctx.lineTo(7, -25); ctx.lineTo(22, -3); ctx.moveTo(-24, 9); ctx.lineTo(5, 23); ctx.stroke(); }
+    else if (item.kind === 'cave-spike') { ctx.fillStyle = '#c9d5df'; ctx.strokeStyle = '#465b6b'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-18, -35); ctx.lineTo(18, -35); ctx.lineTo(0, 30); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+    else if (item.kind === 'spike-pit') { ctx.fillStyle = '#202d3a'; ctx.fillRect(-105, -8, 210, 19); ctx.fillStyle = '#d9e6ee'; for (let spike = -90; spike <= 90; spike += 24) { ctx.beginPath(); ctx.moveTo(spike, -8); ctx.lineTo(spike + 10, -40); ctx.lineTo(spike + 20, -8); ctx.fill(); } }
+    else if (item.kind === 'bear') coffeeBearArt(ctx, 0, 0, s.elapsed);
     else coconut(ctx, 0, 0);
     ctx.restore();
     if (!collectible) {
       const labelY = item.kind === 'drop' ? item.y + 34 : item.y - 33;
       ctx.fillStyle = '#fff'; ctx.fillRect(x - (item.bossAmmo ? 65 : 29), labelY - 10, item.bossAmmo ? 130 : 58, 19);
       ctx.fillStyle = '#174d35'; ctx.font = item.bossAmmo ? 'bold 10px sans-serif' : 'bold 12px sans-serif';
-      ctx.fillText(item.bossAmmo ? 'BOUNCE TO STRIKE' : item.kind === 'barrel' ? 'DIVE / JUMP' : movingCoconut || ['low', 'drop'].includes(item.kind) ? 'JUMP / DIVE' : item.kind === 'high' ? 'DUCK' : 'RUN', x, labelY);
+      ctx.fillText(item.bossAmmo ? 'BOUNCE TO STRIKE' : item.kind === 'bear' ? 'COFFEE BEAR! STRIKE!' : item.kind === 'spike-pit' ? 'SPIKE PIT! JUMP!' : item.kind === 'cave-spike' ? 'FALLING SPIKES!' : item.kind === 'boulder' ? 'GIANT BOULDER! DASH!' : item.kind === 'barrel' ? 'DIVE / JUMP' : movingCoconut || ['low', 'drop'].includes(item.kind) ? 'JUMP / DIVE' : item.kind === 'high' ? 'DUCK' : 'RUN', x, labelY);
     }
   }
   for (const crack of s.cracks) {
@@ -523,7 +539,11 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
       kick: [770, 120, 355, 410, 125, 124],
       dive: [1122, 210, 395, 285, 142, 102],
     } as const;
-    const [sx, sy, sw, sh, dw, dh] = fightFrames[pose];
+    // The two running poses on the supplied sheet alternate on the beat so
+    // Johnny visibly runs rather than gliding between encounters.
+    const runFrame = Math.floor(s.elapsed * 11) % 2;
+    const runFrames = [[26, 142, 340, 390, 100, 114], [24, 555, 340, 390, 100, 114]] as const;
+    const [sx, sy, sw, sh, dw, dh] = pose === 'run' ? runFrames[runFrame] : fightFrames[pose];
     ctx.drawImage(fightSprite, sx, sy, sw, sh, -dw / 2, -dh + 8, dw, dh);
   } else if (sprite.complete && sprite.naturalWidth) {
     // This sheet is not a uniform grid: the slide extends across an old cell
