@@ -97,6 +97,7 @@ export default function KidGamesPage() {
   const [settings, setSettings] = useState<Record<string, GameSetting>>({});
   const [availability, setAvailability] = useState<Availability>({});
   const [activeGame, setActiveGame] = useState<Game["key"] | null>(null);
+  const [showJohnnyMenu, setShowJohnnyMenu] = useState(false);
   const [loading, setLoading] = useState(true);
   const [reward, setReward] = useState<Reward | null>(null);
 
@@ -182,7 +183,12 @@ export default function KidGamesPage() {
         </div>
       )}
 
-      {activeGame === "memory-match" ? (
+      {showJohnnyMenu ? (
+        <JohnnyAdventureMenu
+          onBack={() => setShowJohnnyMenu(false)}
+          onStart={() => { setShowJohnnyMenu(false); setReward(null); setActiveGame("jungle-vine-swing"); }}
+        />
+      ) : activeGame === "memory-match" ? (
         <MemoryMatch onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("memory-match", score, duration, metadata)} />
       ) : activeGame === "bible-trivia" ? (
         <BibleTrivia age={member.age} onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("bible-trivia", score, duration, metadata)} />
@@ -205,6 +211,32 @@ export default function KidGamesPage() {
             const status = availability[game.key];
             const Icon = iconForGame(game.key);
             const locked = !status?.available;
+            if (game.key === "jungle-vine-swing") {
+              return (
+                <button
+                  key={game.key}
+                  type="button"
+                  disabled={locked}
+                  onClick={() => { setReward(null); setShowJohnnyMenu(true); }}
+                  className="group relative col-span-full min-h-72 overflow-hidden rounded-3xl border-2 border-amber-300 bg-emerald-950 text-left shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-65"
+                >
+                  <span className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105" style={{ backgroundImage: "url('/games/johnny-hero-journey.png')" }} />
+                  <span className="absolute inset-0 bg-gradient-to-r from-emerald-950 via-emerald-950/75 to-transparent" />
+                  <span className="relative flex min-h-72 max-w-xl flex-col items-start justify-end p-6 text-white sm:p-8">
+                    <span className="mb-auto inline-flex items-center gap-2 rounded-full border border-yellow-200/60 bg-amber-400/20 px-3 py-1 text-xs font-black uppercase tracking-wider text-yellow-100">🌟 Story Adventure</span>
+                    <span className="text-3xl font-black drop-shadow-sm sm:text-4xl">Johnny: The People&apos;s Champ</span>
+                    <span className="mt-2 text-sm font-bold leading-6 text-emerald-50 sm:text-base">Cross the Great Gorge, take on the jungle, and bring hope back to the village.</span>
+                    <span className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-yellow-300 px-5 py-3 font-black text-emerald-950 shadow-lg">Begin the journey <span aria-hidden>→</span></span>
+                    <span className="mt-4 flex flex-wrap gap-2 text-xs font-black">
+                      <span className="rounded-full bg-white/15 px-3 py-1">{game.playTime}</span>
+                      <span className="rounded-full bg-white/15 px-3 py-1">{settingText(setting)}</span>
+                      <span className="rounded-full bg-white/15 px-3 py-1">Believe · Trust · Act</span>
+                    </span>
+                    {locked && <span className="mt-4 text-sm font-black text-yellow-200">{status?.reason ?? "Locked"}</span>}
+                  </span>
+                </button>
+              );
+            }
             return (
               <button
                 key={game.key}
@@ -236,6 +268,42 @@ export default function KidGamesPage() {
         </section>
       )}
     </div>
+  );
+}
+
+function JohnnyAdventureMenu({ onBack, onStart }: { onBack: () => void; onStart: () => void }) {
+  return (
+    <section className="overflow-hidden rounded-[2rem] border-4 border-amber-200 bg-emerald-950 shadow-xl">
+      <div className="relative min-h-80 bg-cover bg-center p-5 sm:min-h-[28rem] sm:p-9" style={{ backgroundImage: "url('/games/johnny-hero-journey.png')" }}>
+        <div className="absolute inset-0 bg-gradient-to-r from-emerald-950 via-emerald-950/70 to-transparent" />
+        <div className="relative flex min-h-72 max-w-xl flex-col justify-between text-white sm:min-h-[24rem]">
+          <div>
+            <p className="text-sm font-black uppercase tracking-[0.18em] text-yellow-200">A Hero&apos;s Journey</p>
+            <h2 className="mt-2 text-4xl font-black leading-none drop-shadow-md sm:text-6xl">Johnny<br />the People&apos;s Champ</h2>
+            <p className="mt-4 max-w-md text-sm font-bold leading-6 text-emerald-50 sm:text-base">The Great Gorge is broken. The village is counting on one brave young chimp to find a way across.</p>
+          </div>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <button type="button" onClick={onStart} className="rounded-2xl bg-yellow-300 px-6 py-3 text-base font-black text-emerald-950 shadow-lg transition-transform hover:scale-[1.02]">Start Johnny&apos;s Journey →</button>
+            <button type="button" onClick={onBack} className="rounded-2xl border border-white/40 bg-white/10 px-5 py-3 text-sm font-black text-white backdrop-blur-sm">← Games portal</button>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-0 bg-[#fff7dd] lg:grid-cols-2">
+        <div className="p-6 sm:p-9">
+          <p className="text-sm font-black uppercase tracking-[0.16em] text-orange-700">Johnny&apos;s story</p>
+          <h3 className="mt-2 text-2xl font-black text-emerald-950">Believe. Trust. Act.</h3>
+          <div className="mt-4 space-y-4 text-sm font-medium leading-6 text-stone-700 sm:text-base">
+            <p>Johnny was a young chimp from a small jungle village. He was smaller than the others, and when he dreamed of crossing the Great Gorge, they told him it couldn&apos;t be done.</p>
+            <p>Then a storm tore down the bridge. The village needed food and medicine from the other side, and Johnny knew every family was counting on someone to try. He was scared, but he believed a path was possible, trusted the friends who helped him pack, and took the first step.</p>
+            <p>The crossing was harder than he imagined. Johnny slipped, climbed back up, and kept moving until he reached the far bank. At sunrise, he returned with the supplies as his neighbors cheered.</p>
+            <p className="font-bold text-emerald-900">They called him the People&apos;s Champ. Johnny knew the victory belonged to everyone who had helped him—and to the choice he made when the odds looked impossible: believe, trust, and act.</p>
+          </div>
+          <button type="button" onClick={onStart} className="mt-6 rounded-2xl bg-emerald-700 px-6 py-3 font-black text-white shadow-md transition-colors hover:bg-emerald-800">Play the adventure</button>
+        </div>
+        <div className="min-h-72 bg-cover bg-center" style={{ backgroundImage: "url('/games/johnny-adventure-quest.png')" }} aria-label="Johnny crossing the Great Gorge with village friends cheering" />
+      </div>
+    </section>
   );
 }
 
