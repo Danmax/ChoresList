@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { pantherPaw } from '../lib/jungle-motion';
-import { GEM_Y, createOrangutan, orangutanHand, piranhaPosition, eelPhase, createHogs, createBats, GEMS, hasAllGems, spiderPosition, ELEPHANT_TOP, crocodileFrame, hippoFrame, createRunner, createPredator, dashBoost, duckRunner, FLOOR, jumpRunner, LEVELS, levelSeconds, PLAYER_X, runnerScore, runnerSpeed, stepRunner, travelSpeed } from '../lib/jungle-runner';
+import { GEM_Y, createOrangutan, orangutanHand, piranhaPosition, eelPhase, createHogs, createBats, GEMS, hasAllGems, spiderPosition, ELEPHANT_TOP, crocodileFrame, hippoFrame, createRunner, createPredator, dashBoost, duckRunner, FLOOR, jumpRunner, LEVELS, levelSeconds, PLAYER_X, runnerScore, runnerSpeed, stepRunner, STRONG_DIVE_SECONDS, travelSpeed } from '../lib/jungle-runner';
 
 function active() { const s = createRunner(); s.phase = 'playing'; s.items = []; s.nextSection = 100000; return s; }
 function advance(s: ReturnType<typeof active>, seconds: number, fps = 120) { for (let i = 0; i < seconds * fps; i++) stepRunner(s, 1 / fps); }
@@ -200,8 +200,8 @@ test('slide surges forward, eases down, and returns to running speed after 1.5 s
   advance(dash, 0.6); assert.ok(dashBoost(dash) < early);
   advance(dash, 0.7); advance(run, 1.6);
   assert.equal(dashBoost(dash), 0); assert.equal(travelSpeed(dash), runnerSpeed(dash));
-  assert.ok(dash.distance > run.distance + 80);
-  assert.ok(dash.distance < run.distance + 95);
+  assert.ok(dash.distance > run.distance + 95);
+  assert.ok(dash.distance < run.distance + 115);
 });
 
 test('crocodiles snap once as the monkey jumps above each bank', () => {
@@ -249,13 +249,25 @@ test('bird coconut falls first, then bounces toward the player; cherries do not 
   }
 });
 
-test('jumping or releasing cancels dash, and diving has no midair speed boost', () => {
+test('strong dive gives a brief airborne forward surge and ends when released', () => {
   const s = active(); duckRunner(s, true); advance(s, 0.1); jumpRunner(s);
   assert.equal(dashBoost(s), 0);
   advance(s, 0.1); duckRunner(s, false); duckRunner(s, true);
-  assert.equal(dashBoost(s), 0); assert.ok(s.vy >= 650);
-  advance(s, 0.3); assert.ok(dashBoost(s) > 0);
+  assert.equal(dashBoost(s), 180); assert.ok(s.vy >= 650);
+  advance(s, STRONG_DIVE_SECONDS + 0.05); assert.ok(dashBoost(s) > 0 && dashBoost(s) < 180);
   duckRunner(s, false); assert.equal(dashBoost(s), 0);
+});
+
+test('strong dive smashes coconuts and barrels, then leaves them dangerous', () => {
+  for (const kind of ['rolling', 'barrel'] as const) {
+    const smash = active(); duckRunner(smash, true);
+    smash.items = [{ x: PLAYER_X + 2, y: FLOOR - (kind === 'barrel' ? 28 : 20), kind }];
+    advance(smash, 0.02);
+    assert.equal(smash.lives, 3); assert.equal(smash.items.length, 0); assert.equal(smash.cracks[0].kind, kind === 'barrel' ? 'barrel' : 'coconut');
+  }
+  const late = active(); duckRunner(late, true); advance(late, STRONG_DIVE_SECONDS + 0.02);
+  late.items = [{ x: late.distance + PLAYER_X + 2, y: FLOOR - 20, kind: 'rolling' }]; advance(late, 0.02);
+  assert.equal(late.lives, 2);
 });
 
 test('rolling coconuts approach and rotate; bouncing coconuts repeatedly land and rebound', () => {

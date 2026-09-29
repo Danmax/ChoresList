@@ -17,9 +17,10 @@ export const LEVELS = [
 ] as const;
 export const LEVEL_SECONDS = 60;
 export const SLIDE_SECONDS = 1.5;
+export const STRONG_DIVE_SECONDS = 0.42;
 export const FLIP_SECONDS = 0.5;
 export const GEM_Y = FLOOR - 235;
-export type RunnerItem = { x: number; y: number; kind: 'banana' | 'golden' | 'cherry' | 'heart' | 'fruit' | 'star' | 'gem' | 'drop' | 'low' | 'high' | 'canopy' | 'rolling' | 'bouncing'; collected?: boolean; level?: number; vy?: number; vx?: number; previousX?: number; reflected?: boolean; bossAmmo?: boolean; rotation?: number };
+export type RunnerItem = { x: number; y: number; kind: 'banana' | 'golden' | 'cherry' | 'heart' | 'fruit' | 'star' | 'gem' | 'drop' | 'low' | 'high' | 'canopy' | 'rolling' | 'bouncing' | 'barrel'; collected?: boolean; level?: number; vy?: number; vx?: number; previousX?: number; reflected?: boolean; bossAmmo?: boolean; rotation?: number };
 export const GEMS = [
   { name: 'Emerald', color: '#4cf7ae' }, { name: 'Sapphire', color: '#6fbaff' },
   { name: 'Ruby', color: '#ff6e97' }, { name: 'Amber', color: '#ffcb56' },
@@ -105,7 +106,11 @@ function nextInsectEncounter(s: Runner): InsectKind {
 export function levelSeconds(s: Pick<Runner, 'difficulty'>) { return RUNNER_DIFFICULTIES[s.difficulty].seconds; }
 export function runnerSpeed(s: Runner) { return (LEVELS[s.level].speed + (s.elapsed % levelSeconds(s)) * 0.3) * RUNNER_DIFFICULTIES[s.difficulty].speed; }
 export function dashBoost(s: Runner) {
-  return s.duck && s.y >= FLOOR - 1 && s.stun <= 0 ? 180 * (s.slideLeft / SLIDE_SECONDS) ** 2 : 0;
+  if (!s.duck || s.stun > 0) return 0;
+  // The opening of every dive carries momentum even in the air. After that,
+  // only a grounded slide keeps its fading dash speed.
+  if (s.strongDiveLeft > 0) return 180;
+  return s.y >= FLOOR - 1 ? 180 * (s.slideLeft / SLIDE_SECONDS) ** 2 : 0;
 }
 export function airBoost(s: Runner) { return 180 * (s.flipLeft / FLIP_SECONDS) ** 2; }
 export function travelSpeed(s: Runner) { return runnerSpeed(s) + dashBoost(s) + airBoost(s); }
@@ -120,9 +125,9 @@ export function createRunner(difficulty: RunnerDifficulty = 'medium') {
     insects: [] as Insect[], antRocks: [] as AntRock[], caterpillarBounces: 0,
     reaction: 'bonk' as HitReaction, reactionLeft: 0,
     phase: 'ready' as 'ready' | 'playing' | 'over' | 'victory',
-    distance: 0, elapsed: 0, level: 0, y: FLOOR, vy: 0, jumps: 0, duck: false, duckHeld: false, slideLeft: 0, cameraLead: 0,
+    distance: 0, elapsed: 0, level: 0, y: FLOOR, vy: 0, jumps: 0, duck: false, duckHeld: false, slideLeft: 0, strongDiveLeft: 0, cameraLead: 0,
     flipLeft: 0, swing: null as ({ river: River; progress: number } | { lemming: Lemming; progress: number }) | null,
-    cracks: [] as { x: number; y: number; age: number }[],
+    cracks: [] as { x: number; y: number; age: number; kind?: 'coconut' | 'barrel' }[],
     golden: 0, cherries: 0, bonusScore: 0, gems: 0,
     gemSpawned: LEVELS.map(() => false), gemCollected: LEVELS.map(() => false), celebrationTime: 0,
     lives: Number(RUNNER_DIFFICULTIES[difficulty].lives), bananas: 0, hits: 0, bounces: 0, stun: 0, invincible: 0, starPower: 0,
@@ -142,19 +147,21 @@ export function jumpRunner(s: Runner) {
   if (s.jumps >= 2) return;
   s.duck = false;
   s.slideLeft = 0;
+  s.strongDiveLeft = 0;
   s.vy = -540;
   s.jumps++;
   if (s.jumps === 2) s.flipLeft = FLIP_SECONDS;
 }
 
 export function duckRunner(s: Runner, held: boolean) {
-  if (!held) { s.duckHeld = false; s.duck = false; s.slideLeft = 0; return; }
+  if (!held) { s.duckHeld = false; s.duck = false; s.slideLeft = 0; s.strongDiveLeft = 0; return; }
   if (s.duckHeld || s.phase !== 'playing' || s.stun > 0) return;
   if (s.swing) return;
   s.flipLeft = 0;
   s.duckHeld = true;
   s.duck = true;
   s.slideLeft = SLIDE_SECONDS;
+  s.strongDiveLeft = STRONG_DIVE_SECONDS;
   if (s.y < FLOOR) s.vy = Math.max(650, s.vy);
 }
 
@@ -182,6 +189,7 @@ function hurt(s: Runner, message: string, reaction: HitReaction = 'bonk') {
   s.jumps = 0;
   s.duck = false;
   s.slideLeft = 0;
+  s.strongDiveLeft = 0;
   if (s.lives <= 0) s.phase = 'over';
 }
 
@@ -224,8 +232,8 @@ function addSection(s: Runner) {
     s.nextSection += Math.max(1400, runnerSpeed(s) * 3.1);
     return;
   }
-  const patterns = [[8, 16, 10, 14, 3, 11, 12, 4, 7, 6], [16, 3, 12, 14, 5, 9, 10, 11, 4, 7, 6, 8], [7, 16, 14, 12, 11, 5, 10, 9, 4, 1, 3, 8, 6], [16, 7, 11, 14, 12, 10, 9, 5, 8, 7, 3, 6, 5, 4, 1], [13, 15, 16, 14, 11, 13, 12, 15, 10, 7, 3, 13, 4, 8]][s.level];
-  const easyPatterns = [[0, 1, 3, 4, 6, 14, 1, 12, 4, 3], [1, 3, 4, 6, 14, 0, 12, 1, 4, 3], [4, 0, 3, 14, 6, 1, 12, 4, 3, 0], [1, 4, 12, 3, 14, 6, 0, 4, 1, 3], [0, 1, 3, 4, 6, 14, 12, 1, 4, 3]][s.level];
+  const patterns = [[8, 16, 10, 14, 3, 11, 12, 4, 7, 6, 17], [16, 3, 12, 14, 5, 9, 10, 11, 4, 7, 6, 8, 17], [7, 16, 14, 12, 11, 5, 10, 9, 4, 1, 3, 8, 6, 17], [16, 7, 11, 14, 12, 10, 9, 5, 8, 7, 3, 6, 5, 4, 1, 17], [13, 15, 16, 14, 11, 13, 12, 15, 10, 7, 3, 13, 4, 8, 17]][s.level];
+  const easyPatterns = [[0, 1, 3, 4, 6, 14, 1, 12, 4, 3, 17], [1, 3, 4, 6, 14, 0, 12, 1, 4, 3, 17], [4, 0, 3, 14, 6, 1, 12, 4, 3, 0, 17], [1, 4, 12, 3, 14, 6, 0, 4, 1, 3, 17], [0, 1, 3, 4, 6, 14, 12, 1, 4, 3, 17]][s.level];
   const source = s.difficulty === 'easy' ? easyPatterns : patterns;
   const type = nextEncounter(s, source);
   s.section++;
@@ -264,6 +272,8 @@ function addSection(s: Runner) {
     s.predators.push(createPredator('tiger', x));
   } else if (type === 8 || type === 9) {
     s.items.push({ x, y: FLOOR - 20, kind: type === 8 ? 'rolling' : 'bouncing', vy: type === 9 ? -360 : undefined, rotation: 0 });
+  } else if (type === 17) {
+    s.items.push({ x, y: FLOOR - 28, kind: 'barrel' });
   } else {
     s.items.push({ x, y: type === 0 ? FLOOR - 22 : type === 1 ? FLOOR - 64 : FLOOR - 118, kind: type === 0 ? 'low' : type === 1 ? 'high' : 'canopy' });
   }
@@ -300,6 +310,7 @@ export function stepRunner(s: Runner, dt: number) {
   if (s.stun > 0) { s.stun = Math.max(0, s.stun - dt); return; }
   if (s.duck) {
     s.slideLeft = Math.max(0, s.slideLeft - dt);
+    s.strongDiveLeft = Math.max(0, s.strongDiveLeft - dt);
     if (s.slideLeft === 0) s.duck = false;
   }
   s.elapsed += dt;
@@ -664,6 +675,11 @@ export function stepRunner(s: Runner, dt: number) {
       s.y = item.y - 10; s.vy = -470; s.jumps = 1;
       item.reflected = true; item.vx = 1350; item.vy = -300;
       s.message = 'COCONUT RETURN! HIT THE SCORPION!'; s.messageTime = 1.2;
+    } else if (!item.reflected && !item.bossAmmo && s.strongDiveLeft > 0 && ['rolling', 'bouncing', 'drop', 'barrel'].includes(item.kind)) {
+      item.collected = true;
+      s.cracks.push({ x: item.x, y: item.y, age: 0, kind: item.kind === 'barrel' ? 'barrel' : 'coconut' });
+      s.bonusScore += 10;
+      s.message = item.kind === 'barrel' ? 'BARREL SMASH! +10' : 'COCONUT SMASH! +10'; s.messageTime = 0.9;
     } else if (!item.reflected && s.invincible <= 0) { item.collected = true; s.cracks.push({ x: item.x, y: item.y, age: 0 }); hurt(s, 'CRACK!'); break; }
   }
   s.items = s.items.filter(i => i.x > s.distance - 60 && !i.collected);

@@ -4,7 +4,7 @@ import { drawInsectGrove, drawInsects, drawReaction } from '@/lib/jungle-insect-
 import { pantherPaw } from '@/lib/jungle-motion';
 import { drawWaterLife, drawOrangutan, drawPineapple } from '@/lib/jungle-water-art';
 import { useEffect, useRef, useState } from 'react';
-import { RUNNER_DIFFICULTIES, type RunnerDifficulty, GEMS, spiderPosition, slothPosition, airBoost, FLIP_SECONDS, vinePosition, birdHeight, crocodileFrame, hippoFrame, createRunner, dashBoost, duckRunner, FLOOR, jumpRunner, LEVELS, levelSeconds, PLAYER_X, runnerScore, travelSpeed, stepRunner, type Runner } from '@/lib/jungle-runner';
+import { RUNNER_DIFFICULTIES, type RunnerDifficulty, GEMS, spiderPosition, slothPosition, airBoost, FLIP_SECONDS, vinePosition, birdHeight, crocodileFrame, hippoFrame, createRunner, dashBoost, duckRunner, FLOOR, jumpRunner, LEVELS, levelSeconds, PLAYER_X, runnerScore, STRONG_DIVE_SECONDS, travelSpeed, stepRunner, type Runner } from '@/lib/jungle-runner';
 
 // Canvas artwork keeps shells and moving limbs crisp at every display density.
 function coconut(ctx: CanvasRenderingContext2D, x: number, y: number, rotation = 0, split = 0) {
@@ -19,6 +19,21 @@ function coconut(ctx: CanvasRenderingContext2D, x: number, y: number, rotation =
     ctx.restore();
   }
   if (!split) { ctx.fillStyle = '#301d12'; for (const [a, b] of [[-6, -5], [3, -7], [-1, 3]]) { ctx.beginPath(); ctx.arc(a, b, 2.5, 0, Math.PI * 2); ctx.fill(); } }
+  ctx.restore();
+}
+
+function barrel(ctx: CanvasRenderingContext2D, x: number, y: number, split = 0) {
+  ctx.save(); ctx.translate(x, y);
+  for (const side of [-1, 1]) {
+    ctx.save(); ctx.translate(side * split * 28, -split * 8); ctx.rotate(side * split * 0.7);
+    ctx.fillStyle = '#985126'; ctx.strokeStyle = '#442314'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.roundRect(-19, -27, 38, 54, 10); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#d9a664'; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.moveTo(-19, -13); ctx.lineTo(19, -13); ctx.moveTo(-19, 13); ctx.lineTo(19, 13); ctx.stroke();
+    ctx.strokeStyle = '#633116'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(-8, -25); ctx.lineTo(-8, 25); ctx.moveTo(8, -25); ctx.lineTo(8, 25); ctx.stroke();
+    ctx.restore();
+  }
   ctx.restore();
 }
 
@@ -390,18 +405,21 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     ctx.save(); ctx.translate(x, item.y);
     if (movingCoconut) ctx.rotate(item.rotation ?? 0);
     ctx.font = collectible ? '27px sans-serif' : '38px sans-serif';
-    if (collectible) ctx.fillText(item.kind === 'cherry' ? '🍒' : item.kind === 'heart' ? '❤️' : item.kind === 'fruit' ? '🍍' : item.kind === 'star' ? '⭐' : '🍌', 0, 0); else coconut(ctx, 0, 0);
+    if (collectible) ctx.fillText(item.kind === 'cherry' ? '🍒' : item.kind === 'heart' ? '❤️' : item.kind === 'fruit' ? '🍍' : item.kind === 'star' ? '⭐' : '🍌', 0, 0);
+    else if (item.kind === 'barrel') barrel(ctx, 0, 0);
+    else coconut(ctx, 0, 0);
     ctx.restore();
     if (!collectible) {
       const labelY = item.kind === 'drop' ? item.y + 34 : item.y - 33;
       ctx.fillStyle = '#fff'; ctx.fillRect(x - (item.bossAmmo ? 65 : 29), labelY - 10, item.bossAmmo ? 130 : 58, 19);
       ctx.fillStyle = '#174d35'; ctx.font = item.bossAmmo ? 'bold 10px sans-serif' : 'bold 12px sans-serif';
-      ctx.fillText(item.bossAmmo ? 'BOUNCE TO STRIKE' : movingCoconut || ['low', 'drop'].includes(item.kind) ? 'JUMP' : item.kind === 'high' ? 'DUCK' : 'RUN', x, labelY);
+      ctx.fillText(item.bossAmmo ? 'BOUNCE TO STRIKE' : item.kind === 'barrel' ? 'DIVE / JUMP' : movingCoconut || ['low', 'drop'].includes(item.kind) ? 'JUMP / DIVE' : item.kind === 'high' ? 'DUCK' : 'RUN', x, labelY);
     }
   }
   for (const crack of s.cracks) {
     ctx.save(); ctx.globalAlpha = 1 - crack.age / 0.75;
-    coconut(ctx, crack.x - cameraDistance, crack.y + 120 * crack.age ** 2, crack.age, 0.2 + crack.age * 2);
+    if (crack.kind === 'barrel') barrel(ctx, crack.x - cameraDistance, crack.y + 120 * crack.age ** 2, 0.2 + crack.age * 2);
+    else coconut(ctx, crack.x - cameraDistance, crack.y + 120 * crack.age ** 2, crack.age, 0.2 + crack.age * 2);
     ctx.fillStyle = '#fff6de';
     for (let i = 0; i < 7; i++) { const a = i * Math.PI * 2 / 7; ctx.beginPath(); ctx.arc(crack.x - cameraDistance + Math.cos(a) * crack.age * 110, crack.y + Math.sin(a) * crack.age * 80, 3, 0, Math.PI * 2); ctx.fill(); }
     ctx.restore();
@@ -469,6 +487,10 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
   ctx.save();
   const bob = grounded && !s.duck && s.phase === 'playing' && !knocked ? Math.sin(s.elapsed * 18 * Math.PI) * 2 : 0;
   ctx.translate(playerX + (knocked ? Math.sin(s.stun * 70) * 6 : 0), s.y + bob);
+  if (s.strongDiveLeft > 0 && !knocked) {
+    ctx.strokeStyle = '#ffe56b'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+    for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(-68 - i * 13, -50 + i * 17); ctx.lineTo(-38 - i * 7, -50 + i * 17); ctx.stroke(); }
+  }
   if (s.flipLeft > 0 && !knocked) { ctx.translate(0, -46); ctx.rotate((1 - s.flipLeft / FLIP_SECONDS) * Math.PI * 2); ctx.translate(0, 46); }
   else if (!grounded && !knocked) ctx.rotate(Math.max(-0.12, Math.min(0.12, s.vy / 4500)));
   if (s.starPower > 0 && !knocked) { ctx.shadowColor = '#ffe363'; ctx.shadowBlur = 24; }
@@ -640,7 +662,7 @@ export function JungleVineSwing({ onExit, onFinish }: {
         <button disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); jump(); }} onClick={e => { if (e.detail === 0) jump(); }} className="min-h-14 touch-none select-none rounded-2xl bg-yellow-300 p-3 font-black text-emerald-950 disabled:opacity-40">JUMP <small className="block">Tap again: flip / release vine</small></button>
         <button disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); duck(`pointer-${e.pointerId}`, true); }} onPointerUp={e => duck(`pointer-${e.pointerId}`, false)} onPointerCancel={e => duck(`pointer-${e.pointerId}`, false)} onLostPointerCapture={e => duck(`pointer-${e.pointerId}`, false)} onKeyDown={e => { if (e.key === 'Enter') duck('enter', true); }} onKeyUp={e => { if (e.key === 'Enter') duck('enter', false); }} className="min-h-14 touch-none select-none rounded-2xl bg-emerald-600 p-3 font-black disabled:opacity-40">SLIDE {hud.slide > 0 ? `${hud.slide.toFixed(1)}s` : ''} <small className="block">Fast dash → slow · 1.5s</small></button>
       </div>
-      <p className="mt-2 text-center text-xs text-emerald-200">Space / ↑: jump / flip / release vine · ↓: dive / dash (1.5s) · Release before sliding again</p>
+      <p className="mt-2 text-center text-xs text-emerald-200">Space / ↑: jump / flip / release vine · ↓: dive / dash (1.5s) · First {STRONG_DIVE_SECONDS}s smashes coconuts & barrels · Release before sliding again</p>
     </div>
   </section>;
 }
