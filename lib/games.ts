@@ -93,8 +93,8 @@ export const GAME_DEFINITIONS: GameDefinition[] = [
   },
   {
     key: "jungle-vine-swing",
-    title: "Jungle Runner",
-    description: "Collect gems, dodge dancing orangutans’ pineapples, cross piranha and electric-eel waters, brave moonlit bats, and bounce through Giant Insect Grove.",
+    title: "Johnny's Jungle Journey",
+    description: "Help Johnny, the People’s Champ, cross the Great Gorge for his village. Believe, trust, and act through every jungle challenge.",
     icon: "TreePine",
     ageMin: 5,
     ageMax: 14,
