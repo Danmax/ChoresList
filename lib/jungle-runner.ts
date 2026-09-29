@@ -1,4 +1,4 @@
-import { createInsect, INSECT_KINDS, stepInsects, type Insect, type AntRock, type HitReaction } from './jungle-insects';
+import { createInsect, INSECT_KINDS, stepInsects, type Insect, type InsectKind, type AntRock, type HitReaction } from './jungle-insects';
 export const FLOOR = 310;
 export const PLAYER_X = 150;
 export const RUNNER_DIFFICULTIES = {
@@ -82,6 +82,25 @@ export function createPredator(kind: Predator['kind'], x: number, temperament = 
   return { kind, x, y: FLOOR - 22, state: 'waiting', age: 0, hit: false, temperament, homeX: x, facing: -1, attackStyle: 'leap', attackSpeed: 0, leapHeight: 0 };
 }
 export type Runner = ReturnType<typeof createRunner>;
+
+function shuffle<T>(values: readonly T[]): T[] {
+  const deck = [...values];
+  for (let i = deck.length - 1; i > 0; i--) {
+    const pick = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[pick]] = [deck[pick], deck[i]];
+  }
+  return deck;
+}
+
+function nextEncounter(s: Runner, choices: readonly number[]) {
+  if (s.encounterDeck.length === 0) s.encounterDeck = shuffle(choices);
+  return s.encounterDeck.pop()!;
+}
+
+function nextInsectEncounter(s: Runner): InsectKind {
+  if (s.insectDeck.length === 0) s.insectDeck = shuffle(INSECT_KINDS);
+  return s.insectDeck.pop()!;
+}
 export function levelSeconds(s: Pick<Runner, 'difficulty'>) { return RUNNER_DIFFICULTIES[s.difficulty].seconds; }
 export function runnerSpeed(s: Runner) { return (LEVELS[s.level].speed + (s.elapsed % levelSeconds(s)) * 0.3) * RUNNER_DIFFICULTIES[s.difficulty].speed; }
 export function dashBoost(s: Runner) {
@@ -106,7 +125,7 @@ export function createRunner(difficulty: RunnerDifficulty = 'medium') {
     golden: 0, cherries: 0, bonusScore: 0, gems: 0,
     gemSpawned: LEVELS.map(() => false), gemCollected: LEVELS.map(() => false),
     lives: Number(RUNNER_DIFFICULTIES[difficulty].lives), bananas: 0, hits: 0, bounces: 0, stun: 0, invincible: 0,
-    message: '', messageTime: 0, nextSection: 950, section: 0,
+    message: '', messageTime: 0, nextSection: 950, section: 0, encounterDeck: [] as number[], insectDeck: [] as InsectKind[],
     items: Array.from({ length: 12 }, (_, i): RunnerItem => ({ x: 380 + i * 42, y: FLOOR - 30, kind: 'banana' })),
     orangutans: [] as Orangutan[], pineapples: [] as Pineapple[], splats: [] as { x: number; y: number; age: number }[],
     hogs: [] as Hog[], bats: [] as Bat[],
@@ -164,7 +183,7 @@ function addSection(s: Runner) {
   const x = s.nextSection;
   if (s.level === 5) {
     const finale = s.elapsed % levelSeconds(s) >= levelSeconds(s) - 20;
-    const kind = finale && !s.gemSpawned[5] ? 'caterpillar' : INSECT_KINDS[s.section % INSECT_KINDS.length];
+    const kind = finale && !s.gemSpawned[5] ? 'caterpillar' : nextInsectEncounter(s);
     s.section++;
     s.insects.push(createInsect(kind, x));
     if (kind === 'fire-ant') {
@@ -193,7 +212,8 @@ function addSection(s: Runner) {
   const patterns = [[8, 16, 10, 14, 3, 11, 12, 4, 7, 6], [16, 3, 12, 14, 5, 9, 10, 11, 4, 7, 6, 8], [7, 16, 14, 12, 11, 5, 10, 9, 4, 1, 3, 8, 6], [16, 7, 11, 14, 12, 10, 9, 5, 8, 7, 3, 6, 5, 4, 1], [13, 15, 16, 14, 11, 13, 12, 15, 10, 7, 3, 13, 4, 8]][s.level];
   const easyPatterns = [[0, 1, 3, 4, 6, 14, 1, 12, 4, 3], [1, 3, 4, 6, 14, 0, 12, 1, 4, 3], [4, 0, 3, 14, 6, 1, 12, 4, 3, 0], [1, 4, 12, 3, 14, 6, 0, 4, 1, 3], [0, 1, 3, 4, 6, 14, 12, 1, 4, 3]][s.level];
   const source = s.difficulty === 'easy' ? easyPatterns : patterns;
-  const type = source[s.section++ % source.length];
+  const type = nextEncounter(s, source);
+  s.section++;
   let recovery = type === 10 || type === 12 ? 820 : 470;
   if (type === 16) {
     s.orangutans.push(createOrangutan(x)); recovery = 800;
@@ -269,7 +289,7 @@ export function stepRunner(s: Runner, dt: number) {
       s.items = []; s.rivers = []; s.predators = []; s.hogs = []; s.bats = []; s.herds = []; s.spiders = []; s.orangutans = []; s.pineapples = []; s.birds = []; s.sloths = []; s.lemmings = [];
       s.swing = null; s.nextSection = s.distance + 1100;
     }
-    s.level = level; s.section = 0; s.items = s.items.filter(i => i.kind !== 'gem'); s.message = `LEVEL ${level + 1}: ${LEVELS[level].name}`; s.messageTime = 3; }
+    s.level = level; s.section = 0; s.encounterDeck = []; s.insectDeck = []; s.items = s.items.filter(i => i.kind !== 'gem'); s.message = `LEVEL ${level + 1}: ${LEVELS[level].name}`; s.messageTime = 3; }
   const speed = runnerSpeed(s);
   const boost = dashBoost(s) + airBoost(s);
   if (!s.swing) s.distance += (speed + boost) * dt;
