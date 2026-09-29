@@ -206,7 +206,7 @@ export default function KidGamesPage() {
         <JungleVineSwing onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("jungle-vine-swing", score, duration, metadata)} />
       ) : (
         <section className="grid gap-4 sm:grid-cols-2">
-          {games.map((game) => {
+          {[...games].sort((a, b) => Number(b.key === "jungle-vine-swing") - Number(a.key === "jungle-vine-swing")).map((game) => {
             const setting = settings[game.key];
             const status = availability[game.key];
             const Icon = iconForGame(game.key);
@@ -218,16 +218,16 @@ export default function KidGamesPage() {
                   type="button"
                   disabled={locked}
                   onClick={() => { setReward(null); setShowJohnnyMenu(true); }}
-                  className="group relative col-span-full min-h-72 overflow-hidden rounded-3xl border-2 border-amber-300 bg-emerald-950 text-left shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-65"
+                  className="group relative min-h-52 overflow-hidden rounded-3xl border-2 border-amber-300 bg-emerald-950 text-left shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-65"
                 >
                   <span className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105" style={{ backgroundImage: "url('/games/johnny-hero-journey.png')" }} />
                   <span className="absolute inset-0 bg-gradient-to-r from-emerald-950 via-emerald-950/75 to-transparent" />
-                  <span className="relative flex min-h-72 max-w-xl flex-col items-start justify-end p-6 text-white sm:p-8">
+                  <span className="relative flex min-h-52 flex-col items-start justify-end p-5 text-white">
                     <span className="mb-auto inline-flex items-center gap-2 rounded-full border border-yellow-200/60 bg-amber-400/20 px-3 py-1 text-xs font-black uppercase tracking-wider text-yellow-100">🌟 Story Adventure</span>
-                    <span className="text-3xl font-black drop-shadow-sm sm:text-4xl">Johnny: The People&apos;s Champ</span>
-                    <span className="mt-2 text-sm font-bold leading-6 text-emerald-50 sm:text-base">Cross the Great Gorge, take on the jungle, and bring hope back to the village.</span>
-                    <span className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-yellow-300 px-5 py-3 font-black text-emerald-950 shadow-lg">Begin the journey <span aria-hidden>→</span></span>
-                    <span className="mt-4 flex flex-wrap gap-2 text-xs font-black">
+                    <span className="text-2xl font-black drop-shadow-sm">Johnny: The People&apos;s Champ</span>
+                    <span className="mt-1 text-sm font-bold leading-5 text-emerald-50">Cross the Great Gorge and bring hope home.</span>
+                    <span className="mt-3 inline-flex items-center gap-2 rounded-xl bg-yellow-300 px-4 py-2 text-sm font-black text-emerald-950 shadow-lg">Begin the journey <span aria-hidden>→</span></span>
+                    <span className="mt-3 flex flex-wrap gap-2 text-xs font-black">
                       <span className="rounded-full bg-white/15 px-3 py-1">{game.playTime}</span>
                       <span className="rounded-full bg-white/15 px-3 py-1">{settingText(setting)}</span>
                       <span className="rounded-full bg-white/15 px-3 py-1">Believe · Trust · Act</span>
