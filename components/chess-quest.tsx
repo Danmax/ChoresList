@@ -52,7 +52,15 @@ function pseudoMoves(board: Board, from: number): number[] {
   return moves;
 }
 function applyMove(board: Board, move: Move): Board { const next = [...board]; const source = next[move.from]; next[move.to] = source?.kind === "pawn" && (move.to < 8 || move.to >= 56) ? piece(source.color, "queen") : source; next[move.from] = null; return next; }
-function inCheck(board: Board, color: Color) { const king = board.findIndex((item) => item?.color === color && item.kind === "king"); return king >= 0 && board.some((item, index) => item?.color !== color && pseudoMoves(board, index).includes(king)); }
+function attacksSquare(board: Board, from: number, target: number) {
+  const moving = board[from]; if (!moving) return false;
+  if (moving.kind !== "pawn") return pseudoMoves(board, from).includes(target);
+  const row = Math.floor(from / 8), col = from % 8;
+  const targetRow = Math.floor(target / 8), targetCol = target % 8;
+  const direction = moving.color === "white" ? -1 : 1;
+  return targetRow === row + direction && Math.abs(targetCol - col) === 1;
+}
+function inCheck(board: Board, color: Color) { const king = board.findIndex((item) => item?.color === color && item.kind === "king"); return king >= 0 && board.some((item, index) => item?.color !== color && attacksSquare(board, index, king)); }
 function legalMoves(board: Board, color: Color) { const moves: Move[] = []; board.forEach((item, from) => { if (item?.color === color) pseudoMoves(board, from).forEach((to) => { const target = board[to]; if (target?.kind !== "king" && !inCheck(applyMove(board, { from, to }), color)) moves.push({ from, to }); }); }); return moves; }
 
 function BoardView({ board, selected, targets, onSquare, disabled }: { board: Board; selected: number | null; targets: number[]; onSquare: (square: number) => void; disabled?: boolean }) {
