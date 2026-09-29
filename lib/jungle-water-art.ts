@@ -23,7 +23,10 @@ export function drawOrangutan(ctx: CanvasRenderingContext2D, o: Orangutan, camer
     // The supplied orangutan art is a seven-frame strip: four pineapple
     // throw poses, then three celebratory dance poses. Crop the active cell
     // rather than squeezing the entire sheet into one character.
-    const cellWidth = sprite.naturalWidth / 7;
+    // The art is 2192px wide: seven 313px frames plus one trailing pixel.
+    // Integer source bounds plus a tiny inset stop canvas smoothing from
+    // sampling an adjacent pose along the frame edge.
+    const cellWidth = 313, inset = 2;
     const frame = o.stunned !== undefined ? 6 : o.state === 'dance'
       ? 4 + Math.floor(o.age * 6) % 3
       : o.state === 'windup'
@@ -36,7 +39,7 @@ export function drawOrangutan(ctx: CanvasRenderingContext2D, o: Orangutan, camer
     ctx.fillStyle = '#b28a52'; ctx.beginPath(); ctx.ellipse(0, 0, 39, 9, 0, 0, Math.PI * 2); ctx.fill();
     // These measured bounds remove the transparent top/bottom band while
     // retaining every hand, foot, and the pineapple in the throw poses.
-    ctx.drawImage(sprite, frame * cellWidth, 92, cellWidth, 470, -64, -192, 128, 192); ctx.restore();
+    ctx.drawImage(sprite, frame * cellWidth + inset, 92 + inset, cellWidth - inset * 2, 470 - inset * 2, -64, -192, 128, 192); ctx.restore();
     // The sheet contains the fruit through release; while he dances between
     // throws, keep the held pineapple visible at the launch hand.
     if (o.state === 'dance' && o.throws < 3) {

@@ -134,7 +134,8 @@ export function heroAttackReach(s: Runner) {
   if (s.specialLeft > 0) return 300;
   if (s.forwardDashLeft > 0) return 165;
   if (s.attackLeft > 0) return 155;
-  return s.combatMove === 'kick' ? 178 : s.combatMove === 'punch' ? 142 : 0;
+  const comboReach = Math.max(0, s.comboStep - 1) * (s.combatMove === 'kick' ? 15 : 22);
+  return s.combatMove === 'kick' ? 178 + comboReach : s.combatMove === 'punch' ? 142 + comboReach : 0;
 }
 export function heroMove(s: Runner) {
   if (s.specialLeft > 0) return 'kick' as const;
@@ -152,7 +153,7 @@ export function createRunner(difficulty: RunnerDifficulty = 'medium') {
     insects: [] as Insect[], antRocks: [] as AntRock[], caterpillarBounces: 0,
     reaction: 'bonk' as HitReaction, reactionLeft: 0,
     phase: 'ready' as 'ready' | 'playing' | 'over' | 'victory',
-    distance: 0, elapsed: 0, level: 0, y: FLOOR, vy: 0, jumps: 0, duck: false, duckHeld: false, slideLeft: 0, slideCooldown: 0, strongDiveLeft: 0, attackLeft: 0, forwardDashLeft: 0, combatMove: 'run' as 'run' | 'punch' | 'kick' | 'dash', combatLeft: 0, counterLeft: 0, ki: 0, specialLeft: 0, cameraLead: 0,
+    distance: 0, elapsed: 0, level: 0, y: FLOOR, vy: 0, jumps: 0, duck: false, duckHeld: false, slideLeft: 0, slideCooldown: 0, strongDiveLeft: 0, attackLeft: 0, forwardDashLeft: 0, combatMove: 'run' as 'run' | 'punch' | 'kick' | 'dash', combatLeft: 0, comboStep: 0, comboWindow: 0, counterLeft: 0, ki: 0, specialLeft: 0, cameraLead: 0,
     flipLeft: 0, swing: null as ({ river: River; progress: number } | { lemming: Lemming; progress: number }) | null,
     cracks: [] as { x: number; y: number; age: number; kind?: 'coconut' | 'barrel' }[],
     golden: 0, cherries: 0, bonusScore: 0, gems: 0,
@@ -208,8 +209,12 @@ function startCombatMove(s: Runner, move: 'punch' | 'kick') {
   s.duck = false;
   s.slideLeft = 0;
   s.strongDiveLeft = 0;
+  const chain = s.combatLeft > 0 && s.comboWindow > 0;
+  s.comboStep = chain ? Math.min(3, s.comboStep + 1) : 1;
+  s.comboWindow = 0.42;
   s.combatMove = move;
-  s.combatLeft = move === 'punch' ? 0.28 : 0.36;
+  s.combatLeft = (move === 'punch' ? 0.28 : 0.36) + (s.comboStep === 3 ? 0.1 : 0);
+  if (s.comboStep > 1) { s.message = `${s.comboStep} HIT COMBO!`; s.messageTime = 0.55; }
 }
 export function punchRunner(s: Runner) { startCombatMove(s, 'punch'); }
 export function kickRunner(s: Runner) { startCombatMove(s, 'kick'); }
@@ -393,8 +398,10 @@ export function stepRunner(s: Runner, dt: number) {
   s.forwardDashLeft = Math.max(0, s.forwardDashLeft - dt);
   s.specialLeft = Math.max(0, s.specialLeft - dt);
   s.combatLeft = Math.max(0, s.combatLeft - dt);
+  s.comboWindow = Math.max(0, s.comboWindow - dt);
   s.counterLeft = Math.max(0, s.counterLeft - dt);
   if (s.combatLeft === 0) s.combatMove = 'run';
+  if (s.comboWindow === 0 && s.combatLeft === 0) s.comboStep = 0;
   s.messageTime = Math.max(0, s.messageTime - dt);
   s.invincible = Math.max(0, s.invincible - dt);
   s.starPower = Math.max(0, s.starPower - dt);
