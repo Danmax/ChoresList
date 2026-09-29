@@ -19,7 +19,7 @@ export const LEVEL_SECONDS = 60;
 export const SLIDE_SECONDS = 1.5;
 export const FLIP_SECONDS = 0.5;
 export const GEM_Y = FLOOR - 235;
-export type RunnerItem = { x: number; y: number; kind: 'banana' | 'golden' | 'cherry' | 'heart' | 'fruit' | 'star' | 'gem' | 'drop' | 'low' | 'high' | 'canopy' | 'rolling' | 'bouncing'; collected?: boolean; level?: number; vy?: number; vx?: number; previousX?: number; reflected?: boolean; rotation?: number };
+export type RunnerItem = { x: number; y: number; kind: 'banana' | 'golden' | 'cherry' | 'heart' | 'fruit' | 'star' | 'gem' | 'drop' | 'low' | 'high' | 'canopy' | 'rolling' | 'bouncing'; collected?: boolean; level?: number; vy?: number; vx?: number; previousX?: number; reflected?: boolean; bossAmmo?: boolean; rotation?: number };
 export const GEMS = [
   { name: 'Emerald', color: '#4cf7ae' }, { name: 'Sapphire', color: '#6fbaff' },
   { name: 'Ruby', color: '#ff6e97' }, { name: 'Amber', color: '#ffcb56' },
@@ -198,7 +198,7 @@ function addSection(s: Runner) {
       // Both targets arrive before the boss, giving the player a chance to
       // bounce them forward instead of receiving a free automatic knockout.
       s.pineapples.push({ x: x - 550, y: FLOOR - 90, vx: 0, vy: 0, rotation: 0, bounceAmmo: true });
-      s.items.push({ x: x - 360, y: FLOOR - 20, kind: 'bouncing', vy: -360, rotation: 0 });
+      s.items.push({ x: x - 360, y: FLOOR - 20, kind: 'rolling', rotation: 0, bossAmmo: true });
     }
     if (kind === 'fire-ant') {
       const count = { easy: 3, medium: 4, hard: 5 }[s.difficulty];
@@ -660,7 +660,7 @@ export function stepRunner(s: Runner, dt: number) {
       else if (item.kind === 'cherry') { s.cherries++; s.bonusScore += 50; s.message = 'SWEET! +50 POINTS'; s.messageTime = 1; }
       else { s.bananas += item.kind === 'golden' ? 10 : 1; if (item.kind === 'golden') { s.golden++; s.message = 'GOLDEN BANANA! +10 COINS'; s.messageTime = 1; } }
       if (Math.floor(s.bananas / 100) > Math.floor(previous / 100)) { s.lives++; s.message = '100 BANANAS! +1 LIFE'; s.messageTime = 2; }
-    } else if ((item.kind === 'rolling' || item.kind === 'bouncing') && !item.reflected && s.vy > 0 && previousY <= item.y - 10 && s.y >= item.y - 10) {
+    } else if (item.bossAmmo && !item.reflected && s.vy > 0 && previousY <= item.y - 10 && s.y >= item.y - 10) {
       s.y = item.y - 10; s.vy = -470; s.jumps = 1;
       item.reflected = true; item.vx = 1350; item.vy = -300;
       s.message = 'COCONUT RETURN! HIT THE SCORPION!'; s.messageTime = 1.2;

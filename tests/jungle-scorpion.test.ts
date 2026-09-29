@@ -56,3 +56,40 @@ test('mud pits can be crossed by landing on the caterpillar at every difficulty'
     assert.ok(escaped, `${difficulty} needs a reachable bounce route`);
   }
 });
+
+test('scorpion chases right after the monkey passes and prepares another attack', () => {
+  const s = grove(); const bug = createInsect('scorpion', PLAYER_X - 80, 0);
+  bug.state = 'recover'; bug.age = 0.75; s.insects = [bug]; s.invincible = 2;
+  const start = bug.x;
+  stepRunner(s, 1 / 120);
+  assert.ok(bug.x > start, 'the scorpion moves right in pursuit');
+  assert.equal(bug.state, 'warning', 'the scorpion can attack again after recovering');
+});
+
+test('landing on a coconut bounces it into the Scorpion King for one knockout', () => {
+  const s = grove(); s.insects = [createInsect('scorpion', PLAYER_X + 200, 0)];
+  s.items = [{ x: PLAYER_X, y: FLOOR - 20, kind: 'rolling', bossAmmo: true }];
+  s.y = FLOOR - 31; s.vy = 220; s.jumps = 1;
+  stepRunner(s, 1 / 120);
+  assert.equal(s.items[0].reflected, true); assert.ok(s.vy < 0);
+  for (let i = 0; i < 40 && s.insects.length; i++) stepRunner(s, 1 / 120);
+  assert.equal(s.insects.length, 0); assert.equal(s.bonusScore, 25); assert.equal(s.hits, 0);
+});
+
+test('landing on a pineapple bounces it into the Scorpion King for one knockout', () => {
+  const s = grove(); s.insects = [createInsect('scorpion', PLAYER_X + 200, 1)];
+  s.pineapples = [{ x: PLAYER_X, y: FLOOR - 26, vx: 0, vy: 0, rotation: 0, bounceAmmo: true }];
+  s.y = FLOOR - 39; s.vy = 220; s.jumps = 1;
+  stepRunner(s, 1 / 120);
+  assert.equal(s.pineapples[0].reflected, true); assert.ok(s.vy < 0);
+  for (let i = 0; i < 40 && s.insects.length; i++) stepRunner(s, 1 / 120);
+  assert.equal(s.insects.length, 0); assert.equal(s.bonusScore, 25); assert.equal(s.hits, 0);
+});
+
+test('Scorpion King encounters supply both bounceable projectiles', () => {
+  const s = grove(); s.nextSection = 950; s.insectDeck = ['scorpion'];
+  stepRunner(s, 1 / 120);
+  assert.ok(s.insects.some(bug => bug.kind === 'scorpion'));
+  assert.ok(s.items.some(item => item.bossAmmo && item.kind === 'rolling'));
+  assert.ok(s.pineapples.some(p => p.bounceAmmo));
+});

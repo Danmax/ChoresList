@@ -48,8 +48,12 @@ export function stepInsects(s: Runner, dt: number, speed: number, previousY: num
     }
     if (bug.kind === 'scorpion') {
       bug.age += dt;
+      // Once the monkey slips past, the king pursues to the right. He gains
+      // ground slowly enough to leave time to return the bouncing fruit.
+      if (ahead < -20) bug.x += (speed + 120) * dt;
       if (bug.state === 'waiting' && ahead < speed * (warning + 0.45) + 100) { bug.state = 'warning'; bug.age = 0; }
       if (bug.state === 'warning' && bug.age >= warning) { bug.state = 'attack'; bug.age = 0; }
+      if (bug.state === 'recover' && bug.age >= 0.75 && Math.abs(ahead) < 250) { bug.state = 'warning'; bug.age = 0; }
       if (bug.state === 'attack') {
         const tail = bug.stack === 1;
         if (bug.age < 0.45 && ahead > -65 && ahead < 150 &&
