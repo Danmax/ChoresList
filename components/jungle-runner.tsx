@@ -297,7 +297,13 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     ctx.fillStyle = '#fef08a'; ctx.font = 'bold 13px sans-serif'; ctx.fillText('BOUNCE', hx, FLOOR - 100);
   }
   for (const o of s.orangutans) drawOrangutan(ctx, o, cameraDistance, allySprites.orangutan);
-  for (const p of s.pineapples) drawPineapple(ctx, p.x - cameraDistance, p.y, p.rotation);
+  for (const p of s.pineapples) {
+    drawPineapple(ctx, p.x - cameraDistance, p.y, p.rotation);
+    if (p.bounceAmmo && !p.reflected) {
+      ctx.fillStyle = '#fff4aa'; ctx.font = 'bold 12px sans-serif';
+      ctx.fillText('BOUNCE TO STRIKE', p.x - cameraDistance, p.y - 42);
+    }
+  }
   for (const splat of s.splats) {
     ctx.save(); ctx.globalAlpha = 1 - splat.age / 0.65;
     for (let i = 0; i < 9; i++) {
@@ -388,9 +394,9 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     ctx.restore();
     if (!collectible) {
       const labelY = item.kind === 'drop' ? item.y + 34 : item.y - 33;
-      ctx.fillStyle = '#fff'; ctx.fillRect(x - 29, labelY - 10, 58, 19);
-      ctx.fillStyle = '#174d35'; ctx.font = 'bold 12px sans-serif';
-      ctx.fillText(movingCoconut || ['low', 'drop'].includes(item.kind) ? 'JUMP' : item.kind === 'high' ? 'DUCK' : 'RUN', x, labelY);
+      ctx.fillStyle = '#fff'; ctx.fillRect(x - (item.bossAmmo ? 65 : 29), labelY - 10, item.bossAmmo ? 130 : 58, 19);
+      ctx.fillStyle = '#174d35'; ctx.font = item.bossAmmo ? 'bold 10px sans-serif' : 'bold 12px sans-serif';
+      ctx.fillText(item.bossAmmo ? 'BOUNCE TO STRIKE' : movingCoconut || ['low', 'drop'].includes(item.kind) ? 'JUMP' : item.kind === 'high' ? 'DUCK' : 'RUN', x, labelY);
     }
   }
   for (const crack of s.cracks) {
