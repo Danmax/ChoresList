@@ -147,7 +147,7 @@ export function createRunner(difficulty: RunnerDifficulty = 'medium') {
     insects: [] as Insect[], antRocks: [] as AntRock[], caterpillarBounces: 0,
     reaction: 'bonk' as HitReaction, reactionLeft: 0,
     phase: 'ready' as 'ready' | 'playing' | 'over' | 'victory',
-    distance: 0, elapsed: 0, level: 0, y: FLOOR, vy: 0, jumps: 0, duck: false, duckHeld: false, slideLeft: 0, strongDiveLeft: 0, attackLeft: 0, forwardDashLeft: 0, combatMove: 'run' as 'run' | 'punch' | 'kick' | 'dash', combatLeft: 0, counterLeft: 0, ki: 0, specialLeft: 0, cameraLead: 0,
+    distance: 0, elapsed: 0, level: 0, y: FLOOR, vy: 0, jumps: 0, duck: false, duckHeld: false, slideLeft: 0, slideCooldown: 0, strongDiveLeft: 0, attackLeft: 0, forwardDashLeft: 0, combatMove: 'run' as 'run' | 'punch' | 'kick' | 'dash', combatLeft: 0, counterLeft: 0, ki: 0, specialLeft: 0, cameraLead: 0,
     flipLeft: 0, swing: null as ({ river: River; progress: number } | { lemming: Lemming; progress: number }) | null,
     cracks: [] as { x: number; y: number; age: number; kind?: 'coconut' | 'barrel' }[],
     golden: 0, cherries: 0, bonusScore: 0, gems: 0,
@@ -176,14 +176,20 @@ export function jumpRunner(s: Runner) {
 }
 
 export function duckRunner(s: Runner, held: boolean) {
-  if (!held) { s.duckHeld = false; s.duck = false; s.slideLeft = 0; s.strongDiveLeft = 0; return; }
-  if (s.duckHeld || s.phase !== 'playing' || s.stun > 0) return;
+  if (!held) {
+    const wasSliding = s.duck || s.slideLeft > 0;
+    s.duckHeld = false; s.duck = false; s.slideLeft = 0; s.strongDiveLeft = 0;
+    if (wasSliding) s.slideCooldown = Math.max(s.slideCooldown, 0.3);
+    return;
+  }
+  if (s.duckHeld || (s.slideCooldown > 0 && s.y >= FLOOR - 1) || s.phase !== 'playing' || s.stun > 0) return;
   if (s.swing) return;
   s.flipLeft = 0;
   s.duckHeld = true;
   s.duck = true;
   s.slideLeft = SLIDE_SECONDS;
   s.strongDiveLeft = STRONG_DIVE_SECONDS;
+  s.slideCooldown = 0.7;
   if (s.y < FLOOR) {
     // An air-started attack completes its full 0.42-second animation even if
     // the monkey lands or the player releases the control early.
@@ -372,6 +378,7 @@ export function stepRunner(s: Runner, dt: number) {
   s.knockouts = s.knockouts.filter(k => k.age < 0.8);
   s.flipLeft = Math.max(0, s.flipLeft - dt);
   s.attackLeft = Math.max(0, s.attackLeft - dt);
+  s.slideCooldown = Math.max(0, s.slideCooldown - dt);
   s.forwardDashLeft = Math.max(0, s.forwardDashLeft - dt);
   s.specialLeft = Math.max(0, s.specialLeft - dt);
   s.combatLeft = Math.max(0, s.combatLeft - dt);
@@ -391,7 +398,7 @@ export function stepRunner(s: Runner, dt: number) {
   if (s.duck) {
     s.slideLeft = Math.max(0, s.slideLeft - dt);
     s.strongDiveLeft = Math.max(0, s.strongDiveLeft - dt);
-    if (s.slideLeft === 0) s.duck = false;
+    if (s.slideLeft === 0) { s.duck = false; s.slideCooldown = Math.max(s.slideCooldown, 0.45); }
   }
   s.elapsed += dt;
   if (s.elapsed >= levelSeconds(s) * LEVELS.length) { s.phase = 'victory'; return; }

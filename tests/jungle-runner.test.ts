@@ -106,10 +106,11 @@ test('hippo remains reachable at maximum running speed', () => {
   advance(s, 1.7); assert.ok(s.bounces >= 1); assert.equal(s.lives, 3);
 });
 
-test('slide times out even while held and requires release to restart', () => {
+test('slide times out while held, then has a brief ground re-entry cooldown', () => {
   const s = active(); duckRunner(s, true); advance(s, 1.6);
   assert.equal(s.duck, false); duckRunner(s, true); assert.equal(s.duck, false);
-  duckRunner(s, false); duckRunner(s, true); assert.equal(s.duck, true);
+  duckRunner(s, false); duckRunner(s, true); assert.equal(s.duck, false);
+  advance(s, 0.46); duckRunner(s, true); assert.equal(s.duck, true);
 });
 
 test('gold is above single-jump reach but reachable with a double jump', () => {

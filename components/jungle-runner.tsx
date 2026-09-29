@@ -530,20 +530,17 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
   else if (!grounded && !knocked) ctx.rotate(Math.max(-0.12, Math.min(0.12, s.vy / 4500)));
   if (s.starPower > 0 && !knocked) { ctx.shadowColor = '#ffe363'; ctx.shadowBlur = 24; }
   else if (s.invincible > 0 && !knocked) ctx.globalAlpha = 0.65 + Math.sin(s.elapsed * 30) * 0.25;
-  if (fightSprite.complete && fightSprite.naturalWidth && !knocked && s.phase === 'playing') {
-    // The supplied 4×2 hero sheet provides authored fight poses: run, punch,
-    // kick, and dive. Explicit bounds keep the soft transparent gutters out.
+  if (fightSprite.complete && fightSprite.naturalWidth && pose !== 'run' && !knocked && s.phase === 'playing') {
+    // The supplied fight sheet provides punch, kick, and dive poses. Running
+    // stays on the original runner sheet, whose two non-mirrored run frames
+    // were authored as a matched left/right stride cycle.
     const fightFrames = {
       run: [26, 142, 340, 390, 100, 114],
       punch: [404, 145, 360, 385, 112, 116],
       kick: [770, 120, 355, 410, 125, 124],
       dive: [1122, 210, 395, 285, 142, 102],
     } as const;
-    // The two running poses on the supplied sheet alternate on the beat so
-    // Johnny visibly runs rather than gliding between encounters.
-    const runFrame = Math.floor(s.elapsed * 11) % 2;
-    const runFrames = [[26, 142, 340, 390, 100, 114], [24, 555, 340, 390, 100, 114]] as const;
-    const [sx, sy, sw, sh, dw, dh] = pose === 'run' ? runFrames[runFrame] : fightFrames[pose];
+    const [sx, sy, sw, sh, dw, dh] = fightFrames[pose];
     ctx.drawImage(fightSprite, sx, sy, sw, sh, -dw / 2, -dh + 8, dw, dh);
   } else if (sprite.complete && sprite.naturalWidth) {
     // This sheet is not a uniform grid: the slide extends across an old cell
