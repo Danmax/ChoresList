@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { pantherPaw } from '../lib/jungle-motion';
 import { createInsect } from '../lib/jungle-insects';
-import { COUNTER_ATTACK_SECONDS, GEM_Y, createOrangutan, orangutanHand, piranhaPosition, eelPhase, createHogs, createBats, GEMS, hasAllGems, spiderPosition, ELEPHANT_TOP, crocodileFrame, hippoFrame, createRunner, createPredator, dashBoost, duckRunner, FLOOR, forwardDashRunner, isAirAttack, jumpRunner, kickRunner, KI_MAX, LEVELS, levelSeconds, PLAYER_X, punchRunner, runnerScore, runnerSpeed, specialRunner, stepRunner, STRONG_DIVE_SECONDS, travelSpeed } from '../lib/jungle-runner';
+import { COUNTER_ATTACK_SECONDS, GEM_Y, createJungleGuardian, createOrangutan, orangutanHand, piranhaPosition, eelPhase, createHogs, createBats, GEMS, hasAllGems, spiderPosition, ELEPHANT_TOP, crocodileFrame, hippoFrame, createRunner, createPredator, dashBoost, duckRunner, FLOOR, forwardDashRunner, isAirAttack, jumpRunner, kickRunner, KI_MAX, LEVELS, levelSeconds, PLAYER_X, punchRunner, runnerScore, runnerSpeed, specialRunner, stepRunner, STRONG_DIVE_SECONDS, travelSpeed } from '../lib/jungle-runner';
 
 function active() { const s = createRunner(); s.phase = 'playing'; s.items = []; s.nextSection = 100000; return s; }
 function advance(s: ReturnType<typeof active>, seconds: number, fps = 120) { for (let i = 0; i < seconds * fps; i++) stepRunner(s, 1 / fps); }
@@ -717,4 +717,11 @@ test('cave spikes release one at a time and guardian projectiles travel toward J
   assert.equal(delayedSpike.y, 12); assert.ok(arrow.x < PLAYER_X + 500); assert.ok(dart.x < PLAYER_X + 600);
   advance(s, 0.25);
   assert.ok(delayedSpike.y > 12);
+});
+
+test('a jungle guardian runs in, fires two separate arrows, then retreats', () => {
+  const s = active(); s.invincible = 10;
+  const guardian = createJungleGuardian(PLAYER_X + 650); s.guardians = [guardian];
+  advance(s, 1.4);
+  assert.equal(guardian.attacks, 2); assert.equal(guardian.state, 'retreat');
 });

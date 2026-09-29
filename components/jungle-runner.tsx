@@ -139,6 +139,21 @@ function coffeeBearArt(ctx: CanvasRenderingContext2D, x: number, y: number, age:
   ctx.fillStyle = '#fff4b4'; ctx.font = 'bold 11px sans-serif'; ctx.fillText('Zz? ☕', 0, -93); ctx.restore();
 }
 
+function jungleGuardianArt(ctx: CanvasRenderingContext2D, x: number, age: number, aiming: boolean) {
+  const stride = Math.sin(age * 19) * (aiming ? 2 : 9);
+  ctx.save(); ctx.translate(x, FLOOR); ctx.lineCap = 'round';
+  // A fully fictional forest guardian: bright mask, leaf cloak, and a simple bow.
+  ctx.strokeStyle = '#213d3c'; ctx.lineWidth = 8; ctx.beginPath(); ctx.moveTo(-9, -39); ctx.lineTo(-20 + stride, -9); ctx.moveTo(9, -39); ctx.lineTo(20 - stride, -9); ctx.stroke();
+  ctx.fillStyle = '#2b6d5e'; ctx.beginPath(); ctx.moveTo(-19, -76); ctx.lineTo(19, -76); ctx.lineTo(27, -34); ctx.lineTo(-27, -34); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#ff9a4c'; ctx.beginPath(); ctx.arc(0, -91, 22, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#163843'; ctx.beginPath(); ctx.roundRect(-16, -100, 32, 20, 7); ctx.fill();
+  ctx.fillStyle = '#baf6d3'; ctx.beginPath(); ctx.arc(-7, -90, 4, 0, Math.PI * 2); ctx.arc(7, -90, 4, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#d9bd72'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(28, -61, 14, -1.3, 1.3); ctx.stroke();
+  ctx.strokeStyle = '#f5e4b0'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(27, -75); ctx.lineTo(27, -47); ctx.stroke();
+  if (aiming) { ctx.strokeStyle = '#f2d77d'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(10, -65); ctx.lineTo(39, -65); ctx.stroke(); }
+  ctx.restore();
+}
+
 function slothArt(ctx: CanvasRenderingContext2D, x: number, y: number, age: number) {
   const sway = Math.sin(age * 1.8) * 0.18, blink = Math.sin(age * 1.25) > 0.96;
   ctx.save(); ctx.translate(x, y); ctx.rotate(sway);
@@ -324,6 +339,12 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     ctx.fillStyle = '#fef08a'; ctx.font = 'bold 13px sans-serif'; ctx.fillText('BOUNCE', hx, FLOOR - 100);
   }
   for (const o of s.orangutans) drawOrangutan(ctx, o, cameraDistance, allySprites.orangutan);
+  for (const guardian of s.guardians) {
+    const x = guardian.x - cameraDistance;
+    if (x < -90 || x > 900) continue;
+    jungleGuardianArt(ctx, x, guardian.age, guardian.state === 'aim');
+    ctx.fillStyle = '#fff4b4'; ctx.font = 'bold 11px sans-serif'; ctx.fillText(guardian.state === 'aim' ? `${2 - guardian.attacks} ARROWS — SLIDE!` : guardian.state === 'retreat' ? 'RETREAT!' : 'JUNGLE GUARDIAN!', x, FLOOR - 126);
+  }
   for (const p of s.pineapples) {
     drawPineapple(ctx, p.x - cameraDistance, p.y, p.rotation);
     if (p.bounceAmmo && !p.reflected) {

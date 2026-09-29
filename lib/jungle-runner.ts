@@ -51,6 +51,8 @@ export type Lemming = { x: number; y: number; endX: number; age: number; used: b
 export type River = { resident?: 'piranha' | 'eel'; waterAge?: number; x: number; width: number; vine?: boolean; used?: boolean; bounced?: boolean; bounceLeft?: number; snapLeft?: number[]; snapped?: boolean[]; piranhasKnocked?: boolean[]; eelStun?: number; eelScored?: boolean };
 export type Orangutan = { x: number; age: number; state: 'dance' | 'windup' | 'throw' | 'recover'; throws: number; stunned?: number };
 export type Pineapple = { x: number; y: number; vx: number; vy: number; rotation: number; bounceAmmo?: boolean; reflected?: boolean; previousX?: number };
+export type JungleGuardian = { x: number; age: number; attacks: number; state: 'run-in' | 'aim' | 'retreat' };
+export function createJungleGuardian(x: number): JungleGuardian { return { x, age: 0, attacks: 0, state: 'run-in' }; }
 export function createOrangutan(x: number): Orangutan { return { x, age: 0, state: 'dance', throws: 0 }; }
 export function orangutanHand(o: Orangutan) {
   const t = Math.min(1, o.age / 0.55);
@@ -159,7 +161,7 @@ export function createRunner(difficulty: RunnerDifficulty = 'medium') {
     knockouts: [] as { x: number; y: number; age: number; label: string }[],
     message: '', messageTime: 0, nextSection: 950, section: 0, encounterDeck: [] as number[], insectDeck: [] as InsectKind[],
     items: Array.from({ length: 12 }, (_, i): RunnerItem => ({ x: 380 + i * 42, y: FLOOR - 30, kind: 'banana' })),
-    orangutans: [] as Orangutan[], pineapples: [] as Pineapple[], splats: [] as { x: number; y: number; age: number }[],
+    orangutans: [] as Orangutan[], pineapples: [] as Pineapple[], splats: [] as { x: number; y: number; age: number }[], guardians: [] as JungleGuardian[],
     hogs: [] as Hog[], bats: [] as Bat[],
     herds: [] as Herd[], spiders: [] as Spider[], elephantBounces: 0,
     rivers: [] as River[], birds: [] as Bird[], birdsSpawned: 0, sloths: [] as Sloth[], lemmings: [] as Lemming[], predators: [] as Predator[],
@@ -353,7 +355,7 @@ function addSection(s: Runner) {
   } else if (type === 21) {
     s.items.push({ x, y: FLOOR - 26, kind: 'bear' }); recovery = 760;
   } else if (type === 22) {
-    s.items.push({ x, y: FLOOR - 112, kind: 'arrow', vx: -360, rotation: 0 }); recovery = 650;
+    s.guardians.push(createJungleGuardian(x)); recovery = 1050;
   } else if (type === 23) {
     s.items.push({ x, y: FLOOR - 72, kind: 'dart', vx: -430, rotation: 0 }); recovery = 650;
   } else {
@@ -414,7 +416,7 @@ export function stepRunner(s: Runner, dt: number) {
   const level = Math.floor(s.elapsed / levelSeconds(s));
   if (level !== s.level) {
     if (level === 5) {
-      s.items = []; s.rivers = []; s.predators = []; s.hogs = []; s.bats = []; s.herds = []; s.spiders = []; s.orangutans = []; s.pineapples = []; s.birds = []; s.sloths = []; s.lemmings = [];
+      s.items = []; s.rivers = []; s.predators = []; s.hogs = []; s.bats = []; s.herds = []; s.spiders = []; s.orangutans = []; s.pineapples = []; s.guardians = []; s.birds = []; s.sloths = []; s.lemmings = [];
       s.swing = null; s.nextSection = s.distance + 1100;
     }
     s.level = level; s.section = 0; s.encounterDeck = []; s.insectDeck = []; s.items = s.items.filter(i => i.kind !== 'gem'); s.message = `LEVEL ${level + 1}: ${LEVELS[level].name}`; s.messageTime = 3; }
@@ -615,6 +617,29 @@ export function stepRunner(s: Runner, dt: number) {
     else if (o.state === 'recover' && o.age >= 0.55) { o.state = 'dance'; o.age = 0; }
   }
   s.orangutans = s.orangutans.filter(o => o.x > s.distance - 140);
+  for (const guardian of s.guardians) {
+    const ahead = guardian.x - worldX;
+    if (guardian.state === 'run-in') {
+      if (ahead > 850) continue;
+      guardian.x -= 460 * dt;
+      if (guardian.x - worldX <= 470) { guardian.state = 'aim'; guardian.age = 0; }
+      continue;
+    }
+    guardian.age += dt;
+    if (guardian.state === 'aim') {
+      // A visible half-beat separates the two shots, so the encounter asks
+      // for two quick defensive decisions rather than one unavoidable hit.
+      const fireAt = guardian.attacks === 0 ? 0.18 : 0.58;
+      if (guardian.attacks < 2 && guardian.age >= fireAt) {
+        const y = guardian.attacks === 0 ? FLOOR - 112 : FLOOR - 82;
+        s.items.push({ x: guardian.x - 38, y, kind: 'arrow', vx: -500, rotation: 0 });
+        guardian.attacks++;
+        s.message = guardian.attacks === 1 ? 'JUNGLE GUARDIAN! FIRST ARROW!' : 'SECOND ARROW! STAY LOW!'; s.messageTime = 0.75;
+      }
+      if (guardian.attacks === 2 && guardian.age >= 0.95) { guardian.state = 'retreat'; guardian.age = 0; }
+    } else guardian.x += 540 * dt;
+  }
+  s.guardians = s.guardians.filter(guardian => guardian.state !== 'retreat' || guardian.x < s.distance + 1150);
   s.pineapples = s.pineapples.filter(p => {
     p.previousX = p.x;
     p.x += p.vx * dt; p.vy += 650 * dt; p.y += p.vy * dt; p.rotation += dt * (p.reflected ? 14 : 7);
