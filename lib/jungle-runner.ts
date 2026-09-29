@@ -315,10 +315,13 @@ export function stepRunner(s: Runner, dt: number) {
   for (const sloth of s.sloths) {
     sloth.age += dt;
     const ahead = sloth.x - (s.distance + PLAYER_X);
-    // Do not begin the slow descent until the player can see the whole gift
-    // sequence. Once the gift is left, the sloth climbs back to its canopy.
-    if (sloth.state === 'waiting' && ahead < 620 && ahead > -70) sloth.state = 'lowering';
-    if (sloth.state === 'lowering') sloth.y = Math.min(sloth.targetY, sloth.y + 150 * dt);
+    // Descend sooner and faster at high speeds so the reward reaches the
+    // path before the runner passes beneath it.
+    const dropSpeed = Math.max(150, speed * 0.42);
+    const descentSeconds = (sloth.targetY - sloth.homeY) / dropSpeed;
+    const dropLead = Math.max(620, speed * (descentSeconds + 0.4));
+    if (sloth.state === 'waiting' && ahead < dropLead && ahead > -70) sloth.state = 'lowering';
+    if (sloth.state === 'lowering') sloth.y = Math.min(sloth.targetY, sloth.y + dropSpeed * dt);
     if (!sloth.dropped && sloth.state === 'lowering' && sloth.y >= sloth.targetY) {
       sloth.dropped = true;
       s.items.push({ x: sloth.x, y: sloth.targetY + 18, kind: sloth.reward });
@@ -399,7 +402,7 @@ export function stepRunner(s: Runner, dt: number) {
     }
   }
   const river = s.rivers.find(r => worldX > r.x && worldX < r.x + r.width);
-  if (river && s.invincible <= 0) {
+  if (river) {
     const hippoX = river.x + river.width * 0.6;
     const hippoTop = FLOOR - 12;
     if (!river.vine && Math.abs(worldX - hippoX) < 44 && s.vy > 0 && previousY <= hippoTop && s.y >= hippoTop) {
@@ -412,7 +415,7 @@ export function stepRunner(s: Runner, dt: number) {
       river.bounced = true;
       river.bounceLeft = 0.45;
       s.message = 'HIPPO BOUNCE!'; s.messageTime = 1;
-    } else if (s.y > FLOOR + 55) hurt(s, river.resident === 'eel' ? 'ZAP! Electric eel!' : 'SPLASH! Stay above the water!', river.resident === 'eel' ? 'zap' : 'bonk');
+    } else if (s.y > FLOOR + 55 && s.invincible <= 0) hurt(s, river.resident === 'eel' ? 'ZAP! Electric eel!' : 'SPLASH! Stay above the water!', river.resident === 'eel' ? 'zap' : 'bonk');
   } else if (s.y >= FLOOR) {
     s.y = FLOOR; s.vy = 0; s.jumps = 0;
   }

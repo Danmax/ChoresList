@@ -72,6 +72,15 @@ test('sloths wait for the approaching monkey, lower a gift, then climb back up',
   advance(s, 1); assert.equal(s.sloths[0].y, 22);
 });
 
+test('sloths deliver their reward before a fast runner passes them', () => {
+  const s = active(); s.level = 5; s.elapsed = levelSeconds(s) * 5 + 45; s.difficulty = 'hard';
+  const speed = runnerSpeed(s);
+  s.sloths = [{ x: s.distance + PLAYER_X + 700, y: 22, homeY: 22, targetY: FLOOR - 92, age: 0, state: 'waiting', reward: 'star', dropped: false }];
+  advance(s, 1.1);
+  assert.equal(s.sloths[0].dropped, true); assert.ok(s.distance + PLAYER_X < s.sloths[0].x);
+  advance(s, 0.5); assert.ok(s.invincible > 9.5);
+});
+
 test('a jumping monkey can catch a lemming lift and swing safely past a herd', () => {
   const s = active(); s.lemmings = [{ x: PLAYER_X + 10, y: FLOOR - 112, endX: PLAYER_X + 700, age: 0, used: false }];
   jumpRunner(s); advance(s, 0.25);
@@ -214,6 +223,18 @@ test('hippo opens on approach, springs on contact, and finishes its bounce anima
   }
   assert.ok(sawOpen); assert.equal(s.bounces, 1); assert.equal(hippoFrame(r, s.distance + PLAYER_X), 3);
   advance(s, 0.5); assert.equal(r.bounceLeft, 0);
+});
+
+test('star power still permits hippo bounces and vine swings', () => {
+  const bounce = active(); bounce.invincible = 10; bounce.rivers = [{ x: PLAYER_X + 10, width: 250 }];
+  jumpRunner(bounce); advance(bounce, 1.7); assert.ok(bounce.bounces >= 1); assert.equal(bounce.lives, 3);
+  const vine = active(); vine.invincible = 10; const river = { x: PLAYER_X + 260, width: 680, vine: true }; vine.rivers = [river];
+  let grabbed = false;
+  for (let delay = 0; delay < 1.8 && !grabbed; delay += 0.025) {
+    const attempt = active(); attempt.invincible = 10; attempt.rivers = [{ ...river }]; advance(attempt, delay); jumpRunner(attempt);
+    for (let i = 0; i < 6 * 120; i++) { stepRunner(attempt, 1 / 120); grabbed ||= attempt.swing !== null; }
+  }
+  assert.equal(grabbed, true);
 });
 
 test('bird coconut falls first, then bounces toward the player; cherries do not rebound', () => {
