@@ -284,6 +284,16 @@ test('air strikes defeat snakes and panthers with level-scaled 1–3 hit pips', 
   assert.match(s.message, /PANTHER STRIKE/);
 });
 
+test('panthers and tigers are duel foes that a single forward dash cannot defeat', () => {
+  assert.equal(createPredator('panther', 0).hitPoints, 2);
+  assert.equal(createPredator('tiger', 0).hitPoints, 3);
+  const s = active(); s.invincible = 10;
+  const tiger = createPredator('tiger', PLAYER_X + 30);
+  tiger.state = 'recover'; s.predators = [tiger];
+  forwardDashRunner(s); advance(s, 0.34);
+  assert.equal(tiger.hits, 1); assert.equal(tiger.knocked, undefined);
+});
+
 test('punches and kicks drive the Scorpion King back into battle space', () => {
   const s = active();
   const king = createInsect('scorpion', PLAYER_X + 100);

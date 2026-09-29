@@ -85,7 +85,10 @@ export type Predator = { kind: 'snake' | 'tiger' | 'panther'; x: number; y: numb
 // Later jungle zones ask for a quick combo during one dive, rather than a
 // surprise damage spike. The pips are rendered directly above each foe.
 export function createPredator(kind: Predator['kind'], x: number, temperament = Math.random(), level = 0): Predator {
-  const hitPoints = Math.min(3, 1 + Math.floor(level / 2));
+  const levelHits = Math.min(3, 1 + Math.floor(level / 2));
+  // Big cats are duel foes: a forward dash can stagger them, but never end
+  // the encounter in one pass. Tigers take the longest to bring down.
+  const hitPoints = kind === 'tiger' ? Math.max(3, levelHits) : kind === 'panther' ? Math.max(2, levelHits) : levelHits;
   return { kind, x, y: FLOOR - 22, state: 'waiting', age: 0, hit: false, temperament, homeX: x, facing: -1, attackStyle: 'leap', attackSpeed: 0, leapHeight: 0, hits: 0, hitPoints, hitCooldown: 0 };
 }
 export type Runner = ReturnType<typeof createRunner>;
@@ -725,8 +728,10 @@ export function stepRunner(s: Runner, dt: number) {
     // per-foe cooldown lets the 0.42-second attack register a readable 2–3
     // hit combo on the tougher late-level predators.
     if (visible && isHeroAttack(s) && p.hitCooldown === 0 && Math.abs(p.x - worldX) < radiusX + heroAttackReach(s) && p.y + radiusY + 16 >= s.y - height && p.y - radiusY - 16 <= s.y - 4) {
-      p.hit = true;
-      p.hitCooldown = 0.12;
+      // A forward dash gets exactly one stagger hit. Dive combos retain their
+      // short rhythm, while an unfinished tiger stays able to maul the hero.
+      p.hit = p.kind !== 'tiger' || p.hits + 1 >= p.hitPoints;
+      p.hitCooldown = s.forwardDashLeft > 0 ? 0.5 : 0.12;
       p.hits++;
       gainKi(s, 12);
       if (p.hits >= p.hitPoints) {

@@ -538,7 +538,7 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
       run: [26, 142, 340, 390, 100, 114],
       punch: [404, 145, 360, 385, 112, 116],
       kick: [770, 120, 355, 410, 125, 124],
-      dive: [1122, 210, 395, 285, 142, 102],
+      dive: [1122, 210, 395, 285, 152, 110],
     } as const;
     const [sx, sy, sw, sh, dw, dh] = fightFrames[pose];
     ctx.drawImage(fightSprite, sx, sy, sw, sh, -dw / 2, -dh + 8, dw, dh);
