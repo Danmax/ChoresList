@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { pantherPaw } from '../lib/jungle-motion';
-import { GEM_Y, createOrangutan, orangutanHand, piranhaPosition, eelPhase, createHogs, createBats, GEMS, hasAllGems, spiderPosition, ELEPHANT_TOP, crocodileFrame, hippoFrame, createRunner, createPredator, dashBoost, duckRunner, FLOOR, jumpRunner, LEVELS, levelSeconds, PLAYER_X, runnerScore, runnerSpeed, stepRunner, STRONG_DIVE_SECONDS, travelSpeed } from '../lib/jungle-runner';
+import { GEM_Y, createOrangutan, orangutanHand, piranhaPosition, eelPhase, createHogs, createBats, GEMS, hasAllGems, spiderPosition, ELEPHANT_TOP, crocodileFrame, hippoFrame, createRunner, createPredator, dashBoost, duckRunner, FLOOR, isAirAttack, jumpRunner, LEVELS, levelSeconds, PLAYER_X, runnerScore, runnerSpeed, stepRunner, STRONG_DIVE_SECONDS, travelSpeed } from '../lib/jungle-runner';
 
 function active() { const s = createRunner(); s.phase = 'playing'; s.items = []; s.nextSection = 100000; return s; }
 function advance(s: ReturnType<typeof active>, seconds: number, fps = 120) { for (let i = 0; i < seconds * fps; i++) stepRunner(s, 1 / fps); }
@@ -256,6 +256,30 @@ test('strong dive gives a brief airborne forward surge and ends when released', 
   assert.equal(dashBoost(s), 180); assert.ok(s.vy >= 650);
   advance(s, STRONG_DIVE_SECONDS + 0.05); assert.ok(dashBoost(s) > 0 && dashBoost(s) < 180);
   duckRunner(s, false); assert.equal(dashBoost(s), 0);
+});
+
+test('an air-started dive stays active for its 0.42-second strike window', () => {
+  const s = active(); jumpRunner(s); advance(s, 0.06);
+  duckRunner(s, true);
+  assert.equal(isAirAttack(s), true);
+  duckRunner(s, false);
+  advance(s, STRONG_DIVE_SECONDS - 0.04);
+  assert.equal(isAirAttack(s), true);
+  advance(s, 0.05);
+  assert.equal(isAirAttack(s), false);
+});
+
+test('air strikes defeat snakes and panthers with level-scaled 1–3 hit pips', () => {
+  assert.deepEqual([0, 2, 4].map(level => createPredator('snake', 0, 0.5, level).hitPoints), [1, 2, 3]);
+  const s = active(); jumpRunner(s); advance(s, 0.06);
+  const panther = createPredator('panther', s.distance + PLAYER_X + 35, 0.5, 4);
+  panther.state = 'recover';
+  s.predators = [panther];
+  duckRunner(s, true);
+  advance(s, 0.32);
+  assert.equal(panther.hits, 3);
+  assert.equal(panther.knocked, true);
+  assert.match(s.message, /PANTHER STRIKE/);
 });
 
 test('strong dive smashes coconuts and barrels, then leaves them dangerous', () => {

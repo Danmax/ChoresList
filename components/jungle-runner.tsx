@@ -4,7 +4,7 @@ import { drawInsectGrove, drawInsects, drawReaction } from '@/lib/jungle-insect-
 import { pantherPaw } from '@/lib/jungle-motion';
 import { drawWaterLife, drawOrangutan, drawPineapple } from '@/lib/jungle-water-art';
 import { useEffect, useRef, useState } from 'react';
-import { RUNNER_DIFFICULTIES, type RunnerDifficulty, GEMS, spiderPosition, slothPosition, airBoost, FLIP_SECONDS, vinePosition, birdHeight, crocodileFrame, hippoFrame, createRunner, dashBoost, duckRunner, FLOOR, jumpRunner, LEVELS, levelSeconds, PLAYER_X, runnerScore, STRONG_DIVE_SECONDS, travelSpeed, stepRunner, type Runner } from '@/lib/jungle-runner';
+import { RUNNER_DIFFICULTIES, type RunnerDifficulty, GEMS, spiderPosition, slothPosition, airBoost, FLIP_SECONDS, vinePosition, birdHeight, crocodileFrame, hippoFrame, createRunner, dashBoost, duckRunner, FLOOR, isAirAttack, jumpRunner, LEVELS, levelSeconds, PLAYER_X, runnerScore, STRONG_DIVE_SECONDS, travelSpeed, stepRunner, type Runner } from '@/lib/jungle-runner';
 
 // Canvas artwork keeps shells and moving limbs crisp at every display density.
 function coconut(ctx: CanvasRenderingContext2D, x: number, y: number, rotation = 0, split = 0) {
@@ -444,6 +444,10 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
       panther(ctx, x, p.y, p.age, p.facing, p.state === 'attack', p.state === 'warning');
       ctx.fillStyle = p.state === 'waiting' && !night ? '#172031' : '#fff176'; ctx.font = 'bold 13px sans-serif';
       ctx.fillText(p.state === 'waiting' ? 'PANTHER PATROL' : 'HIGH POUNCE! SLIDE!', x, p.y - 53);
+      for (let hit = 0; hit < p.hitPoints; hit++) {
+        ctx.fillStyle = hit < p.hits ? '#ff7a42' : '#fff0b8';
+        ctx.beginPath(); ctx.arc(x - (p.hitPoints - 1) * 8 + hit * 16, p.y - 72, 5, 0, Math.PI * 2); ctx.fill();
+      }
       continue;
     }
     const frame = p.kind === 'tiger' && p.attackStyle === 'rush' && p.state === 'attack' ? (Math.floor(p.age * 12) % 2 === 0 ? 0 : 3) : p.state === 'attack' ? p.age < 0.13 ? 1 : p.age < (p.kind === 'tiger' ? 0.72 : 0.9) ? 2 : 3 : p.state === 'crouch' ? 1 : p.state === 'recover' ? 3 : Math.floor(p.age * 3) % 2 === 0 ? 0 : 3;
@@ -460,6 +464,10 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     ctx.fillStyle = '#fff5b6'; ctx.fillRect(x - 48, p.y - height / 2 - 24, 96, 20);
     ctx.fillStyle = '#713719'; ctx.font = 'bold 12px sans-serif';
     ctx.fillText(p.kind === 'snake' ? 'DOUBLE JUMP' : p.attackStyle === 'rush' ? 'LOW! JUMP!' : p.attackStyle === 'intercept' ? 'AIR HUNT! DIVE!' : p.state === 'attack' ? 'DUCK / DIVE!' : 'HIGH! SLIDE!', x, p.y - height / 2 - 14);
+    for (let hit = 0; hit < p.hitPoints; hit++) {
+      ctx.fillStyle = hit < p.hits ? '#ff7a42' : '#fff0b8';
+      ctx.beginPath(); ctx.arc(x - (p.hitPoints - 1) * 8 + hit * 16, p.y - height / 2 - 34, 5, 0, Math.PI * 2); ctx.fill();
+    }
   }
   const tigerWarning = s.predators.some(p => p.kind === 'tiger' && ['warning', 'crouch'].includes(p.state));
   if (tigerWarning) {
@@ -490,6 +498,11 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
   if (s.strongDiveLeft > 0 && !knocked) {
     ctx.strokeStyle = '#ffe56b'; ctx.lineWidth = 4; ctx.lineCap = 'round';
     for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(-68 - i * 13, -50 + i * 17); ctx.lineTo(-38 - i * 7, -50 + i * 17); ctx.stroke(); }
+  }
+  if (isAirAttack(s) && !knocked) {
+    ctx.strokeStyle = '#ffed72'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(20, -54, 42, -2.2, 0.9); ctx.stroke();
+    ctx.fillStyle = '#fff4a3'; ctx.font = 'bold 13px sans-serif'; ctx.fillText('STRIKE!', -25, -122);
   }
   if (s.flipLeft > 0 && !knocked) { ctx.translate(0, -46); ctx.rotate((1 - s.flipLeft / FLIP_SECONDS) * Math.PI * 2); ctx.translate(0, 46); }
   else if (!grounded && !knocked) ctx.rotate(Math.max(-0.12, Math.min(0.12, s.vy / 4500)));
@@ -566,13 +579,13 @@ export function JungleVineSwing({ onExit, onFinish }: {
   const canvas = useRef<HTMLCanvasElement>(null);
   const world = useRef(createRunner());
   const [difficulty, setDifficulty] = useState<RunnerDifficulty>('medium');
-  const [hud, setHud] = useState({ phase: 'ready', lives: 3, bananas: 0, seconds: 60, paused: false, level: 0, score: 0, golden: 0, cherries: 0, gems: 0, levelGem: false, slide: 0, speed: 1 });
+  const [hud, setHud] = useState({ phase: 'ready', lives: 3, bananas: 0, seconds: 60, paused: false, level: 0, score: 0, golden: 0, cherries: 0, gems: 0, levelGem: false, slide: 0, attack: 0, speed: 1 });
   const paused = useRef(false);
   const saved = useRef(false);
   const duckSources = useRef(new Set<string>());
   const publish = () => {
     const s = world.current;
-    setHud({ phase: s.phase, lives: s.lives, bananas: s.bananas, seconds: Math.max(0, Math.ceil((s.level + 1) * levelSeconds(s) - s.elapsed)), paused: paused.current, level: s.level, score: runnerScore(s), golden: s.golden, cherries: s.cherries, gems: s.gems, levelGem: s.gemCollected[s.level], slide: s.slideLeft, speed: travelSpeed(s) / LEVELS[0].speed });
+    setHud({ phase: s.phase, lives: s.lives, bananas: s.bananas, seconds: Math.max(0, Math.ceil((s.level + 1) * levelSeconds(s) - s.elapsed)), paused: paused.current, level: s.level, score: runnerScore(s), golden: s.golden, cherries: s.cherries, gems: s.gems, levelGem: s.gemCollected[s.level], slide: s.slideLeft, attack: isAirAttack(s) ? s.attackLeft : 0, speed: travelSpeed(s) / LEVELS[0].speed });
   };
   function selectDifficulty(value: RunnerDifficulty) {
     if (world.current.phase !== 'ready') return;
@@ -660,9 +673,9 @@ export function JungleVineSwing({ onExit, onFinish }: {
       </div>
       <div className="mt-3 grid grid-cols-2 gap-3">
         <button disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); jump(); }} onClick={e => { if (e.detail === 0) jump(); }} className="min-h-14 touch-none select-none rounded-2xl bg-yellow-300 p-3 font-black text-emerald-950 disabled:opacity-40">JUMP <small className="block">Tap again: flip / release vine</small></button>
-        <button disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); duck(`pointer-${e.pointerId}`, true); }} onPointerUp={e => duck(`pointer-${e.pointerId}`, false)} onPointerCancel={e => duck(`pointer-${e.pointerId}`, false)} onLostPointerCapture={e => duck(`pointer-${e.pointerId}`, false)} onKeyDown={e => { if (e.key === 'Enter') duck('enter', true); }} onKeyUp={e => { if (e.key === 'Enter') duck('enter', false); }} className="min-h-14 touch-none select-none rounded-2xl bg-emerald-600 p-3 font-black disabled:opacity-40">SLIDE {hud.slide > 0 ? `${hud.slide.toFixed(1)}s` : ''} <small className="block">Fast dash → slow · 1.5s</small></button>
+        <button disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); duck(`pointer-${e.pointerId}`, true); }} onPointerUp={e => duck(`pointer-${e.pointerId}`, false)} onPointerCancel={e => duck(`pointer-${e.pointerId}`, false)} onLostPointerCapture={e => duck(`pointer-${e.pointerId}`, false)} onKeyDown={e => { if (e.key === 'Enter') duck('enter', true); }} onKeyUp={e => { if (e.key === 'Enter') duck('enter', false); }} className="min-h-14 touch-none select-none rounded-2xl bg-emerald-600 p-3 font-black disabled:opacity-40">{hud.attack > 0 ? `STRIKE ${hud.attack.toFixed(2)}s` : `SLIDE ${hud.slide > 0 ? `${hud.slide.toFixed(1)}s` : ''}`} <small className="block">In air: 0.42s dive strike</small></button>
       </div>
-      <p className="mt-2 text-center text-xs text-emerald-200">Space / ↑: jump / flip / release vine · ↓: dive / dash (1.5s) · First {STRONG_DIVE_SECONDS}s smashes coconuts & barrels · Release before sliding again</p>
+      <p className="mt-2 text-center text-xs text-emerald-200">Space / ↑: jump / flip / release vine · ↓: dive / dash (1.5s) · Dive while airborne to strike snakes and panthers for {STRONG_DIVE_SECONDS}s. Later foes show 2–3 hit pips.</p>
     </div>
   </section>;
 }

@@ -79,9 +79,12 @@ export function hippoFrame(river: River, worldX: number) {
   const ahead = river.x + river.width * 0.6 - worldX;
   return ahead > -65 && ahead < 240 ? ahead < 150 ? 2 : 1 : 0;
 }
-export type Predator = { kind: 'snake' | 'tiger' | 'panther'; x: number; y: number; state: 'waiting' | 'warning' | 'crouch' | 'attack' | 'recover'; age: number; hit: boolean; knocked?: boolean; temperament: number; homeX: number; facing: number; attackStyle: 'leap' | 'rush' | 'intercept'; attackSpeed: number; leapHeight: number };
-export function createPredator(kind: Predator['kind'], x: number, temperament = Math.random()): Predator {
-  return { kind, x, y: FLOOR - 22, state: 'waiting', age: 0, hit: false, temperament, homeX: x, facing: -1, attackStyle: 'leap', attackSpeed: 0, leapHeight: 0 };
+export type Predator = { kind: 'snake' | 'tiger' | 'panther'; x: number; y: number; state: 'waiting' | 'warning' | 'crouch' | 'attack' | 'recover'; age: number; hit: boolean; knocked?: boolean; temperament: number; homeX: number; facing: number; attackStyle: 'leap' | 'rush' | 'intercept'; attackSpeed: number; leapHeight: number; hits: number; hitPoints: number; hitCooldown: number };
+// Later jungle zones ask for a quick combo during one dive, rather than a
+// surprise damage spike. The pips are rendered directly above each foe.
+export function createPredator(kind: Predator['kind'], x: number, temperament = Math.random(), level = 0): Predator {
+  const hitPoints = Math.min(3, 1 + Math.floor(level / 2));
+  return { kind, x, y: FLOOR - 22, state: 'waiting', age: 0, hit: false, temperament, homeX: x, facing: -1, attackStyle: 'leap', attackSpeed: 0, leapHeight: 0, hits: 0, hitPoints, hitCooldown: 0 };
 }
 export type Runner = ReturnType<typeof createRunner>;
 
@@ -114,6 +117,10 @@ export function dashBoost(s: Runner) {
 }
 export function airBoost(s: Runner) { return 180 * (s.flipLeft / FLIP_SECONDS) ** 2; }
 export function travelSpeed(s: Runner) { return runnerSpeed(s) + dashBoost(s) + airBoost(s); }
+// Pressing dive while airborne turns its initial 0.42-second burst into the
+// monkey's attack. It intentionally shares the existing control on touch and
+// keyboard so the move is equally available on every device.
+export function isAirAttack(s: Runner) { return s.attackLeft > 0 && s.stun <= 0; }
 export function vinePosition(r: River, elapsed: number, progress?: number) {
   const t = progress ?? (0.5 + Math.sin(elapsed * 2.2 + r.x * 0.001) * 0.5);
   return { x: r.x - 45 + (r.width + 90) * t, y: 160 + Math.sin(t * Math.PI) * 45 };
@@ -125,7 +132,7 @@ export function createRunner(difficulty: RunnerDifficulty = 'medium') {
     insects: [] as Insect[], antRocks: [] as AntRock[], caterpillarBounces: 0,
     reaction: 'bonk' as HitReaction, reactionLeft: 0,
     phase: 'ready' as 'ready' | 'playing' | 'over' | 'victory',
-    distance: 0, elapsed: 0, level: 0, y: FLOOR, vy: 0, jumps: 0, duck: false, duckHeld: false, slideLeft: 0, strongDiveLeft: 0, cameraLead: 0,
+    distance: 0, elapsed: 0, level: 0, y: FLOOR, vy: 0, jumps: 0, duck: false, duckHeld: false, slideLeft: 0, strongDiveLeft: 0, attackLeft: 0, cameraLead: 0,
     flipLeft: 0, swing: null as ({ river: River; progress: number } | { lemming: Lemming; progress: number }) | null,
     cracks: [] as { x: number; y: number; age: number; kind?: 'coconut' | 'barrel' }[],
     golden: 0, cherries: 0, bonusScore: 0, gems: 0,
@@ -162,7 +169,12 @@ export function duckRunner(s: Runner, held: boolean) {
   s.duck = true;
   s.slideLeft = SLIDE_SECONDS;
   s.strongDiveLeft = STRONG_DIVE_SECONDS;
-  if (s.y < FLOOR) s.vy = Math.max(650, s.vy);
+  if (s.y < FLOOR) {
+    // An air-started attack completes its full 0.42-second animation even if
+    // the monkey lands or the player releases the control early.
+    s.attackLeft = STRONG_DIVE_SECONDS;
+    s.vy = Math.max(650, s.vy);
+  }
 }
 
 export function runnerScore(s: Runner) { return s.bananas * 10 + s.bonusScore; }
@@ -190,6 +202,7 @@ function hurt(s: Runner, message: string, reaction: HitReaction = 'bonk') {
   s.duck = false;
   s.slideLeft = 0;
   s.strongDiveLeft = 0;
+  s.attackLeft = 0;
   if (s.lives <= 0) s.phase = 'over';
 }
 
@@ -254,7 +267,7 @@ function addSection(s: Runner) {
   } else if (type === 10) {
     s.rivers.push({ x, width: 680, vine: true, resident: (s.level + s.section) % 2 ? 'piranha' : 'eel', waterAge: 0 });
   } else if (type === 11) {
-    s.predators.push(createPredator('panther', x));
+    s.predators.push(createPredator('panther', x, Math.random(), s.level));
   } else if (type === 3) {
     // Wider rivers at higher speeds preserve the hippo landing window.
     s.rivers.push({ x, width: Math.max(250, runnerSpeed(s) * 1.05), resident: s.difficulty === 'easy' ? undefined : (s.level + s.section) % 2 ? 'eel' : 'piranha', waterAge: 0 });
@@ -264,12 +277,12 @@ function addSection(s: Runner) {
     for (let i = 0; i < 3; i++) s.items.push({ x: x + i * 36, y: FLOOR - 215, kind: 'golden' });
     s.items.push({ x: x - 90, y: FLOOR - 105, kind: 'banana' });
   } else if (type === 5) {
-    s.predators.push(createPredator('snake', x));
+    s.predators.push(createPredator('snake', x, Math.random(), s.level));
   } else if (type === 6) {
     const gifts: Bird['gift'][] = ['cherry', 'fruit', 'heart', 'star', 'drop'];
     s.birds.push({ x, y: 70, gift: gifts[s.birdsSpawned++ % gifts.length], dropped: false });
   } else if (type === 7) {
-    s.predators.push(createPredator('tiger', x));
+    s.predators.push(createPredator('tiger', x, Math.random(), s.level));
   } else if (type === 8 || type === 9) {
     s.items.push({ x, y: FLOOR - 20, kind: type === 8 ? 'rolling' : 'bouncing', vy: type === 9 ? -360 : undefined, rotation: 0 });
   } else if (type === 17) {
@@ -304,6 +317,7 @@ export function stepRunner(s: Runner, dt: number) {
   for (const knockout of s.knockouts) knockout.age += dt;
   s.knockouts = s.knockouts.filter(k => k.age < 0.8);
   s.flipLeft = Math.max(0, s.flipLeft - dt);
+  s.attackLeft = Math.max(0, s.attackLeft - dt);
   s.messageTime = Math.max(0, s.messageTime - dt);
   s.invincible = Math.max(0, s.invincible - dt);
   s.starPower = Math.max(0, s.starPower - dt);
@@ -584,6 +598,7 @@ export function stepRunner(s: Runner, dt: number) {
   for (const p of s.predators) {
     const ahead = p.x - worldX;
     p.age += dt;
+    p.hitCooldown = Math.max(0, p.hitCooldown - dt);
     if (p.kind === 'snake') {
       if (p.state === 'waiting' && s.jumps > 0 && ahead > 0 && ahead < speed * 0.85) { p.state = 'attack'; p.age = 0; }
       if (p.state === 'attack') {
@@ -627,6 +642,23 @@ export function stepRunner(s: Runner, dt: number) {
     const visible = p.kind !== 'tiger' || !['waiting', 'warning'].includes(p.state);
     const radiusX = p.kind === 'snake' ? 32 : 48;
     const radiusY = p.kind === 'snake' ? 25 : 28;
+    // A descending dive is an active strike, not merely a dodge. A short
+    // per-foe cooldown lets the 0.42-second attack register a readable 2–3
+    // hit combo on the tougher late-level predators.
+    if (visible && isAirAttack(s) && p.hitCooldown === 0 && Math.abs(p.x - worldX) < radiusX + 34 && p.y + radiusY + 16 >= s.y - height && p.y - radiusY - 16 <= s.y - 4) {
+      p.hit = true;
+      p.hitCooldown = 0.12;
+      p.hits++;
+      if (p.hits >= p.hitPoints) {
+        p.knocked = true;
+        starKnockout(s, p.x, p.y, p.kind.toUpperCase());
+        s.message = `${p.kind.toUpperCase()} STRIKE! ${p.hits}/${p.hitPoints} — KNOCKOUT!`;
+      } else {
+        s.message = `${p.kind.toUpperCase()} STRIKE! ${p.hits}/${p.hitPoints}`;
+      }
+      s.messageTime = 0.8;
+      continue;
+    }
     if (visible && !p.hit && Math.abs(p.x - worldX) < radiusX + 16 && p.y + radiusY >= s.y - height && p.y - radiusY <= s.y - 4) {
       p.hit = true;
       if (s.starPower > 0) { p.knocked = true; starKnockout(s, p.x, p.y, p.kind.toUpperCase()); }
