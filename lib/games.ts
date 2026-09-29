@@ -1,4 +1,4 @@
-export type GameKey = "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot" | "shape-safari" | "codebreaker-quest" | "tic-tac-toe" | "burger-rush" | "jungle-vine-swing";
+export type GameKey = "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot" | "shape-safari" | "codebreaker-quest" | "tic-tac-toe" | "burger-rush" | "jungle-vine-swing" | "chess-quest";
 export type GameRewardType = "none" | "points" | "tickets";
 
 export type GameDefinition = {
@@ -102,6 +102,17 @@ export const GAME_DEFINITIONS: GameDefinition[] = [
     color: "#15803d",
     bg: "#dcfce7",
   },
+  {
+    key: "chess-quest",
+    title: "Chess Quest",
+    description: "Learn clever moves, solve bite-size chess puzzles, and play a friendly practice match.",
+    icon: "Crown",
+    ageMin: 6,
+    ageMax: 18,
+    playTime: "4-8 min",
+    color: "#7c3aed",
+    bg: "#f3e8ff",
+  },
 ];
 
 export const DEFAULT_GAME_SETTINGS: Record<GameKey, {
@@ -175,6 +186,14 @@ export const DEFAULT_GAME_SETTINGS: Record<GameKey, {
     rewardTickets: 0,
     requiresChoresComplete: false,
     dailyPlayLimit: 4,
+  },
+  "chess-quest": {
+    enabled: true,
+    rewardType: "points",
+    rewardPoints: 8,
+    rewardTickets: 0,
+    requiresChoresComplete: false,
+    dailyPlayLimit: 3,
   },
 };
 

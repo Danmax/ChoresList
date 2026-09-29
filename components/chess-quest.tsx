@@ -1,0 +1,79 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { ArrowLeft, BookOpen, Bot, Crown, Lightbulb, RotateCcw, Sparkles, Swords } from "lucide-react";
+
+type Color = "white" | "black";
+type Kind = "king" | "queen" | "rook" | "bishop" | "knight" | "pawn";
+type Piece = { color: Color; kind: Kind };
+type Square = Piece | null;
+type Board = Square[];
+type Move = { from: number; to: number };
+
+const GLYPH: Record<Color, Record<Kind, string>> = {
+  white: { king: "♔", queen: "♕", rook: "♖", bishop: "♗", knight: "♘", pawn: "♙" },
+  black: { king: "♚", queen: "♛", rook: "♜", bishop: "♝", knight: "♞", pawn: "♟" },
+};
+
+const files = ["a", "b", "c", "d", "e", "f", "g", "h"];
+const piece = (color: Color, kind: Kind): Piece => ({ color, kind });
+const at = (file: string, rank: number) => (8 - rank) * 8 + files.indexOf(file);
+const label = (index: number) => `${files[index % 8]}${8 - Math.floor(index / 8)}`;
+
+function emptyBoard(): Board { return Array.from({ length: 64 }, () => null); }
+function setupBoard(): Board {
+  const board = emptyBoard();
+  const order: Kind[] = ["rook", "knight", "bishop", "queen", "king", "bishop", "knight", "rook"];
+  order.forEach((kind, file) => { board[file] = piece("black", kind); board[56 + file] = piece("white", kind); board[8 + file] = piece("black", "pawn"); board[48 + file] = piece("white", "pawn"); });
+  return board;
+}
+
+const PUZZLES: { title: string; lesson: string; prompt: string; board: Board; expected: Move; win: string }[] = [
+  (() => { const board = emptyBoard(); board[at("g", 1)] = piece("white", "king"); board[at("d", 1)] = piece("white", "queen"); board[at("a", 8)] = piece("black", "king"); board[at("d", 8)] = piece("black", "rook"); return { title: "The Queen's Path", lesson: "Queens travel any number of squares in a straight line.", prompt: "Win the rook! Move your queen to d8.", board, expected: { from: at("d", 1), to: at("d", 8) }, win: "Excellent! Your queen moved straight up the file and captured the rook." }; })(),
+  (() => { const board = emptyBoard(); board[at("g", 1)] = piece("white", "king"); board[at("e", 4)] = piece("white", "knight"); board[at("a", 8)] = piece("black", "king"); board[at("f", 6)] = piece("black", "queen"); return { title: "Knight's Leap", lesson: "Knights move in an L shape: two squares one way, then one sideways.", prompt: "Leap to f6 and capture the queen.", board, expected: { from: at("e", 4), to: at("f", 6) }, win: "Brilliant leap! Knights are the only pieces that can jump over others." }; })(),
+  (() => { const board = emptyBoard(); board[at("g", 1)] = piece("white", "king"); board[at("c", 2)] = piece("white", "bishop"); board[at("a", 8)] = piece("black", "king"); board[at("g", 6)] = piece("black", "rook"); return { title: "Diagonal Dash", lesson: "Bishops glide as far as they like on diagonals.", prompt: "Slide to g6 and collect the rook.", board, expected: { from: at("c", 2), to: at("g", 6) }, win: "Nice diagonal! A bishop always stays on the same color square." }; })(),
+];
+
+function inside(row: number, col: number) { return row >= 0 && row < 8 && col >= 0 && col < 8; }
+function pseudoMoves(board: Board, from: number): number[] {
+  const moving = board[from]; if (!moving) return [];
+  const row = Math.floor(from / 8), col = from % 8, moves: number[] = [];
+  const add = (r: number, c: number) => { if (inside(r, c) && (!board[r * 8 + c] || board[r * 8 + c]?.color !== moving.color)) moves.push(r * 8 + c); };
+  const slide = (directions: number[][]) => directions.forEach(([dr, dc]) => { for (let r = row + dr, c = col + dc; inside(r, c); r += dr, c += dc) { const target = r * 8 + c; if (!board[target]) moves.push(target); else { if (board[target]?.color !== moving.color) moves.push(target); break; } } });
+  if (moving.kind === "knight") [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(([r,c]) => add(row+r,col+c));
+  if (moving.kind === "king") [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]].forEach(([r,c]) => add(row+r,col+c));
+  if (moving.kind === "rook" || moving.kind === "queen") slide([[-1,0],[1,0],[0,-1],[0,1]]);
+  if (moving.kind === "bishop" || moving.kind === "queen") slide([[-1,-1],[-1,1],[1,-1],[1,1]]);
+  if (moving.kind === "pawn") { const direction = moving.color === "white" ? -1 : 1; const next = (row + direction) * 8 + col; if (inside(row + direction, col) && !board[next]) { moves.push(next); const start = moving.color === "white" ? 6 : 1; const double = (row + direction * 2) * 8 + col; if (row === start && !board[double]) moves.push(double); } [-1, 1].forEach((delta) => { const target = (row + direction) * 8 + col + delta; if (inside(row + direction, col + delta) && board[target]?.color !== moving.color) moves.push(target); }); }
+  return moves;
+}
+function applyMove(board: Board, move: Move): Board { const next = [...board]; const source = next[move.from]; next[move.to] = source?.kind === "pawn" && (move.to < 8 || move.to >= 56) ? piece(source.color, "queen") : source; next[move.from] = null; return next; }
+function inCheck(board: Board, color: Color) { const king = board.findIndex((item) => item?.color === color && item.kind === "king"); return king >= 0 && board.some((item, index) => item?.color !== color && pseudoMoves(board, index).includes(king)); }
+function legalMoves(board: Board, color: Color) { const moves: Move[] = []; board.forEach((item, from) => { if (item?.color === color) pseudoMoves(board, from).forEach((to) => { const target = board[to]; if (target?.kind !== "king" && !inCheck(applyMove(board, { from, to }), color)) moves.push({ from, to }); }); }); return moves; }
+
+function BoardView({ board, selected, targets, onSquare, disabled }: { board: Board; selected: number | null; targets: number[]; onSquare: (square: number) => void; disabled?: boolean }) {
+  return <div className="grid w-full max-w-[34rem] grid-cols-8 overflow-hidden rounded-2xl border-4 border-violet-900 bg-violet-900 shadow-xl" role="grid" aria-label="Chess board">
+    {board.map((item, index) => { const light = (Math.floor(index / 8) + index % 8) % 2 === 0; const isTarget = targets.includes(index); return <button key={index} type="button" disabled={disabled} onClick={() => onSquare(index)} aria-label={`${label(index)}${item ? ` ${item.color} ${item.kind}` : " empty"}`} className={`relative aspect-square text-[clamp(1.35rem,7vw,3.25rem)] leading-none transition-colors ${light ? "bg-[#f8e7bf]" : "bg-[#ab754b]"} ${selected === index ? "ring-4 ring-inset ring-yellow-300" : ""} ${isTarget ? "after:absolute after:inset-[34%] after:rounded-full after:bg-violet-700/55" : ""}`}><span className="relative z-10 drop-shadow-sm">{item ? GLYPH[item.color][item.kind] : ""}</span>{index % 8 === 0 && <span className="absolute left-1 top-0.5 text-[9px] font-black text-violet-950/55">{8 - Math.floor(index / 8)}</span>}{Math.floor(index / 8) === 7 && <span className="absolute bottom-0.5 right-1 text-[9px] font-black text-violet-950/55">{files[index % 8]}</span>}</button>; })}
+  </div>;
+}
+
+export function ChessQuest({ onExit, onFinish }: { onExit: () => void; onFinish: (score: number, durationSeconds: number, metadata: Record<string, unknown>) => void }) {
+  const [mode, setMode] = useState<"home" | "lesson" | "match">("home");
+  const [lesson, setLesson] = useState(0); const [board, setBoard] = useState<Board>(() => PUZZLES[0].board); const [selected, setSelected] = useState<number | null>(null); const [message, setMessage] = useState(""); const [solved, setSolved] = useState(0); const [turn, setTurn] = useState<Color>("white"); const [startedAt, setStartedAt] = useState(0); const [moves, setMoves] = useState(0);
+  const targets = useMemo(() => selected === null ? [] : (mode === "lesson" ? pseudoMoves(board, selected) : turn === "white" ? legalMoves(board, "white").filter((move) => move.from === selected).map((move) => move.to) : []), [board, selected, mode, turn]);
+  function beginLesson() { setLesson(0); setBoard(PUZZLES[0].board); setMode("lesson"); setSelected(null); setMessage(PUZZLES[0].prompt); setSolved(0); setStartedAt(Date.now()); }
+  function beginMatch() { setBoard(setupBoard()); setMode("match"); setSelected(null); setMessage("Your turn! You are White. Pick a piece, then a glowing square."); setTurn("white"); setMoves(0); setStartedAt(Date.now()); }
+  function finish(score: number, metadata: Record<string, unknown>) { onFinish(score, Math.max(1, Math.round((Date.now() - startedAt) / 1000)), metadata); }
+  function aiMove(nextBoard: Board) { const options = legalMoves(nextBoard, "black"); if (!options.length) { setMessage(inCheck(nextBoard, "black") ? "Checkmate! You won the practice match!" : "Stalemate — great defense!"); return; } const captures = options.filter((move) => nextBoard[move.to]); const pick = (captures.length ? captures : options)[Math.floor(Math.random() * (captures.length ? captures.length : options.length))]; const after = applyMove(nextBoard, pick); setBoard(after); setTurn("white"); setMessage(inCheck(after, "white") ? "The guide gives check! Find a safe move." : "Your turn — look for a clever move."); }
+  function clickSquare(square: number) {
+    if (mode === "lesson") { const puzzle = PUZZLES[lesson]; if (selected === null) { if (board[square]?.color === "white") setSelected(square); return; } if (square === selected) { setSelected(null); return; } if (!targets.includes(square)) { setMessage("That piece cannot move there. Try the glowing path!"); return; } if (selected === puzzle.expected.from && square === puzzle.expected.to) { setBoard(applyMove(board, { from: selected, to: square })); setSelected(null); setSolved((value) => value + 1); setMessage(puzzle.win); } else { setSelected(null); setMessage("Good idea, but this quest has one special target. Try again!"); } return; }
+    if (mode !== "match" || turn !== "white") return;
+    if (selected === null) { if (board[square]?.color === "white") setSelected(square); return; }
+    if (square === selected) { setSelected(null); return; }
+    if (!targets.includes(square)) { if (board[square]?.color === "white") setSelected(square); else { setSelected(null); setMessage("Choose one of the glowing legal moves."); } return; }
+    const after = applyMove(board, { from: selected, to: square }); const nextMoves = moves + 1; setBoard(after); setSelected(null); setMoves(nextMoves); setTurn("black"); if (!legalMoves(after, "black").length) { setMessage(inCheck(after, "black") ? "Checkmate! You won!" : "Stalemate — a draw!"); return; } if (nextMoves >= 20) { setMessage("Practice match complete! You made 20 thoughtful moves."); return; } window.setTimeout(() => aiMove(after), 420);
+  }
+  const puzzleDone = mode === "lesson" && solved > lesson;
+  return <main className="mx-auto max-w-5xl pb-8"><div className="mb-5 flex items-center justify-between"><button type="button" onClick={mode === "home" ? onExit : () => setMode("home")} className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2 font-black text-slate-700 shadow-sm"><ArrowLeft size={18} /> {mode === "home" ? "Games" : "Quest map"}</button><span className="rounded-full bg-violet-100 px-4 py-2 text-sm font-black text-violet-700">♟ Chess Quest</span></div>
+    {mode === "home" ? <section className="overflow-hidden rounded-[2rem] bg-gradient-to-br from-violet-700 via-fuchsia-700 to-indigo-800 p-6 text-white shadow-xl sm:p-10"><div className="max-w-xl"><span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-sm font-black"><Sparkles size={16} /> Learn by playing</span><h2 className="mt-4 text-4xl font-black tracking-tight sm:text-5xl">Welcome to Chess Quest!</h2><p className="mt-3 text-lg font-bold leading-7 text-violet-100">Meet the pieces, solve three quick challenges, then test your new skills against the friendly castle guide.</p><div className="mt-7 grid gap-3 sm:grid-cols-2"><button type="button" onClick={beginLesson} className="rounded-2xl bg-yellow-300 p-4 text-left text-violet-950 shadow-lg transition-transform hover:-translate-y-0.5"><BookOpen size={24}/><span className="mt-2 block text-lg font-black">Start the lessons</span><span className="text-sm font-bold">3 bite-size puzzles</span></button><button type="button" onClick={beginMatch} className="rounded-2xl bg-white/15 p-4 text-left text-white ring-1 ring-white/30 transition-transform hover:-translate-y-0.5"><Swords size={24}/><span className="mt-2 block text-lg font-black">Practice match</span><span className="text-sm font-bold text-violet-100">Play the castle guide</span></button></div></div></section> : <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]"><div><BoardView board={board} selected={selected} targets={targets} onSquare={clickSquare} disabled={mode === "lesson" && puzzleDone || mode === "match" && (turn !== "white" || moves >= 20)} /></div><aside className="rounded-3xl bg-white p-5 shadow-sm"><div className="flex items-center gap-2 text-violet-700"><Crown size={22}/><span className="font-black">{mode === "lesson" ? PUZZLES[lesson].title : "Practice match"}</span></div><p className="mt-4 text-lg font-black text-slate-800">{mode === "lesson" ? PUZZLES[lesson].lesson : "Play White against a gentle guide."}</p><p aria-live="polite" className="mt-3 rounded-2xl bg-violet-50 p-4 text-sm font-bold leading-6 text-violet-900">{message}</p>{mode === "lesson" && <div className="mt-5"><div className="flex gap-2">{PUZZLES.map((_, index) => <span key={index} className={`h-2 flex-1 rounded-full ${index <= lesson ? "bg-violet-600" : "bg-slate-200"}`}/>)}</div>{puzzleDone ? lesson < PUZZLES.length - 1 ? <button type="button" onClick={() => { const next = lesson + 1; setLesson(next); setBoard(PUZZLES[next].board); setMessage(PUZZLES[next].prompt); }} className="mt-4 w-full rounded-xl bg-violet-700 px-4 py-3 font-black text-white">Next lesson</button> : <button type="button" onClick={() => finish(300, { mode: "lessons", puzzlesSolved: PUZZLES.length })} className="mt-4 w-full rounded-xl bg-emerald-600 px-4 py-3 font-black text-white">Claim quest stars</button> : <button type="button" onClick={() => setMessage(PUZZLES[lesson].prompt)} className="mt-4 inline-flex items-center gap-2 font-black text-violet-700"><Lightbulb size={18}/> Show my mission</button>}</div>}{mode === "match" && <div className="mt-5 space-y-3"><p className="text-sm font-black text-slate-500">Moves played: {moves}/20</p>{(moves >= 20 || message.includes("Checkmate") || message.includes("Stalemate")) && <button type="button" onClick={() => finish(Math.max(80, moves * 12), { mode: "practice", moves, result: message.includes("Checkmate") ? "win" : "complete" })} className="w-full rounded-xl bg-emerald-600 px-4 py-3 font-black text-white">Finish match</button>}<button type="button" onClick={beginMatch} className="inline-flex items-center gap-2 font-black text-violet-700"><RotateCcw size={18}/> New board</button></div>}</aside></section>}</main>;
+}

@@ -3,10 +3,11 @@
 import { type DragEvent, type MouseEvent as ReactMouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, BookOpen, CheckCircle2, ChefHat, Circle, FileText, Gamepad2, Grid3X3, KeyRound, Puzzle, RefreshCw, Scissors, Shapes, Swords, TreePine, Trophy } from "lucide-react";
+import { ArrowLeft, BookOpen, CheckCircle2, ChefHat, Circle, Crown, FileText, Gamepad2, Grid3X3, KeyRound, Puzzle, RefreshCw, Scissors, Shapes, Swords, TreePine, Trophy } from "lucide-react";
 import { toast } from "sonner";
 import { MemberAvatar } from "@/components/member-avatar";
 import { JungleVineSwing } from "@/components/jungle-runner";
+import { ChessQuest } from "@/components/chess-quest";
 import { createTriviaRound, type TriviaLevel } from "@/lib/bible-trivia";
 
 type Member = {
@@ -21,7 +22,7 @@ type Member = {
 };
 
 type Game = {
-  key: "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot" | "shape-safari" | "codebreaker-quest" | "tic-tac-toe" | "burger-rush" | "jungle-vine-swing";
+  key: "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot" | "shape-safari" | "codebreaker-quest" | "tic-tac-toe" | "burger-rush" | "jungle-vine-swing" | "chess-quest";
   title: string;
   description: string;
   ageMin: number;
@@ -81,6 +82,7 @@ function iconForGame(key: string) {
   if (key === "tic-tac-toe") return Grid3X3;
   if (key === "burger-rush") return ChefHat;
   if (key === "jungle-vine-swing") return TreePine;
+  if (key === "chess-quest") return Crown;
   return Gamepad2;
 }
 
@@ -204,6 +206,8 @@ export default function KidGamesPage() {
         <BurgerRush onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("burger-rush", score, duration, metadata)} />
       ) : activeGame === "jungle-vine-swing" ? (
         <JungleVineSwing onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("jungle-vine-swing", score, duration, metadata)} />
+      ) : activeGame === "chess-quest" ? (
+        <ChessQuest onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("chess-quest", score, duration, metadata)} />
       ) : (
         <section className="grid gap-4 sm:grid-cols-2">
           {[...games].sort((a, b) => Number(b.key === "jungle-vine-swing") - Number(a.key === "jungle-vine-swing")).map((game) => {
