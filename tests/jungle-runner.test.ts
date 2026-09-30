@@ -719,11 +719,28 @@ test('cave spikes release one at a time and guardian projectiles travel toward J
   assert.ok(delayedSpike.y > 12);
 });
 
-test('a jungle guardian runs in, fires two separate arrows, then retreats', () => {
+test('a forest archer repeats alternating arrows while recovering and takes three hits', () => {
   const s = active(); s.invincible = 10;
   const guardian = createJungleGuardian(PLAYER_X + 650); s.guardians = [guardian];
-  advance(s, 1.4);
-  assert.equal(guardian.attacks, 2); assert.equal(guardian.state, 'retreat');
+  advance(s, 4.5);
+  assert.ok(guardian.attacks >= 3); assert.equal(guardian.hitPoints, 3);
+  guardian.x = s.distance + PLAYER_X + 10;
+  for (let i = 0; i < 3; i++) { punchRunner(s); advance(s, 0.2); }
+  assert.equal(s.guardians.length, 0);
+});
+
+test('forward dash has the same brief re-entry limit as slide', () => {
+  const s = active();
+  forwardDashRunner(s); assert.ok(s.forwardDashLeft > 0);
+  advance(s, 0.4); forwardDashRunner(s); assert.equal(s.forwardDashLeft, 0);
+  advance(s, 0.31); forwardDashRunner(s); assert.ok(s.forwardDashLeft > 0);
+});
+
+test('landing on an elephant head bounces the hero even while attacking', () => {
+  const s = active(); const herd = { x: PLAYER_X, age: 1, charging: true, warned: true }; s.herds = [herd];
+  s.y = ELEPHANT_TOP - 1; s.vy = 150; s.jumps = 2; punchRunner(s);
+  stepRunner(s, 1 / 120);
+  assert.equal(s.elephantBounces, 1); assert.ok(s.vy < 0); assert.equal(herd.knocked?.[0], undefined);
 });
 
 test('punch and kick chain into a timed three-hit monkey combo', () => {

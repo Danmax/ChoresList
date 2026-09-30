@@ -343,7 +343,8 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     const x = guardian.x - cameraDistance;
     if (x < -90 || x > 900) continue;
     jungleGuardianArt(ctx, x, guardian.age, guardian.state === 'aim');
-    ctx.fillStyle = '#fff4b4'; ctx.font = 'bold 11px sans-serif'; ctx.fillText(guardian.state === 'aim' ? `${2 - guardian.attacks} ARROWS — SLIDE!` : guardian.state === 'retreat' ? 'RETREAT!' : 'JUNGLE GUARDIAN!', x, FLOOR - 126);
+    ctx.fillStyle = '#fff4b4'; ctx.font = 'bold 11px sans-serif'; ctx.fillText(guardian.state === 'aim' ? 'ARROW READY — SLIDE!' : guardian.state === 'retreat' ? 'RECOVERING — CLOSE IN!' : 'FOREST ARCHER!', x, FLOOR - 126);
+    ctx.fillStyle = '#ffcf66'; ctx.font = 'bold 12px sans-serif'; ctx.fillText(`♥ ${Math.max(0, guardian.hitPoints - guardian.hits)}`, x, FLOOR - 143);
   }
   for (const p of s.pineapples) {
     drawPineapple(ctx, p.x - cameraDistance, p.y, p.rotation);

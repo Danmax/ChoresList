@@ -51,8 +51,10 @@ export type Lemming = { x: number; y: number; endX: number; age: number; used: b
 export type River = { resident?: 'piranha' | 'eel'; waterAge?: number; x: number; width: number; vine?: boolean; used?: boolean; bounced?: boolean; bounceLeft?: number; snapLeft?: number[]; snapped?: boolean[]; piranhasKnocked?: boolean[]; eelStun?: number; eelScored?: boolean };
 export type Orangutan = { x: number; age: number; state: 'dance' | 'windup' | 'throw' | 'recover'; throws: number; stunned?: number };
 export type Pineapple = { x: number; y: number; vx: number; vy: number; rotation: number; bounceAmmo?: boolean; reflected?: boolean; previousX?: number };
-export type JungleGuardian = { x: number; age: number; attacks: number; state: 'run-in' | 'aim' | 'retreat' };
-export function createJungleGuardian(x: number): JungleGuardian { return { x, age: 0, attacks: 0, state: 'run-in' }; }
+// Forest archers stay in the encounter until the monkey lands a short combo.
+// Their pause between arrows gives a clear opening to close the distance.
+export type JungleGuardian = { x: number; age: number; attacks: number; state: 'run-in' | 'aim' | 'retreat'; hits: number; hitPoints: number; hitCooldown: number };
+export function createJungleGuardian(x: number): JungleGuardian { return { x, age: 0, attacks: 0, state: 'run-in', hits: 0, hitPoints: 3, hitCooldown: 0 }; }
 export function createOrangutan(x: number): Orangutan { return { x, age: 0, state: 'dance', throws: 0 }; }
 export function orangutanHand(o: Orangutan) {
   const t = Math.min(1, o.age / 0.55);
@@ -153,7 +155,7 @@ export function createRunner(difficulty: RunnerDifficulty = 'medium') {
     insects: [] as Insect[], antRocks: [] as AntRock[], caterpillarBounces: 0,
     reaction: 'bonk' as HitReaction, reactionLeft: 0,
     phase: 'ready' as 'ready' | 'playing' | 'over' | 'victory',
-    distance: 0, elapsed: 0, level: 0, y: FLOOR, vy: 0, jumps: 0, duck: false, duckHeld: false, slideLeft: 0, slideCooldown: 0, strongDiveLeft: 0, attackLeft: 0, forwardDashLeft: 0, combatMove: 'run' as 'run' | 'punch' | 'kick' | 'dash', combatLeft: 0, comboStep: 0, comboWindow: 0, counterLeft: 0, ki: 0, specialLeft: 0, cameraLead: 0,
+    distance: 0, elapsed: 0, level: 0, y: FLOOR, vy: 0, jumps: 0, duck: false, duckHeld: false, slideLeft: 0, slideCooldown: 0, strongDiveLeft: 0, attackLeft: 0, forwardDashLeft: 0, forwardDashCooldown: 0, combatMove: 'run' as 'run' | 'punch' | 'kick' | 'dash', combatLeft: 0, comboStep: 0, comboWindow: 0, counterLeft: 0, ki: 0, specialLeft: 0, cameraLead: 0,
     flipLeft: 0, swing: null as ({ river: River; progress: number } | { lemming: Lemming; progress: number }) | null,
     cracks: [] as { x: number; y: number; age: number; kind?: 'coconut' | 'barrel' }[],
     golden: 0, cherries: 0, bonusScore: 0, gems: 0,
@@ -219,9 +221,11 @@ function startCombatMove(s: Runner, move: 'punch' | 'kick') {
 export function punchRunner(s: Runner) { startCombatMove(s, 'punch'); }
 export function kickRunner(s: Runner) { startCombatMove(s, 'kick'); }
 export function forwardDashRunner(s: Runner) {
-  if (s.phase !== 'playing' || s.swing || (s.stun > 0 && s.counterLeft <= 0)) return;
+  // Match slide's re-entry limit so holding or rapidly tapping Forward cannot
+  // turn the runner into a permanent dash.
+  if (s.phase !== 'playing' || s.swing || s.forwardDashLeft > 0 || s.forwardDashCooldown > 0 || (s.stun > 0 && s.counterLeft <= 0)) return;
   s.duck = false; s.slideLeft = 0; s.strongDiveLeft = 0;
-  s.combatMove = 'dash'; s.combatLeft = 0.34; s.forwardDashLeft = 0.34;
+  s.combatMove = 'dash'; s.combatLeft = 0.34; s.forwardDashLeft = 0.34; s.forwardDashCooldown = 0.7;
 }
 export function gainKi(s: Runner, amount: number) {
   const before = s.ki;
@@ -396,6 +400,7 @@ export function stepRunner(s: Runner, dt: number) {
   s.attackLeft = Math.max(0, s.attackLeft - dt);
   s.slideCooldown = Math.max(0, s.slideCooldown - dt);
   s.forwardDashLeft = Math.max(0, s.forwardDashLeft - dt);
+  s.forwardDashCooldown = Math.max(0, s.forwardDashCooldown - dt);
   s.specialLeft = Math.max(0, s.specialLeft - dt);
   s.combatLeft = Math.max(0, s.combatLeft - dt);
   s.comboWindow = Math.max(0, s.comboWindow - dt);
@@ -580,6 +585,8 @@ export function stepRunner(s: Runner, dt: number) {
     for (let i = 0; i < 3; i++) {
       if (herd.knocked?.[i]) continue;
       if (Math.abs(worldX - (herd.x + i * 175)) > 65) continue;
+      // A head/back landing is always a springboard for the hero. It takes no
+      // elephant health and cannot turn into a defeat, even during an attack.
       if (s.vy > 0 && previousY <= ELEPHANT_TOP && s.y >= ELEPHANT_TOP) {
         s.y = ELEPHANT_TOP; s.vy = -460; s.jumps = 1; s.duck = false; s.slideLeft = 0; s.flipLeft = 0;
         s.elephantBounces++; s.message = 'HERD HOP!'; s.messageTime = 0.7;
@@ -626,6 +633,7 @@ export function stepRunner(s: Runner, dt: number) {
   s.orangutans = s.orangutans.filter(o => o.x > s.distance - 140);
   for (const guardian of s.guardians) {
     const ahead = guardian.x - worldX;
+    guardian.hitCooldown = Math.max(0, guardian.hitCooldown - dt);
     if (guardian.state === 'run-in') {
       if (ahead > 850) continue;
       guardian.x -= 460 * dt;
@@ -634,19 +642,33 @@ export function stepRunner(s: Runner, dt: number) {
     }
     guardian.age += dt;
     if (guardian.state === 'aim') {
-      // A visible half-beat separates the two shots, so the encounter asks
-      // for two quick defensive decisions rather than one unavoidable hit.
-      const fireAt = guardian.attacks === 0 ? 0.18 : 0.58;
-      if (guardian.attacks < 2 && guardian.age >= fireAt) {
-        const y = guardian.attacks === 0 ? FLOOR - 112 : FLOOR - 82;
+      // The archer alternates a high and low arrow, then gets a recovery beat
+      // before repeating the pattern instead of disappearing after two shots.
+      if (guardian.age >= 0.28) {
+        const y = guardian.attacks % 2 === 0 ? FLOOR - 112 : FLOOR - 82;
         s.items.push({ x: guardian.x - 38, y, kind: 'arrow', vx: -500, rotation: 0 });
         guardian.attacks++;
-        s.message = guardian.attacks === 1 ? 'JUNGLE GUARDIAN! FIRST ARROW!' : 'SECOND ARROW! STAY LOW!'; s.messageTime = 0.75;
+        guardian.state = 'retreat'; guardian.age = 0;
+        s.message = guardian.attacks % 2 ? 'FOREST ARCHER! HIGH ARROW!' : 'FOREST ARCHER! LOW ARROW!'; s.messageTime = 0.75;
       }
-      if (guardian.attacks === 2 && guardian.age >= 0.95) { guardian.state = 'retreat'; guardian.age = 0; }
-    } else guardian.x += 540 * dt;
+    } else {
+      // Back away between shots, then set up the next arrow every few seconds.
+      guardian.x += 110 * dt;
+      if (guardian.age >= 1.65) { guardian.state = 'aim'; guardian.age = 0; }
+    }
+    if (isHeroAttack(s) && guardian.hitCooldown === 0 && Math.abs(ahead) < 55 + heroAttackReach(s) && s.y > FLOOR - 155) {
+      guardian.hits++;
+      guardian.hitCooldown = s.forwardDashLeft > 0 ? 0.5 : 0.12;
+      gainKi(s, 12);
+      if (guardian.hits >= guardian.hitPoints) {
+        guardian.state = 'retreat'; guardian.age = 99;
+        starKnockout(s, guardian.x, FLOOR - 92, 'FOREST ARCHER');
+        s.message = `FOREST ARCHER STRIKE! ${guardian.hits}/${guardian.hitPoints} — KNOCKOUT!`;
+      } else s.message = `FOREST ARCHER STRIKE! ${guardian.hits}/${guardian.hitPoints}`;
+      s.messageTime = 0.8;
+    }
   }
-  s.guardians = s.guardians.filter(guardian => guardian.state !== 'retreat' || guardian.x < s.distance + 1150);
+  s.guardians = s.guardians.filter(guardian => guardian.age < 90 && guardian.x > s.distance - 140 && guardian.x < s.distance + 1150);
   s.pineapples = s.pineapples.filter(p => {
     p.previousX = p.x;
     p.x += p.vx * dt; p.vy += 650 * dt; p.y += p.vy * dt; p.rotation += dt * (p.reflected ? 14 : 7);
