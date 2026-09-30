@@ -7,7 +7,7 @@ import { ArrowLeft, BookOpen, CheckCircle2, ChefHat, Circle, Crown, FileText, Ga
 import { toast } from "sonner";
 import { MemberAvatar } from "@/components/member-avatar";
 import { JungleVineSwing } from "@/components/jungle-runner";
-import { ChessQuest } from "@/components/chess-quest";
+import { ChessQuest, type ChessStats } from "@/components/chess-quest";
 import { createTriviaRound, type TriviaLevel } from "@/lib/bible-trivia";
 
 type Member = {
@@ -103,6 +103,7 @@ export default function KidGamesPage() {
   const [showJohnnyMenu, setShowJohnnyMenu] = useState(false);
   const [loading, setLoading] = useState(true);
   const [reward, setReward] = useState<Reward | null>(null);
+  const [chessStats, setChessStats] = useState<ChessStats>({ gamesPlayed: 0, wins: 0, losses: 0, draws: 0, rating: 1000 });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -124,6 +125,7 @@ export default function KidGamesPage() {
       }
       setSettings(nextSettings);
       setAvailability(gamesData?.availability ?? {});
+      setChessStats(gamesData?.chessStats ?? { gamesPlayed: 0, wins: 0, losses: 0, draws: 0, rating: 1000 });
     } else {
       toast.error(gamesData?.error ?? "Could not load games");
     }
@@ -212,6 +214,7 @@ export default function KidGamesPage() {
         <ChessQuest
           playerName={member.name}
           opponents={familyMembers.filter((familyMember) => familyMember.id !== id).map((familyMember) => ({ id: familyMember.id, name: familyMember.name }))}
+          stats={chessStats}
           onExit={() => setActiveGame(null)}
           onFinish={(score, duration, metadata) => recordSession("chess-quest", score, duration, metadata)}
         />

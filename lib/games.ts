@@ -105,7 +105,7 @@ export const GAME_DEFINITIONS: GameDefinition[] = [
   {
     key: "chess-quest",
     title: "Chess Quest",
-    description: "Learn clever moves, solve bite-size chess puzzles, and play a friendly practice match.",
+    description: "Learn clever moves, solve bite-size chess puzzles, and play a normal chess game with rating stats.",
     icon: "Crown",
     ageMin: 6,
     ageMax: 18,

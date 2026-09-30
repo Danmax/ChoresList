@@ -32,6 +32,23 @@ function cleanMetadata(value: unknown): Prisma.InputJsonValue | undefined {
   return JSON.parse(serialized) as Prisma.InputJsonValue;
 }
 
+function chessStats(sessions: { metadata: Prisma.JsonValue | null }[]) {
+  const stats = { gamesPlayed: 0, wins: 0, losses: 0, draws: 0, rating: 1000 };
+  for (const session of sessions) {
+    const metadata = session.metadata;
+    if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) continue;
+    const result = metadata.result;
+    if (result !== "win" && result !== "loss" && result !== "draw") continue;
+    stats.gamesPlayed++;
+    if (result === "win") stats.wins++;
+    else if (result === "loss") stats.losses++;
+    else stats.draws++;
+    const ratingAfter = Number(metadata.ratingAfter);
+    if (Number.isFinite(ratingAfter) && ratingAfter >= 100) stats.rating = Math.round(ratingAfter);
+  }
+  return stats;
+}
+
 function isDueToday(assignment: {
   frequency: string;
   dayOfWeek: number | null;
@@ -110,6 +127,11 @@ export const GET = withErrors(async (req: NextRequest) => {
     orderBy: { playedAt: "desc" },
     take: 20,
   });
+  const completedChessSessions = memberId ? await prisma.gameSession.findMany({
+    where: { householdId, memberId, gameKey: "chess-quest", member: memberAccess },
+    select: { metadata: true },
+    orderBy: { playedAt: "asc" },
+  }) : [];
 
   const today = todayStart();
   let availability: Record<string, { playsToday: number; openChores: number; available: boolean; reason: string | null }> = {};
@@ -148,7 +170,7 @@ export const GET = withErrors(async (req: NextRequest) => {
     }));
   }
 
-  return NextResponse.json({ games: GAME_DEFINITIONS, settings, recentSessions, availability });
+  return NextResponse.json({ games: GAME_DEFINITIONS, settings, recentSessions, availability, chessStats: chessStats(completedChessSessions) });
 });
 
 export const PUT = withErrors(async (req: NextRequest) => {

@@ -737,7 +737,7 @@ test('forward dash has the same brief re-entry limit as slide', () => {
 });
 
 test('landing on an elephant head bounces the hero even while attacking', () => {
-  const s = active(); const herd = { x: PLAYER_X, age: 1, charging: true, warned: true }; s.herds = [herd];
+  const s = active(); const herd: { x: number; age: number; charging: boolean; warned: boolean; knocked?: boolean[] } = { x: PLAYER_X, age: 1, charging: true, warned: true }; s.herds = [herd];
   s.y = ELEPHANT_TOP - 1; s.vy = 150; s.jumps = 2; punchRunner(s);
   stepRunner(s, 1 / 120);
   assert.equal(s.elephantBounces, 1); assert.ok(s.vy < 0); assert.equal(herd.knocked?.[0], undefined);
