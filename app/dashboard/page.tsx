@@ -451,10 +451,17 @@ export default function FamilyDashboard() {
         </div>
       )}
 
+      {!authRequired && !tvMode && kids.length > 0 && (
+        <section className="mb-8 rounded-3xl bg-white/70 p-4 shadow-sm sm:p-5">
+          <div className="mb-3 flex items-center justify-between gap-3"><div><h2 className="font-black text-slate-800">Family members</h2><p className="text-xs font-bold text-slate-400">Open a family member&apos;s chores, progress, and games</p></div><Link href="/parent/members" className="inline-flex items-center gap-1 text-sm font-black text-violet-600 hover:text-violet-800">Manage <ArrowRight size={14} /></Link></div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{kids.map((member) => { const todayDone = member.assignments.filter((assignment) => assignment.completions.length > 0).length; const academy = academyByMember.get(member.id) ?? { assignments: 0, projects: 0, completed: 0 }; return <Link key={member.id} href={`/kid/${member.id}`} className="flex items-center gap-3 rounded-2xl border-2 bg-white p-3 transition-all hover:-translate-y-0.5 hover:shadow-md" style={{ borderColor: `${member.color}55` }}><MemberAvatar avatar={member.avatar} avatarConfig={member.avatarConfig} avatarImageUrl={member.avatarImageUrl} name={member.name} className="h-14 w-14 shrink-0 rounded-2xl" /><span className="min-w-0 flex-1"><span className="block truncate font-black text-slate-800">{member.name}</span><span className="block text-xs font-bold text-slate-500">{todayDone}/{member.assignments.length} chores today</span>{educationEnabled && <span className="mt-1 block text-xs font-black text-blue-600">{academy.assignments + academy.projects > 0 ? `${academy.assignments + academy.projects} academy open` : "Academy clear"}</span>}</span><ArrowRight size={17} className="shrink-0 text-slate-300" /></Link>; })}</div>
+        </section>
+      )}
+
       {!authRequired && !tvMode && !apiError && !loading && (
         <div className="mb-8 grid gap-5 xl:grid-cols-2">
           {educationEnabled && (
-            <section className="rounded-3xl bg-white/80 p-5 shadow-sm xl:col-span-2">
+            <section className="order-last rounded-3xl bg-white/80 p-5 shadow-sm xl:col-span-2">
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="flex items-center gap-2 font-black text-slate-800">
@@ -724,7 +731,7 @@ export default function FamilyDashboard() {
         </div>
       )}
 
-      {!authRequired && (
+      {tvMode && !authRequired && (
         <div
           className={`grid gap-6 ${
             tvMode
