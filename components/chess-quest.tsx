@@ -105,7 +105,7 @@ function BoardView({ board, selected, targets, onSquare, disabled }: { board: Bo
 
 type Opponent = { id: string; name: string };
 export type ChessStats = { gamesPlayed: number; wins: number; losses: number; draws: number; rating: number };
-const DEFAULT_CHESS_STATS: ChessStats = { gamesPlayed: 0, wins: 0, losses: 0, draws: 0, rating: 1000 };
+const DEFAULT_CHESS_STATS: ChessStats = { gamesPlayed: 0, wins: 0, losses: 0, draws: 0, rating: 100 };
 
 function clockLabel(milliseconds: number) {
   const seconds = Math.max(0, Math.ceil(milliseconds / 1000));
@@ -131,7 +131,7 @@ export function ChessQuest({ playerName, opponents, stats = DEFAULT_CHESS_STATS,
   function beginMatch(type: "ai" | "family") { chess.current = new Chess(); setBoard(boardFromChess(chess.current)); setMode("match"); setMatchType(type); setDifficulty("medium"); setSelected(null); setMessage(type === "family" ? `${playerName} is White. Take the first move!` : "Normal chess against the Castle Guide — your turn!"); setTurn("white"); setMoves(0); setWhiteMs(10 * 60_000); setBlackMs(10 * 60_000); setStartedAt(Date.now()); }
   function finish(score: number, metadata: Record<string, unknown>) { onFinish(score, Math.max(1, Math.round((Date.now() - startedAt) / 1000)), metadata); }
   function matchOutcome(): "win" | "loss" | "draw" { if (timedOut) return whiteMs <= 0 ? "loss" : "win"; if (chess.current.isCheckmate()) return chess.current.turn() === "b" ? "win" : "loss"; return "draw"; }
-  function finishMatch() { const result = matchOutcome(); const score = result === "win" ? Math.max(160, moves * 14) : result === "draw" ? Math.max(100, moves * 10) : Math.max(80, moves * 8); const expected = 1 / (1 + 10 ** ((1000 - stats.rating) / 400)); const actual = result === "win" ? 1 : result === "draw" ? 0.5 : 0; const ratingAfter = Math.max(100, Math.round(stats.rating + 32 * (actual - expected))); finish(score, { mode: matchType === "family" ? "family" : "normal", moves, opponent: matchType === "family" ? blackName : "Castle Guide", result, ratingBefore: stats.rating, ratingAfter }); }
+  function finishMatch() { const result = matchOutcome(); const score = result === "win" ? Math.max(160, moves * 14) : result === "draw" ? Math.max(100, moves * 10) : Math.max(80, moves * 8); const expected = 1 / (1 + 10 ** ((100 - stats.rating) / 400)); const actual = result === "win" ? 1 : result === "draw" ? 0.5 : 0; const ratingAfter = Math.max(100, Math.round(stats.rating + 32 * (actual - expected))); finish(score, { mode: matchType === "family" ? "family" : "normal", moves, opponent: matchType === "family" ? blackName : "Castle Guide", result, ratingBefore: stats.rating, ratingAfter }); }
   function gameMessage() { if (chess.current.isCheckmate()) return `Checkmate! ${chess.current.turn() === "w" ? blackName : playerName} wins!`; if (chess.current.isStalemate()) return "Stalemate — a draw!"; if (chess.current.isThreefoldRepetition()) return "Draw by repetition."; if (chess.current.isInsufficientMaterial()) return "Draw — not enough material to checkmate."; if (chess.current.isDraw()) return "Draw!"; return ""; }
   useEffect(() => {
     if (mode !== "match" || chess.current.isGameOver() || timedOut) return;

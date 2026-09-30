@@ -33,7 +33,7 @@ function cleanMetadata(value: unknown): Prisma.InputJsonValue | undefined {
 }
 
 function chessStats(sessions: { metadata: Prisma.JsonValue | null }[]) {
-  const stats = { gamesPlayed: 0, wins: 0, losses: 0, draws: 0, rating: 1000 };
+  const stats = { gamesPlayed: 0, wins: 0, losses: 0, draws: 0, rating: 100 };
   for (const session of sessions) {
     const metadata = session.metadata;
     if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) continue;

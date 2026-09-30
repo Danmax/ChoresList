@@ -103,7 +103,7 @@ export default function KidGamesPage() {
   const [showJohnnyMenu, setShowJohnnyMenu] = useState(false);
   const [loading, setLoading] = useState(true);
   const [reward, setReward] = useState<Reward | null>(null);
-  const [chessStats, setChessStats] = useState<ChessStats>({ gamesPlayed: 0, wins: 0, losses: 0, draws: 0, rating: 1000 });
+  const [chessStats, setChessStats] = useState<ChessStats>({ gamesPlayed: 0, wins: 0, losses: 0, draws: 0, rating: 100 });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -125,7 +125,7 @@ export default function KidGamesPage() {
       }
       setSettings(nextSettings);
       setAvailability(gamesData?.availability ?? {});
-      setChessStats(gamesData?.chessStats ?? { gamesPlayed: 0, wins: 0, losses: 0, draws: 0, rating: 1000 });
+      setChessStats(gamesData?.chessStats ?? { gamesPlayed: 0, wins: 0, losses: 0, draws: 0, rating: 100 });
     } else {
       toast.error(gamesData?.error ?? "Could not load games");
     }
