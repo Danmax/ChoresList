@@ -121,6 +121,16 @@ type EducationProject = {
   member?: { id: number; name: string; avatar: string; color: string } | null;
 };
 
+type RewardTicket = {
+  id: string;
+  rewardTitle: string;
+  rewardEmoji: string;
+  status: string;
+  earnedAt: string;
+  member: { id: string; name: string; avatar: string; color: string };
+  project: { id: string; title: string; emoji: string };
+};
+
 const PARENT_ITEMS = [
   { href: "/parent/tasks", Icon: CheckCircle2, label: "Parent Tasks", desc: "Complete parent chores", color: "#14b8a6", bg: "#ccfbf1" },
   { href: "/parent/assign", Icon: CalendarDays, label: "Assign Chores", desc: "Plan daily and weekly work", color: "#34d399", bg: "#d1fae5" },
@@ -170,6 +180,8 @@ export default function FamilyDashboard() {
   const [educationProjects, setEducationProjects] = useState<EducationProject[]>([]);
   const [educationSetCount, setEducationSetCount] = useState(0);
   const [educationEnabled, setEducationEnabled] = useState(false);
+  const [rewardTickets, setRewardTickets] = useState<RewardTicket[]>([]);
+  const [redeemingTicketId, setRedeemingTicketId] = useState<string | null>(null);
   const [groceryEnabled, setGroceryEnabled] = useState(false);
   const [communityEnabled, setCommunityEnabled] = useState(false);
   const [calendarEnabled, setCalendarEnabled] = useState(false);
@@ -199,6 +211,7 @@ export default function FamilyDashboard() {
         setEducationProjects([]);
         setEducationSetCount(0);
         setEducationEnabled(false);
+        setRewardTickets([]);
         setLoading(false);
         return;
       }
@@ -220,11 +233,12 @@ export default function FamilyDashboard() {
       setCommunityEnabled(nextCommunityEnabled);
       setCalendarEnabled(activePluginKeys.has("family-calendar"));
 
-      const [listsRes, groupsRes, discoverRes, educationRes] = await Promise.all([
+      const [listsRes, groupsRes, discoverRes, educationRes, ticketsRes] = await Promise.all([
         nextGroceryEnabled ? fetch("/api/groceries/lists?status=active") : Promise.resolve(null),
         nextCommunityEnabled ? fetch("/api/community/groups") : Promise.resolve(null),
         nextCommunityEnabled ? fetch("/api/community/groups?discover=true") : Promise.resolve(null),
         nextEducationEnabled ? fetch("/api/education/parent") : Promise.resolve(null),
+        fetch("/api/tickets?status=pending"),
       ]);
       const [nextLists, nextGroups, nextDiscoverGroups] = await Promise.all([
         readJsonArray<GroceryList>(listsRes),
@@ -239,6 +253,7 @@ export default function FamilyDashboard() {
       setEducationAssignments(Array.isArray(educationData?.assignments) ? educationData.assignments : []);
       setEducationProjects(Array.isArray(educationData?.projects) ? educationData.projects : []);
       setEducationSetCount(Array.isArray(educationData?.sets) ? educationData.sets.length : 0);
+      setRewardTickets(await readJsonArray<RewardTicket>(ticketsRes));
 
       const detailedGroups = await Promise.all(
         nextGroups.slice(0, 8).map(async (group) => {
@@ -298,6 +313,7 @@ export default function FamilyDashboard() {
       setEducationProjects([]);
       setEducationSetCount(0);
       setEducationEnabled(false);
+      setRewardTickets([]);
       setLoading(false);
     }
   }, []);
@@ -325,6 +341,7 @@ export default function FamilyDashboard() {
   const publicGroupsToJoin = discoverGroups.filter((group) => !group.currentMembership);
   const openEducationAssignments = educationAssignments.filter((assignment) => assignment.status !== "completed" && assignment.status !== "archived");
   const openEducationProjects = educationProjects.filter((project) => project.status === "open");
+  const pendingTickets = rewardTickets.filter((ticket) => ticket.status === "pending");
   const academyByMember = new Map<number, { assignments: number; projects: number; completed: number }>();
   members.forEach((member) => academyByMember.set(member.id, { assignments: 0, projects: 0, completed: 0 }));
   educationAssignments.forEach((assignment) => {
@@ -339,6 +356,13 @@ export default function FamilyDashboard() {
     const summary = academyByMember.get(memberId);
     if (summary) summary.projects += 1;
   });
+
+  async function redeemTicket(ticketId: string) {
+    setRedeemingTicketId(ticketId);
+    const response = await fetch("/api/tickets", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: ticketId, status: "redeemed" }) });
+    if (response.ok) setRewardTickets((tickets) => tickets.filter((ticket) => ticket.id !== ticketId));
+    setRedeemingTicketId(null);
+  }
 
   return (
     <div className={`min-h-screen ${tvMode ? "p-12" : "p-4 sm:p-6"}`}>
@@ -499,6 +523,19 @@ export default function FamilyDashboard() {
               ))}
             </div>
           </section>
+
+          {pendingTickets.length > 0 && <section className="rounded-3xl border-2 border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-5 shadow-sm">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="flex items-center gap-2 font-black text-slate-800"><Trophy size={18} className="text-amber-600" /> Tickets to redeem</h2>
+                <p className="text-xs font-bold text-amber-700">{pendingTickets.length} reward {pendingTickets.length === 1 ? "ticket" : "tickets"} ready</p>
+              </div>
+              <Link href="/parent/tickets" className="inline-flex items-center gap-1 text-sm font-black text-amber-700 hover:text-amber-800">View all <ArrowRight size={14} /></Link>
+            </div>
+            <div className="space-y-3">
+              {pendingTickets.slice(0, 3).map((ticket) => <article key={ticket.id} className="flex items-center gap-3 rounded-2xl bg-white/90 p-3 shadow-sm"><span className="text-3xl">{ticket.rewardEmoji}</span><span className="min-w-0 flex-1"><span className="block truncate font-black text-slate-800">{ticket.rewardTitle}</span><span className="block truncate text-xs font-bold text-slate-500">{ticket.member.avatar} {ticket.member.name} · {ticket.project.emoji} {ticket.project.title}</span></span><button type="button" disabled={redeemingTicketId === ticket.id} onClick={() => void redeemTicket(ticket.id)} className="rounded-xl bg-amber-500 px-3 py-2 text-xs font-black text-white hover:bg-amber-600 disabled:opacity-50">{redeemingTicketId === ticket.id ? "Redeeming…" : "Redeem"}</button></article>)}
+            </div>
+          </section>}
 
           {groceryEnabled && <section className="rounded-3xl bg-white/80 p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between gap-3">

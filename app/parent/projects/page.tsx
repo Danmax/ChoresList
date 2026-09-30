@@ -40,6 +40,7 @@ export default function ProjectsPage() {
   const [filterStatus, setFilterStatus] = useState("open");
   const [assigningProject, setAssigningProject] = useState<Project | null>(null);
   const [assignmentIds, setAssignmentIds] = useState<string[]>([]);
+  const [openedWorkImage, setOpenedWorkImage] = useState<{ url: string; alt: string } | null>(null);
 
   const load = useCallback(async () => {
     const [pRes, mRes] = await Promise.all([fetch("/api/projects"), fetch("/api/members")]);
@@ -214,7 +215,7 @@ export default function ProjectsPage() {
                     <div className="space-y-2">
                       {p.workLogs.slice(0, 4).map((log) => (
                         <div key={log.id} className="flex gap-3 rounded-2xl bg-orange-50 p-3 text-sm">
-                          {log.photoUrl && <img src={log.photoUrl} alt={`Project update from ${log.member.name}`} className="h-16 w-16 rounded-xl object-cover" />}
+                          {log.photoUrl && <button type="button" onClick={() => setOpenedWorkImage({ url: log.photoUrl!, alt: `Project update from ${log.member.name}` })} className="shrink-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"><img src={log.photoUrl} alt={`Open project update from ${log.member.name}`} className="h-16 w-16 rounded-xl object-cover transition-transform hover:scale-105" /></button>}
                           <div className="min-w-0 flex-1"><p className="font-black text-slate-700">{log.member.avatar} {log.member.name} <span className="font-semibold text-slate-400">· {new Date(log.createdAt).toLocaleDateString()}</span></p>{log.note && <p className="mt-0.5 text-xs font-semibold text-slate-600">{log.note}</p>}<p className="mt-1 text-xs font-black text-orange-700">{log.minutesWorked > 0 && `${(log.minutesWorked / 60).toLocaleString(undefined, { maximumFractionDigits: 2 })} hrs`}{log.minutesWorked > 0 && log.progressPercent !== null && " · "}{log.progressPercent !== null && `${log.progressPercent}% progress`}</p></div>
                         </div>
                       ))}
@@ -253,6 +254,13 @@ export default function ProjectsPage() {
           </div>
         )}
       </div>
+
+      <Dialog open={!!openedWorkImage} onOpenChange={(isOpen) => !isOpen && setOpenedWorkImage(null)}>
+        <DialogContent className="max-w-3xl overflow-hidden rounded-3xl p-2">
+          <DialogHeader className="sr-only"><DialogTitle>Project work update image</DialogTitle></DialogHeader>
+          {openedWorkImage && <img src={openedWorkImage.url} alt={openedWorkImage.alt} className="max-h-[80vh] w-full rounded-2xl object-contain" />}
+        </DialogContent>
+      </Dialog>
 
       {/* Mark Complete Dialog */}
       <Dialog open={!!assigningProject} onOpenChange={(open) => !open && setAssigningProject(null)}>
