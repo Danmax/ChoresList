@@ -22,7 +22,9 @@ export const COUNTER_ATTACK_SECONDS = 0.20;
 export const KI_MAX = 100;
 export const FLIP_SECONDS = 0.5;
 export const GEM_Y = FLOOR - 235;
-export type RunnerItem = { x: number; y: number; kind: 'banana' | 'golden' | 'cherry' | 'heart' | 'fruit' | 'star' | 'gem' | 'drop' | 'low' | 'high' | 'canopy' | 'rolling' | 'bouncing' | 'barrel' | 'boulder' | 'cave-spike' | 'spike-pit' | 'bear' | 'arrow' | 'dart'; collected?: boolean; level?: number; vy?: number; vx?: number; previousX?: number; reflected?: boolean; bossAmmo?: boolean; rotation?: number; scale?: number; fallDelay?: number };
+export const COFFEE_SPECIALS = ['espresso', 'cafe-con-leche', 'iced-coffee', 'macchiato'] as const;
+export type CoffeeSpecial = typeof COFFEE_SPECIALS[number];
+export type RunnerItem = { x: number; y: number; kind: 'banana' | 'golden' | 'cherry' | 'heart' | 'fruit' | 'star' | 'gem' | 'drop' | 'low' | 'high' | 'canopy' | 'rolling' | 'bouncing' | 'barrel' | 'boulder' | 'cave-spike' | 'spike-pit' | 'bear' | 'arrow' | 'dart'; coffee?: CoffeeSpecial; collected?: boolean; level?: number; vy?: number; vx?: number; previousX?: number; reflected?: boolean; bossAmmo?: boolean; rotation?: number; scale?: number; fallDelay?: number };
 export const GEMS = [
   { name: 'Emerald', color: '#4cf7ae' }, { name: 'Sapphire', color: '#6fbaff' },
   { name: 'Ruby', color: '#ff6e97' }, { name: 'Amber', color: '#ffcb56' },
@@ -116,7 +118,10 @@ function nextInsectEncounter(s: Runner): InsectKind {
   return s.insectDeck.pop()!;
 }
 export function levelSeconds(s: Pick<Runner, 'difficulty'>) { return RUNNER_DIFFICULTIES[s.difficulty].seconds; }
-export function runnerSpeed(s: Runner) { return (LEVELS[s.level].speed + (s.elapsed % levelSeconds(s)) * 0.3) * RUNNER_DIFFICULTIES[s.difficulty].speed; }
+export function runnerSpeed(s: Runner) {
+  const base = (LEVELS[s.level].speed + (s.elapsed % levelSeconds(s)) * 0.3) * RUNNER_DIFFICULTIES[s.difficulty].speed;
+  return base * (s.espressoBoost > 0 ? 1.35 : 1);
+}
 export function dashBoost(s: Runner) {
   if (s.forwardDashLeft > 0) return 260;
   if (!s.duck || s.stun > 0) return 0;
@@ -160,7 +165,7 @@ export function createRunner(difficulty: RunnerDifficulty = 'medium') {
     cracks: [] as { x: number; y: number; age: number; kind?: 'coconut' | 'barrel' }[],
     golden: 0, cherries: 0, bonusScore: 0, gems: 0,
     gemSpawned: LEVELS.map(() => false), gemCollected: LEVELS.map(() => false), celebrationTime: 0,
-    lives: Number(RUNNER_DIFFICULTIES[difficulty].lives), bananas: 0, hits: 0, bounces: 0, stun: 0, invincible: 0, starPower: 0,
+    lives: Number(RUNNER_DIFFICULTIES[difficulty].lives), bananas: 0, hits: 0, bounces: 0, stun: 0, invincible: 0, starPower: 0, espressoBoost: 0, coffeeServed: 0,
     knockouts: [] as { x: number; y: number; age: number; label: string }[],
     message: '', messageTime: 0, nextSection: 950, section: 0, encounterDeck: [] as number[], insectDeck: [] as InsectKind[],
     items: Array.from({ length: 12 }, (_, i): RunnerItem => ({ x: 380 + i * 42, y: FLOOR - 30, kind: 'banana' })),
@@ -362,7 +367,7 @@ function addSection(s: Runner) {
   } else if (type === 20) {
     s.items.push({ x, y: FLOOR - 8, kind: 'spike-pit' }); recovery = 730;
   } else if (type === 21) {
-    s.items.push({ x, y: FLOOR - 26, kind: 'bear' }); recovery = 760;
+    s.items.push({ x, y: FLOOR - 26, kind: 'bear', coffee: COFFEE_SPECIALS[s.coffeeServed++ % COFFEE_SPECIALS.length] }); recovery = 760;
   } else if (type === 22) {
     s.guardians.push(createJungleGuardian(x)); recovery = 1050;
   } else if (type === 23) {
@@ -410,6 +415,7 @@ export function stepRunner(s: Runner, dt: number) {
   s.messageTime = Math.max(0, s.messageTime - dt);
   s.invincible = Math.max(0, s.invincible - dt);
   s.starPower = Math.max(0, s.starPower - dt);
+  s.espressoBoost = Math.max(0, s.espressoBoost - dt);
   if (s.stun > 0) {
     s.stun = Math.max(0, s.stun - dt);
     // Keep only combat resolution alive during hit stun. That enables the
@@ -858,8 +864,15 @@ export function stepRunner(s: Runner, dt: number) {
       else if (item.kind === 'cherry') { s.cherries++; s.bonusScore += 50; s.message = 'SWEET! +50 POINTS'; s.messageTime = 1; }
       else { s.bananas += item.kind === 'golden' ? 10 : 1; gainKi(s, item.kind === 'golden' ? 8 : 2); if (item.kind === 'golden') { s.golden++; s.message = 'GOLDEN BANANA! +10 COINS'; s.messageTime = 1; } }
       if (Math.floor(s.bananas / 100) > Math.floor(previous / 100)) { s.lives++; s.message = '100 BANANAS! +1 LIFE'; s.messageTime = 2; }
-    } else if (isHeroAttack(s) && ['boulder', 'bear'].includes(item.kind)) {
-      item.collected = true; starKnockout(s, item.x, item.y, item.kind === 'bear' ? 'COFFEE BEAR' : 'BOULDER');
+    } else if (item.kind === 'bear') {
+      item.collected = true;
+      if (item.coffee === 'espresso') { s.espressoBoost = 8; s.message = 'ESPRESSO! 8s SPEED BOOST'; }
+      else if (item.coffee === 'cafe-con-leche') { s.lives++; s.message = 'CAFÉ CON LECHE! +1 LIFE'; }
+      else if (item.coffee === 'iced-coffee') { s.bonusScore += 10; s.message = 'ICED COFFEE! +10 POINTS'; }
+      else { s.starPower = 10; s.invincible = Math.max(s.invincible, 10); s.message = 'MACCHIATO! 10s KNOCKOUT POWER'; }
+      s.messageTime = 2;
+    } else if (isHeroAttack(s) && item.kind === 'boulder') {
+      item.collected = true; starKnockout(s, item.x, item.y, 'BOULDER');
     } else if (item.bossAmmo && !item.reflected && s.vy > 0 && previousY <= item.y - 10 && s.y >= item.y - 10) {
       s.y = item.y - 10; s.vy = -470; s.jumps = 1;
       item.reflected = true; item.vx = 1350; item.vy = -300;
@@ -872,7 +885,7 @@ export function stepRunner(s: Runner, dt: number) {
     } else if (!item.reflected && s.invincible <= 0) {
       item.collected = true;
       s.cracks.push({ x: item.x, y: item.y, age: 0 });
-      hurt(s, item.kind === 'spike-pit' ? 'RATTLESNAKE SWAMP! Jump the bog!' : item.kind === 'cave-spike' ? 'CAVE SPIKE! Keep moving!' : item.kind === 'arrow' ? 'GUARDIAN ARROW! Slide low!' : item.kind === 'dart' ? 'SCOUT DART! Duck it!' : item.kind === 'bear' ? 'COFFEE BEAR! Dash or strike!' : item.kind === 'boulder' ? 'BOULDER AVALANCHE! Dash through!' : 'CRACK!');
+      hurt(s, item.kind === 'spike-pit' ? 'RATTLESNAKE SWAMP! Jump the bog!' : item.kind === 'cave-spike' ? 'CAVE SPIKE! Keep moving!' : item.kind === 'arrow' ? 'GUARDIAN ARROW! Slide low!' : item.kind === 'dart' ? 'SCOUT DART! Duck it!' : item.kind === 'boulder' ? 'BOULDER AVALANCHE! Dash through!' : 'CRACK!');
       break;
     }
   }

@@ -64,6 +64,21 @@ test('ally gifts grant a heart, fruit bonus, and a full ten seconds of star prot
   assert.ok(star.invincible > 9.9); advance(star, 9.5); assert.ok(star.invincible > 0); advance(star, 0.6); assert.equal(star.invincible, 0);
 });
 
+test('the Coffee Bear rotates four friendly coffee specials', () => {
+  const espresso = active(); espresso.items = [{ x: PLAYER_X, y: FLOOR - 26, kind: 'bear', coffee: 'espresso' }];
+  const normalSpeed = runnerSpeed(espresso); advance(espresso, 0.02);
+  assert.ok(espresso.espressoBoost > 7.9); assert.ok(runnerSpeed(espresso) > normalSpeed * 1.3);
+
+  const leche = active(); leche.items = [{ x: PLAYER_X, y: FLOOR - 26, kind: 'bear', coffee: 'cafe-con-leche' }]; advance(leche, 0.02);
+  assert.equal(leche.lives, 4);
+
+  const iced = active(); iced.items = [{ x: PLAYER_X, y: FLOOR - 26, kind: 'bear', coffee: 'iced-coffee' }]; advance(iced, 0.02);
+  assert.equal(iced.bonusScore, 10);
+
+  const macchiato = active(); macchiato.items = [{ x: PLAYER_X, y: FLOOR - 26, kind: 'bear', coffee: 'macchiato' }]; advance(macchiato, 0.02);
+  assert.ok(macchiato.starPower > 9.9); assert.ok(macchiato.invincible > 9.9);
+});
+
 test('sloths wait for the approaching monkey, lower a gift, then climb back up', () => {
   const s = active();
   s.sloths = [{ x: PLAYER_X + 700, y: 22, homeY: 22, targetY: FLOOR - 92, age: 0, state: 'waiting', reward: 'heart', dropped: false }];
