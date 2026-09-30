@@ -35,7 +35,7 @@ export const GET = withErrors(async (req: NextRequest) => {
   if (!groupId) return NextResponse.json({ error: "Group is required" }, { status: 400 });
   await requireGroupMember(groupId, parentId);
 
-  const [parent, profile, profiles, connections, friendships, myChildren, chessMatches] = await Promise.all([
+  const [parent, profile, profiles, connections, friendships, myChildren, chessMatches, householdParents] = await Promise.all([
     prisma.parentAccount.findFirst({ where: { id: parentId, householdId }, select: { displayName: true, email: true } }),
     prisma.communityParentProfile.findUnique({ where: { groupId_parentId: { groupId, parentId } } }),
     prisma.communityParentProfile.findMany({
@@ -50,6 +50,7 @@ export const GET = withErrors(async (req: NextRequest) => {
       include: { moves: { select: { san: true }, orderBy: { ply: "desc" }, take: 1 } },
       orderBy: { lastMoveAt: "desc" }, take: 20,
     }),
+    prisma.parentAccount.findMany({ where: { householdId }, select: { id: true } }),
   ]);
 
   const connectedParentIds = connections.filter((item) => item.status === "active").map((item) => item.requesterParentId === parentId ? item.recipientParentId : item.requesterParentId);
@@ -66,6 +67,7 @@ export const GET = withErrors(async (req: NextRequest) => {
   return NextResponse.json({
     profile: profile ?? { parentId, displayName: parent?.displayName || parent?.email?.split("@")[0] || "Parent", avatar: "👋", bio: "", isDiscoverable: false, childSocialEnabled: false },
     profiles, connections, friendships, myChildren, childrenByParent, chessMatches,
+    householdParentIds: householdParents.map((item) => item.id),
   });
 });
 
@@ -99,7 +101,12 @@ export const POST = withErrors(async (req: NextRequest) => {
     const recipientParentId = cleanId(body.parentId);
     if (!recipientParentId || recipientParentId === parentId) return NextResponse.json({ error: "Choose another parent" }, { status: 400 });
     const profile = await prisma.communityParentProfile.findUnique({ where: { groupId_parentId: { groupId, parentId: recipientParentId } } });
-    if (!profile?.isDiscoverable || !(await parentInGroup(groupId, recipientParentId))) return NextResponse.json({ error: "That parent is not available to connect" }, { status: 404 });
+    if (!(await parentInGroup(groupId, recipientParentId))) return NextResponse.json({ error: "That parent is not available to connect" }, { status: 404 });
+    const householdParent = await prisma.parentAccount.findFirst({ where: { id: recipientParentId, householdId }, select: { id: true } });
+    if (householdParent) {
+      return NextResponse.json({ connection: { id: `family:${parentId}:${recipientParentId}`, requesterParentId: parentId, recipientParentId, status: "active", implicit: true } });
+    }
+    if (!profile?.isDiscoverable) return NextResponse.json({ error: "That parent is not available to connect" }, { status: 404 });
     const existing = await prisma.communityParentConnection.findFirst({ where: { groupId, OR: [{ requesterParentId: parentId, recipientParentId }, { requesterParentId: recipientParentId, recipientParentId: parentId }] } });
     if (existing?.status === "blocked") return NextResponse.json({ error: "This connection is unavailable" }, { status: 403 });
     if (existing) return NextResponse.json({ connection: existing });
@@ -120,6 +127,8 @@ export const POST = withErrors(async (req: NextRequest) => {
   if (action === "friend-request") {
     const myChildId = cleanId(body.myChildId); const friendChildId = cleanId(body.friendChildId); const recipientParentId = cleanId(body.parentId);
     if (!myChildId || !friendChildId || !recipientParentId || myChildId === friendChildId) return NextResponse.json({ error: "Choose two different children" }, { status: 400 });
+    const householdParent = await prisma.parentAccount.findFirst({ where: { id: recipientParentId, householdId }, select: { id: true } });
+    if (householdParent) return NextResponse.json({ familyConnection: true, message: "Family members in the same household are already connected" });
     if (!(await connected(groupId, parentId, recipientParentId))) return NextResponse.json({ error: "Parents must connect before requesting a child friendship" }, { status: 403 });
     const [myProfile, theirProfile, mine, theirs] = await Promise.all([
       prisma.communityParentProfile.findUnique({ where: { groupId_parentId: { groupId, parentId } } }), prisma.communityParentProfile.findUnique({ where: { groupId_parentId: { groupId, parentId: recipientParentId } } }),
