@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireSession, withErrors } from "@/lib/api";
 import { requirePluginAccess } from "@/lib/plugins/registry";
 import { createAppNotification } from "@/lib/app-notifications";
+import { publishChessMatchUpdate } from "@/lib/chess-realtime";
 
 const CHILD = { role: "child" };
 const activeMembership = (groupId: string, parentId: string) => ({ groupId, parentId, status: "active" });
@@ -34,7 +35,7 @@ export const GET = withErrors(async (req: NextRequest) => {
   if (!groupId) return NextResponse.json({ error: "Group is required" }, { status: 400 });
   await requireGroupMember(groupId, parentId);
 
-  const [parent, profile, profiles, connections, friendships, myChildren] = await Promise.all([
+  const [parent, profile, profiles, connections, friendships, myChildren, chessMatches] = await Promise.all([
     prisma.parentAccount.findFirst({ where: { id: parentId, householdId }, select: { displayName: true, email: true } }),
     prisma.communityParentProfile.findUnique({ where: { groupId_parentId: { groupId, parentId } } }),
     prisma.communityParentProfile.findMany({
@@ -44,6 +45,11 @@ export const GET = withErrors(async (req: NextRequest) => {
     prisma.communityParentConnection.findMany({ where: { groupId, OR: [{ requesterParentId: parentId }, { recipientParentId: parentId }] }, orderBy: { updatedAt: "desc" } }),
     prisma.communityChildFriendship.findMany({ where: { groupId, OR: [{ requesterParentId: parentId }, { recipientParentId: parentId }] }, orderBy: { updatedAt: "desc" } }),
     prisma.familyMember.findMany({ where: { householdId, ...CHILD }, select: { id: true, name: true, avatar: true, color: true }, orderBy: { name: "asc" } }),
+    prisma.communityChessMatch.findMany({
+      where: { groupId, friendship: { OR: [{ requesterParentId: parentId }, { recipientParentId: parentId }] } },
+      include: { moves: { select: { san: true }, orderBy: { ply: "desc" }, take: 1 } },
+      orderBy: { lastMoveAt: "desc" }, take: 20,
+    }),
   ]);
 
   const connectedParentIds = connections.filter((item) => item.status === "active").map((item) => item.requesterParentId === parentId ? item.recipientParentId : item.requesterParentId);
@@ -59,7 +65,7 @@ export const GET = withErrors(async (req: NextRequest) => {
 
   return NextResponse.json({
     profile: profile ?? { parentId, displayName: parent?.displayName || parent?.email?.split("@")[0] || "Parent", avatar: "👋", bio: "", isDiscoverable: false, childSocialEnabled: false },
-    profiles, connections, friendships, myChildren, childrenByParent,
+    profiles, connections, friendships, myChildren, childrenByParent, chessMatches,
   });
 });
 
@@ -142,7 +148,13 @@ export const POST = withErrors(async (req: NextRequest) => {
     const friendshipId = cleanId(body.friendshipId); const whiteMemberId = cleanId(body.whiteMemberId); const blackMemberId = cleanId(body.blackMemberId);
     const friendship = await prisma.communityChildFriendship.findFirst({ where: { id: friendshipId, groupId, status: "active", OR: [{ requesterParentId: parentId }, { recipientParentId: parentId }] } });
     if (!friendship || ![friendship.childAId, friendship.childBId].includes(whiteMemberId) || ![friendship.childAId, friendship.childBId].includes(blackMemberId) || whiteMemberId === blackMemberId) return NextResponse.json({ error: "Choose an approved child friendship" }, { status: 403 });
+    const whitePlayer = await prisma.familyMember.findFirst({ where: { id: whiteMemberId, householdId, ...CHILD }, select: { id: true } });
+    if (!whitePlayer) return NextResponse.json({ error: "Your child must start the private chess room" }, { status: 403 });
+    const existingMatch = await prisma.communityChessMatch.findFirst({ where: { groupId, friendshipId, status: "active" }, orderBy: { lastMoveAt: "desc" } });
+    if (existingMatch) return NextResponse.json({ match: existingMatch });
     const match = await prisma.communityChessMatch.create({ data: { groupId, friendshipId, whiteMemberId, blackMemberId, fen: new Chess().fen() } });
+    const opponentParentId = friendship.requesterParentId === parentId ? friendship.recipientParentId : friendship.requesterParentId;
+    await createAppNotification({ recipientParentId: opponentParentId, type: "chess-invite", title: "A private chess room is ready", body: "A connected family started a parent-approved chess game. Open the lobby when it is your child’s turn.", url: `/community/${groupId}/friends`, groupId, dedupeKey: `chess-invite:${match.id}` });
     return NextResponse.json({ match }, { status: 201 });
   }
 
@@ -162,6 +174,7 @@ export const POST = withErrors(async (req: NextRequest) => {
     const updated = await prisma.communityChessMatch.updateMany({ where: { id: match.id, fen: match.fen, status: "active" }, data: { fen: nextFen, currentTurn: chess.turn() === "w" ? "white" : "black", status: completed ? "completed" : "active", result, lastMoveAt: new Date() } });
     if (!updated.count) return NextResponse.json({ error: "The board changed. Refresh and try again." }, { status: 409 });
     await prisma.communityChessMove.create({ data: { matchId: match.id, memberId, ply: match.moves.length + 1, san: move.san, from: move.from, to: move.to, promotion: move.promotion ?? null, fen: nextFen } });
+    publishChessMatchUpdate(match.id);
     if (!completed) {
       const opponentParentId = match.friendship.requesterParentId === parentId ? match.friendship.recipientParentId : match.friendship.requesterParentId;
       await createAppNotification({ recipientParentId: opponentParentId, type: "chess-turn", title: "Your child’s chess turn", body: "A friend made a move in a private chess match.", url: `/community/${groupId}/friends`, groupId, dedupeKey: `chess-turn:${match.id}:${match.moves.length + 1}` });
