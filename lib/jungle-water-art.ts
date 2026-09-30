@@ -20,26 +20,21 @@ export function drawOrangutan(ctx: CanvasRenderingContext2D, o: Orangutan, camer
   const dancing = o.state === 'dance', beat = Math.sin(o.age * 7);
   const sway = dancing ? beat * 7 : o.state === 'throw' ? -9 * (1 - o.age / 0.25) : 3;
   if (sprite?.complete && sprite.naturalWidth) {
-    // The supplied orangutan art is a seven-frame strip: four pineapple
-    // throw poses, then three celebratory dance poses. Crop the active cell
-    // rather than squeezing the entire sheet into one character.
-    // The art is 2192px wide: seven 313px frames plus one trailing pixel.
-    // Integer source bounds plus a tiny inset stop canvas smoothing from
-    // sampling an adjacent pose along the frame edge.
-    const cellWidth = 313, inset = 2;
-    const frame = o.stunned !== undefined ? 6 : o.state === 'dance'
-      ? 4 + Math.floor(o.age * 6) % 3
+    // The supplied sheet is an authored four-by-two sequence: joyful dance
+    // poses across the top and the pineapple wind-up/release across the
+    // bottom. Select a whole cell to retain its transparent silhouette.
+    const cellWidth = sprite.naturalWidth / 4, cellHeight = sprite.naturalHeight / 2, inset = 2;
+    const [column, row] = o.stunned !== undefined ? [3, 1] : o.state === 'dance'
+      ? [Math.floor(o.age * 6) % 4, 0]
       : o.state === 'windup'
-        ? (o.age < 0.28 ? 0 : 1)
+        ? [o.age < 0.28 ? 0 : 1, 1]
         : o.state === 'throw'
-          ? (o.age < 0.12 ? 2 : 3)
-          : 3;
+          ? [o.age < 0.12 ? 2 : 3, 1]
+          : [0, 1];
     ctx.save(); ctx.translate(x, feet);
     ctx.fillStyle = '#61432b'; ctx.fillRect(-39, 0, 78, 35);
     ctx.fillStyle = '#b28a52'; ctx.beginPath(); ctx.ellipse(0, 0, 39, 9, 0, 0, Math.PI * 2); ctx.fill();
-    // These measured bounds remove the transparent top/bottom band while
-    // retaining every hand, foot, and the pineapple in the throw poses.
-    ctx.drawImage(sprite, frame * cellWidth + inset, 92 + inset, cellWidth - inset * 2, 470 - inset * 2, -64, -192, 128, 192); ctx.restore();
+    ctx.drawImage(sprite, column * cellWidth + inset, row * cellHeight + inset, cellWidth - inset * 2, cellHeight - inset * 2, -108, -206, 216, 206); ctx.restore();
     // The sheet contains the fruit through release; while he dances between
     // throws, keep the held pineapple visible at the launch hand.
     if (o.state === 'dance' && o.throws < 3) {
