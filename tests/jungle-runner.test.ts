@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { pantherPaw } from '../lib/jungle-motion';
 import { createInsect } from '../lib/jungle-insects';
-import { COUNTER_ATTACK_SECONDS, GEM_Y, createJungleGuardian, createOrangutan, orangutanHand, piranhaPosition, eelPhase, createHogs, createBats, GEMS, hasAllGems, spiderPosition, ELEPHANT_TOP, crocodileFrame, hippoFrame, createRunner, createPredator, dashBoost, duckRunner, FLOOR, forwardDashRunner, heroAttackReach, isAirAttack, jumpRunner, kickRunner, KI_MAX, LEVELS, levelSeconds, PLAYER_X, punchRunner, runnerScore, runnerSpeed, specialRunner, stepRunner, STRONG_DIVE_SECONDS, travelSpeed } from '../lib/jungle-runner';
+import { COUNTER_ATTACK_SECONDS, GEM_Y, createJungleGuardian, createOrangutan, orangutanHand, piranhaPosition, eelPhase, createHogs, createBats, GEMS, hasAllGems, spiderPosition, ELEPHANT_TOP, crocodileFrame, hippoFrame, createRunner, createPredator, dashBoost, duckRunner, FLOOR, forwardDashRunner, hesitateRunner, heroAttackReach, isAirAttack, jumpRunner, kickRunner, KI_MAX, LEVELS, levelSeconds, PLAYER_X, punchRunner, runnerScore, runnerSpeed, specialRunner, stepRunner, STRONG_DIVE_SECONDS, travelSpeed } from '../lib/jungle-runner';
 
 function active() { const s = createRunner(); s.phase = 'playing'; s.items = []; s.nextSection = 100000; return s; }
 function advance(s: ReturnType<typeof active>, seconds: number, fps = 120) { for (let i = 0; i < seconds * fps; i++) stepRunner(s, 1 / fps); }
@@ -31,6 +31,18 @@ test('difficulty changes pace, starting lives, and protection after collisions',
 
 test('difficulty sets 42, 51, and 60 second levels', () => {
   assert.deepEqual((['easy', 'medium', 'hard'] as const).map(difficulty => levelSeconds(createRunner(difficulty))), [42, 51, 60]);
+});
+
+test('left-arrow hesitation slows the automatic approach until released', () => {
+  const s = active();
+  const normal = travelSpeed(s);
+  hesitateRunner(s, true);
+  assert.ok(travelSpeed(s) < normal * 0.3);
+  const before = s.distance; advance(s, 0.2);
+  assert.ok(s.distance - before < normal * 0.2 * 0.35);
+  hesitateRunner(s, false);
+  assert.equal(s.hesitating, false);
+  assert.ok(travelSpeed(s) >= normal);
 });
 
 test('a selected stage starts at that level and completes without running the full adventure', () => {
@@ -353,6 +365,24 @@ test('punches and forward dashes counter pineapples, while Ki Burst consumes a f
   assert.equal(dashBoost(dash), 260);
   const burst = active(); burst.ki = KI_MAX; specialRunner(burst);
   assert.equal(burst.ki, 0); assert.ok(burst.specialLeft > 0);
+});
+
+test('Ki Burst deals double damage to multi-hit foes', () => {
+  const s = active(); s.ki = KI_MAX;
+  const tiger = createPredator('tiger', PLAYER_X + 30); tiger.state = 'recover'; s.predators = [tiger];
+  specialRunner(s); stepRunner(s, 1 / 120);
+  assert.equal(tiger.hits, 2);
+  assert.equal(s.hitEffects[0].power, true);
+  assert.equal(s.hitEffects[0].mass, 'heavy');
+});
+
+test('star power destroys a falling cave spike on contact', () => {
+  const s = active(); s.starPower = 5; s.invincible = 5;
+  s.items = [{ x: PLAYER_X, y: FLOOR - 50, kind: 'cave-spike', vy: 100 }];
+  stepRunner(s, 1 / 120);
+  assert.equal(s.items.length, 0);
+  assert.equal(s.lives, 3);
+  assert.match(s.message, /SPIKE DESTROYED/);
 });
 
 test('boulders can be dashed through and spike pits require a jump', () => {

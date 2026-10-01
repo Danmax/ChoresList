@@ -1,4 +1,4 @@
-import { FLOOR, PLAYER_X, gainKi, heroStrikeConnects, isHeroAttack, recordHeroHit, runnerSpeed, starKnockout, type Runner } from './jungle-runner';
+import { FLOOR, PLAYER_X, gainKi, heroDamage, heroStrikeConnects, isHeroAttack, recordHeroHit, runnerSpeed, starKnockout, type Runner } from './jungle-runner';
 
 export type DinoKind = 'triceratops' | 'sauropod' | 'baboon' | 'sabertooth' | 'pterodactyl' | 'mammoth' | 'trex';
 export type Dino = {
@@ -136,7 +136,7 @@ export function stepDinoLand(s: Runner, dt: number, previousY: number, hurt: (me
         dino.cycle++; dino.state = 'warn'; dino.age = 0;
       }
       if (dino.state === 'recover' && dino.hitCooldown === 0 && heroStrikeConnects(s, dino.x, 100, FLOOR - 190, FLOOR)) {
-        dino.hits++; dino.hitCooldown = 0.42; gainKi(s, 18); recordHeroHit(s, dino.x - 70, FLOOR - 85);
+        dino.hits += heroDamage(s); dino.hitCooldown = 0.42; gainKi(s, 18); recordHeroHit(s, dino.x - 70, FLOOR - 85, 'heavy');
         s.message = `T. REX COUNTER! ${dino.hits}/${dino.hitPoints}`; s.messageTime = 0.9;
         if (dino.hits >= dino.hitPoints) {
           dino.knocked = true; s.dinoBossDefeated = true; s.phase = 'victory';
@@ -171,7 +171,7 @@ export function stepDinoLand(s: Runner, dt: number, previousY: number, hurt: (me
       continue;
     }
     if (dino.hitCooldown === 0 && heroStrikeConnects(s, dino.x, bodyX, top, bottom)) {
-      dino.hits++; dino.hitCooldown = 0.32; gainKi(s, 12); recordHeroHit(s, dino.x - bodyX / 2, Math.max(top + 20, FLOOR - 80));
+      dino.hits += heroDamage(s); dino.hitCooldown = 0.32; gainKi(s, 12); recordHeroHit(s, dino.x - bodyX / 2, Math.max(top + 20, FLOOR - 80), dino.kind === 'mammoth' || dino.kind === 'triceratops' ? 'heavy' : dino.kind === 'baboon' ? 'light' : 'medium');
       if (dino.hits >= dino.hitPoints) { dino.knocked = true; starKnockout(s, dino.x, dino.y - 60, dino.kind.toUpperCase()); }
       else { s.message = `${dino.kind.toUpperCase()} ${dino.hits}/${dino.hitPoints}`; s.messageTime = 0.8; }
       continue;

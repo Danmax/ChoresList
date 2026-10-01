@@ -1,4 +1,4 @@
-import { gainKi, heroStrikeConnects, isHeroAttack, recordHeroHit, starKnockout, type Runner } from './jungle-runner';
+import { gainKi, heroDamage, heroStrikeConnects, isHeroAttack, recordHeroHit, starKnockout, type Runner } from './jungle-runner';
 
 const FLOOR = 310;
 export const INSECT_KINDS = ['centipede', 'beetle', 'worker', 'fire-ant', 'stinger', 'katydid', 'caterpillar', 'mud-pit', 'scorpion'] as const;
@@ -57,7 +57,7 @@ export function stepInsects(s: Runner, dt: number, speed: number, previousY: num
           for (const ant of s.insects) if (ant.kind === 'fire-ant' && Math.abs(ant.x - bug.x) < 10) ant.used = true;
         } else bug.used = true;
         gainKi(s, 12);
-        recordHeroHit(s, bug.x - 16, bug.y - lift);
+        recordHeroHit(s, bug.x - 16, bug.y - lift, bug.kind === 'centipede' ? 'medium' : 'light');
         starKnockout(s, bug.x, bug.y - lift, bug.kind.toUpperCase());
         continue;
       }
@@ -71,9 +71,8 @@ export function stepInsects(s: Runner, dt: number, speed: number, previousY: num
       if (ahead < 113) bug.x += Math.min(210, 113 - ahead) + 105 * dt;
       else if (ahead > 355 && bug.state !== 'attack') bug.x -= Math.min(55 * dt, ahead - 300);
       if (move !== 'run' && (bug.hitCooldown ?? 0) === 0 && heroStrikeConnects(s, bug.x, 60, FLOOR - 170, FLOOR)) {
-        bug.hits = (bug.hits ?? 0) + 1;
-        recordHeroHit(s, bug.x - 35, FLOOR - 100);
-        if (move === 'special') bug.hits += 2;
+        bug.hits = (bug.hits ?? 0) + heroDamage(s);
+        recordHeroHit(s, bug.x - 35, FLOOR - 100, 'heavy');
         bug.hitCooldown = 0.16;
         bug.x += 185;
         bug.state = 'recover'; bug.age = 0;

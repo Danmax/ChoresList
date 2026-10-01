@@ -125,6 +125,7 @@ export function runnerSpeed(s: Runner) {
   const base = (LEVELS[s.level].speed + (s.elapsed % levelSeconds(s)) * 0.3) * RUNNER_DIFFICULTIES[s.difficulty].speed;
   return base * (s.espressoBoost > 0 ? 1.35 : 1);
 }
+export function forwardPace(s: Runner) { return runnerSpeed(s) * (s.hesitating ? 0.28 : 1); }
 export function dashBoost(s: Runner) {
   if (s.forwardDashLeft > 0) return 260;
   if (!s.duck || s.stun > 0) return 0;
@@ -134,7 +135,7 @@ export function dashBoost(s: Runner) {
   return s.y >= FLOOR - 1 ? 180 * (s.slideLeft / SLIDE_SECONDS) ** 2 : 0;
 }
 export function airBoost(s: Runner) { return 180 * (s.flipLeft / FLIP_SECONDS) ** 2; }
-export function travelSpeed(s: Runner) { return runnerSpeed(s) + dashBoost(s) + airBoost(s); }
+export function travelSpeed(s: Runner) { return forwardPace(s) + dashBoost(s) + airBoost(s); }
 // Pressing dive while airborne turns its initial 0.42-second burst into the
 // monkey's attack. It intentionally shares the existing control on touch and
 // keyboard so the move is equally available on every device.
@@ -158,14 +159,18 @@ export function heroStrikeConnects(s: Runner, targetX: number, halfWidth: number
   const strikeBottom = s.y - (s.combatMove === 'punch' && s.specialLeft <= 0 ? 20 : 5);
   return left <= targetX + halfWidth && worldX + right >= targetX - halfWidth && strikeTop <= bottom && strikeBottom >= top;
 }
-export function recordHeroHit(s: Runner, x: number, y: number) {
+export type ImpactMass = 'light' | 'medium' | 'heavy';
+export function heroDamage(s: Runner) { return s.specialLeft > 0 ? 2 : 1; }
+export function recordHeroHit(s: Runner, x: number, y: number, mass: ImpactMass = 'medium') {
   s.attackLanded = true;
   s.hitCombo = s.hitComboWindow > 0 ? s.hitCombo + 1 : 1;
   s.hitComboWindow = 1.15;
   s.hitStreak++;
   s.hitStreakWindow = 4;
   s.bestHitStreak = Math.max(s.bestHitStreak, s.hitStreak);
-  s.hitEffects.push({ x, y, age: 0, combo: s.hitCombo });
+  const power = s.specialLeft > 0;
+  s.hitEffects.push({ x, y, age: 0, combo: s.hitCombo, mass, power });
+  s.impactShake = Math.max(s.impactShake, ({ light: 0.08, medium: 0.14, heavy: 0.24 }[mass]) * (power ? 1.5 : 1));
 }
 export function heroMove(s: Runner) {
   if (s.specialLeft > 0) return 'kick' as const;
@@ -189,14 +194,14 @@ export function createRunner(difficulty: RunnerDifficulty = 'medium', startLevel
     dinoEncounterIndex: 0, dinoBossStarted: false, dinoBossDefeated: false, groundShake: 0, tarTime: 0,
     reaction: 'bonk' as HitReaction, reactionLeft: 0,
     phase: 'ready' as 'ready' | 'playing' | 'over' | 'victory',
-    distance: 0, elapsed: initialLevel * RUNNER_DIFFICULTIES[difficulty].seconds, level: initialLevel, endLevel: finalLevel, y: FLOOR, vy: 0, jumps: 0, duck: false, duckHeld: false, slideLeft: 0, slideCooldown: 0, strongDiveLeft: 0, attackLeft: 0, forwardDashLeft: 0, forwardDashCooldown: 0, combatMove: 'run' as 'run' | 'punch' | 'kick' | 'dash', combatLeft: 0, comboStep: 0, comboWindow: 0, hitCombo: 0, hitComboWindow: 0, hitStreak: 0, hitStreakWindow: 0, bestHitStreak: 0, attackLanded: false, counterLeft: 0, ki: 0, specialLeft: 0, cameraLead: 0,
+    distance: 0, elapsed: initialLevel * RUNNER_DIFFICULTIES[difficulty].seconds, level: initialLevel, endLevel: finalLevel, y: FLOOR, vy: 0, jumps: 0, duck: false, duckHeld: false, hesitating: false, slideLeft: 0, slideCooldown: 0, strongDiveLeft: 0, attackLeft: 0, forwardDashLeft: 0, forwardDashCooldown: 0, combatMove: 'run' as 'run' | 'punch' | 'kick' | 'dash', combatLeft: 0, comboStep: 0, comboWindow: 0, hitCombo: 0, hitComboWindow: 0, hitStreak: 0, hitStreakWindow: 0, bestHitStreak: 0, attackLanded: false, counterLeft: 0, ki: 0, specialLeft: 0, cameraLead: 0, impactShake: 0,
     flipLeft: 0, swing: null as ({ river: River; progress: number } | { lemming: Lemming; progress: number }) | null,
     cracks: [] as { x: number; y: number; age: number; kind?: 'coconut' | 'barrel' }[],
-    golden: 0, cherries: 0, bonusScore: 0, gems: 0,
+    golden: 0, cherries: 0, fruitPickups: 0, supplyPickups: 0, bonusScore: 0, gems: 0,
     gemSpawned: LEVELS.map(() => false), gemCollected: LEVELS.map(() => false), celebrationTime: 0,
     lives: Number(RUNNER_DIFFICULTIES[difficulty].lives), bananas: 0, hits: 0, bounces: 0, stun: 0, invincible: 0, starPower: 0, espressoBoost: 0, coffeeServed: 0,
     knockouts: [] as { x: number; y: number; age: number; label: string }[],
-    hitEffects: [] as { x: number; y: number; age: number; combo: number }[],
+    hitEffects: [] as { x: number; y: number; age: number; combo: number; mass: ImpactMass; power: boolean }[],
     message: '', messageTime: 0, nextSection: 950, section: 0, encounterDeck: [] as number[], insectDeck: [] as InsectKind[],
     items: Array.from({ length: 12 }, (_, i): RunnerItem => ({ x: 380 + i * 42, y: FLOOR - 30, kind: 'banana' })),
     orangutans: [] as Orangutan[], pineapples: [] as Pineapple[], splats: [] as { x: number; y: number; age: number }[], guardians: [] as JungleGuardian[],
@@ -238,6 +243,14 @@ export function duckRunner(s: Runner, held: boolean) {
     // the monkey lands or the player releases the control early.
     s.attackLeft = STRONG_DIVE_SECONDS;
     s.vy = Math.max(650, s.vy);
+  }
+}
+
+export function hesitateRunner(s: Runner, held: boolean) {
+  s.hesitating = held && s.phase === 'playing' && s.stun <= 0;
+  if (s.hesitating) {
+    s.message = 'HESITATION FAKE!';
+    s.messageTime = Math.max(s.messageTime, 0.25);
   }
 }
 
@@ -445,6 +458,7 @@ export function stepRunner(s: Runner, dt: number) {
   s.forwardDashLeft = Math.max(0, s.forwardDashLeft - dt);
   s.forwardDashCooldown = Math.max(0, s.forwardDashCooldown - dt);
   s.specialLeft = Math.max(0, s.specialLeft - dt);
+  s.impactShake = Math.max(0, s.impactShake - dt);
   const combatExpired = s.combatLeft > 0 && s.combatLeft <= dt;
   s.combatLeft = Math.max(0, s.combatLeft - dt);
   if (combatExpired && !s.attackLanded) { s.hitStreak = 0; s.hitStreakWindow = 0; s.hitCombo = 0; s.hitComboWindow = 0; }
@@ -491,7 +505,7 @@ export function stepRunner(s: Runner, dt: number) {
       s.nextSection = s.distance + 950;
     }
     s.level = level; s.section = 0; s.encounterDeck = []; s.insectDeck = []; s.items = s.items.filter(i => i.kind !== 'gem'); s.message = `LEVEL ${level + 1}: ${LEVELS[level].name}`; s.messageTime = 3; }
-  const speed = runnerSpeed(s);
+  const speed = forwardPace(s);
   const boost = dashBoost(s) + airBoost(s);
   const tarred = s.level === 6 && s.y >= FLOOR - 2 && s.tarPits.some(p => s.distance + PLAYER_X > p.x && s.distance + PLAYER_X < p.x + p.width);
   if (!s.swing) s.distance += (speed * (tarred ? 0.62 : 1) + boost) * dt;
@@ -714,12 +728,12 @@ export function stepRunner(s: Runner, dt: number) {
       }
     } else {
       // Back away between shots, then set up the next arrow every few seconds.
-      guardian.x += 110 * dt;
-      if (guardian.age >= 1.65) { guardian.state = 'aim'; guardian.age = 0; }
+      guardian.x += 230 * dt;
+      if (guardian.age >= 1.05) { guardian.state = 'aim'; guardian.age = 0; }
     }
     if (guardian.hitCooldown === 0 && heroStrikeConnects(s, guardian.x, 55, FLOOR - 150, FLOOR)) {
-      guardian.hits++;
-      recordHeroHit(s, guardian.x - 25, FLOOR - 92);
+      guardian.hits += heroDamage(s);
+      recordHeroHit(s, guardian.x - 25, FLOOR - 92, 'medium');
       guardian.hitCooldown = s.forwardDashLeft > 0 ? 0.5 : 0.12;
       gainKi(s, 12);
       if (guardian.hits >= guardian.hitPoints) {
@@ -862,8 +876,8 @@ export function stepRunner(s: Runner, dt: number) {
       // short rhythm, while an unfinished tiger stays able to maul the hero.
       p.hit = p.kind !== 'tiger' || p.hits + 1 >= p.hitPoints;
       p.hitCooldown = s.forwardDashLeft > 0 ? 0.5 : 0.12;
-      p.hits++;
-      recordHeroHit(s, p.x - radiusX / 2, p.y);
+      p.hits += heroDamage(s);
+      recordHeroHit(s, p.x - radiusX / 2, p.y, p.kind === 'snake' ? 'light' : p.kind === 'tiger' ? 'heavy' : 'medium');
       gainKi(s, 12);
       if (p.hits >= p.hitPoints) {
         p.knocked = true;
@@ -915,19 +929,24 @@ export function stepRunner(s: Runner, dt: number) {
           s.gemCollected[gemLevel] = true; s.gems++; s.bonusScore += 250;
           s.message = `${GEMS[gemLevel].name.toUpperCase()}! +250 POINTS`; s.messageTime = 2;
         }
-      } else if (item.kind === 'heart') { s.lives++; s.message = 'SLOTH HEART! +1 LIFE'; s.messageTime = 1.5; }
-      else if (item.kind === 'fruit') { s.bananas += 5; s.bonusScore += 25; s.message = 'FRUIT FEAST! +5 COINS'; s.messageTime = 1.5; }
-      else if (item.kind === 'star') { s.starPower = 10; s.invincible = Math.max(s.invincible, 10); s.message = 'RARE STAR! 10s KNOCKOUT POWER'; s.messageTime = 2; }
+      } else if (item.kind === 'heart') { s.lives++; s.supplyPickups++; s.message = 'SLOTH HEART! +1 LIFE'; s.messageTime = 1.5; }
+      else if (item.kind === 'fruit') { s.bananas += 5; s.fruitPickups++; s.supplyPickups++; s.bonusScore += 25; s.message = 'FRUIT FEAST! +5 COINS'; s.messageTime = 1.5; }
+      else if (item.kind === 'star') { s.starPower = 10; s.supplyPickups++; s.invincible = Math.max(s.invincible, 10); s.message = 'RARE STAR! 10s KNOCKOUT POWER'; s.messageTime = 2; }
       else if (item.kind === 'cherry') { s.cherries++; s.bonusScore += 50; s.message = 'SWEET! +50 POINTS'; s.messageTime = 1; }
       else { s.bananas += item.kind === 'golden' ? 10 : 1; gainKi(s, item.kind === 'golden' ? 8 : 2); if (item.kind === 'golden') { s.golden++; s.message = 'GOLDEN BANANA! +10 COINS'; s.messageTime = 1; } }
       if (Math.floor(s.bananas / 100) > Math.floor(previous / 100)) { s.lives++; s.message = '100 BANANAS! +1 LIFE'; s.messageTime = 2; }
     } else if (item.kind === 'bear') {
       item.collected = true;
+      s.supplyPickups++;
       if (item.coffee === 'espresso') { s.espressoBoost = 8; s.message = 'ESPRESSO! 8s SPEED BOOST'; }
       else if (item.coffee === 'cafe-con-leche') { s.lives++; s.message = 'CAFÉ CON LECHE! +1 LIFE'; }
       else if (item.coffee === 'iced-coffee') { s.bonusScore += 10; s.message = 'ICED COFFEE! +10 POINTS'; }
       else { s.starPower = 10; s.invincible = Math.max(s.invincible, 10); s.message = 'MACCHIATO! 10s KNOCKOUT POWER'; }
       s.messageTime = 2;
+    } else if (s.starPower > 0 && item.kind === 'cave-spike') {
+      item.collected = true;
+      starKnockout(s, item.x, item.y, 'CAVE SPIKE');
+      s.message = 'STAR SMASH! SPIKE DESTROYED!'; s.messageTime = 0.8;
     } else if (isHeroAttack(s) && item.kind === 'boulder') {
       item.collected = true; starKnockout(s, item.x, item.y, 'BOULDER');
     } else if (item.bossAmmo && !item.reflected && s.vy > 0 && previousY <= item.y - 10 && s.y >= item.y - 10) {

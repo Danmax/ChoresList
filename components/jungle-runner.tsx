@@ -5,7 +5,7 @@ import { drawDinoBackdrop, drawDinoLand, type DinoAnimations } from '@/lib/jungl
 import { pantherPaw } from '@/lib/jungle-motion';
 import { drawWaterLife, drawOrangutan, drawPineapple } from '@/lib/jungle-water-art';
 import { useEffect, useRef, useState } from 'react';
-import { RUNNER_DIFFICULTIES, type RunnerDifficulty, type CoffeeSpecial, GEMS, spiderPosition, slothPosition, airBoost, FLIP_SECONDS, vinePosition, birdHeight, crocodileFrame, hippoFrame, createRunner, dashBoost, duckRunner, FLOOR, forwardDashRunner, heroMove, isAirAttack, jumpRunner, kickRunner, KI_MAX, LEVELS, levelSeconds, PLAYER_X, punchRunner, runnerScore, specialRunner, STRONG_DIVE_SECONDS, travelSpeed, stepRunner, type Runner } from '@/lib/jungle-runner';
+import { RUNNER_DIFFICULTIES, type RunnerDifficulty, type CoffeeSpecial, GEMS, spiderPosition, slothPosition, airBoost, FLIP_SECONDS, vinePosition, birdHeight, crocodileFrame, hippoFrame, createRunner, dashBoost, duckRunner, FLOOR, forwardDashRunner, hesitateRunner, heroMove, isAirAttack, jumpRunner, kickRunner, KI_MAX, LEVELS, levelSeconds, PLAYER_X, punchRunner, runnerScore, specialRunner, STRONG_DIVE_SECONDS, travelSpeed, stepRunner, type Runner } from '@/lib/jungle-runner';
 
 // Canvas artwork keeps shells and moving limbs crisp at every display density.
 function coconut(ctx: CanvasRenderingContext2D, x: number, y: number, rotation = 0, split = 0) {
@@ -279,7 +279,8 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
   };
   ctx.clearRect(0, 0, W, H);
   ctx.save();
-  if (dinoZone && s.groundShake > 0) ctx.translate(Math.sin(s.elapsed * 85) * 4 * Math.min(1, s.groundShake * 4), Math.cos(s.elapsed * 94) * 3 * Math.min(1, s.groundShake * 4));
+  const shake = Math.max(dinoZone ? s.groundShake : 0, s.impactShake);
+  if (shake > 0) ctx.translate(Math.sin(s.elapsed * 97) * 5 * Math.min(1, shake * 6), Math.cos(s.elapsed * 111) * 4 * Math.min(1, shake * 6));
   const sky = ctx.createLinearGradient(0, 0, 0, H);
   sky.addColorStop(0, LEVELS[s.level].sky); sky.addColorStop(1, LEVELS[s.level].mist);
   ctx.fillStyle = sky; ctx.fillRect(-8, -8, W + 16, H + 16);
@@ -468,7 +469,7 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     else if (item.kind === 'boulder') { const scale = item.scale ?? 1; ctx.scale(scale, scale); ctx.fillStyle = '#66717a'; ctx.strokeStyle = '#263541'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(0, 0, 38, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.strokeStyle = '#aeb9bd'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-17, -13); ctx.lineTo(7, -25); ctx.lineTo(22, -3); ctx.moveTo(-24, 9); ctx.lineTo(5, 23); ctx.stroke(); }
     else if (item.kind === 'cave-spike') { const length = 30 * (item.scale ?? 1); ctx.fillStyle = '#c9d5df'; ctx.strokeStyle = '#465b6b'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-18, -length); ctx.lineTo(18, -length); ctx.lineTo(0, length); ctx.closePath(); ctx.fill(); ctx.stroke(); }
     else if (item.kind === 'spike-pit') { ctx.fillStyle = '#315d50'; ctx.beginPath(); ctx.ellipse(0, 0, 108, 19, 0, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#88b06b'; ctx.lineWidth = 2; for (let ripple = -62; ripple <= 62; ripple += 40) { ctx.beginPath(); ctx.arc(ripple, -3, 12, 0.2, Math.PI - 0.2); ctx.stroke(); } ctx.fillStyle = '#8aa44e'; for (let reed = -92; reed <= 92; reed += 22) { ctx.fillRect(reed, -34 - (Math.abs(reed) % 3) * 5, 3, 31); } ctx.strokeStyle = '#b5a05d'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(-26, -5); ctx.bezierCurveTo(-6, -27, 20, 18, 39, -7); ctx.stroke(); ctx.fillStyle = '#c9b66f'; ctx.beginPath(); ctx.arc(42, -8, 8, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#3a2a1d'; ctx.beginPath(); ctx.arc(45, -10, 2, 0, Math.PI * 2); ctx.fill(); }
-    else if (item.kind === 'arrow' || item.kind === 'dart') { const dart = item.kind === 'dart'; ctx.strokeStyle = dart ? '#64c98b' : '#ddb66b'; ctx.lineWidth = dart ? 4 : 3; ctx.beginPath(); ctx.moveTo(-28, 0); ctx.lineTo(24, 0); ctx.stroke(); ctx.fillStyle = dart ? '#c8f1b6' : '#e5e7de'; ctx.beginPath(); ctx.moveTo(24, 0); ctx.lineTo(13, -6); ctx.lineTo(13, 6); ctx.closePath(); ctx.fill(); ctx.fillStyle = dart ? '#2e744d' : '#a86e3e'; ctx.fillRect(-28, -5, 10, 10); }
+    else if (item.kind === 'arrow' || item.kind === 'dart') { const dart = item.kind === 'dart'; ctx.strokeStyle = dart ? '#64c98b' : '#ddb66b'; ctx.lineWidth = dart ? 4 : 3; ctx.beginPath(); ctx.moveTo(-28, 0); ctx.lineTo(24, 0); ctx.stroke(); ctx.fillStyle = dart ? '#c8f1b6' : '#e5e7de'; ctx.beginPath(); if (dart) { ctx.moveTo(-28, 0); ctx.lineTo(-16, -6); ctx.lineTo(-16, 6); } else { ctx.moveTo(24, 0); ctx.lineTo(13, -6); ctx.lineTo(13, 6); } ctx.closePath(); ctx.fill(); ctx.fillStyle = dart ? '#2e744d' : '#a86e3e'; ctx.fillRect(dart ? 15 : -28, -5, 10, 10); }
     else if (item.kind === 'bear') coffeeBearArt(ctx, 0, 0, s.elapsed, coffeeBear, item.coffee);
     else coconut(ctx, 0, 0);
     ctx.restore();
@@ -553,14 +554,17 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     if (x < -40 || x > 840) continue;
     const progress = effect.age / 0.38;
     ctx.save(); ctx.globalAlpha = 1 - progress;
-    ctx.strokeStyle = effect.combo > 2 ? '#fff2a3' : '#ffb363'; ctx.lineWidth = 3;
-    for (let i = 0; i < 8; i++) {
-      const angle = i * Math.PI / 4;
-      const inner = 11 + progress * 12, outer = inner + 10;
+    const massScale = effect.mass === 'heavy' ? 1.75 : effect.mass === 'medium' ? 1.3 : 1;
+    ctx.strokeStyle = effect.power ? '#bff8ff' : effect.combo > 2 ? '#fff2a3' : '#ffb363'; ctx.lineWidth = effect.mass === 'heavy' ? 5 : 3;
+    ctx.shadowColor = effect.power ? '#766dff' : '#ff8a42'; ctx.shadowBlur = effect.power ? 22 : effect.mass === 'heavy' ? 12 : 4;
+    for (let i = 0; i < (effect.mass === 'heavy' ? 12 : 8); i++) {
+      const angle = i * Math.PI * 2 / (effect.mass === 'heavy' ? 12 : 8);
+      const inner = (11 + progress * 12) * massScale, outer = inner + 10 * massScale;
       ctx.beginPath(); ctx.moveTo(x + Math.cos(angle) * inner, y + Math.sin(angle) * inner);
       ctx.lineTo(x + Math.cos(angle) * outer, y + Math.sin(angle) * outer); ctx.stroke();
     }
-    if (effect.combo > 1) { ctx.fillStyle = '#fff6c9'; ctx.font = 'bold 18px sans-serif'; ctx.fillText(`HIT ×${effect.combo}`, x, y - 35 - progress * 18); }
+    ctx.shadowBlur = 0;
+    if (effect.combo > 1 || effect.power) { ctx.fillStyle = '#fff6c9'; ctx.font = `bold ${effect.mass === 'heavy' ? 22 : 18}px sans-serif`; ctx.fillText(effect.power ? 'KI ×2 DAMAGE!' : `HIT ×${effect.combo}`, x, y - 35 - progress * 18); }
     ctx.restore();
   }
   const knocked = s.reactionLeft > 0 || s.stun > 0 || s.phase === 'over';
@@ -576,7 +580,8 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
   }
   ctx.save();
   const bob = grounded && !s.duck && s.phase === 'playing' && !knocked ? Math.sin(s.elapsed * 18 * Math.PI) * 2 : 0;
-  ctx.translate(playerX + (knocked ? Math.sin(s.stun * 70) * 6 : 0), s.y + bob);
+  ctx.translate(playerX - (s.hesitating ? 16 : 0) + (knocked ? Math.sin(s.stun * 70) * 6 : 0), s.y + bob);
+  if (s.hesitating && !knocked) { ctx.fillStyle = '#fff4a3'; ctx.font = 'bold 13px sans-serif'; ctx.fillText('FAKE!', 0, -124); }
   if (s.strongDiveLeft > 0 && !knocked) {
     ctx.strokeStyle = '#ffe56b'; ctx.lineWidth = 4; ctx.lineCap = 'round';
     for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(-68 - i * 13, -50 + i * 17); ctx.lineTo(-38 - i * 7, -50 + i * 17); ctx.stroke(); }
@@ -677,6 +682,31 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
   }
 }
 
+function StageVictoryPayout({ bananas, golden, cherries, fruit, supplies, stones, score }: { bananas: number; golden: number; cherries: number; fruit: number; supplies: number; stones: number; score: number }) {
+  const [progress, setProgress] = useState(0);
+  useEffect(() => {
+    const started = performance.now();
+    let frame = 0;
+    const count = (now: number) => {
+      const elapsed = Math.min(1, (now - started) / 1100);
+      setProgress(1 - (1 - elapsed) ** 3);
+      if (elapsed < 1) frame = requestAnimationFrame(count);
+    };
+    frame = requestAnimationFrame(count);
+    return () => cancelAnimationFrame(frame);
+  }, []);
+  const value = (target: number) => Math.round(target * progress);
+  const rewards = [
+    ['🍌', 'Bananas', bananas], ['🌟', 'Golden', golden], ['🍒', 'Cherries', cherries],
+    ['🍍', 'Fruit', fruit], ['🎒', 'Supplies', supplies], ['💎', 'Stones', stones],
+  ] as const;
+  return <div className="my-3 rounded-2xl border-2 border-yellow-300/70 bg-slate-950/75 p-3 shadow-[0_0_35px_rgba(250,204,21,0.25)]">
+    <p className="animate-pulse text-xs font-black uppercase tracking-[0.24em] text-yellow-200">Level cleared</p>
+    <div className="mt-3 grid grid-cols-3 gap-2">{rewards.map(([icon, label, target]) => <div key={label} className="rounded-xl bg-white/10 px-2 py-2"><span className="block text-lg">{icon}</span><strong className="block text-lg text-white">{value(target)}</strong><small className="block text-[10px] font-bold uppercase tracking-wide text-emerald-100">{label}</small></div>)}</div>
+    <div className="mt-3 rounded-xl bg-gradient-to-r from-yellow-300 to-orange-300 px-4 py-2 text-emerald-950"><small className="block font-black uppercase tracking-wider">Victory payout</small><strong className="text-2xl font-black">{value(score).toLocaleString()} PTS</strong></div>
+  </div>;
+}
+
 export function JungleVineSwing({ onExit, onFinish }: {
   onExit: () => void;
   onFinish: (score: number, duration: number, metadata: Record<string, unknown>) => void;
@@ -686,15 +716,16 @@ export function JungleVineSwing({ onExit, onFinish }: {
   const [difficulty, setDifficulty] = useState<RunnerDifficulty>('medium');
   const [runMode, setRunMode] = useState<'adventure' | 'stage'>('adventure');
   const [selectedLevel, setSelectedLevel] = useState(0);
-  const [hud, setHud] = useState({ phase: 'ready', lives: 3, bananas: 0, seconds: 60, paused: false, level: 0, score: 0, golden: 0, cherries: 0, gems: 0, levelGem: false, slide: 0, attack: 0, move: 'run', combo: 0, streak: 0, bestStreak: 0, ki: 0, special: 0, speed: 1, espresso: 0, bossStarted: false, bossHp: 0, bossMax: 0 });
+  const [hud, setHud] = useState({ phase: 'ready', lives: 3, bananas: 0, seconds: 60, paused: false, level: 0, score: 0, golden: 0, cherries: 0, fruit: 0, supplies: 0, gems: 0, levelGem: false, slide: 0, attack: 0, move: 'run', combo: 0, streak: 0, bestStreak: 0, ki: 0, special: 0, speed: 1, espresso: 0, hesitating: false, bossStarted: false, bossHp: 0, bossMax: 0 });
   const paused = useRef(false);
   const saved = useRef(false);
   const duckSources = useRef(new Set<string>());
+  const hesitateSources = useRef(new Set<string>());
   const publish = () => {
     const s = world.current;
     const bossMax = { easy: 2, medium: 3, hard: 4 }[s.difficulty];
     const boss = s.dinos.find(d => d.kind === 'trex');
-    setHud({ phase: s.phase, lives: s.lives, bananas: s.bananas, seconds: Math.max(0, Math.ceil((s.level + 1) * levelSeconds(s) - s.elapsed)), paused: paused.current, level: s.level, score: runnerScore(s), golden: s.golden, cherries: s.cherries, gems: s.gems, levelGem: s.gemCollected[s.level], slide: s.slideLeft, attack: isAirAttack(s) ? s.attackLeft : 0, move: heroMove(s), combo: s.hitCombo, streak: s.hitStreak, bestStreak: s.bestHitStreak, ki: s.ki, special: s.specialLeft, speed: travelSpeed(s) / LEVELS[0].speed, espresso: s.espressoBoost, bossStarted: s.dinoBossStarted, bossHp: boss ? bossMax - boss.hits : 0, bossMax });
+    setHud({ phase: s.phase, lives: s.lives, bananas: s.bananas, seconds: Math.max(0, Math.ceil((s.level + 1) * levelSeconds(s) - s.elapsed)), paused: paused.current, level: s.level, score: runnerScore(s), golden: s.golden, cherries: s.cherries, fruit: s.fruitPickups, supplies: s.supplyPickups, gems: s.gems, levelGem: s.gemCollected[s.level], slide: s.slideLeft, attack: isAirAttack(s) ? s.attackLeft : 0, move: heroMove(s), combo: s.hitCombo, streak: s.hitStreak, bestStreak: s.bestHitStreak, ki: s.ki, special: s.specialLeft, speed: travelSpeed(s) / LEVELS[0].speed, espresso: s.espressoBoost, hesitating: s.hesitating, bossStarted: s.dinoBossStarted, bossHp: boss ? Math.max(0, bossMax - boss.hits) : 0, bossMax });
   };
   function resetRunner(nextDifficulty = difficulty, nextMode = runMode, nextLevel = selectedLevel) {
     world.current = createRunner(nextDifficulty, nextMode === 'stage' ? nextLevel : 0, nextMode === 'stage' ? nextLevel : LEVELS.length - 1);
@@ -720,12 +751,16 @@ export function JungleVineSwing({ onExit, onFinish }: {
     if (down) duckSources.current.add(source); else duckSources.current.delete(source);
     duckRunner(world.current, duckSources.current.size > 0 && !paused.current);
   }
+  function hesitate(source: string, down: boolean) {
+    if (down) hesitateSources.current.add(source); else hesitateSources.current.delete(source);
+    hesitateRunner(world.current, hesitateSources.current.size > 0 && !paused.current);
+  }
   function punch() { if (!paused.current) punchRunner(world.current); }
   function kick() { if (!paused.current) kickRunner(world.current); }
   function forwardDash() { if (!paused.current) forwardDashRunner(world.current); }
   function special() { if (!paused.current) specialRunner(world.current); }
-  function pause() { paused.current = !paused.current; duckSources.current.clear(); duckRunner(world.current, false); publish(); }
-  function start() { world.current = createRunner(difficulty, runMode === 'stage' ? selectedLevel : 0, runMode === 'stage' ? selectedLevel : LEVELS.length - 1); world.current.phase = 'playing'; paused.current = false; saved.current = false; duckSources.current.clear(); publish(); }
+  function pause() { paused.current = !paused.current; duckSources.current.clear(); hesitateSources.current.clear(); duckRunner(world.current, false); hesitateRunner(world.current, false); publish(); }
+  function start() { world.current = createRunner(difficulty, runMode === 'stage' ? selectedLevel : 0, runMode === 'stage' ? selectedLevel : LEVELS.length - 1); world.current.phase = 'playing'; paused.current = false; saved.current = false; duckSources.current.clear(); hesitateSources.current.clear(); publish(); }
 
   useEffect(() => {
     const sprite = new Image(); sprite.src = '/games/jungle-monkey-runner-sprites-v2.png';
@@ -766,14 +801,14 @@ export function JungleVineSwing({ onExit, onFinish }: {
     frame = requestAnimationFrame(tick);
     const down = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement)?.closest('input, textarea, select')) return;
-      if (['Space', 'ArrowUp', 'KeyW', 'ArrowDown', 'KeyS', 'ArrowRight', 'KeyD', 'KeyJ', 'KeyK', 'KeyE'].includes(e.code)) {
+      if (['Space', 'ArrowUp', 'KeyW', 'ArrowDown', 'KeyS', 'ArrowLeft', 'KeyA', 'ArrowRight', 'KeyD', 'KeyJ', 'KeyK', 'KeyE'].includes(e.code)) {
         e.preventDefault();
         if (e.repeat) return;
-        if (['ArrowDown', 'KeyS'].includes(e.code)) duck(e.code, true); else if (['ArrowRight', 'KeyD'].includes(e.code)) forwardDash(); else if (e.code === 'KeyJ') punch(); else if (e.code === 'KeyK') kick(); else if (e.code === 'KeyE') special(); else jump();
+        if (['ArrowDown', 'KeyS'].includes(e.code)) duck(e.code, true); else if (['ArrowLeft', 'KeyA'].includes(e.code)) hesitate(e.code, true); else if (['ArrowRight', 'KeyD'].includes(e.code)) forwardDash(); else if (e.code === 'KeyJ') punch(); else if (e.code === 'KeyK') kick(); else if (e.code === 'KeyE') special(); else jump();
       }
     };
-    const up = (e: KeyboardEvent) => { if (['ArrowDown', 'KeyS'].includes(e.code)) { e.preventDefault(); duck(e.code, false); } };
-    const blur = () => { if (world.current.phase === 'playing') paused.current = true; duckSources.current.clear(); duckRunner(world.current, false); publish(); };
+    const up = (e: KeyboardEvent) => { if (['ArrowDown', 'KeyS'].includes(e.code)) { e.preventDefault(); duck(e.code, false); } else if (['ArrowLeft', 'KeyA'].includes(e.code)) { e.preventDefault(); hesitate(e.code, false); } };
+    const blur = () => { if (world.current.phase === 'playing') paused.current = true; duckSources.current.clear(); hesitateSources.current.clear(); duckRunner(world.current, false); hesitateRunner(world.current, false); publish(); };
     const visibility = () => { if (document.hidden) blur(); };
     window.addEventListener('keydown', down); window.addEventListener('keyup', up); window.addEventListener('blur', blur); document.addEventListener('visibilitychange', visibility);
     return () => { cancelAnimationFrame(frame); window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); window.removeEventListener('blur', blur); document.removeEventListener('visibilitychange', visibility); };
@@ -815,7 +850,15 @@ export function JungleVineSwing({ onExit, onFinish }: {
       </div>
       <div className="relative overflow-hidden rounded-2xl border-2 border-emerald-700">
         <canvas ref={canvas} width={800} height={400} aria-label="Jungle runner with seven levels, ending in DinoLand with a T. rex boss." className="block aspect-[2/1] w-full" />
-        {(hud.phase === 'ready' || ended || hud.paused) && <div className="absolute inset-0 flex items-start justify-center overflow-y-auto bg-emerald-950/75 p-3"><div className="my-auto max-w-md text-center"><h3 className="text-lg font-black sm:text-2xl">{hud.paused ? 'Taking a breather' : ended ? hud.phase === 'victory' ? runMode === 'stage' ? `${LEVELS[selectedLevel].name} complete!` : hud.gems === LEVELS.length ? 'Jungle Crown Victory!' : 'DinoLand victory!' : 'Run complete!' : runMode === 'stage' ? `Stage ${selectedLevel + 1}: ${LEVELS[selectedLevel].name}` : 'Adventure Mode'}</h3><p className="my-2 text-xs sm:text-sm">{ended ? `${hud.gems === LEVELS.length && hud.phase === 'victory' ? '✦ All seven gems captured — the Jungle Crown is yours! ✦ ' : ''}${hud.bananas} banana coins · ${hud.golden} gold · ${hud.cherries} cherries · ${hud.gems}/${LEVELS.length} gems · ${hud.score} points` : runMode === 'stage' ? `Complete ${LEVELS[selectedLevel].name} as a single-stage run.${selectedLevel === LEVELS.length - 1 ? ' Defeat the T. rex to win DinoLand.' : ''}` : 'Complete every jungle stage in one continuous run. Meet the friendly Coffee Bear for rotating specials, use jungle allies to survive, and defeat the T. rex in DinoLand.'}</p>{hud.paused ? <button onClick={pause} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Resume</button> : ended ? <button onClick={() => { if (saved.current) return; saved.current = true; const s = world.current; onFinish(runnerScore(s), Math.max(1, Math.round(s.elapsed - (runMode === 'stage' ? selectedLevel * levelSeconds(s) : 0))), { difficulty: s.difficulty, mode: runMode, selectedStage: runMode === 'stage' ? selectedLevel + 1 : null, bananas: s.bananas, goldenBananas: s.golden, cherries: s.cherries, gems: s.gems, gemLevels: s.gemCollected, levelsCompleted: s.phase === 'victory' ? (runMode === 'stage' ? 1 : LEVELS.length) : Math.max(0, s.level - (runMode === 'stage' ? selectedLevel : 0)), dinoBossDefeated: s.dinoBossDefeated, hits: s.hits, hippoBounces: s.bounces, elephantBounces: s.elephantBounces, caterpillarBounces: s.caterpillarBounces, extraLives: Math.floor(s.bananas / 100) }); }} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Save run</button> : <button onClick={start} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">{runMode === 'stage' ? 'Play stage' : 'Start adventure'}</button>}</div></div>}
+        {(hud.phase === 'ready' || ended || hud.paused) && <div className="absolute inset-0 flex items-start justify-center overflow-y-auto bg-emerald-950/75 p-3">
+          <div className="my-auto max-w-md text-center">
+            <h3 className="text-lg font-black sm:text-2xl">{hud.paused ? 'Taking a breather' : ended ? hud.phase === 'victory' ? runMode === 'stage' ? `${LEVELS[selectedLevel].name} complete!` : hud.gems === LEVELS.length ? 'Jungle Crown Victory!' : 'DinoLand victory!' : 'Run complete!' : runMode === 'stage' ? `Stage ${selectedLevel + 1}: ${LEVELS[selectedLevel].name}` : 'Adventure Mode'}</h3>
+            {ended && hud.phase === 'victory' && runMode === 'stage'
+              ? <StageVictoryPayout bananas={hud.bananas} golden={hud.golden} cherries={hud.cherries} fruit={hud.fruit} supplies={hud.supplies} stones={hud.gems} score={hud.score} />
+              : <p className="my-2 text-xs sm:text-sm">{ended ? `${hud.gems === LEVELS.length && hud.phase === 'victory' ? '✦ All seven gems captured — the Jungle Crown is yours! ✦ ' : ''}${hud.bananas} banana coins · ${hud.golden} gold · ${hud.cherries} cherries · ${hud.gems}/${LEVELS.length} gems · ${hud.score} points` : runMode === 'stage' ? `Complete ${LEVELS[selectedLevel].name} as a single-stage run.${selectedLevel === LEVELS.length - 1 ? ' Defeat the T. rex to win DinoLand.' : ''}` : 'Complete every jungle stage in one continuous run. Meet the friendly Coffee Bear for rotating specials, use jungle allies to survive, and defeat the T. rex in DinoLand.'}</p>}
+            {hud.paused ? <button onClick={pause} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Resume</button> : ended ? <button onClick={() => { if (saved.current) return; saved.current = true; const s = world.current; onFinish(runnerScore(s), Math.max(1, Math.round(s.elapsed - (runMode === 'stage' ? selectedLevel * levelSeconds(s) : 0))), { difficulty: s.difficulty, mode: runMode, selectedStage: runMode === 'stage' ? selectedLevel + 1 : null, bananas: s.bananas, goldenBananas: s.golden, cherries: s.cherries, fruitPickups: s.fruitPickups, supplyPickups: s.supplyPickups, gems: s.gems, gemLevels: s.gemCollected, levelsCompleted: s.phase === 'victory' ? (runMode === 'stage' ? 1 : LEVELS.length) : Math.max(0, s.level - (runMode === 'stage' ? selectedLevel : 0)), dinoBossDefeated: s.dinoBossDefeated, hits: s.hits, hippoBounces: s.bounces, elephantBounces: s.elephantBounces, caterpillarBounces: s.caterpillarBounces, extraLives: Math.floor(s.bananas / 100) }); }} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Save run</button> : <button onClick={start} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">{runMode === 'stage' ? 'Play stage' : 'Start adventure'}</button>}
+          </div>
+        </div>}
       </div>
       <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
         <button disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); jump(); }} onClick={e => { if (e.detail === 0) jump(); }} className="min-h-14 touch-none select-none rounded-2xl bg-yellow-300 p-3 font-black text-emerald-950 disabled:opacity-40">JUMP <small className="block">Tap again: flip / release vine</small></button>
@@ -823,9 +866,10 @@ export function JungleVineSwing({ onExit, onFinish }: {
         <button disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); punch(); }} onClick={e => { if (e.detail === 0) punch(); }} className="min-h-14 touch-none select-none rounded-2xl bg-orange-400 p-3 font-black text-orange-950 disabled:opacity-40">PUNCH<small className="block">J · land hits to build a combo</small></button>
         <button disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); kick(); }} onClick={e => { if (e.detail === 0) kick(); }} className="min-h-14 touch-none select-none rounded-2xl bg-rose-400 p-3 font-black text-rose-950 disabled:opacity-40">KICK<small className="block">K · reach farther than a punch</small></button>
         <button disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); forwardDash(); }} onClick={e => { if (e.detail === 0) forwardDash(); }} className="min-h-14 touch-none select-none rounded-2xl bg-sky-400 p-3 font-black text-sky-950 disabled:opacity-40">FORWARD DASH <small className="block">→ · counter charge</small></button>
+        <button disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); hesitate(`hesitate-${e.pointerId}`, true); }} onPointerUp={e => hesitate(`hesitate-${e.pointerId}`, false)} onPointerCancel={e => hesitate(`hesitate-${e.pointerId}`, false)} onLostPointerCapture={e => hesitate(`hesitate-${e.pointerId}`, false)} onKeyDown={e => { if (e.key === 'Enter') hesitate('hesitate-enter', true); }} onKeyUp={e => { if (e.key === 'Enter') hesitate('hesitate-enter', false); }} className={`min-h-14 touch-none select-none rounded-2xl p-3 font-black disabled:opacity-40 ${hud.hesitating ? 'bg-fuchsia-200 text-fuchsia-950 ring-4 ring-white/60' : 'bg-fuchsia-400 text-fuchsia-950'}`}>HESITATE / FAKE <small className="block">← · hold to slow your approach</small></button>
         <button disabled={hud.phase !== 'playing' || hud.paused || hud.ki < KI_MAX} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); special(); }} onClick={e => { if (e.detail === 0) special(); }} className="min-h-14 touch-none select-none rounded-2xl bg-violet-400 p-3 font-black text-violet-950 disabled:opacity-40">KI BURST <small className="block">E · full meter</small></button>
       </div>
-      <p className="mt-2 text-center text-xs text-emerald-200">Run is automatic · Space / ↑: jump / flip · ↓: slide dash · →: forward dash · J: punch · K: kick · E: Ki Burst. Punch, kick, and dash can counter pineapples and foes; each counter charges Ki.</p>
+      <p className="mt-2 text-center text-xs text-emerald-200">Run is automatic · Space / ↑: jump / flip · ←: hesitation fake · ↓: slide dash · →: forward dash · J: punch · K: kick · E: Ki Burst. Ki Burst deals double damage; star power destroys falling spikes on contact.</p>
     </div>
   </section>;
 }
