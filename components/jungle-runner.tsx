@@ -743,9 +743,11 @@ function StageVictoryPayout({ bananas, golden, cherries, fruit, supplies, stones
   </div>;
 }
 
-export function JungleVineSwing({ onExit, onFinish }: {
+export function JungleVineSwing({ onExit, onFinish, onRunStart, finishLabel = 'Save & exit' }: {
   onExit: () => void;
   onFinish: (score: number, duration: number, metadata: Record<string, unknown>) => void;
+  onRunStart?: () => boolean;
+  finishLabel?: string;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const world = useRef(createRunner());
@@ -753,6 +755,7 @@ export function JungleVineSwing({ onExit, onFinish }: {
   const [difficulty, setDifficulty] = useState<RunnerDifficulty>('medium');
   const [runMode, setRunMode] = useState<'adventure' | 'stage'>('adventure');
   const [selectedLevel, setSelectedLevel] = useState(0);
+  const [shareCopied, setShareCopied] = useState(false);
   const [hud, setHud] = useState({ phase: 'ready', lives: 3, bananas: 0, seconds: 60, paused: false, level: 0, score: 0, golden: 0, cherries: 0, fruit: 0, supplies: 0, gems: 0, levelGem: false, slide: 0, attack: 0, move: 'run', combo: 0, streak: 0, bestStreak: 0, ki: 0, special: 0, speed: 1, espresso: 0, hesitating: false, bossStarted: false, bossHp: 0, bossMax: 0 });
   const paused = useRef(false);
   const saved = useRef(false);
@@ -802,7 +805,24 @@ export function JungleVineSwing({ onExit, onFinish }: {
   function forwardDash() { if (!paused.current) forwardDashRunner(world.current); }
   function special() { if (!paused.current) specialRunner(world.current); }
   function pause() { paused.current = !paused.current; duckSources.current.clear(); hesitateSources.current.clear(); duckRunner(world.current, false); hesitateRunner(world.current, false); publish(); }
-  function start() { world.current = createRunner(difficulty, runMode === 'stage' ? selectedLevel : 0, runMode === 'stage' ? selectedLevel : LEVELS.length - 1); world.current.phase = 'playing'; paused.current = false; saved.current = false; nextComboAttack.current = 'punch'; duckSources.current.clear(); hesitateSources.current.clear(); publish(); }
+  function start() {
+    if (onRunStart && !onRunStart()) return;
+    world.current = createRunner(difficulty, runMode === 'stage' ? selectedLevel : 0, runMode === 'stage' ? selectedLevel : LEVELS.length - 1); world.current.phase = 'playing'; paused.current = false; saved.current = false; nextComboAttack.current = 'punch'; duckSources.current.clear(); hesitateSources.current.clear(); publish();
+  }
+  async function shareGame() {
+    const url = `${window.location.origin}/play/jungle`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "Johnny: The People's Champ", text: 'Play the Jungle Runner demo with me!', url });
+        return;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+      }
+    }
+    await navigator.clipboard?.writeText(url);
+    setShareCopied(true);
+    window.setTimeout(() => setShareCopied(false), 1800);
+  }
   function saveRun() {
     if (saved.current) return;
     saved.current = true;
@@ -865,7 +885,7 @@ export function JungleVineSwing({ onExit, onFinish }: {
   const ended = hud.phase === 'over' || hud.phase === 'victory';
   return <section data-game-screen={hud.phase !== 'ready'} data-playing={hud.phase === 'playing'} data-paused={hud.paused} className={`${styles.root} fixed inset-0 z-50 flex flex-col justify-center overflow-auto bg-emerald-950 text-white`}>
     <div className={`${styles.shell} mx-auto w-full max-w-4xl`}>
-      <header className={`${styles.header} mb-2 flex items-center justify-between gap-2`}><h2 className="font-black">Jungle Runner</h2><div className="flex gap-2"><button onClick={pause} disabled={hud.phase !== 'playing'} className="rounded-xl bg-white/10 px-3 py-2 disabled:opacity-40">{hud.paused ? 'Resume' : 'Pause'}</button><button onClick={onExit} className="rounded-xl bg-white/10 px-3 py-2">Exit</button></div></header>
+      <header className={`${styles.header} mb-2 flex items-center justify-between gap-2`}><h2 className="font-black">Jungle Runner</h2><div className="flex gap-2"><button type="button" onClick={() => void shareGame()} className="rounded-xl bg-cyan-300 px-3 py-2 font-black text-emerald-950">{shareCopied ? '✓ Copied' : '↗ Share'}</button><button onClick={pause} disabled={hud.phase !== 'playing'} className="rounded-xl bg-white/10 px-3 py-2 disabled:opacity-40">{hud.paused ? 'Resume' : 'Pause'}</button><button onClick={onExit} className="rounded-xl bg-white/10 px-3 py-2">Exit</button></div></header>
       {hud.phase === 'ready' && (
         <fieldset className={`${styles.setup} mb-3 rounded-xl bg-white/10 p-3`}>
           <legend className="px-1 text-sm font-black">Choose your run</legend>
@@ -914,7 +934,7 @@ export function JungleVineSwing({ onExit, onFinish }: {
             {ended && hud.phase === 'victory' && runMode === 'stage'
               ? <StageVictoryPayout bananas={hud.bananas} golden={hud.golden} cherries={hud.cherries} fruit={hud.fruit} supplies={hud.supplies} stones={hud.gems} score={hud.score} />
               : <p className="my-2 text-xs sm:text-sm">{ended ? `${hud.gems === LEVELS.length && hud.phase === 'victory' ? '✦ All seven gems captured — the Jungle Crown is yours! ✦ ' : ''}${hud.bananas} banana coins · ${hud.golden} gold · ${hud.cherries} cherries · ${hud.gems}/${LEVELS.length} gems · ${hud.score} points` : runMode === 'stage' ? `Complete ${LEVELS[selectedLevel].name} as a single-stage run.${selectedLevel === LEVELS.length - 1 ? ' Defeat the T. rex to win DinoLand.' : ''}` : 'Complete every jungle stage in one continuous run. Meet the friendly Coffee Bear for rotating specials, use jungle allies to survive, and defeat the T. rex in DinoLand.'}</p>}
-            {hud.paused ? <div className="flex justify-center gap-2"><button onClick={pause} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Resume</button><button onClick={onExit} className="rounded-xl bg-white/15 px-5 py-2 font-black text-white">Exit</button></div> : ended ? <div className="flex flex-wrap justify-center gap-2"><button onClick={start} className="rounded-xl bg-cyan-300 px-5 py-2 font-black text-emerald-950">Replay</button><button onClick={saveRun} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Save &amp; exit</button></div> : <button onClick={start} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">{runMode === 'stage' ? 'Play stage' : 'Start adventure'}</button>}
+            {hud.paused ? <div className="flex justify-center gap-2"><button onClick={pause} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Resume</button><button onClick={onExit} className="rounded-xl bg-white/15 px-5 py-2 font-black text-white">Exit</button></div> : ended ? <div className="flex flex-wrap justify-center gap-2"><button onClick={start} className="rounded-xl bg-cyan-300 px-5 py-2 font-black text-emerald-950">Replay</button><button onClick={saveRun} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">{finishLabel}</button></div> : <button onClick={start} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">{runMode === 'stage' ? 'Play stage' : 'Start adventure'}</button>}
           </div>
         </div>}
         <div className={styles.landscapeControls} aria-label="Landscape gamepad controls">
