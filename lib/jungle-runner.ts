@@ -1,4 +1,5 @@
 import { createInsect, INSECT_KINDS, stepInsects, type Insect, type InsectKind, type AntRock, type HitReaction } from './jungle-insects';
+import { addDinoSection, stepDinoLand, type Dino, type DinoProjectile, type Eruption, type TarPit } from './jungle-dinoland';
 export const FLOOR = 310;
 export const PLAYER_X = 150;
 export const RUNNER_DIFFICULTIES = {
@@ -14,6 +15,7 @@ export const LEVELS = [
   { name: 'Tiger Territory', sky: '#7d83c4', mist: '#e7bbde', speed: 385 },
   { name: 'Moonlit Webs', sky: '#090e29', mist: '#33496b', speed: 445 },
   { name: 'Giant Insect Grove', sky: '#542b79', mist: '#b4efd0', speed: 505 },
+  { name: 'DinoLand', sky: '#dc7b58', mist: '#f9ce7c', speed: 565 },
 ] as const;
 export const LEVEL_SECONDS = 60;
 export const SLIDE_SECONDS = 1.5;
@@ -29,6 +31,7 @@ export const GEMS = [
   { name: 'Emerald', color: '#4cf7ae' }, { name: 'Sapphire', color: '#6fbaff' },
   { name: 'Ruby', color: '#ff6e97' }, { name: 'Amber', color: '#ffcb56' },
   { name: 'Moonstone', color: '#d2b7ff' }, { name: 'Peridot', color: '#c4ff57' },
+  { name: 'Sunstone', color: '#ff9d52' },
 ] as const;
 export function hasAllGems(s: Pick<Runner, 'gemCollected'>) { return s.gemCollected.every(Boolean); }
 export type Hog = { herdX: number; x: number; y: number; vy: number; age: number; jumper: boolean; jumpIn: number; active: boolean; knocked?: boolean };
@@ -158,6 +161,8 @@ export function createRunner(difficulty: RunnerDifficulty = 'medium') {
   return {
     difficulty,
     insects: [] as Insect[], antRocks: [] as AntRock[], caterpillarBounces: 0,
+    dinos: [] as Dino[], tarPits: [] as TarPit[], eruptions: [] as Eruption[], dinoProjectiles: [] as DinoProjectile[],
+    dinoEncounterIndex: 0, dinoBossStarted: false, dinoBossDefeated: false, groundShake: 0, tarTime: 0,
     reaction: 'bonk' as HitReaction, reactionLeft: 0,
     phase: 'ready' as 'ready' | 'playing' | 'over' | 'victory',
     distance: 0, elapsed: 0, level: 0, y: FLOOR, vy: 0, jumps: 0, duck: false, duckHeld: false, slideLeft: 0, slideCooldown: 0, strongDiveLeft: 0, attackLeft: 0, forwardDashLeft: 0, forwardDashCooldown: 0, combatMove: 'run' as 'run' | 'punch' | 'kick' | 'dash', combatLeft: 0, comboStep: 0, comboWindow: 0, counterLeft: 0, ki: 0, specialLeft: 0, cameraLead: 0,
@@ -280,6 +285,7 @@ function hurt(s: Runner, message: string, reaction: HitReaction = 'bonk') {
 // of screen size. Every challenge is followed by a long, safe coin trail.
 function addSection(s: Runner) {
   const x = s.nextSection;
+  if (s.level === 6) { addDinoSection(s); return; }
   if (s.level === 5) {
     const finale = s.elapsed % levelSeconds(s) >= levelSeconds(s) - 20;
     const kind = finale && !s.gemSpawned[5] ? 'caterpillar' : nextInsectEncounter(s);
@@ -430,17 +436,25 @@ export function stepRunner(s: Runner, dt: number) {
     if (s.slideLeft === 0) { s.duck = false; s.slideCooldown = Math.max(s.slideCooldown, 0.45); }
   }
   s.elapsed += dt;
-  if (s.elapsed >= levelSeconds(s) * LEVELS.length) { s.phase = 'victory'; return; }
+  if (s.elapsed >= levelSeconds(s) * LEVELS.length) {
+    if (s.dinoBossDefeated) { s.phase = 'victory'; return; }
+    s.elapsed = levelSeconds(s) * LEVELS.length - 0.001;
+  }
   const level = Math.floor(s.elapsed / levelSeconds(s));
   if (level !== s.level) {
     if (level === 5) {
       s.items = []; s.rivers = []; s.predators = []; s.hogs = []; s.bats = []; s.herds = []; s.spiders = []; s.orangutans = []; s.pineapples = []; s.guardians = []; s.birds = []; s.sloths = []; s.lemmings = [];
       s.swing = null; s.nextSection = s.distance + 1100;
     }
+    if (level === 6) {
+      s.items = []; s.insects = []; s.antRocks = []; s.pineapples = [];
+      s.nextSection = s.distance + 950;
+    }
     s.level = level; s.section = 0; s.encounterDeck = []; s.insectDeck = []; s.items = s.items.filter(i => i.kind !== 'gem'); s.message = `LEVEL ${level + 1}: ${LEVELS[level].name}`; s.messageTime = 3; }
   const speed = runnerSpeed(s);
   const boost = dashBoost(s) + airBoost(s);
-  if (!s.swing) s.distance += (speed + boost) * dt;
+  const tarred = s.level === 6 && s.y >= FLOOR - 2 && s.tarPits.some(p => s.distance + PLAYER_X > p.x && s.distance + PLAYER_X < p.x + p.width);
+  if (!s.swing) s.distance += (speed * (tarred ? 0.62 : 1) + boost) * dt;
   // Camera lags briefly behind a dash: the monkey visibly surges forward while
   // world-space collisions stay aligned with the faster movement.
   s.cameraLead += (boost * 0.2 - s.cameraLead) * (1 - Math.exp(-10 * dt));
@@ -606,6 +620,7 @@ export function stepRunner(s: Runner, dt: number) {
   }
   s.herds = s.herds.filter(h => h.x + 440 > s.distance - 80);
   const height = s.duck && s.y >= FLOOR - 1 ? 30 : 76;
+  stepDinoLand(s, dt, previousY, (message, reaction) => hurt(s, message, reaction));
   for (const r of s.rivers) {
     if (r.resident === 'piranha') for (let i = 0; i < 2; i++) {
       if (r.piranhasKnocked?.[i]) continue;

@@ -1,18 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createRunner, stepRunner, FLOOR, PLAYER_X, runnerSpeed, jumpRunner, duckRunner } from '../lib/jungle-runner';
+import { createRunner, stepRunner, FLOOR, PLAYER_X, runnerSpeed, jumpRunner, duckRunner, levelSeconds } from '../lib/jungle-runner';
 import { createInsect, INSECT_KINDS, insectWarning } from '../lib/jungle-insects';
 
 for (const difficulty of ['easy', 'medium', 'hard'] as const) {
-  function active() { const s = createRunner(difficulty); s.phase = 'playing'; s.level = 5; s.elapsed = 300; s.items = []; s.nextSection = 100000; return s; }
+  function active() { const s = createRunner(difficulty); s.phase = 'playing'; s.level = 5; s.elapsed = levelSeconds(s) * 5; s.items = []; s.nextSection = 100000; return s; }
   test(`${difficulty}: sixth level introduces every insect and exactly one Peridot`, () => {
     const s = active(); s.nextSection = 1100;
     const kinds = new Set<string>(); const gems = new Set<object>();
-    for (let i = 0; i < 61 * 120; i++) {
+    for (let i = 0; i < levelSeconds(s) * 120 - 1; i++) {
       s.invincible = 5; stepRunner(s, 1 / 120);
       s.insects.forEach(b => kinds.add(b.kind)); s.items.filter(item => item.kind === 'gem').forEach(item => gems.add(item));
     }
-    assert.deepEqual([...kinds].sort(), [...INSECT_KINDS].sort()); assert.equal(gems.size, 1); assert.equal(s.phase, 'victory');
+    assert.deepEqual([...kinds].sort(), [...INSECT_KINDS].sort()); assert.equal(gems.size, 1); assert.equal(s.level, 5); assert.equal(s.phase, 'playing');
   });
   test(`${difficulty}: warning completes before worker throws, then rock travels`, () => {
     const s = active(); s.insects = [createInsect('worker', PLAYER_X + runnerSpeed(s) * (insectWarning(difficulty) + 0.8))];

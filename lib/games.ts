@@ -94,11 +94,11 @@ export const GAME_DEFINITIONS: GameDefinition[] = [
   {
     key: "jungle-vine-swing",
     title: "Johnny's Jungle Journey",
-    description: "Find your jungle rhythm. Race through the jungle with double jumps, front flips, slide and forward dashes, and vine swings. Collect hearts, fruit, and rare stars while friendly birds lend a hand. Brave hog herds, crocodile pits, prowling tigers, giant spiders, bats, boulders, falling cave spikes, spike pits, and the sleepless coffee bear. Bounce through the Insect Grove, dodge dancing orangutan pineapples, build Ki with punch and kick counters, and face the laser-firing Scorpion King on Johnny’s journey home.",
+    description: "Race through seven worlds with jumps, flips, slides, dashes, vine swings, and Ki counters. Survive the jungle and Giant Insect Grove, then enter DinoLand for triceratops charges, long-neck crossings, baboon crews, saber-toothed tigers, pterodactyl dives, mammoth herds, tar pits, volcanic eruptions, and a T. rex finale.",
     icon: "TreePine",
     ageMin: 5,
     ageMax: 14,
-    playTime: "6 min",
+    playTime: "5-8 min",
     color: "#15803d",
     bg: "#dcfce7",
   },

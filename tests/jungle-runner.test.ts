@@ -158,13 +158,13 @@ test('waiting snakes hurt on the ground and invulnerability prevents repeat dama
   advance(s, 1); assert.equal(s.lives, 2);
 });
 
-test('levels advance without resetting earned coins or lives and victory follows the insect sixth level', () => {
+test('levels advance without resetting earned coins or lives and DinoLand follows the insect grove', () => {
   const s = active(), seconds = levelSeconds(active()); s.bananas = 110; s.lives = 4; s.elapsed = seconds - 0.01;
   advance(s, 0.03); assert.equal(s.level, 1); assert.equal(s.phase, 'playing');
   s.elapsed = seconds * 2 - 0.01; advance(s, 0.03); assert.equal(s.level, 2);
   s.elapsed = seconds * 3 - 0.01; advance(s, 0.03); assert.equal(s.level, 3); assert.equal(s.phase, 'playing');
   s.elapsed = seconds * 4 - 0.01; advance(s, 0.03); assert.equal(s.phase, 'playing'); assert.equal(s.level, 4);
-  s.elapsed = seconds * 6 - 0.01; advance(s, 0.03); assert.equal(s.phase, 'victory'); assert.equal(s.bananas, 110); assert.equal(s.lives, 4);
+  s.elapsed = seconds * 6 - 0.01; advance(s, 0.03); assert.equal(s.level, 6); assert.equal(s.phase, 'playing'); assert.equal(s.bananas, 110); assert.equal(s.lives, 4);
 });
 
 test('every level starts faster than the previous level finishes', () => {
@@ -174,7 +174,7 @@ test('every level starts faster than the previous level finishes', () => {
   }
 });
 
-for (let level = 0; level < LEVELS.length; level++) {
+for (let level = 0; level < 6; level++) {
   test(`level ${level + 1}: reactive snake catches a single jump but double jump clears it`, () => {
     for (const double of [false, true]) {
       const s = active(); s.level = level; s.elapsed = level * levelSeconds(s) + 10;
@@ -400,7 +400,7 @@ test('second jump starts a forward burst and a flip, which diving cancels', () =
   duckRunner(s, true); assert.equal(s.flipLeft, 0);
 });
 
-for (let level = 0; level < LEVELS.length; level++) {
+for (let level = 0; level < 6; level++) {
   test(`level ${level + 1}: a timed jump can catch a vine and cross the wide pit`, () => {
     let cleared = false;
     for (let delay = 0; delay < 1.8 && !cleared; delay += 0.025) {
@@ -443,7 +443,7 @@ test('jump releases a caught vine and a missed vine has no hippo rescue', () => 
   advance(fall, 0.6); assert.equal(fall.lives, 2); assert.equal(fall.bounces, 0);
 });
 
-for (let level = 0; level < LEVELS.length; level++) {
+for (let level = 0; level < 6; level++) {
   test(`level ${level + 1}: elephant herd punishes running and permits a timed double-jump escape`, () => {
     const hit = active(); hit.level = level; hit.elapsed = level * 60;
     hit.herds = [{ x: PLAYER_X + 600, age: 0, charging: false, warned: false }];
@@ -512,11 +512,11 @@ test('hogs stay in their section until approach, hurt on contact, and can be bou
   advance(bounce, 0.02); assert.equal(bounce.hits, 0); assert.ok(bounce.vy < 0); assert.equal(bounce.jumps, 1);
 });
 
-for (let level = 0; level < LEVELS.length; level++) {
+for (let level = 0; level < 6; level++) {
   test(`level ${level + 1}: compact hog herds can be crossed with jumps and back bounces`, () => {
     let cleared = false;
     for (let timing = 0.2; timing <= 0.55 && !cleared; timing += 0.025) {
-      const s = active(); s.level = level; s.elapsed = level * 60;
+      const s = active(); s.level = level; s.elapsed = level * levelSeconds(s) + 10;
       s.hogs = createHogs(PLAYER_X + 600, runnerSpeed(s));
       for (const h of s.hogs) h.jumpIn = 100;
       for (let i = 0; i < 10 * 120; i++) {
@@ -533,25 +533,25 @@ for (let level = 0; level < LEVELS.length; level++) {
 test('full run spawns exactly one gem per level and bats only at night', () => {
   const s = createRunner(); s.phase = 'playing';
   const seen = new Set<object>(), counts = GEMS.map(() => 0); let nightBats = false;
-  for (let i = 0; i < 361 * 120; i++) {
+  for (let i = 0; i < (levelSeconds(s) * LEVELS.length + 3) * 120; i++) {
     s.invincible = 5; stepRunner(s, 1 / 120);
     for (const item of s.items) if (item.kind === 'gem' && !seen.has(item)) { seen.add(item); counts[item.level!]++; }
     if (s.bats.length) { assert.equal(s.level, 4); nightBats = true; }
   }
-  assert.deepEqual(counts, [1, 1, 1, 1, 1, 1]); assert.ok(nightBats); assert.equal(s.phase, 'victory');
+  assert.deepEqual(counts, [1, 1, 1, 1, 1, 1, 1]); assert.ok(nightBats); assert.equal(s.phase, 'playing'); assert.equal(s.level, 6);
 });
 
 test('gem collection awards 250 points once per level, and restart clears progress', () => {
   const s = active();
   for (let level = 0; level < LEVELS.length; level++) {
-    s.level = level; s.elapsed = level * 60;
+    s.level = level; s.elapsed = level * levelSeconds(s);
     for (let duplicate = 0; duplicate < 2; duplicate++) {
       s.items = [{ x: s.distance + PLAYER_X, y: FLOOR - 40, kind: 'gem', level }];
       stepRunner(s, 1 / 120);
     }
   }
-  assert.equal(s.gems, 6); assert.equal(runnerScore(s), 1500); assert.equal(s.bananas, 0);
-  assert.deepEqual(s.gemCollected, [true, true, true, true, true, true]); assert.equal(createRunner().gems, 0);
+  assert.equal(s.gems, 7); assert.equal(runnerScore(s), 1750); assert.equal(s.bananas, 0);
+  assert.deepEqual(s.gemCollected, [true, true, true, true, true, true, true]); assert.equal(createRunner().gems, 0);
   assert.equal(hasAllGems(s), true);
   s.phase = 'victory'; stepRunner(s, 0.5); assert.equal(s.celebrationTime, 0.5);
 });
@@ -616,7 +616,7 @@ test('falling into an eel river triggers the visible zap reaction', () => {
   assert.equal(s.reaction, 'zap'); assert.ok(s.reactionLeft > 0); assert.equal(s.lives, 2);
 });
 
-for (let level = 0; level < LEVELS.length; level++) {
+for (let level = 0; level < 6; level++) {
   for (const resident of ['piranha', 'eel'] as const) {
     test(`level ${level + 1}: ${resident} river has a safe timed jump route`, () => {
       let safe = false;
@@ -655,7 +655,7 @@ test('pineapple leaves the throwing hand, rotates, and bursts once on impact', (
 
 for (const resident of ['piranha', 'eel'] as const) {
   test(`vine crossings remain reachable above ${resident} water at every speed`, () => {
-    for (let level = 0; level < LEVELS.length; level++) {
+    for (let level = 0; level < 6; level++) {
       let safe = false;
       for (let delay = 0; delay < 1.8 && !safe; delay += 0.025) {
         const s = active(); s.level = level; s.elapsed = level * 60;
