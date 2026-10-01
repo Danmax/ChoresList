@@ -6,6 +6,7 @@ import { pantherPaw } from '@/lib/jungle-motion';
 import { drawWaterLife, drawOrangutan, drawPineapple } from '@/lib/jungle-water-art';
 import { useEffect, useRef, useState } from 'react';
 import { RUNNER_DIFFICULTIES, type RunnerDifficulty, type CoffeeSpecial, GEMS, spiderPosition, slothPosition, airBoost, FLIP_SECONDS, vinePosition, birdHeight, crocodileFrame, hippoFrame, createRunner, dashBoost, duckRunner, FLOOR, forwardDashRunner, hesitateRunner, heroMove, isAirAttack, jumpRunner, kickRunner, KI_MAX, LEVELS, levelSeconds, PLAYER_X, punchRunner, runnerScore, specialRunner, STRONG_DIVE_SECONDS, travelSpeed, stepRunner, type Runner } from '@/lib/jungle-runner';
+import styles from './jungle-runner.module.css';
 
 // Canvas artwork keeps shells and moving limbs crisp at every display density.
 function coconut(ctx: CanvasRenderingContext2D, x: number, y: number, rotation = 0, split = 0) {
@@ -815,11 +816,11 @@ export function JungleVineSwing({ onExit, onFinish }: {
   }, []);
 
   const ended = hud.phase === 'over' || hud.phase === 'victory';
-  return <section className="fixed inset-0 z-50 flex flex-col justify-center overflow-auto bg-emerald-950 p-3 text-white sm:p-6" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
-    <div className="mx-auto w-full max-w-4xl">
-      <header className="mb-2 flex items-center justify-between gap-2"><h2 className="font-black">Jungle Runner</h2><div className="flex gap-2"><button onClick={pause} disabled={hud.phase !== 'playing'} className="rounded-xl bg-white/10 px-3 py-2 disabled:opacity-40">{hud.paused ? 'Resume' : 'Pause'}</button><button onClick={onExit} className="rounded-xl bg-white/10 px-3 py-2">Exit</button></div></header>
+  return <section className={`${styles.root} fixed inset-0 z-50 flex flex-col justify-center overflow-auto bg-emerald-950 text-white`}>
+    <div className={`${styles.shell} mx-auto w-full max-w-4xl`}>
+      <header className={`${styles.header} mb-2 flex items-center justify-between gap-2`}><h2 className="font-black">Jungle Runner</h2><div className="flex gap-2"><button onClick={pause} disabled={hud.phase !== 'playing'} className="rounded-xl bg-white/10 px-3 py-2 disabled:opacity-40">{hud.paused ? 'Resume' : 'Pause'}</button><button onClick={onExit} className="rounded-xl bg-white/10 px-3 py-2">Exit</button></div></header>
       {hud.phase === 'ready' && (
-        <fieldset className="mb-3 rounded-xl bg-white/10 p-3">
+        <fieldset className={`${styles.setup} mb-3 rounded-xl bg-white/10 p-3`}>
           <legend className="px-1 text-sm font-black">Choose your run</legend>
           <div className="mb-3 grid grid-cols-2 gap-2">
             <button type="button" onClick={() => selectMode('adventure')} className={`rounded-lg px-3 py-2 text-sm font-black ${runMode === 'adventure' ? 'bg-yellow-300 text-emerald-950' : 'bg-emerald-900 text-white'}`}>Adventure Mode <small className="block font-bold">All {LEVELS.length} stages</small></button>
@@ -838,17 +839,17 @@ export function JungleVineSwing({ onExit, onFinish }: {
           <p className="mt-2 text-center text-xs text-emerald-100">{runMode === 'adventure' ? `Adventure Mode: complete all ${LEVELS.length} stages in one run.` : `Selected stage: ${LEVELS[selectedLevel].name}. Win this stage to complete it.`} · {RUNNER_DIFFICULTIES[difficulty].description}</p>
         </fieldset>
       )}
-      <div className="mb-2 flex justify-between gap-2 text-sm font-black"><span>🍌 {hud.bananas} <small className="block text-yellow-200">{hud.bananas % 100}/100 → +1 life</small></span><span>❤️ {hud.lives} lives</span><span>{hud.bossStarted ? `🦖 ${hud.bossHp}/${hud.bossMax} HP` : `${hud.seconds}s`} · {hud.score} pts</span></div>
-      <p className="mb-2 text-xs font-bold text-yellow-200">{RUNNER_DIFFICULTIES[difficulty].label} · Level {hud.level + 1}/{LEVELS.length} · {LEVELS[hud.level].name} · {hud.move.toUpperCase()} · {hud.speed.toFixed(1)}× pace{hud.espresso > 0 ? ` · ☕ espresso ${hud.espresso.toFixed(1)}s` : ''} · ⭐ {hud.golden} gold · 🍒 {hud.cherries} · 💎 {hud.gems}/{LEVELS.length} · {GEMS[hud.level].name}: {hud.levelGem ? "collected" : "find it!"}</p>
-      {(hud.streak > 0 || hud.bestStreak > 1) && <p className="mb-2 rounded-lg bg-orange-500/20 px-3 py-1 text-sm font-black text-orange-100" aria-live="polite">{hud.streak > 0 ? `💥 ${hud.combo > 0 ? `${hud.combo} HIT COMBO · ` : ''}${hud.streak} HIT STREAK` : '💥 STREAK ENDED'} · Best {hud.bestStreak}</p>}
-      <div className="mb-3 flex items-center gap-3 rounded-xl border border-cyan-300/50 bg-cyan-950/50 px-3 py-2">
+      <div className={`${styles.stats} mb-2 flex justify-between gap-2 text-sm font-black`}><span>🍌 {hud.bananas} <small className="block text-yellow-200">{hud.bananas % 100}/100 → +1 life</small></span><span>❤️ {hud.lives} lives</span><span>{hud.bossStarted ? `🦖 ${hud.bossHp}/${hud.bossMax} HP` : `${hud.seconds}s`} · {hud.score} pts</span></div>
+      <p className={`${styles.status} mb-2 text-xs font-bold text-yellow-200`}>{RUNNER_DIFFICULTIES[difficulty].label} · Level {hud.level + 1}/{LEVELS.length} · {LEVELS[hud.level].name} · {hud.move.toUpperCase()} · {hud.speed.toFixed(1)}× pace{hud.espresso > 0 ? ` · ☕ espresso ${hud.espresso.toFixed(1)}s` : ''} · ⭐ {hud.golden} gold · 🍒 {hud.cherries} · 💎 {hud.gems}/{LEVELS.length} · {GEMS[hud.level].name}: {hud.levelGem ? "collected" : "find it!"}</p>
+      {(hud.streak > 0 || hud.bestStreak > 1) && <p className={`${styles.streak} mb-2 rounded-lg bg-orange-500/20 px-3 py-1 text-sm font-black text-orange-100`} aria-live="polite">{hud.streak > 0 ? `💥 ${hud.combo > 0 ? `${hud.combo} HIT COMBO · ` : ''}${hud.streak} HIT STREAK` : '💥 STREAK ENDED'} · Best {hud.bestStreak}</p>}
+      <div className={`${styles.ki} mb-3 flex items-center gap-3 rounded-xl border border-cyan-300/50 bg-cyan-950/50 px-3 py-2`}>
         <span className="shrink-0 text-xs font-black tracking-wide text-cyan-100">KI {Math.round(hud.ki)}%</span>
         <div className="h-3 flex-1 overflow-hidden rounded-full border border-cyan-100/70 bg-slate-950">
           <div className={`h-full rounded-full transition-all ${hud.ki >= KI_MAX ? 'bg-gradient-to-r from-cyan-300 via-white to-violet-300 animate-pulse' : 'bg-gradient-to-r from-cyan-500 to-violet-400'}`} style={{ width: `${hud.ki}%` }} />
         </div>
         <span className="text-xs font-black text-cyan-100">{hud.special > 0 ? 'BURST!' : hud.ki >= KI_MAX ? 'E: READY' : 'COUNTER TO CHARGE'}</span>
       </div>
-      <div className="relative overflow-hidden rounded-2xl border-2 border-emerald-700">
+      <div className={`${styles.stage} relative overflow-hidden rounded-2xl border-2 border-emerald-700`}>
         <canvas ref={canvas} width={800} height={400} aria-label="Jungle runner with seven levels, ending in DinoLand with a T. rex boss." className="block aspect-[2/1] w-full" />
         {(hud.phase === 'ready' || ended || hud.paused) && <div className="absolute inset-0 flex items-start justify-center overflow-y-auto bg-emerald-950/75 p-3">
           <div className="my-auto max-w-md text-center">
@@ -860,7 +861,7 @@ export function JungleVineSwing({ onExit, onFinish }: {
           </div>
         </div>}
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <div className={`${styles.controls} mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3`}>
         <button disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); jump(); }} onClick={e => { if (e.detail === 0) jump(); }} className="min-h-14 touch-none select-none rounded-2xl bg-yellow-300 p-3 font-black text-emerald-950 disabled:opacity-40">JUMP <small className="block">Tap again: flip / release vine</small></button>
         <button disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); duck(`pointer-${e.pointerId}`, true); }} onPointerUp={e => duck(`pointer-${e.pointerId}`, false)} onPointerCancel={e => duck(`pointer-${e.pointerId}`, false)} onLostPointerCapture={e => duck(`pointer-${e.pointerId}`, false)} onKeyDown={e => { if (e.key === 'Enter') duck('enter', true); }} onKeyUp={e => { if (e.key === 'Enter') duck('enter', false); }} className="min-h-14 touch-none select-none rounded-2xl bg-emerald-600 p-3 font-black disabled:opacity-40">{hud.attack > 0 ? `STRIKE ${hud.attack.toFixed(2)}s` : `SLIDE ${hud.slide > 0 ? `${hud.slide.toFixed(1)}s` : ''}`} <small className="block">In air: 0.42s dive strike</small></button>
         <button disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); punch(); }} onClick={e => { if (e.detail === 0) punch(); }} className="min-h-14 touch-none select-none rounded-2xl bg-orange-400 p-3 font-black text-orange-950 disabled:opacity-40">PUNCH<small className="block">J · land hits to build a combo</small></button>
@@ -869,7 +870,7 @@ export function JungleVineSwing({ onExit, onFinish }: {
         <button disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); hesitate(`hesitate-${e.pointerId}`, true); }} onPointerUp={e => hesitate(`hesitate-${e.pointerId}`, false)} onPointerCancel={e => hesitate(`hesitate-${e.pointerId}`, false)} onLostPointerCapture={e => hesitate(`hesitate-${e.pointerId}`, false)} onKeyDown={e => { if (e.key === 'Enter') hesitate('hesitate-enter', true); }} onKeyUp={e => { if (e.key === 'Enter') hesitate('hesitate-enter', false); }} className={`min-h-14 touch-none select-none rounded-2xl p-3 font-black disabled:opacity-40 ${hud.hesitating ? 'bg-fuchsia-200 text-fuchsia-950 ring-4 ring-white/60' : 'bg-fuchsia-400 text-fuchsia-950'}`}>HESITATE / FAKE <small className="block">← · hold to slow your approach</small></button>
         <button disabled={hud.phase !== 'playing' || hud.paused || hud.ki < KI_MAX} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); special(); }} onClick={e => { if (e.detail === 0) special(); }} className="min-h-14 touch-none select-none rounded-2xl bg-violet-400 p-3 font-black text-violet-950 disabled:opacity-40">KI BURST <small className="block">E · full meter</small></button>
       </div>
-      <p className="mt-2 text-center text-xs text-emerald-200">Run is automatic · Space / ↑: jump / flip · ←: hesitation fake · ↓: slide dash · →: forward dash · J: punch · K: kick · E: Ki Burst. Ki Burst deals double damage; star power destroys falling spikes on contact.</p>
+      <p className={`${styles.help} mt-2 text-center text-xs text-emerald-200`}>Run is automatic · Space / ↑: jump / flip · ←: hesitation fake · ↓: slide dash · →: forward dash · J: punch · K: kick · E: Ki Burst. Ki Burst deals double damage; star power destroys falling spikes on contact.</p>
     </div>
   </section>;
 }
