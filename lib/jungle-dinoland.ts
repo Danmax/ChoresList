@@ -1,4 +1,4 @@
-import { FLOOR, PLAYER_X, gainKi, heroAttackReach, isHeroAttack, runnerSpeed, starKnockout, type Runner } from './jungle-runner';
+import { FLOOR, PLAYER_X, gainKi, heroStrikeConnects, isHeroAttack, recordHeroHit, runnerSpeed, starKnockout, type Runner } from './jungle-runner';
 
 export type DinoKind = 'triceratops' | 'sauropod' | 'baboon' | 'sabertooth' | 'pterodactyl' | 'mammoth' | 'trex';
 export type Dino = {
@@ -135,8 +135,8 @@ export function stepDinoLand(s: Runner, dt: number, previousY: number, hurt: (me
       } else if (dino.state === 'recover' && dino.age >= (s.difficulty === 'hard' ? 0.78 : 1.05)) {
         dino.cycle++; dino.state = 'warn'; dino.age = 0;
       }
-      if (dino.state === 'recover' && isHeroAttack(s) && dino.hitCooldown === 0 && Math.abs(dino.x - worldX) < heroAttackReach(s) + 60) {
-        dino.hits++; dino.hitCooldown = 0.42; gainKi(s, 18);
+      if (dino.state === 'recover' && dino.hitCooldown === 0 && heroStrikeConnects(s, dino.x, 100, FLOOR - 190, FLOOR)) {
+        dino.hits++; dino.hitCooldown = 0.42; gainKi(s, 18); recordHeroHit(s, dino.x - 70, FLOOR - 85);
         s.message = `T. REX COUNTER! ${dino.hits}/${dino.hitPoints}`; s.messageTime = 0.9;
         if (dino.hits >= dino.hitPoints) {
           dino.knocked = true; s.dinoBossDefeated = true; s.phase = 'victory';
@@ -162,23 +162,22 @@ export function stepDinoLand(s: Runner, dt: number, previousY: number, hurt: (me
       }
       if (dino.age >= 1.1) { dino.state = 'recover'; dino.age = 0; }
     }
-    if (dino.kind === 'baboon') continue;
-    const bodyX = dino.kind === 'mammoth' ? 60 : dino.kind === 'pterodactyl' ? 52 : 50;
-    const top = dino.kind === 'pterodactyl' ? dino.y - 26 : dino.kind === 'sabertooth' ? dino.y - 85 : dino.kind === 'mammoth' ? FLOOR - 112 : FLOOR - 90;
+    const bodyX = dino.kind === 'mammoth' ? 65 : dino.kind === 'pterodactyl' ? 52 : dino.kind === 'baboon' ? 36 : dino.kind === 'sabertooth' ? 60 : 50;
+    const top = dino.kind === 'pterodactyl' ? dino.y - 26 : dino.kind === 'sabertooth' ? dino.y - 85 : dino.kind === 'mammoth' ? FLOOR - 112 : dino.kind === 'baboon' ? FLOOR - 105 : FLOOR - 90;
     const bottom = dino.kind === 'pterodactyl' ? dino.y + 16 : dino.kind === 'sabertooth' ? dino.y + 40 : FLOOR;
     if (dino.kind === 'mammoth' && Math.abs(ahead) < bodyX && s.vy > 0 && previousY <= top && s.y >= top) {
       s.y = top; s.vy = -465; s.jumps = 1; s.duck = false;
       s.message = 'MAMMOTH HERD HOP!'; s.messageTime = 0.75;
       continue;
     }
-    if (isHeroAttack(s) && dino.hitCooldown === 0 && Math.abs(ahead) < bodyX + heroAttackReach(s) && bottom >= s.y - height && top <= s.y - 4) {
-      dino.hits++; dino.hitCooldown = 0.32; gainKi(s, 12);
+    if (dino.hitCooldown === 0 && heroStrikeConnects(s, dino.x, bodyX, top, bottom)) {
+      dino.hits++; dino.hitCooldown = 0.32; gainKi(s, 12); recordHeroHit(s, dino.x - bodyX / 2, Math.max(top + 20, FLOOR - 80));
       if (dino.hits >= dino.hitPoints) { dino.knocked = true; starKnockout(s, dino.x, dino.y - 60, dino.kind.toUpperCase()); }
       else { s.message = `${dino.kind.toUpperCase()} ${dino.hits}/${dino.hitPoints}`; s.messageTime = 0.8; }
       continue;
     }
     if (Math.abs(ahead) < bodyX && bottom >= s.y - height && top <= s.y - 4 && s.invincible <= 0) {
-      hurt(dino.kind === 'pterodactyl' ? 'PTERODACTYL DIVE! Slide low!' : dino.kind === 'mammoth' ? 'MAMMOTH STAMPEDE! Jump the herd!' : dino.kind === 'sabertooth' ? 'SABER-TOOTH POUNCE! Slide!' : 'TRICERATOPS CHARGE! Double jump!', dino.kind === 'mammoth' ? 'flatten' : 'tussle');
+      hurt(dino.kind === 'pterodactyl' ? 'PTERODACTYL DIVE! Slide low!' : dino.kind === 'mammoth' ? 'MAMMOTH STAMPEDE! Jump the herd!' : dino.kind === 'sabertooth' ? 'SABER-TOOTH POUNCE! Slide!' : dino.kind === 'baboon' ? 'BABOON CREW! Punch or jump!' : 'TRICERATOPS CHARGE! Double jump!', dino.kind === 'mammoth' ? 'flatten' : 'tussle');
     }
   }
   s.dinos = s.dinos.filter(d => !d.knocked && (d.kind === 'trex' || d.x > s.distance - 160));

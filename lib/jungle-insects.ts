@@ -1,4 +1,4 @@
-import { gainKi, heroAttackReach, isHeroAttack, starKnockout, type Runner } from './jungle-runner';
+import { gainKi, heroStrikeConnects, isHeroAttack, recordHeroHit, starKnockout, type Runner } from './jungle-runner';
 
 const FLOOR = 310;
 export const INSECT_KINDS = ['centipede', 'beetle', 'worker', 'fire-ant', 'stinger', 'katydid', 'caterpillar', 'mud-pit', 'scorpion'] as const;
@@ -52,11 +52,12 @@ export function stepInsects(s: Runner, dt: number, speed: number, previousY: num
       const lift = bug.kind === 'fire-ant' ? (bug.stack ?? 0) * 27 : 0;
       const top = bug.y - lift - 34;
       const bottom = bug.y - lift + 34;
-      if (Math.abs(ahead) < heroAttackReach(s) && bottom >= s.y - height && top <= s.y - 4) {
+      if (heroStrikeConnects(s, bug.x, bug.kind === 'centipede' ? 44 : 32, top, bottom)) {
         if (bug.kind === 'fire-ant') {
           for (const ant of s.insects) if (ant.kind === 'fire-ant' && Math.abs(ant.x - bug.x) < 10) ant.used = true;
         } else bug.used = true;
         gainKi(s, 12);
+        recordHeroHit(s, bug.x - 16, bug.y - lift);
         starKnockout(s, bug.x, bug.y - lift, bug.kind.toUpperCase());
         continue;
       }
@@ -65,13 +66,13 @@ export function stepInsects(s: Runner, dt: number, speed: number, previousY: num
       bug.age += dt;
       bug.hitCooldown = Math.max(0, (bug.hitCooldown ?? 0) - dt);
       const move = s.specialLeft > 0 ? 'special' : s.attackLeft > 0 ? 'dive' : s.combatLeft > 0 ? s.combatMove : 'run';
-      const reach = heroAttackReach(s);
       // The King paces at a deliberate standoff. A landed hit sends him back
       // into that zone, making the finale a battle instead of body contact.
-      if (ahead < 135) bug.x += Math.min(210, 135 - ahead) + 105 * dt;
+      if (ahead < 113) bug.x += Math.min(210, 113 - ahead) + 105 * dt;
       else if (ahead > 355 && bug.state !== 'attack') bug.x -= Math.min(55 * dt, ahead - 300);
-      if (move !== 'run' && reach > 0 && (bug.hitCooldown ?? 0) === 0 && ahead > -10 && ahead < reach && s.y > FLOOR - 160) {
+      if (move !== 'run' && (bug.hitCooldown ?? 0) === 0 && heroStrikeConnects(s, bug.x, 60, FLOOR - 170, FLOOR)) {
         bug.hits = (bug.hits ?? 0) + 1;
+        recordHeroHit(s, bug.x - 35, FLOOR - 100);
         if (move === 'special') bug.hits += 2;
         bug.hitCooldown = 0.16;
         bug.x += 185;

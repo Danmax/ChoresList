@@ -141,11 +141,31 @@ export function travelSpeed(s: Runner) { return runnerSpeed(s) + dashBoost(s) + 
 export function isAirAttack(s: Runner) { return s.attackLeft > 0 && s.stun <= 0; }
 export function isHeroAttack(s: Runner) { return isAirAttack(s) || s.strongDiveLeft > 0 || s.combatLeft > 0 || s.forwardDashLeft > 0 || s.specialLeft > 0; }
 export function heroAttackReach(s: Runner) {
-  if (s.specialLeft > 0) return 300;
-  if (s.forwardDashLeft > 0) return 165;
-  if (s.attackLeft > 0) return 155;
-  const comboReach = Math.max(0, s.comboStep - 1) * (s.combatMove === 'kick' ? 15 : 22);
-  return s.combatMove === 'kick' ? 178 + comboReach : s.combatMove === 'punch' ? 142 + comboReach : 0;
+  // The fight sprites extend only about 55–76 pixels ahead of the monkey.
+  // A small contact allowance keeps collisions aligned with the artwork.
+  if (s.specialLeft > 0) return 100;
+  if (s.forwardDashLeft > 0) return 90;
+  if (s.attackLeft > 0 || s.strongDiveLeft > 0) return 94;
+  return s.combatMove === 'kick' ? 78 : s.combatMove === 'punch' ? 68 : 0;
+}
+export function heroStrikeConnects(s: Runner, targetX: number, halfWidth: number, top: number, bottom: number) {
+  if (!isHeroAttack(s)) return false;
+  const right = heroAttackReach(s);
+  if (right <= 0) return false;
+  const worldX = s.distance + PLAYER_X;
+  const left = worldX + (s.specialLeft > 0 ? 5 : 14);
+  const strikeTop = s.y - (s.specialLeft > 0 ? 125 : s.combatMove === 'kick' ? 75 : 92);
+  const strikeBottom = s.y - (s.combatMove === 'punch' && s.specialLeft <= 0 ? 20 : 5);
+  return left <= targetX + halfWidth && worldX + right >= targetX - halfWidth && strikeTop <= bottom && strikeBottom >= top;
+}
+export function recordHeroHit(s: Runner, x: number, y: number) {
+  s.attackLanded = true;
+  s.hitCombo = s.hitComboWindow > 0 ? s.hitCombo + 1 : 1;
+  s.hitComboWindow = 1.15;
+  s.hitStreak++;
+  s.hitStreakWindow = 4;
+  s.bestHitStreak = Math.max(s.bestHitStreak, s.hitStreak);
+  s.hitEffects.push({ x, y, age: 0, combo: s.hitCombo });
 }
 export function heroMove(s: Runner) {
   if (s.specialLeft > 0) return 'kick' as const;
@@ -165,13 +185,14 @@ export function createRunner(difficulty: RunnerDifficulty = 'medium') {
     dinoEncounterIndex: 0, dinoBossStarted: false, dinoBossDefeated: false, groundShake: 0, tarTime: 0,
     reaction: 'bonk' as HitReaction, reactionLeft: 0,
     phase: 'ready' as 'ready' | 'playing' | 'over' | 'victory',
-    distance: 0, elapsed: 0, level: 0, y: FLOOR, vy: 0, jumps: 0, duck: false, duckHeld: false, slideLeft: 0, slideCooldown: 0, strongDiveLeft: 0, attackLeft: 0, forwardDashLeft: 0, forwardDashCooldown: 0, combatMove: 'run' as 'run' | 'punch' | 'kick' | 'dash', combatLeft: 0, comboStep: 0, comboWindow: 0, counterLeft: 0, ki: 0, specialLeft: 0, cameraLead: 0,
+    distance: 0, elapsed: 0, level: 0, y: FLOOR, vy: 0, jumps: 0, duck: false, duckHeld: false, slideLeft: 0, slideCooldown: 0, strongDiveLeft: 0, attackLeft: 0, forwardDashLeft: 0, forwardDashCooldown: 0, combatMove: 'run' as 'run' | 'punch' | 'kick' | 'dash', combatLeft: 0, comboStep: 0, comboWindow: 0, hitCombo: 0, hitComboWindow: 0, hitStreak: 0, hitStreakWindow: 0, bestHitStreak: 0, attackLanded: false, counterLeft: 0, ki: 0, specialLeft: 0, cameraLead: 0,
     flipLeft: 0, swing: null as ({ river: River; progress: number } | { lemming: Lemming; progress: number }) | null,
     cracks: [] as { x: number; y: number; age: number; kind?: 'coconut' | 'barrel' }[],
     golden: 0, cherries: 0, bonusScore: 0, gems: 0,
     gemSpawned: LEVELS.map(() => false), gemCollected: LEVELS.map(() => false), celebrationTime: 0,
     lives: Number(RUNNER_DIFFICULTIES[difficulty].lives), bananas: 0, hits: 0, bounces: 0, stun: 0, invincible: 0, starPower: 0, espressoBoost: 0, coffeeServed: 0,
     knockouts: [] as { x: number; y: number; age: number; label: string }[],
+    hitEffects: [] as { x: number; y: number; age: number; combo: number }[],
     message: '', messageTime: 0, nextSection: 950, section: 0, encounterDeck: [] as number[], insectDeck: [] as InsectKind[],
     items: Array.from({ length: 12 }, (_, i): RunnerItem => ({ x: 380 + i * 42, y: FLOOR - 30, kind: 'banana' })),
     orangutans: [] as Orangutan[], pineapples: [] as Pineapple[], splats: [] as { x: number; y: number; age: number }[], guardians: [] as JungleGuardian[],
@@ -218,6 +239,8 @@ export function duckRunner(s: Runner, held: boolean) {
 
 function startCombatMove(s: Runner, move: 'punch' | 'kick') {
   if (s.phase !== 'playing' || s.swing || (s.stun > 0 && s.counterLeft <= 0)) return;
+  if (s.combatLeft > 0 && !s.attackLanded) { s.hitStreak = 0; s.hitStreakWindow = 0; s.hitCombo = 0; s.hitComboWindow = 0; }
+  s.attackLanded = false;
   s.duck = false;
   s.slideLeft = 0;
   s.strongDiveLeft = 0;
@@ -226,7 +249,6 @@ function startCombatMove(s: Runner, move: 'punch' | 'kick') {
   s.comboWindow = 0.42;
   s.combatMove = move;
   s.combatLeft = (move === 'punch' ? 0.28 : 0.36) + (s.comboStep === 3 ? 0.1 : 0);
-  if (s.comboStep > 1) { s.message = `${s.comboStep} HIT COMBO!`; s.messageTime = 0.55; }
 }
 export function punchRunner(s: Runner) { startCombatMove(s, 'punch'); }
 export function kickRunner(s: Runner) { startCombatMove(s, 'kick'); }
@@ -234,6 +256,8 @@ export function forwardDashRunner(s: Runner) {
   // Match slide's re-entry limit so holding or rapidly tapping Forward cannot
   // turn the runner into a permanent dash.
   if (s.phase !== 'playing' || s.swing || s.forwardDashLeft > 0 || s.forwardDashCooldown > 0 || (s.stun > 0 && s.counterLeft <= 0)) return;
+  if (s.combatLeft > 0 && !s.attackLanded) { s.hitStreak = 0; s.hitStreakWindow = 0; s.hitCombo = 0; s.hitComboWindow = 0; }
+  s.attackLanded = false;
   s.duck = false; s.slideLeft = 0; s.strongDiveLeft = 0;
   s.combatMove = 'dash'; s.combatLeft = 0.34; s.forwardDashLeft = 0.34; s.forwardDashCooldown = 0.7;
 }
@@ -244,6 +268,7 @@ export function gainKi(s: Runner, amount: number) {
 }
 export function specialRunner(s: Runner) {
   if (s.phase !== 'playing' || s.ki < KI_MAX || s.stun > 0) return;
+  s.attackLanded = false;
   s.ki = 0; s.specialLeft = 0.65; s.combatMove = 'kick'; s.combatLeft = 0.65;
   s.message = 'KI BURST!'; s.messageTime = 0.8;
 }
@@ -263,6 +288,7 @@ function hurt(s: Runner, message: string, reaction: HitReaction = 'bonk') {
   s.flipLeft = 0;
   s.lives--;
   s.hits++;
+  s.hitCombo = 0; s.hitComboWindow = 0; s.hitStreak = 0; s.hitStreakWindow = 0;
   s.stun = 0.65;
   s.reaction = reaction; s.reactionLeft = 0.9;
   s.invincible = RUNNER_DIFFICULTIES[s.difficulty].protection;
@@ -407,13 +433,21 @@ export function stepRunner(s: Runner, dt: number) {
   s.cracks = s.cracks.filter(c => c.age < 0.75);
   for (const knockout of s.knockouts) knockout.age += dt;
   s.knockouts = s.knockouts.filter(k => k.age < 0.8);
+  for (const effect of s.hitEffects) effect.age += dt;
+  s.hitEffects = s.hitEffects.filter(effect => effect.age < 0.38);
   s.flipLeft = Math.max(0, s.flipLeft - dt);
   s.attackLeft = Math.max(0, s.attackLeft - dt);
   s.slideCooldown = Math.max(0, s.slideCooldown - dt);
   s.forwardDashLeft = Math.max(0, s.forwardDashLeft - dt);
   s.forwardDashCooldown = Math.max(0, s.forwardDashCooldown - dt);
   s.specialLeft = Math.max(0, s.specialLeft - dt);
+  const combatExpired = s.combatLeft > 0 && s.combatLeft <= dt;
   s.combatLeft = Math.max(0, s.combatLeft - dt);
+  if (combatExpired && !s.attackLanded) { s.hitStreak = 0; s.hitStreakWindow = 0; s.hitCombo = 0; s.hitComboWindow = 0; }
+  s.hitComboWindow = Math.max(0, s.hitComboWindow - dt);
+  if (s.hitComboWindow === 0) s.hitCombo = 0;
+  s.hitStreakWindow = Math.max(0, s.hitStreakWindow - dt);
+  if (s.hitStreakWindow === 0) s.hitStreak = 0;
   s.comboWindow = Math.max(0, s.comboWindow - dt);
   s.counterLeft = Math.max(0, s.counterLeft - dt);
   if (s.combatLeft === 0) s.combatMove = 'run';
@@ -677,8 +711,9 @@ export function stepRunner(s: Runner, dt: number) {
       guardian.x += 110 * dt;
       if (guardian.age >= 1.65) { guardian.state = 'aim'; guardian.age = 0; }
     }
-    if (isHeroAttack(s) && guardian.hitCooldown === 0 && Math.abs(ahead) < 55 + heroAttackReach(s) && s.y > FLOOR - 155) {
+    if (guardian.hitCooldown === 0 && heroStrikeConnects(s, guardian.x, 55, FLOOR - 150, FLOOR)) {
       guardian.hits++;
+      recordHeroHit(s, guardian.x - 25, FLOOR - 92);
       guardian.hitCooldown = s.forwardDashLeft > 0 ? 0.5 : 0.12;
       gainKi(s, 12);
       if (guardian.hits >= guardian.hitPoints) {
@@ -816,12 +851,13 @@ export function stepRunner(s: Runner, dt: number) {
     // A descending dive is an active strike, not merely a dodge. A short
     // per-foe cooldown lets the 0.42-second attack register a readable 2–3
     // hit combo on the tougher late-level predators.
-    if (visible && isHeroAttack(s) && p.hitCooldown === 0 && Math.abs(p.x - worldX) < radiusX + heroAttackReach(s) && p.y + radiusY + 16 >= s.y - height && p.y - radiusY - 16 <= s.y - 4) {
+    if (visible && p.hitCooldown === 0 && heroStrikeConnects(s, p.x, radiusX, p.y - radiusY - 16, p.y + radiusY + 16)) {
       // A forward dash gets exactly one stagger hit. Dive combos retain their
       // short rhythm, while an unfinished tiger stays able to maul the hero.
       p.hit = p.kind !== 'tiger' || p.hits + 1 >= p.hitPoints;
       p.hitCooldown = s.forwardDashLeft > 0 ? 0.5 : 0.12;
       p.hits++;
+      recordHeroHit(s, p.x - radiusX / 2, p.y);
       gainKi(s, 12);
       if (p.hits >= p.hitPoints) {
         p.knocked = true;

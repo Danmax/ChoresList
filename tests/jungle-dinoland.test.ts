@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRunner, duckRunner, FLOOR, jumpRunner, levelSeconds, PLAYER_X, punchRunner, stepRunner } from '../lib/jungle-runner';
 import { createDino } from '../lib/jungle-dinoland';
+import { dinoAnimationFrame } from '../lib/jungle-dino-art';
 
 function dinoland(difficulty: 'easy' | 'medium' | 'hard' = 'medium') {
   const s = createRunner(difficulty);
@@ -87,6 +88,43 @@ test('the long-neck back launches a player over tar', () => {
   stepRunner(s, 1 / 120);
   assert.ok(s.vy < 0);
   assert.equal(s.hits, 0);
+});
+
+test('DinoLand poses change for warnings, attacks, recovery, and movement', () => {
+  const dino = createDino('triceratops', PLAYER_X + 200);
+  assert.equal(dinoAnimationFrame(dino, 0), 0);
+  assert.equal(dinoAnimationFrame(dino, 0.4), 1);
+  dino.state = 'warn'; assert.equal(dinoAnimationFrame(dino, 0), 1);
+  dino.state = 'attack'; assert.equal(dinoAnimationFrame(dino, 0), 2);
+  dino.state = 'recover'; assert.equal(dinoAnimationFrame(dino, 0), 3);
+});
+
+test('punches connect at the front of a dinosaur and only landed hits build a streak', () => {
+  const far = dinoland(); far.invincible = 100;
+  far.dinos = [createDino('triceratops', PLAYER_X + 180)];
+  punchRunner(far); stepRunner(far, 1 / 120);
+  assert.equal(far.dinos[0].hits, 0);
+  assert.equal(far.hitCombo, 0);
+  assert.equal(far.hitStreak, 0);
+
+  const near = dinoland(); near.invincible = 100;
+  near.dinos = [createDino('triceratops', PLAYER_X + 100)];
+  punchRunner(near); stepRunner(near, 1 / 120);
+  assert.equal(near.dinos[0].hits, 1);
+  assert.equal(near.hitCombo, 1);
+  assert.equal(near.hitStreak, 1);
+  assert.equal(near.bestHitStreak, 1);
+  advance(near, 1.3);
+  near.dinos = [createDino('triceratops', near.distance + PLAYER_X + 100)];
+  punchRunner(near); stepRunner(near, 1 / 120);
+  assert.equal(near.hitCombo, 1, 'combo window expires before the next encounter');
+  assert.equal(near.hitStreak, 2, 'streak spans nearby encounters');
+  assert.equal(near.bestHitStreak, 2);
+  near.dinos[0].x = near.distance + PLAYER_X + 500;
+  advance(near, 0.35);
+  punchRunner(near); advance(near, 0.3);
+  assert.equal(near.hitStreak, 0);
+  assert.equal(near.bestHitStreak, 2);
 });
 
 test('T. rex requires counters to win and its stomp and bite have distinct escapes', () => {

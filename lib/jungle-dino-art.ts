@@ -1,5 +1,27 @@
 import { FLOOR, type Runner } from './jungle-runner';
-import type { DinoKind } from './jungle-dinoland';
+import type { Dino, DinoKind } from './jungle-dinoland';
+
+export type DinoAnimations = Record<DinoKind, HTMLImageElement>;
+// Transparent margins measured per 768×512 cell: left, top, right, bottom.
+// Cropping them gives the creatures their intended on-screen size while the
+// empty gutters in the source sheets keep adjacent animation cells distinct.
+const FRAME_BOUNDS: Record<DinoKind, [number, number, number, number][]> = {
+  triceratops: [[153, 138, 91, 82], [116, 183, 123, 73], [122, 100, 90, 136], [110, 82, 130, 133]],
+  sauropod: [[193, 114, 69, 80], [166, 93, 74, 80], [93, 173, 42, 123], [221, 45, 86, 98]],
+  baboon: [[178, 96, 125, 11], [128, 63, 100, 10], [61, 131, 137, 109], [184, 97, 155, 108]],
+  sabertooth: [[122, 131, 30, 63], [154, 170, 73, 59], [57, 32, 24, 137], [97, 148, 55, 84]],
+  pterodactyl: [[84, 43, 44, 44], [73, 185, 50, 13], [220, 46, 127, 81], [82, 53, 60, 90]],
+  mammoth: [[89, 82, 53, 43], [48, 123, 65, 45], [81, 37, 30, 84], [118, 48, 76, 76]],
+  trex: [[148, 139, 101, 77], [107, 221, 143, 76], [148, 113, 83, 135], [168, 63, 145, 117]],
+};
+
+export function dinoAnimationFrame(dino: Dino, elapsed: number) {
+  if (dino.kind === 'sauropod' && dino.state === 'idle') return Math.floor(elapsed * 2.8) % 4;
+  if (dino.state === 'warn') return 1;
+  if (dino.state === 'attack') return 2;
+  if (dino.state === 'recover') return 3;
+  return Math.floor(elapsed * (dino.kind === 'pterodactyl' ? 5 : 3.5)) % 2;
+}
 
 const CELLS: Record<DinoKind | 'lava', [number, number]> = {
   triceratops: [0, 0], sauropod: [1, 0], baboon: [2, 0], sabertooth: [3, 0],
@@ -20,9 +42,24 @@ export function drawDinoBackdrop(ctx: CanvasRenderingContext2D, distance: number
   for (let i = 0; i < 4; i++) {
     ctx.beginPath(); ctx.ellipse(volcanoX + Math.sin(elapsed * 0.8 + i) * 12 + i * 20, 86 - i * 19, 22 + i * 5, 10 + i * 3, 0, 0, Math.PI * 2); ctx.fill();
   }
+  // Short, ground-rooted prehistoric plants replace the jungle's tall trunks.
+  const fernOffset = (distance * 0.35) % 170;
+  ctx.strokeStyle = '#3d514a'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+  for (let i = -1; i < 7; i++) {
+    const x = i * 170 - fernOffset;
+    const sway = Math.sin(elapsed * 1.4 + i) * 3;
+    ctx.beginPath(); ctx.moveTo(x, FLOOR + 3); ctx.quadraticCurveTo(x + sway, FLOOR - 35, x + sway + 5, FLOOR - 66); ctx.stroke();
+    for (let j = 0; j < 4; j++) {
+      const y = FLOOR - 18 - j * 12;
+      ctx.beginPath(); ctx.moveTo(x + sway * (j + 1) / 5, y);
+      ctx.quadraticCurveTo(x - 18, y - 13, x - 30 + j * 2, y - 3); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x + sway * (j + 1) / 5, y);
+      ctx.quadraticCurveTo(x + 18, y - 13, x + 30 - j * 2, y - 4); ctx.stroke();
+    }
+  }
 }
 
-export function drawDinoLand(ctx: CanvasRenderingContext2D, s: Runner, atlas: HTMLImageElement, cameraDistance: number) {
+export function drawDinoLand(ctx: CanvasRenderingContext2D, s: Runner, atlas: HTMLImageElement, animations: DinoAnimations, cameraDistance: number) {
   const ready = atlas.complete && atlas.naturalWidth > 0;
   const cellW = atlas.naturalWidth / 4;
   const cellH = atlas.naturalHeight / 2;
@@ -61,11 +98,26 @@ export function drawDinoLand(ctx: CanvasRenderingContext2D, s: Runner, atlas: HT
       pterodactyl: [205, 180], mammoth: [225, 190], trex: [310, 285],
     };
     const [width, height] = dimensions[dino.kind];
-    const bottom = dino.kind === 'pterodactyl' ? dino.y + 68 : dino.kind === 'sabertooth' ? dino.y + 40 : FLOOR + 16;
+    const bottom = dino.kind === 'pterodactyl' ? dino.y + 20 : dino.kind === 'sabertooth' ? dino.y + 8 : FLOOR + 5;
     ctx.save();
     if (dino.state === 'warn') { ctx.shadowColor = '#fff184'; ctx.shadowBlur = 20; }
     if (dino.kind === 'trex' && dino.state === 'attack') { ctx.shadowColor = '#ff6633'; ctx.shadowBlur = 24; }
-    sprite(dino.kind, x, bottom, width, height);
+    const animated = animations[dino.kind];
+    if (animated.complete && animated.naturalWidth > 0) {
+      const frame = dinoAnimationFrame(dino, s.elapsed);
+      const frameW = animated.naturalWidth / 2, frameH = animated.naturalHeight / 2;
+      const [left, top, right, lower] = FRAME_BOUNDS[dino.kind][frame];
+      const pad = 6;
+      const sourceW = frameW - left - right + pad * 2;
+      const sourceH = frameH - top - lower + pad * 2;
+      const drawnH = Math.min(height, width * sourceH / sourceW);
+      const pulse = Math.sin((dino.state === 'idle' ? s.elapsed : dino.age) * (dino.state === 'attack' ? 18 : 5) + dino.x * 0.01);
+      const drawnW = width * (1 + pulse * 0.025);
+      const livelyH = drawnH * (1 - pulse * 0.025);
+      const lift = dino.kind === 'pterodactyl' ? Math.sin(s.elapsed * 10) * 5 : dino.state === 'attack' ? Math.sin(dino.age * 17) * 3 : Math.sin(s.elapsed * 4 + dino.x * 0.01) * 2;
+      ctx.drawImage(animated, frame % 2 * frameW + left - pad, Math.floor(frame / 2) * frameH + top - pad,
+        sourceW, sourceH, x - drawnW / 2, bottom - livelyH + lift, drawnW, livelyH);
+    } else sprite(dino.kind, x, bottom, width, height);
     ctx.restore();
     const label: Record<DinoKind, string> = {
       triceratops: dino.state === 'warn' ? 'CHARGE! DOUBLE JUMP' : 'TRICERATOPS',

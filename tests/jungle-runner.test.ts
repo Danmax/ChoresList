@@ -289,7 +289,8 @@ test('an air-started dive stays active for its 0.42-second strike window', () =>
 test('air strikes defeat snakes and panthers with level-scaled 1–3 hit pips', () => {
   assert.deepEqual([0, 2, 4].map(level => createPredator('snake', 0, 0.5, level).hitPoints), [1, 2, 3]);
   const s = active(); jumpRunner(s); advance(s, 0.06);
-  const panther = createPredator('panther', s.distance + PLAYER_X + 35, 0.5, 4);
+  // Begin ahead of the monkey so all three dive contacts happen at its front.
+  const panther = createPredator('panther', s.distance + PLAYER_X + 115, 0.5, 4);
   panther.state = 'recover';
   s.predators = [panther];
   duckRunner(s, true);
