@@ -219,25 +219,44 @@
 
   .leftTouchControls,
   .rightTouchControls {
-    display: flex;
+    display: grid;
     position: absolute;
     bottom: max(12px, env(safe-area-inset-bottom));
-    gap: clamp(7px, 1.5vw, 14px);
+    gap: clamp(4px, 1vh, 8px);
     pointer-events: auto;
   }
 
   .leftTouchControls {
     left: max(12px, env(safe-area-inset-left));
+    grid-template-rows: repeat(2, auto);
   }
 
   .rightTouchControls {
     right: max(12px, env(safe-area-inset-right));
+    grid-template-columns: repeat(2, auto);
+    grid-template-rows: repeat(2, auto);
+  }
+
+  .rightTouchControls .specialButton {
+    grid-column: 1 / 3;
+    grid-row: 1;
+    justify-self: center;
+  }
+
+  .rightTouchControls .attackButton {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .rightTouchControls .dashButton {
+    grid-column: 2;
+    grid-row: 2;
   }
 
   .touchButton {
     display: flex;
-    width: clamp(62px, 17vh, 84px);
-    height: clamp(62px, 17vh, 84px);
+    width: clamp(58px, 15.5vh, 78px);
+    height: clamp(58px, 15.5vh, 78px);
     touch-action: none;
     user-select: none;
     flex-direction: column;

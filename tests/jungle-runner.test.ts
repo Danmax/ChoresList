@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { pantherPaw } from '../lib/jungle-motion';
 import { createInsect } from '../lib/jungle-insects';
-import { COUNTER_ATTACK_SECONDS, GEM_Y, createJungleGuardian, createOrangutan, orangutanHand, piranhaPosition, eelPhase, createHogs, createBats, GEMS, hasAllGems, spiderPosition, ELEPHANT_TOP, crocodileFrame, hippoFrame, createRunner, createPredator, dashBoost, duckRunner, FLOOR, forwardDashRunner, hesitateRunner, heroAttackReach, isAirAttack, jumpRunner, kickRunner, KI_MAX, LEVELS, levelSeconds, PLAYER_X, punchRunner, runnerScore, runnerSpeed, specialRunner, stepRunner, STRONG_DIVE_SECONDS, travelSpeed } from '../lib/jungle-runner';
+import { COUNTER_ATTACK_SECONDS, GEM_Y, createJungleGuardian, createOrangutan, orangutanHand, piranhaPosition, eelPhase, createHogs, createBats, GEMS, hasAllGems, spiderPosition, ELEPHANT_TOP, crocodileFrame, hippoFrame, createRunner, createPredator, dashBoost, duckRunner, FLOOR, forwardDashRunner, hesitateRunner, heroAttackReach, isAirAttack, jumpRunner, kickRunner, KI_MAX, LEVELS, levelSeconds, PLAYER_X, punchRunner, runnerScore, runnerSpeed, specialRunner, stepRunner, STRONG_DIVE_SECONDS, travelSpeed, type River } from '../lib/jungle-runner';
 
 function active() { const s = createRunner(); s.phase = 'playing'; s.items = []; s.nextSection = 100000; return s; }
 function advance(s: ReturnType<typeof active>, seconds: number, fps = 120) { for (let i = 0; i < seconds * fps; i++) stepRunner(s, 1 / fps); }
@@ -594,7 +594,7 @@ test('gem collection awards 250 points once per level, and restart clears progre
     }
   }
   assert.equal(s.gems, 7); assert.equal(runnerScore(s), 1750); assert.equal(s.bananas, 0);
-  assert.deepEqual(s.gemCollected, [true, true, true, true, true, true, true]); assert.equal(createRunner().gems, 0);
+  assert.deepEqual(s.gemCollected, [true, true, true, true, true, true, true]); assert.equal(s.gemBursts.length, 7); assert.equal(createRunner().gems, 0);
   assert.equal(hasAllGems(s), true);
   s.phase = 'victory'; stepRunner(s, 0.5); assert.equal(s.celebrationTime, 0.5);
 });
@@ -659,6 +659,19 @@ test('falling into an eel river triggers the visible zap reaction', () => {
   assert.equal(s.reaction, 'zap'); assert.ok(s.reactionLeft > 0); assert.equal(s.lives, 2);
 });
 
+test('an airborne power slide bounces off a piranha with a recovery flip', () => {
+  const s = active();
+  const river: River = { x: 20, width: 500, resident: 'piranha', waterAge: 0.8 };
+  s.rivers = [river];
+  const fish = piranhaPosition(river, 0);
+  s.distance = fish.x - PLAYER_X;
+  s.y = fish.y - 8; s.vy = 180; s.jumps = 1;
+  duckRunner(s, true);
+  stepRunner(s, 1 / 120);
+  assert.ok(s.vy < 0); assert.equal(s.jumps, 1); assert.ok(s.flipLeft > 0);
+  assert.equal(river.piranhasKnocked?.[0], true); assert.match(s.message, /FLIP RECOVERY/);
+});
+
 for (let level = 0; level < 6; level++) {
   for (const resident of ['piranha', 'eel'] as const) {
     test(`level ${level + 1}: ${resident} river has a safe timed jump route`, () => {
@@ -694,6 +707,27 @@ test('pineapple leaves the throwing hand, rotates, and bursts once on impact', (
   s.orangutans = []; s.pineapples = [{ x: s.distance + PLAYER_X, y: FLOOR - 40, vx: 0, vy: 0, rotation: 0 }];
   stepRunner(s, 1 / 120); assert.equal(s.hits, 1); assert.equal(s.splats.length, 1); assert.equal(s.pineapples.length, 0);
   advance(s, 0.7); assert.equal(s.splats.length, 0); assert.equal(s.hits, 1);
+});
+
+test('hitting an orangutan enrages it and it throws right after Johnny passes', () => {
+  const s = active(); const o = createOrangutan(PLAYER_X + 55); s.orangutans = [o];
+  punchRunner(s); stepRunner(s, 1 / 120);
+  assert.equal(o.enraged, true); assert.equal(o.hits, 1); assert.ok(o.hitReact > 0);
+  s.distance = o.x - PLAYER_X + 220; o.state = 'dance'; o.age = 0.4; o.hitCooldown = 0;
+  stepRunner(s, 1 / 120); assert.equal(o.state, 'windup');
+  let threwRight = false;
+  for (let i = 0; i < 90 && !threwRight; i++) {
+    stepRunner(s, 1 / 120);
+    threwRight = s.pineapples.some(p => p.vx > 0);
+  }
+  assert.equal(o.throwDirection, 1); assert.equal(threwRight, true);
+});
+
+test('Super Ki explosively knocks down an orangutan', () => {
+  const s = active(); const o = createOrangutan(PLAYER_X + 55); s.orangutans = [o]; s.ki = KI_MAX;
+  specialRunner(s); stepRunner(s, 1 / 120);
+  assert.equal(s.orangutans.length, 0); assert.ok(s.splats.length >= 3);
+  assert.match(s.message, /SUPER KI EXPLOSION/);
 });
 
 for (const resident of ['piranha', 'eel'] as const) {

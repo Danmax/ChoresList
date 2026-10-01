@@ -483,6 +483,23 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
       ctx.fillStyle = '#174d35'; ctx.fillText(label, x, labelY);
     }
   }
+  for (const burst of s.gemBursts) {
+    const x = burst.x - cameraDistance, progress = burst.age / 1.15;
+    if (x < -100 || x > 900) continue;
+    ctx.save(); ctx.globalAlpha = Math.max(0, 1 - progress);
+    ctx.strokeStyle = burst.color; ctx.lineWidth = 4 - progress * 2; ctx.shadowColor = burst.color; ctx.shadowBlur = 24;
+    ctx.beginPath(); ctx.arc(x, burst.y, 24 + progress * 95, 0, Math.PI * 2); ctx.stroke();
+    for (let i = 0; i < 20; i++) {
+      const angle = i * Math.PI * 2 / 20 + burst.age * (i % 2 ? 2.8 : -2.2);
+      const distance = 12 + progress * (65 + i % 4 * 13);
+      const size = 3 + (i % 3) * 1.5;
+      ctx.save(); ctx.translate(x + Math.cos(angle) * distance, burst.y + Math.sin(angle) * distance * 0.72); ctx.rotate(angle + Math.PI / 4);
+      ctx.fillStyle = i % 3 === 0 ? '#ffffff' : burst.color;
+      ctx.fillRect(-size / 2, -size / 2, size, size); ctx.restore();
+    }
+    ctx.shadowBlur = 0; ctx.fillStyle = '#f4ffff'; ctx.font = 'bold 17px sans-serif';
+    ctx.fillText('✦ GEM SECURED! ✦', x, burst.y - 54 - progress * 34); ctx.restore();
+  }
   for (const crack of s.cracks) {
     ctx.save(); ctx.globalAlpha = 1 - crack.age / 0.75;
     if (crack.kind === 'barrel') barrel(ctx, crack.x - cameraDistance, crack.y + 120 * crack.age ** 2, 0.2 + crack.age * 2);
@@ -900,15 +917,15 @@ export function JungleVineSwing({ onExit, onFinish }: {
             {hud.paused ? <div className="flex justify-center gap-2"><button onClick={pause} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Resume</button><button onClick={onExit} className="rounded-xl bg-white/15 px-5 py-2 font-black text-white">Exit</button></div> : ended ? <div className="flex flex-wrap justify-center gap-2"><button onClick={start} className="rounded-xl bg-cyan-300 px-5 py-2 font-black text-emerald-950">Replay</button><button onClick={saveRun} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Save &amp; exit</button></div> : <button onClick={start} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">{runMode === 'stage' ? 'Play stage' : 'Start adventure'}</button>}
           </div>
         </div>}
-        <div className={styles.landscapeControls} aria-label="Simplified landscape controls">
-          <div className={styles.leftTouchControls}>
-            <button type="button" disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); comboAttack(); }} onClick={e => { if (e.detail === 0) comboAttack(); }} className={`${styles.touchButton} ${styles.attackButton}`}><span>👊</span><strong>ATTACK</strong><small>Punch + kick</small></button>
-            <button type="button" disabled={hud.phase !== 'playing' || hud.paused || hud.ki < KI_MAX} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); special(); }} onClick={e => { if (e.detail === 0) special(); }} className={`${styles.touchButton} ${styles.specialButton}`}><span>⚡</span><strong>KI</strong><small>{hud.ki >= KI_MAX ? 'Ready!' : `${Math.round(hud.ki)}%`}</small></button>
-          </div>
-          <div className={styles.rightTouchControls}>
+        <div className={styles.landscapeControls} aria-label="Landscape gamepad controls">
+          <div className={styles.leftTouchControls} aria-label="Jump and slide controls">
             <button type="button" disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); jump(); }} onClick={e => { if (e.detail === 0) jump(); }} className={`${styles.touchButton} ${styles.jumpButton}`}><span>↑</span><strong>JUMP</strong><small>Tap twice</small></button>
-            <button type="button" disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); forwardDash(); }} onClick={e => { if (e.detail === 0) forwardDash(); }} className={`${styles.touchButton} ${styles.dashButton}`}><span>→</span><strong>DASH</strong><small>Counter</small></button>
             <button type="button" disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); duck(`landscape-slide-${e.pointerId}`, true); }} onPointerUp={e => duck(`landscape-slide-${e.pointerId}`, false)} onPointerCancel={e => duck(`landscape-slide-${e.pointerId}`, false)} onLostPointerCapture={e => duck(`landscape-slide-${e.pointerId}`, false)} className={`${styles.touchButton} ${styles.slideButton}`}><span>↓</span><strong>SLIDE</strong><small>Hold</small></button>
+          </div>
+          <div className={styles.rightTouchControls} aria-label="Fight, dash, and Ki controls">
+            <button type="button" disabled={hud.phase !== 'playing' || hud.paused || hud.ki < KI_MAX} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); special(); }} onClick={e => { if (e.detail === 0) special(); }} className={`${styles.touchButton} ${styles.specialButton}`}><span>⚡</span><strong>KI · X</strong><small>{hud.ki >= KI_MAX ? 'Ready!' : `${Math.round(hud.ki)}%`}</small></button>
+            <button type="button" disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); comboAttack(); }} onClick={e => { if (e.detail === 0) comboAttack(); }} className={`${styles.touchButton} ${styles.attackButton}`}><span>👊</span><strong>FIGHT · Y</strong><small>Punch + kick</small></button>
+            <button type="button" disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); forwardDash(); }} onClick={e => { if (e.detail === 0) forwardDash(); }} className={`${styles.touchButton} ${styles.dashButton}`}><span>→</span><strong>DASH · A</strong><small>Counter</small></button>
           </div>
         </div>
       </div>

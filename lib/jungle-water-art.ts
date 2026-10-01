@@ -24,7 +24,7 @@ export function drawOrangutan(ctx: CanvasRenderingContext2D, o: Orangutan, camer
     // poses across the top and the pineapple wind-up/release across the
     // bottom. Select a whole cell to retain its transparent silhouette.
     const cellWidth = sprite.naturalWidth / 4, cellHeight = sprite.naturalHeight / 2, inset = 2;
-    const [column, row] = o.stunned !== undefined ? [3, 1] : o.state === 'dance'
+    const [column, row] = o.hitReact > 0 || o.stunned !== undefined ? [3, 1] : o.state === 'dance'
       ? [Math.floor(o.age * 6) % 4, 0]
       : o.state === 'windup'
         ? [o.age < 0.28 ? 0 : 1, 1]
@@ -34,15 +34,17 @@ export function drawOrangutan(ctx: CanvasRenderingContext2D, o: Orangutan, camer
     ctx.save(); ctx.translate(x, feet);
     ctx.fillStyle = '#61432b'; ctx.fillRect(-39, 0, 78, 35);
     ctx.fillStyle = '#b28a52'; ctx.beginPath(); ctx.ellipse(0, 0, 39, 9, 0, 0, Math.PI * 2); ctx.fill();
+    if (o.enraged) { ctx.filter = 'saturate(1.45) contrast(1.08)'; ctx.shadowColor = '#ff5d32'; ctx.shadowBlur = 12; }
+    if (o.hitReact > 0) ctx.translate(Math.sin(o.hitReact * 90) * 7, 0);
     ctx.drawImage(sprite, column * cellWidth + inset, row * cellHeight + inset, cellWidth - inset * 2, cellHeight - inset * 2, -108, -206, 216, 206); ctx.restore();
     // The sheet contains the fruit through release; while he dances between
     // throws, keep the held pineapple visible at the launch hand.
-    if (o.state === 'dance' && o.throws < 3) {
+    if (o.state === 'dance' && o.throws < (o.enraged ? 6 : 3)) {
       const hand = orangutanHand(o);
       drawPineapple(ctx, hand.x - camera, hand.y - 8, 0, 0.75);
     }
     ctx.fillStyle = '#fff0bc'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText(o.stunned !== undefined ? 'DIZZY ORANGUTAN!' : o.state === 'windup' ? 'PINEAPPLE WIND-UP!' : o.state === 'throw' ? 'SLIDE UNDER!' : 'DANCING ORANGUTAN', x, FLOOR - 202);
+    ctx.fillText(o.hitReact > 0 ? 'OUCH! NOW I’M MAD!' : o.state === 'windup' ? (o.enraged && o.x < camera + 150 ? 'ANGRY THROW TO THE RIGHT!' : 'PINEAPPLE WIND-UP!') : o.state === 'throw' ? (o.throwDirection === 1 ? 'THROWING RIGHT!' : 'SLIDE UNDER!') : o.enraged ? `ENRAGED ♥ ${Math.max(0, o.hitPoints - o.hits)}` : 'DANCING ORANGUTAN', x, FLOOR - 202);
     if (o.stunned !== undefined) { ctx.font = '24px sans-serif'; ctx.fillText('★  ★', x, FLOOR - 225 + Math.sin(o.stunned * 8) * 5); }
     if (dancing) { ctx.font = '22px sans-serif'; ctx.fillText('♪', x - 57, FLOOR - 160 + beat * 9); ctx.fillText('♫', x + 57, FLOOR - 188 - beat * 8); }
     return;
@@ -87,9 +89,9 @@ export function drawOrangutan(ctx: CanvasRenderingContext2D, o: Orangutan, camer
   for (let i = 0; i < 14; i++) { const side = i % 2 ? 1 : -1, y = -93 + Math.floor(i / 2) * 9; ctx.beginPath(); ctx.moveTo(side * 29, y); ctx.lineTo(side * (36 + i % 3), y + 10); ctx.stroke(); }
   for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.moveTo(-12 + i * 6, -143); ctx.lineTo(-17 + i * 7, -155 - i % 2 * 4); ctx.stroke(); }
   ctx.restore();
-  if (o.state === 'windup' || (o.state === 'dance' && o.throws < 3)) drawPineapple(ctx, hand.x - camera, hand.y - 8, o.state === 'windup' ? -o.age : 0, 0.75);
+  if (o.state === 'windup' || (o.state === 'dance' && o.throws < (o.enraged ? 6 : 3))) drawPineapple(ctx, hand.x - camera, hand.y - 8, o.state === 'windup' ? -o.age : 0, 0.75);
   ctx.fillStyle = '#fff0bc'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
-  ctx.fillText(o.state === 'windup' ? 'PINEAPPLE WIND-UP!' : o.state === 'throw' ? 'SLIDE UNDER!' : 'DANCING ORANGUTAN', x, FLOOR - 202);
+  ctx.fillText(o.hitReact > 0 ? 'OUCH! NOW I’M MAD!' : o.state === 'windup' ? 'PINEAPPLE WIND-UP!' : o.state === 'throw' ? (o.throwDirection === 1 ? 'THROWING RIGHT!' : 'SLIDE UNDER!') : o.enraged ? `ENRAGED ♥ ${Math.max(0, o.hitPoints - o.hits)}` : 'DANCING ORANGUTAN', x, FLOOR - 202);
   if (dancing) { ctx.font = '22px sans-serif'; ctx.fillText('♪', x - 57, FLOOR - 160 + beat * 9); ctx.fillText('♫', x + 57, FLOOR - 188 - beat * 8); }
 }
 

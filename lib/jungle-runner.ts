@@ -54,13 +54,13 @@ export type Bird = { x: number; y: number; gift: 'drop' | 'cherry' | 'heart' | '
 export type Sloth = { x: number; y: number; homeY: number; targetY: number; age: number; state: 'waiting' | 'lowering' | 'climbing'; reward: 'heart' | 'fruit' | 'star'; dropped: boolean };
 export type Lemming = { x: number; y: number; endX: number; age: number; used: boolean };
 export type River = { resident?: 'piranha' | 'eel'; waterAge?: number; x: number; width: number; vine?: boolean; used?: boolean; bounced?: boolean; bounceLeft?: number; snapLeft?: number[]; snapped?: boolean[]; piranhasKnocked?: boolean[]; eelStun?: number; eelScored?: boolean };
-export type Orangutan = { x: number; age: number; state: 'dance' | 'windup' | 'throw' | 'recover'; throws: number; stunned?: number };
+export type Orangutan = { x: number; age: number; state: 'dance' | 'windup' | 'throw' | 'recover'; throws: number; hits: number; hitPoints: number; hitCooldown: number; hitReact: number; enraged: boolean; knocked?: boolean; stunned?: number; throwDirection?: -1 | 1 };
 export type Pineapple = { x: number; y: number; vx: number; vy: number; rotation: number; bounceAmmo?: boolean; reflected?: boolean; previousX?: number };
 // Forest archers stay in the encounter until the monkey lands a short combo.
 // Their pause between arrows gives a clear opening to close the distance.
 export type JungleGuardian = { x: number; age: number; attacks: number; state: 'run-in' | 'aim' | 'retreat'; hits: number; hitPoints: number; hitCooldown: number };
 export function createJungleGuardian(x: number): JungleGuardian { return { x, age: 0, attacks: 0, state: 'run-in', hits: 0, hitPoints: 3, hitCooldown: 0 }; }
-export function createOrangutan(x: number): Orangutan { return { x, age: 0, state: 'dance', throws: 0 }; }
+export function createOrangutan(x: number): Orangutan { return { x, age: 0, state: 'dance', throws: 0, hits: 0, hitPoints: 3, hitCooldown: 0, hitReact: 0, enraged: false }; }
 export function orangutanHand(o: Orangutan) {
   const t = Math.min(1, o.age / 0.55);
   if (o.state === 'windup') return { x: o.x + 20 + t * 22, y: FLOOR - 130 - t * 40 };
@@ -199,6 +199,7 @@ export function createRunner(difficulty: RunnerDifficulty = 'medium', startLevel
     cracks: [] as { x: number; y: number; age: number; kind?: 'coconut' | 'barrel' }[],
     golden: 0, cherries: 0, fruitPickups: 0, supplyPickups: 0, bonusScore: 0, gems: 0,
     gemSpawned: LEVELS.map(() => false), gemCollected: LEVELS.map(() => false), celebrationTime: 0,
+    gemBursts: [] as { x: number; y: number; age: number; color: string }[],
     lives: Number(RUNNER_DIFFICULTIES[difficulty].lives), bananas: 0, hits: 0, bounces: 0, stun: 0, invincible: 0, starPower: 0, espressoBoost: 0, coffeeServed: 0,
     knockouts: [] as { x: number; y: number; age: number; label: string }[],
     hitEffects: [] as { x: number; y: number; age: number; combo: number; mass: ImpactMass; power: boolean }[],
@@ -452,6 +453,8 @@ export function stepRunner(s: Runner, dt: number) {
   s.knockouts = s.knockouts.filter(k => k.age < 0.8);
   for (const effect of s.hitEffects) effect.age += dt;
   s.hitEffects = s.hitEffects.filter(effect => effect.age < 0.38);
+  for (const burst of s.gemBursts) burst.age += dt;
+  s.gemBursts = s.gemBursts.filter(burst => burst.age < 1.15);
   s.flipLeft = Math.max(0, s.flipLeft - dt);
   s.attackLeft = Math.max(0, s.attackLeft - dt);
   s.slideCooldown = Math.max(0, s.slideCooldown - dt);
@@ -680,7 +683,12 @@ export function stepRunner(s: Runner, dt: number) {
       if (r.piranhasKnocked?.[i]) continue;
       const fish = piranhaPosition(r, i);
       if (fish.jumping && Math.abs(fish.x - worldX) < 37 && fish.y + 17 >= s.y - height && fish.y - 17 <= s.y - 4) {
-        if (s.starPower > 0) { r.piranhasKnocked ??= [false, false]; r.piranhasKnocked[i] = true; starKnockout(s, fish.x, fish.y, 'PIRANHA'); }
+        if ((s.strongDiveLeft > 0 || isAirAttack(s)) && s.vy >= 0) {
+          r.piranhasKnocked ??= [false, false]; r.piranhasKnocked[i] = true;
+          s.y = fish.y - 18; s.vy = -620; s.jumps = 1; s.duck = false; s.duckHeld = false; s.slideLeft = 0; s.strongDiveLeft = 0; s.attackLeft = 0; s.flipLeft = FLIP_SECONDS;
+          recordHeroHit(s, fish.x, fish.y, 'light'); gainKi(s, 15); starKnockout(s, fish.x, fish.y, 'PIRANHA FLIP');
+          s.message = 'POWER SLIDE BOUNCE! FLIP RECOVERY!'; s.messageTime = 1.4;
+        } else if (s.starPower > 0) { r.piranhasKnocked ??= [false, false]; r.piranhasKnocked[i] = true; starKnockout(s, fish.x, fish.y, 'PIRANHA'); }
         else hurt(s, 'PIRANHA LEAP! Double jump!');
       }
     }
@@ -691,21 +699,47 @@ export function stepRunner(s: Runner, dt: number) {
   }
   for (const o of s.orangutans) {
     const ahead = o.x - worldX;
-    if (o.stunned !== undefined) { o.stunned += dt; continue; }
+    if (o.knocked) continue;
+    o.hitCooldown = Math.max(0, o.hitCooldown - dt);
+    o.hitReact = Math.max(0, o.hitReact - dt);
+    if (o.hitCooldown === 0 && heroStrikeConnects(s, o.x, 62, FLOOR - 220, FLOOR)) {
+      const kiFinish = s.specialLeft > 0;
+      o.hits += heroDamage(s); o.hitCooldown = 0.3; o.hitReact = 0.45; o.enraged = true;
+      recordHeroHit(s, o.x - 30, FLOOR - 105, 'heavy'); gainKi(s, 14);
+      if (kiFinish || o.hits >= o.hitPoints) {
+        o.knocked = true;
+        for (const offset of [-34, 0, 34]) s.splats.push({ x: o.x + offset, y: FLOOR - 80 - Math.abs(offset), age: 0 });
+        starKnockout(s, o.x, FLOOR - 110, kiFinish ? 'SUPER KI ORANGUTAN' : 'ORANGUTAN');
+        s.message = kiFinish ? 'SUPER KI EXPLOSION! ORANGUTAN DOWN!' : 'ORANGUTAN KNOCKDOWN!'; s.messageTime = 1.6;
+      } else {
+        o.x += 48; o.state = 'recover'; o.age = 0;
+        s.message = `ORANGUTAN ENRAGED! ${o.hits}/${o.hitPoints} — WATCH BEHIND!`; s.messageTime = 1.4;
+      }
+      continue;
+    }
     if (s.starPower > 0 && Math.abs(ahead) < 68 && s.y > FLOOR - 170) {
-      o.stunned = 0; o.throws = 3; starKnockout(s, o.x, FLOOR - 110, 'ORANGUTAN'); continue;
+      o.knocked = true; o.stunned = 0; starKnockout(s, o.x, FLOOR - 110, 'ORANGUTAN'); continue;
     }
     o.age += dt;
-    if (o.state === 'dance' && o.age > 0.3 && ahead < 720 && ahead > 180 && o.throws < 3) { o.state = 'windup'; o.age = 0; }
+    const throwLimit = o.enraged ? 6 : 3;
+    const canTarget = (ahead < 720 && ahead > 180) || (o.enraged && ahead <= 180 && ahead > -650);
+    if (o.state === 'dance' && o.age > 0.3 && canTarget && o.throws < throwLimit) { o.state = 'windup'; o.age = 0; }
     else if (o.state === 'windup' && o.age >= 0.55) {
       o.state = 'throw'; o.age = 0; o.throws++;
-      const hand = orangutanHand(o), vx = -240 - s.level * 15;
-      const flight = Math.max(0.25, (hand.x - worldX) / (travelSpeed(s) - vx));
+      const direction = worldX >= o.x ? 1 : -1;
+      const poseHand = orangutanHand(o);
+      // Release from the leading hand on either side. A rightward throw used
+      // to start behind the orangutan and was immediately culled once Johnny
+      // had passed him.
+      const hand = { x: o.x + direction * 55, y: poseHand.y };
+      o.throwDirection = direction;
+      const vx = direction > 0 ? 650 + s.level * 25 : -240 - s.level * 15;
+      const flight = Math.max(0.25, Math.abs(hand.x - worldX) / (travelSpeed(s) + Math.abs(vx)));
       s.pineapples.push({ ...hand, vx, vy: (FLOOR - 68 - hand.y - 325 * flight ** 2) / flight, rotation: 0 });
     } else if (o.state === 'throw' && o.age >= 0.25) { o.state = 'recover'; o.age = 0; }
     else if (o.state === 'recover' && o.age >= 0.55) { o.state = 'dance'; o.age = 0; }
   }
-  s.orangutans = s.orangutans.filter(o => o.x > s.distance - 140);
+  s.orangutans = s.orangutans.filter(o => !o.knocked && o.x > s.distance - (o.enraged ? 750 : 140));
   for (const guardian of s.guardians) {
     const ahead = guardian.x - worldX;
     guardian.hitCooldown = Math.max(0, guardian.hitCooldown - dt);
@@ -767,7 +801,10 @@ export function stepRunner(s: Runner, dt: number) {
       }
       return false;
     }
-    return p.x > s.distance - 120 && p.x < s.distance + 1500;
+    // Enraged orangutans can retaliate from behind the camera. Keep their
+    // rightward projectile alive long enough to enter the visible playfield.
+    const rearAllowance = p.vx > 0 ? 700 : 120;
+    return p.x > s.distance - rearAllowance && p.x < s.distance + 1500;
   });
   for (const hog of s.hogs) {
     const ahead = hog.x - worldX;
@@ -927,6 +964,7 @@ export function stepRunner(s: Runner, dt: number) {
         const gemLevel = item.level ?? s.level;
         if (!s.gemCollected[gemLevel]) {
           s.gemCollected[gemLevel] = true; s.gems++; s.bonusScore += 250;
+          s.gemBursts.push({ x: item.x, y: item.y, age: 0, color: GEMS[gemLevel].color });
           s.message = `${GEMS[gemLevel].name.toUpperCase()}! +250 POINTS`; s.messageTime = 2;
         }
       } else if (item.kind === 'heart') { s.lives++; s.supplyPickups++; s.message = 'SLOTH HEART! +1 LIFE'; s.messageTime = 1.5; }
