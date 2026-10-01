@@ -33,6 +33,18 @@ test('difficulty sets 42, 51, and 60 second levels', () => {
   assert.deepEqual((['easy', 'medium', 'hard'] as const).map(difficulty => levelSeconds(createRunner(difficulty))), [42, 51, 60]);
 });
 
+test('a selected stage starts at that level and completes without running the full adventure', () => {
+  const stage = createRunner('medium', 2, 2);
+  assert.equal(stage.level, 2);
+  assert.equal(stage.elapsed, levelSeconds(stage) * 2);
+  stage.phase = 'playing';
+  stage.items = [];
+  stage.nextSection = 100000;
+  stage.elapsed = levelSeconds(stage) * 3 - 0.01;
+  stepRunner(stage, 0.02);
+  assert.equal(stage.phase, 'victory');
+});
+
 test('jump follows an arc, permits one air jump, and duck cancels upward motion', () => {
   const s = active(); jumpRunner(s); advance(s, 0.15);
   assert.ok(s.y < FLOOR); jumpRunner(s); assert.equal(s.jumps, 2);

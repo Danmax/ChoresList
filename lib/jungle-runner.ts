@@ -177,7 +177,11 @@ export function vinePosition(r: River, elapsed: number, progress?: number) {
   return { x: r.x - 45 + (r.width + 90) * t, y: 160 + Math.sin(t * Math.PI) * 45 };
 }
 
-export function createRunner(difficulty: RunnerDifficulty = 'medium') {
+// An Adventure run spans every level. A selected-stage run starts and ends on
+// the requested level, while still using the exact same obstacles and finale.
+export function createRunner(difficulty: RunnerDifficulty = 'medium', startLevel = 0, endLevel = LEVELS.length - 1) {
+  const initialLevel = Math.max(0, Math.min(LEVELS.length - 1, startLevel));
+  const finalLevel = Math.max(initialLevel, Math.min(LEVELS.length - 1, endLevel));
   return {
     difficulty,
     insects: [] as Insect[], antRocks: [] as AntRock[], caterpillarBounces: 0,
@@ -185,7 +189,7 @@ export function createRunner(difficulty: RunnerDifficulty = 'medium') {
     dinoEncounterIndex: 0, dinoBossStarted: false, dinoBossDefeated: false, groundShake: 0, tarTime: 0,
     reaction: 'bonk' as HitReaction, reactionLeft: 0,
     phase: 'ready' as 'ready' | 'playing' | 'over' | 'victory',
-    distance: 0, elapsed: 0, level: 0, y: FLOOR, vy: 0, jumps: 0, duck: false, duckHeld: false, slideLeft: 0, slideCooldown: 0, strongDiveLeft: 0, attackLeft: 0, forwardDashLeft: 0, forwardDashCooldown: 0, combatMove: 'run' as 'run' | 'punch' | 'kick' | 'dash', combatLeft: 0, comboStep: 0, comboWindow: 0, hitCombo: 0, hitComboWindow: 0, hitStreak: 0, hitStreakWindow: 0, bestHitStreak: 0, attackLanded: false, counterLeft: 0, ki: 0, specialLeft: 0, cameraLead: 0,
+    distance: 0, elapsed: initialLevel * RUNNER_DIFFICULTIES[difficulty].seconds, level: initialLevel, endLevel: finalLevel, y: FLOOR, vy: 0, jumps: 0, duck: false, duckHeld: false, slideLeft: 0, slideCooldown: 0, strongDiveLeft: 0, attackLeft: 0, forwardDashLeft: 0, forwardDashCooldown: 0, combatMove: 'run' as 'run' | 'punch' | 'kick' | 'dash', combatLeft: 0, comboStep: 0, comboWindow: 0, hitCombo: 0, hitComboWindow: 0, hitStreak: 0, hitStreakWindow: 0, bestHitStreak: 0, attackLanded: false, counterLeft: 0, ki: 0, specialLeft: 0, cameraLead: 0,
     flipLeft: 0, swing: null as ({ river: River; progress: number } | { lemming: Lemming; progress: number }) | null,
     cracks: [] as { x: number; y: number; age: number; kind?: 'coconut' | 'barrel' }[],
     golden: 0, cherries: 0, bonusScore: 0, gems: 0,
@@ -470,9 +474,11 @@ export function stepRunner(s: Runner, dt: number) {
     if (s.slideLeft === 0) { s.duck = false; s.slideCooldown = Math.max(s.slideCooldown, 0.45); }
   }
   s.elapsed += dt;
-  if (s.elapsed >= levelSeconds(s) * LEVELS.length) {
-    if (s.dinoBossDefeated) { s.phase = 'victory'; return; }
-    s.elapsed = levelSeconds(s) * LEVELS.length - 0.001;
+  if (s.elapsed >= levelSeconds(s) * (s.endLevel + 1)) {
+    // DinoLand remains a boss finale; all other selected stages are complete
+    // as soon as their timer finishes.
+    if (s.endLevel < LEVELS.length - 1 || s.dinoBossDefeated) { s.phase = 'victory'; return; }
+    s.elapsed = levelSeconds(s) * (s.endLevel + 1) - 0.001;
   }
   const level = Math.floor(s.elapsed / levelSeconds(s));
   if (level !== s.level) {
