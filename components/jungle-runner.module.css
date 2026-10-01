@@ -5,7 +5,8 @@
   padding-left: max(12px, env(safe-area-inset-left));
 }
 
-.landscapeControls {
+.landscapeControls,
+.landscapeHud {
   display: none;
 }
 
@@ -48,7 +49,7 @@
 
   .setup {
     z-index: 10;
-    grid-column: 1;
+    grid-column: 1 / -1;
     grid-row: 2 / 5;
     min-height: 0;
     margin: 0;
@@ -104,7 +105,7 @@
   }
 
   .controls {
-    display: grid;
+    display: none;
     min-height: 0;
     grid-column: 2;
     grid-row: 2 / 5;
@@ -131,28 +132,28 @@
     display: none;
   }
 
-  .root[data-playing='true'] {
+  .root[data-game-screen='true'] {
     padding: 0;
     background: #020b08;
   }
 
-  .root[data-playing='true'] .shell {
+  .root[data-game-screen='true'] .shell {
     display: block;
     width: 100vw;
     height: 100dvh;
   }
 
-  .root[data-playing='true'] .header,
-  .root[data-playing='true'] .stats,
-  .root[data-playing='true'] .status,
-  .root[data-playing='true'] .streak,
-  .root[data-playing='true'] .ki,
-  .root[data-playing='true'] .controls,
-  .root[data-playing='true'] .help {
+  .root[data-game-screen='true'] .header,
+  .root[data-game-screen='true'] .stats,
+  .root[data-game-screen='true'] .status,
+  .root[data-game-screen='true'] .streak,
+  .root[data-game-screen='true'] .ki,
+  .root[data-game-screen='true'] .controls,
+  .root[data-game-screen='true'] .help {
     display: none;
   }
 
-  .root[data-playing='true'] .stage {
+  .root[data-game-screen='true'] .stage {
     display: flex;
     position: fixed;
     inset: 0;
@@ -166,7 +167,7 @@
     background: #020b08;
   }
 
-  .root[data-playing='true'] .stage > canvas {
+  .root[data-game-screen='true'] .stage > canvas {
     width: 100%;
     height: 100%;
     object-fit: contain;
@@ -182,6 +183,38 @@
 
   .root[data-playing='true'][data-paused='true'] .landscapeControls {
     display: none;
+  }
+
+  .root[data-playing='true'] .landscapeHud {
+    display: flex;
+    position: absolute;
+    z-index: 18;
+    top: max(7px, env(safe-area-inset-top));
+    left: 50%;
+    align-items: center;
+    gap: clamp(5px, 1.1vw, 12px);
+    max-width: calc(100vw - 24px);
+    padding: 5px 9px;
+    transform: translateX(-50%);
+    border: 1px solid rgb(255 255 255 / 32%);
+    border-radius: 999px;
+    background: rgb(3 45 34 / 78%);
+    box-shadow: 0 3px 16px rgb(0 0 0 / 30%);
+    font-size: clamp(9px, 2.1vh, 12px);
+    font-weight: 900;
+    line-height: 1;
+    white-space: nowrap;
+    backdrop-filter: blur(5px);
+  }
+
+  .landscapeHud button {
+    display: grid;
+    width: 25px;
+    height: 25px;
+    place-items: center;
+    border-radius: 999px;
+    background: rgb(255 255 255 / 18%);
+    font-size: 12px;
   }
 
   .leftTouchControls,
@@ -259,5 +292,9 @@
 
   .dashButton {
     background: rgb(2 132 199 / 78%);
+  }
+
+  .slideButton {
+    background: rgb(5 150 105 / 78%);
   }
 }

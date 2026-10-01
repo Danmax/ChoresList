@@ -667,19 +667,37 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     ctx.beginPath(); ctx.moveTo(x, 400); ctx.lineTo(x + 12, 371); ctx.lineTo(x + 19, 389); ctx.lineTo(x + 34, 365); ctx.lineTo(x + 43, 400); ctx.fill();
   }
   ctx.restore();
-  if (s.messageTime > 0) {
-    ctx.fillStyle = '#173e32'; ctx.fillRect(200, 58, 400, 38);
-    ctx.fillStyle = '#fff4a3'; ctx.font = 'bold 20px sans-serif'; ctx.fillText(s.message, 400, 78);
-  }
-  if (s.starPower > 0) {
-    ctx.fillStyle = '#4d3906'; ctx.fillRect(287, 10, 226, 29);
-    ctx.fillStyle = '#ffe363'; ctx.font = 'bold 16px sans-serif';
-    ctx.fillText(`⭐ KNOCKOUT POWER ${s.starPower.toFixed(1)}s`, 400, 25);
-  }
-  if (s.espressoBoost > 0) {
-    ctx.fillStyle = '#51260d'; ctx.fillRect(12, 10, 205, 29);
-    ctx.fillStyle = '#ffd09a'; ctx.font = 'bold 15px sans-serif';
-    ctx.fillText(`☕ ESPRESSO SPEED ${s.espressoBoost.toFixed(1)}s`, 114, 25);
+  const activeAbilities = [
+    s.starPower > 0 ? `⭐ STAR POWER ${s.starPower.toFixed(1)}s` : '',
+    s.espressoBoost > 0 ? `☕ ESPRESSO ${s.espressoBoost.toFixed(1)}s` : '',
+    s.specialLeft > 0 ? `⚡ KI BURST ${s.specialLeft.toFixed(1)}s` : '',
+  ].filter(Boolean);
+  if (s.messageTime > 0 || activeAbilities.length > 0) {
+    const mainMessage = s.messageTime > 0 ? s.message : 'ABILITY ACTIVE';
+    const abilityMessage = activeAbilities.length > 0 ? `ACTIVE ABILITIES  ·  ${activeAbilities.join('  ·  ')}` : '';
+    ctx.save();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    let mainSize = 19;
+    ctx.font = `bold ${mainSize}px sans-serif`;
+    while (mainSize > 12 && ctx.measureText(mainMessage).width > 620) { mainSize--; ctx.font = `bold ${mainSize}px sans-serif`; }
+    const mainWidth = ctx.measureText(mainMessage).width;
+    let abilitySize = 13;
+    ctx.font = `bold ${abilitySize}px sans-serif`;
+    while (abilitySize > 9 && abilityMessage && ctx.measureText(abilityMessage).width > 640) { abilitySize--; ctx.font = `bold ${abilitySize}px sans-serif`; }
+    const abilityWidth = abilityMessage ? ctx.measureText(abilityMessage).width : 0;
+    const panelWidth = Math.min(680, Math.max(270, mainWidth + 48, abilityWidth + 38));
+    const panelHeight = abilityMessage ? 58 : 36;
+    const panelX = 400 - panelWidth / 2, panelY = 47;
+    ctx.fillStyle = 'rgba(8, 48, 42, 0.92)';
+    ctx.strokeStyle = abilityMessage ? '#f8d66d' : '#70d6b1'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(panelX, panelY, panelWidth, panelHeight, 12); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#fff4a3'; ctx.font = `bold ${mainSize}px sans-serif`;
+    ctx.fillText(mainMessage, 400, panelY + (abilityMessage ? 19 : 18));
+    if (abilityMessage) {
+      ctx.fillStyle = '#d8f9ed'; ctx.font = `bold ${abilitySize}px sans-serif`;
+      ctx.fillText(abilityMessage, 400, panelY + 43);
+    }
+    ctx.restore();
   }
 }
 
@@ -712,7 +730,6 @@ export function JungleVineSwing({ onExit, onFinish }: {
   onExit: () => void;
   onFinish: (score: number, duration: number, metadata: Record<string, unknown>) => void;
 }) {
-  const root = useRef<HTMLElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const world = useRef(createRunner());
   const nextComboAttack = useRef<'punch' | 'kick'>('punch');
@@ -767,14 +784,14 @@ export function JungleVineSwing({ onExit, onFinish }: {
   }
   function forwardDash() { if (!paused.current) forwardDashRunner(world.current); }
   function special() { if (!paused.current) specialRunner(world.current); }
-  function enterLandscapeFullscreen() {
-    if (!root.current || !window.matchMedia('(orientation: landscape) and (max-height: 600px)').matches || document.fullscreenElement) return;
-    const target = root.current as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> | void };
-    const request = target.requestFullscreen?.({ navigationUI: 'hide' }) ?? target.webkitRequestFullscreen?.();
-    if (request instanceof Promise) request.catch(() => {});
-  }
   function pause() { paused.current = !paused.current; duckSources.current.clear(); hesitateSources.current.clear(); duckRunner(world.current, false); hesitateRunner(world.current, false); publish(); }
-  function start() { enterLandscapeFullscreen(); world.current = createRunner(difficulty, runMode === 'stage' ? selectedLevel : 0, runMode === 'stage' ? selectedLevel : LEVELS.length - 1); world.current.phase = 'playing'; paused.current = false; saved.current = false; nextComboAttack.current = 'punch'; duckSources.current.clear(); hesitateSources.current.clear(); publish(); }
+  function start() { world.current = createRunner(difficulty, runMode === 'stage' ? selectedLevel : 0, runMode === 'stage' ? selectedLevel : LEVELS.length - 1); world.current.phase = 'playing'; paused.current = false; saved.current = false; nextComboAttack.current = 'punch'; duckSources.current.clear(); hesitateSources.current.clear(); publish(); }
+  function saveRun() {
+    if (saved.current) return;
+    saved.current = true;
+    const s = world.current;
+    onFinish(runnerScore(s), Math.max(1, Math.round(s.elapsed - (runMode === 'stage' ? selectedLevel * levelSeconds(s) : 0))), { difficulty: s.difficulty, mode: runMode, selectedStage: runMode === 'stage' ? selectedLevel + 1 : null, bananas: s.bananas, goldenBananas: s.golden, cherries: s.cherries, fruitPickups: s.fruitPickups, supplyPickups: s.supplyPickups, gems: s.gems, gemLevels: s.gemCollected, levelsCompleted: s.phase === 'victory' ? (runMode === 'stage' ? 1 : LEVELS.length) : Math.max(0, s.level - (runMode === 'stage' ? selectedLevel : 0)), dinoBossDefeated: s.dinoBossDefeated, hits: s.hits, hippoBounces: s.bounces, elephantBounces: s.elephantBounces, caterpillarBounces: s.caterpillarBounces, extraLives: Math.floor(s.bananas / 100) });
+  }
 
   useEffect(() => {
     const sprite = new Image(); sprite.src = '/games/jungle-monkey-runner-sprites-v2.png';
@@ -829,7 +846,7 @@ export function JungleVineSwing({ onExit, onFinish }: {
   }, []);
 
   const ended = hud.phase === 'over' || hud.phase === 'victory';
-  return <section ref={root} data-playing={hud.phase === 'playing'} data-paused={hud.paused} className={`${styles.root} fixed inset-0 z-50 flex flex-col justify-center overflow-auto bg-emerald-950 text-white`}>
+  return <section data-game-screen={hud.phase !== 'ready'} data-playing={hud.phase === 'playing'} data-paused={hud.paused} className={`${styles.root} fixed inset-0 z-50 flex flex-col justify-center overflow-auto bg-emerald-950 text-white`}>
     <div className={`${styles.shell} mx-auto w-full max-w-4xl`}>
       <header className={`${styles.header} mb-2 flex items-center justify-between gap-2`}><h2 className="font-black">Jungle Runner</h2><div className="flex gap-2"><button onClick={pause} disabled={hud.phase !== 'playing'} className="rounded-xl bg-white/10 px-3 py-2 disabled:opacity-40">{hud.paused ? 'Resume' : 'Pause'}</button><button onClick={onExit} className="rounded-xl bg-white/10 px-3 py-2">Exit</button></div></header>
       {hud.phase === 'ready' && (
@@ -850,6 +867,7 @@ export function JungleVineSwing({ onExit, onFinish }: {
             ))}
           </div>
           <p className="mt-2 text-center text-xs text-emerald-100">{runMode === 'adventure' ? `Adventure Mode: complete all ${LEVELS.length} stages in one run.` : `Selected stage: ${LEVELS[selectedLevel].name}. Win this stage to complete it.`} · {RUNNER_DIFFICULTIES[difficulty].description}</p>
+          <button type="button" onClick={start} className="mt-3 w-full rounded-xl bg-yellow-300 px-5 py-3 text-base font-black text-emerald-950 shadow-lg">{runMode === 'stage' ? `Play ${LEVELS[selectedLevel].name}` : 'Start adventure'}</button>
         </fieldset>
       )}
       <div className={`${styles.stats} mb-2 flex justify-between gap-2 text-sm font-black`}><span>🍌 {hud.bananas} <small className="block text-yellow-200">{hud.bananas % 100}/100 → +1 life</small></span><span>❤️ {hud.lives} lives</span><span>{hud.bossStarted ? `🦖 ${hud.bossHp}/${hud.bossMax} HP` : `${hud.seconds}s`} · {hud.score} pts</span></div>
@@ -864,23 +882,33 @@ export function JungleVineSwing({ onExit, onFinish }: {
       </div>
       <div className={`${styles.stage} relative overflow-hidden rounded-2xl border-2 border-emerald-700`}>
         <canvas ref={canvas} width={800} height={400} aria-label="Jungle runner with seven levels, ending in DinoLand with a T. rex boss." className="block aspect-[2/1] w-full" />
+        <div className={styles.landscapeHud} aria-label="Game status">
+          <span>Stage {hud.level + 1} · {LEVELS[hud.level].name}</span>
+          <span>🍌 {hud.bananas}</span>
+          <span>❤️ {hud.lives}</span>
+          <span>{hud.bossStarted ? `🦖 ${hud.bossHp}/${hud.bossMax}` : `⏱ ${hud.seconds}s`}</span>
+          <span>🏆 {hud.score}</span>
+          <span>⚡ {Math.round(hud.ki)}%</span>
+          <button type="button" onClick={pause} aria-label="Pause game">Ⅱ</button>
+        </div>
         {(hud.phase === 'ready' || ended || hud.paused) && <div className="absolute inset-0 flex items-start justify-center overflow-y-auto bg-emerald-950/75 p-3">
           <div className="my-auto max-w-md text-center">
             <h3 className="text-lg font-black sm:text-2xl">{hud.paused ? 'Taking a breather' : ended ? hud.phase === 'victory' ? runMode === 'stage' ? `${LEVELS[selectedLevel].name} complete!` : hud.gems === LEVELS.length ? 'Jungle Crown Victory!' : 'DinoLand victory!' : 'Run complete!' : runMode === 'stage' ? `Stage ${selectedLevel + 1}: ${LEVELS[selectedLevel].name}` : 'Adventure Mode'}</h3>
             {ended && hud.phase === 'victory' && runMode === 'stage'
               ? <StageVictoryPayout bananas={hud.bananas} golden={hud.golden} cherries={hud.cherries} fruit={hud.fruit} supplies={hud.supplies} stones={hud.gems} score={hud.score} />
               : <p className="my-2 text-xs sm:text-sm">{ended ? `${hud.gems === LEVELS.length && hud.phase === 'victory' ? '✦ All seven gems captured — the Jungle Crown is yours! ✦ ' : ''}${hud.bananas} banana coins · ${hud.golden} gold · ${hud.cherries} cherries · ${hud.gems}/${LEVELS.length} gems · ${hud.score} points` : runMode === 'stage' ? `Complete ${LEVELS[selectedLevel].name} as a single-stage run.${selectedLevel === LEVELS.length - 1 ? ' Defeat the T. rex to win DinoLand.' : ''}` : 'Complete every jungle stage in one continuous run. Meet the friendly Coffee Bear for rotating specials, use jungle allies to survive, and defeat the T. rex in DinoLand.'}</p>}
-            {hud.paused ? <button onClick={pause} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Resume</button> : ended ? <button onClick={() => { if (saved.current) return; saved.current = true; const s = world.current; onFinish(runnerScore(s), Math.max(1, Math.round(s.elapsed - (runMode === 'stage' ? selectedLevel * levelSeconds(s) : 0))), { difficulty: s.difficulty, mode: runMode, selectedStage: runMode === 'stage' ? selectedLevel + 1 : null, bananas: s.bananas, goldenBananas: s.golden, cherries: s.cherries, fruitPickups: s.fruitPickups, supplyPickups: s.supplyPickups, gems: s.gems, gemLevels: s.gemCollected, levelsCompleted: s.phase === 'victory' ? (runMode === 'stage' ? 1 : LEVELS.length) : Math.max(0, s.level - (runMode === 'stage' ? selectedLevel : 0)), dinoBossDefeated: s.dinoBossDefeated, hits: s.hits, hippoBounces: s.bounces, elephantBounces: s.elephantBounces, caterpillarBounces: s.caterpillarBounces, extraLives: Math.floor(s.bananas / 100) }); }} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Save run</button> : <button onClick={start} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">{runMode === 'stage' ? 'Play stage' : 'Start adventure'}</button>}
+            {hud.paused ? <div className="flex justify-center gap-2"><button onClick={pause} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Resume</button><button onClick={onExit} className="rounded-xl bg-white/15 px-5 py-2 font-black text-white">Exit</button></div> : ended ? <div className="flex flex-wrap justify-center gap-2"><button onClick={start} className="rounded-xl bg-cyan-300 px-5 py-2 font-black text-emerald-950">Replay</button><button onClick={saveRun} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Save &amp; exit</button></div> : <button onClick={start} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">{runMode === 'stage' ? 'Play stage' : 'Start adventure'}</button>}
           </div>
         </div>}
         <div className={styles.landscapeControls} aria-label="Simplified landscape controls">
           <div className={styles.leftTouchControls}>
-            <button type="button" disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); enterLandscapeFullscreen(); comboAttack(); }} onClick={e => { if (e.detail === 0) comboAttack(); }} className={`${styles.touchButton} ${styles.attackButton}`}><span>👊</span><strong>ATTACK</strong><small>Punch + kick</small></button>
-            <button type="button" disabled={hud.phase !== 'playing' || hud.paused || hud.ki < KI_MAX} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); enterLandscapeFullscreen(); special(); }} onClick={e => { if (e.detail === 0) special(); }} className={`${styles.touchButton} ${styles.specialButton}`}><span>⚡</span><strong>KI</strong><small>{hud.ki >= KI_MAX ? 'Ready!' : `${Math.round(hud.ki)}%`}</small></button>
+            <button type="button" disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); comboAttack(); }} onClick={e => { if (e.detail === 0) comboAttack(); }} className={`${styles.touchButton} ${styles.attackButton}`}><span>👊</span><strong>ATTACK</strong><small>Punch + kick</small></button>
+            <button type="button" disabled={hud.phase !== 'playing' || hud.paused || hud.ki < KI_MAX} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); special(); }} onClick={e => { if (e.detail === 0) special(); }} className={`${styles.touchButton} ${styles.specialButton}`}><span>⚡</span><strong>KI</strong><small>{hud.ki >= KI_MAX ? 'Ready!' : `${Math.round(hud.ki)}%`}</small></button>
           </div>
           <div className={styles.rightTouchControls}>
-            <button type="button" disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); enterLandscapeFullscreen(); jump(); }} onClick={e => { if (e.detail === 0) jump(); }} className={`${styles.touchButton} ${styles.jumpButton}`}><span>↑</span><strong>JUMP</strong><small>Tap twice</small></button>
-            <button type="button" disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); enterLandscapeFullscreen(); forwardDash(); }} onClick={e => { if (e.detail === 0) forwardDash(); }} className={`${styles.touchButton} ${styles.dashButton}`}><span>→</span><strong>DASH</strong><small>Counter</small></button>
+            <button type="button" disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); jump(); }} onClick={e => { if (e.detail === 0) jump(); }} className={`${styles.touchButton} ${styles.jumpButton}`}><span>↑</span><strong>JUMP</strong><small>Tap twice</small></button>
+            <button type="button" disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); forwardDash(); }} onClick={e => { if (e.detail === 0) forwardDash(); }} className={`${styles.touchButton} ${styles.dashButton}`}><span>→</span><strong>DASH</strong><small>Counter</small></button>
+            <button type="button" disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); duck(`landscape-slide-${e.pointerId}`, true); }} onPointerUp={e => duck(`landscape-slide-${e.pointerId}`, false)} onPointerCancel={e => duck(`landscape-slide-${e.pointerId}`, false)} onLostPointerCapture={e => duck(`landscape-slide-${e.pointerId}`, false)} className={`${styles.touchButton} ${styles.slideButton}`}><span>↓</span><strong>SLIDE</strong><small>Hold</small></button>
           </div>
         </div>
       </div>
