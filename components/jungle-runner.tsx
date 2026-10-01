@@ -712,8 +712,10 @@ export function JungleVineSwing({ onExit, onFinish }: {
   onExit: () => void;
   onFinish: (score: number, duration: number, metadata: Record<string, unknown>) => void;
 }) {
+  const root = useRef<HTMLElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const world = useRef(createRunner());
+  const nextComboAttack = useRef<'punch' | 'kick'>('punch');
   const [difficulty, setDifficulty] = useState<RunnerDifficulty>('medium');
   const [runMode, setRunMode] = useState<'adventure' | 'stage'>('adventure');
   const [selectedLevel, setSelectedLevel] = useState(0);
@@ -758,10 +760,21 @@ export function JungleVineSwing({ onExit, onFinish }: {
   }
   function punch() { if (!paused.current) punchRunner(world.current); }
   function kick() { if (!paused.current) kickRunner(world.current); }
+  function comboAttack() {
+    if (paused.current) return;
+    if (nextComboAttack.current === 'punch') punchRunner(world.current); else kickRunner(world.current);
+    nextComboAttack.current = nextComboAttack.current === 'punch' ? 'kick' : 'punch';
+  }
   function forwardDash() { if (!paused.current) forwardDashRunner(world.current); }
   function special() { if (!paused.current) specialRunner(world.current); }
+  function enterLandscapeFullscreen() {
+    if (!root.current || !window.matchMedia('(orientation: landscape) and (max-height: 600px)').matches || document.fullscreenElement) return;
+    const target = root.current as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> | void };
+    const request = target.requestFullscreen?.({ navigationUI: 'hide' }) ?? target.webkitRequestFullscreen?.();
+    if (request instanceof Promise) request.catch(() => {});
+  }
   function pause() { paused.current = !paused.current; duckSources.current.clear(); hesitateSources.current.clear(); duckRunner(world.current, false); hesitateRunner(world.current, false); publish(); }
-  function start() { world.current = createRunner(difficulty, runMode === 'stage' ? selectedLevel : 0, runMode === 'stage' ? selectedLevel : LEVELS.length - 1); world.current.phase = 'playing'; paused.current = false; saved.current = false; duckSources.current.clear(); hesitateSources.current.clear(); publish(); }
+  function start() { enterLandscapeFullscreen(); world.current = createRunner(difficulty, runMode === 'stage' ? selectedLevel : 0, runMode === 'stage' ? selectedLevel : LEVELS.length - 1); world.current.phase = 'playing'; paused.current = false; saved.current = false; nextComboAttack.current = 'punch'; duckSources.current.clear(); hesitateSources.current.clear(); publish(); }
 
   useEffect(() => {
     const sprite = new Image(); sprite.src = '/games/jungle-monkey-runner-sprites-v2.png';
@@ -816,7 +829,7 @@ export function JungleVineSwing({ onExit, onFinish }: {
   }, []);
 
   const ended = hud.phase === 'over' || hud.phase === 'victory';
-  return <section className={`${styles.root} fixed inset-0 z-50 flex flex-col justify-center overflow-auto bg-emerald-950 text-white`}>
+  return <section ref={root} data-playing={hud.phase === 'playing'} data-paused={hud.paused} className={`${styles.root} fixed inset-0 z-50 flex flex-col justify-center overflow-auto bg-emerald-950 text-white`}>
     <div className={`${styles.shell} mx-auto w-full max-w-4xl`}>
       <header className={`${styles.header} mb-2 flex items-center justify-between gap-2`}><h2 className="font-black">Jungle Runner</h2><div className="flex gap-2"><button onClick={pause} disabled={hud.phase !== 'playing'} className="rounded-xl bg-white/10 px-3 py-2 disabled:opacity-40">{hud.paused ? 'Resume' : 'Pause'}</button><button onClick={onExit} className="rounded-xl bg-white/10 px-3 py-2">Exit</button></div></header>
       {hud.phase === 'ready' && (
@@ -860,6 +873,16 @@ export function JungleVineSwing({ onExit, onFinish }: {
             {hud.paused ? <button onClick={pause} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Resume</button> : ended ? <button onClick={() => { if (saved.current) return; saved.current = true; const s = world.current; onFinish(runnerScore(s), Math.max(1, Math.round(s.elapsed - (runMode === 'stage' ? selectedLevel * levelSeconds(s) : 0))), { difficulty: s.difficulty, mode: runMode, selectedStage: runMode === 'stage' ? selectedLevel + 1 : null, bananas: s.bananas, goldenBananas: s.golden, cherries: s.cherries, fruitPickups: s.fruitPickups, supplyPickups: s.supplyPickups, gems: s.gems, gemLevels: s.gemCollected, levelsCompleted: s.phase === 'victory' ? (runMode === 'stage' ? 1 : LEVELS.length) : Math.max(0, s.level - (runMode === 'stage' ? selectedLevel : 0)), dinoBossDefeated: s.dinoBossDefeated, hits: s.hits, hippoBounces: s.bounces, elephantBounces: s.elephantBounces, caterpillarBounces: s.caterpillarBounces, extraLives: Math.floor(s.bananas / 100) }); }} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Save run</button> : <button onClick={start} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">{runMode === 'stage' ? 'Play stage' : 'Start adventure'}</button>}
           </div>
         </div>}
+        <div className={styles.landscapeControls} aria-label="Simplified landscape controls">
+          <div className={styles.leftTouchControls}>
+            <button type="button" disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); enterLandscapeFullscreen(); comboAttack(); }} onClick={e => { if (e.detail === 0) comboAttack(); }} className={`${styles.touchButton} ${styles.attackButton}`}><span>👊</span><strong>ATTACK</strong><small>Punch + kick</small></button>
+            <button type="button" disabled={hud.phase !== 'playing' || hud.paused || hud.ki < KI_MAX} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); enterLandscapeFullscreen(); special(); }} onClick={e => { if (e.detail === 0) special(); }} className={`${styles.touchButton} ${styles.specialButton}`}><span>⚡</span><strong>KI</strong><small>{hud.ki >= KI_MAX ? 'Ready!' : `${Math.round(hud.ki)}%`}</small></button>
+          </div>
+          <div className={styles.rightTouchControls}>
+            <button type="button" disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); enterLandscapeFullscreen(); jump(); }} onClick={e => { if (e.detail === 0) jump(); }} className={`${styles.touchButton} ${styles.jumpButton}`}><span>↑</span><strong>JUMP</strong><small>Tap twice</small></button>
+            <button type="button" disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); enterLandscapeFullscreen(); forwardDash(); }} onClick={e => { if (e.detail === 0) forwardDash(); }} className={`${styles.touchButton} ${styles.dashButton}`}><span>→</span><strong>DASH</strong><small>Counter</small></button>
+          </div>
+        </div>
       </div>
       <div className={`${styles.controls} mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3`}>
         <button disabled={hud.phase !== 'playing' || hud.paused} onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); jump(); }} onClick={e => { if (e.detail === 0) jump(); }} className="min-h-14 touch-none select-none rounded-2xl bg-yellow-300 p-3 font-black text-emerald-950 disabled:opacity-40">JUMP <small className="block">Tap again: flip / release vine</small></button>
