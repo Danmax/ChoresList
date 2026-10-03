@@ -215,6 +215,7 @@ const BLANK_EVENT = {
 };
 
 type CommunityEventForm = typeof BLANK_EVENT;
+type EventDetailTab = "rsvp" | "messages" | "items" | "share";
 
 const BLANK_MEMBER = { email: "", role: "member" as CommunityRole };
 const BLANK_INVITE = { email: "" };
@@ -476,7 +477,7 @@ export default function CommunityGroupPage() {
   const [eventRegistrationMemberIds, setEventRegistrationMemberIds] = useState<Record<string, string>>({});
   const [badgeForm, setBadgeForm] = useState(BLANK_BADGE);
   const [editingBadgeId, setEditingBadgeId] = useState<string | null>(null);
-  const [expandedEventSections, setExpandedEventSections] = useState<Record<string, boolean>>({});
+  const [activeEventTabs, setActiveEventTabs] = useState<Record<string, EventDetailTab>>({});
   const [showAllRecurringSessions, setShowAllRecurringSessions] = useState(false);
   const [showNewItemForms, setShowNewItemForms] = useState<Record<string, boolean>>({});
   const [classPlanForms, setClassPlanForms] = useState<Record<string, typeof BLANK_CLASS_PLAN>>({});
@@ -620,13 +621,8 @@ export default function CommunityGroupPage() {
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
   }
 
-  function sectionExpanded(eventId: string, section: "share" | "items" | "messages") {
-    return Boolean(expandedEventSections[`${eventId}:${section}`]);
-  }
-
-  function toggleEventSection(eventId: string, section: "share" | "items" | "messages") {
-    const key = `${eventId}:${section}`;
-    setExpandedEventSections((current) => ({ ...current, [key]: !current[key] }));
+  function activeEventTab(eventId: string): EventDetailTab {
+    return activeEventTabs[eventId] ?? "rsvp";
   }
 
   function toggleCreateEvent() {
@@ -2169,11 +2165,34 @@ export default function CommunityGroupPage() {
                     </div>
                   )}
 
-                  <button type="button" onClick={() => toggleEventSection(event.id, "share")} className="mb-2 flex w-full items-center justify-between rounded-2xl bg-violet-50 px-4 py-3 font-black text-violet-900">
-                    <span className="flex items-center gap-2"><Share2 size={16} /> Share event</span>
-                    <ChevronDown size={18} className={`transition-transform ${sectionExpanded(event.id, "share") ? "rotate-180" : ""}`} />
-                  </button>
-                  {sectionExpanded(event.id, "share") && <div className="mb-4 grid min-w-0 gap-3 rounded-2xl bg-violet-50 p-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,150px)]">
+                  <div className="mb-4 overflow-hidden rounded-2xl border border-slate-100 bg-slate-50">
+                    <div role="tablist" aria-label={`${event.title} details`} className="flex overflow-x-auto border-b border-slate-200 bg-white p-1.5">
+                      {([
+                        ["rsvp", "RSVP", CalendarDays, null],
+                        ["items", "Items", List, event.items.length],
+                        ["messages", "Messages", MessageCircle, event.messages.length],
+                        ["share", "Share", Share2, null],
+                      ] as const).map(([tab, label, Icon, count]) => {
+                        const active = activeEventTab(event.id) === tab;
+                        return (
+                          <button
+                            key={tab}
+                            id={`${event.id}-${tab}-tab`}
+                            type="button"
+                            role="tab"
+                            aria-selected={active}
+                            aria-controls={`${event.id}-${tab}-panel`}
+                            onClick={() => setActiveEventTabs((current) => ({ ...current, [event.id]: tab }))}
+                            className={`flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-black transition-colors ${active ? "bg-violet-100 text-violet-800" : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"}`}
+                          >
+                            <Icon size={15} /> {label}
+                            {count !== null && <span className={`rounded-full px-1.5 py-0.5 text-xs ${active ? "bg-white text-violet-700" : "bg-slate-100 text-slate-500"}`}>{count}</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                  {activeEventTab(event.id) === "share" && <div id={`${event.id}-share-panel`} role="tabpanel" aria-labelledby={`${event.id}-share-tab`} className="m-3 grid min-w-0 gap-3 rounded-2xl bg-violet-50 p-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,150px)]">
                     <div className="min-w-0">
                       <p className="mb-1 flex items-center gap-2 text-sm font-black text-violet-900"><Share2 size={15} /> Share event</p>
                       <p className="truncate rounded-xl bg-white px-3 py-2 text-xs font-bold text-slate-500">{shareUrl}</p>
@@ -2351,7 +2370,7 @@ export default function CommunityGroupPage() {
                     </div>
                   )}
 
-                  <div className="mb-4 rounded-2xl bg-slate-50 p-3">
+                  {activeEventTab(event.id) === "rsvp" && <div id={`${event.id}-rsvp-panel`} role="tabpanel" aria-labelledby={`${event.id}-rsvp-tab`} className="m-3 rounded-2xl bg-white p-3">
                     <div className="mb-3 flex flex-wrap gap-2 text-xs font-black text-slate-500">
                       <span className="rounded-full bg-emerald-100 px-2 py-1 text-emerald-700">{counts.going} going</span>
                       <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-700">{counts.maybe} maybe</span>
@@ -2384,20 +2403,9 @@ export default function CommunityGroupPage() {
                     ) : (
                       <p className="text-sm font-bold text-slate-400">Join the group to RSVP.</p>
                     )}
-                  </div>
+                  </div>}
 
-                  <div className="mb-4 rounded-2xl bg-slate-50 p-3">
-                    <button
-                      type="button"
-                      onClick={() => toggleEventSection(event.id, "messages")}
-                      className="flex w-full items-center justify-between gap-3 font-black text-slate-800"
-                      aria-expanded={sectionExpanded(event.id, "messages")}
-                    >
-                      <span className="flex items-center gap-2"><MessageCircle size={17} className="text-violet-500" /> Event Message Board <span className="rounded-full bg-white px-2 py-0.5 text-xs text-slate-500">{event.messages.length}</span></span>
-                      <ChevronDown size={18} className={`transition-transform ${sectionExpanded(event.id, "messages") ? "rotate-180" : ""}`} />
-                    </button>
-                    {sectionExpanded(event.id, "messages") && (
-                    <>
+                  {activeEventTab(event.id) === "messages" && <div id={`${event.id}-messages-panel`} role="tabpanel" aria-labelledby={`${event.id}-messages-tab`} className="m-3 rounded-2xl bg-white p-3">
                     <div className="space-y-2">
                       {event.messages.map((message) => {
                         const canDeleteMessage = canManage || message.parentId === group.currentParentId;
@@ -2540,16 +2548,9 @@ export default function CommunityGroupPage() {
                     ) : (
                       <p className="mt-3 rounded-2xl bg-white p-3 text-sm font-bold text-slate-400">Join the group to post messages.</p>
                     )}
-                    </>
-                    )}
-                  </div>
+                  </div>}
 
-                  <div>
-                    <button type="button" onClick={() => toggleEventSection(event.id, "items")} className="mb-2 flex w-full items-center justify-between rounded-2xl bg-slate-50 px-4 py-3 font-black text-slate-800">
-                      <span className="flex items-center gap-2"><List size={16} /> Items to bring <span className="rounded-full bg-white px-2 py-0.5 text-xs text-slate-500">{event.items.length}</span></span>
-                      <ChevronDown size={18} className={`transition-transform ${sectionExpanded(event.id, "items") ? "rotate-180" : ""}`} />
-                    </button>
-                    {sectionExpanded(event.id, "items") && <div>
+                  {activeEventTab(event.id) === "items" && <div id={`${event.id}-items-panel`} role="tabpanel" aria-labelledby={`${event.id}-items-tab`} className="m-3">
                     {canManage && (
                       <div className="mb-3">
                         <button
@@ -2614,7 +2615,7 @@ export default function CommunityGroupPage() {
                         </div>
                       )}
                     </div>
-                    </div>}
+                  </div>}
                   </div>
                 </div>
               );
