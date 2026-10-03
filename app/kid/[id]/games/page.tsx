@@ -107,17 +107,12 @@ export default function KidGamesPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [membersRes, gamesRes] = await Promise.all([
-      fetch("/api/members"),
-      fetch(`/api/games?memberId=${id}`),
-    ]);
-    const membersData = await membersRes.json().catch(() => null);
-    const members = Array.isArray(membersData) ? membersData : Array.isArray(membersData?.members) ? membersData.members : [];
-    setFamilyMembers(members);
-    setMember(members.find((item: Member) => item.id === id) ?? null);
-
+    const gamesRes = await fetch(`/api/games?memberId=${id}`);
     const gamesData = await gamesRes.json().catch(() => null);
     if (gamesRes.ok) {
+      const members = Array.isArray(gamesData?.members) ? gamesData.members : [];
+      setFamilyMembers(members);
+      setMember(gamesData?.member ?? members.find((item: Member) => item.id === id) ?? null);
       setGames(Array.isArray(gamesData?.games) ? gamesData.games : []);
       const nextSettings: Record<string, GameSetting> = {};
       for (const setting of Array.isArray(gamesData?.settings) ? gamesData.settings : []) {
@@ -159,7 +154,7 @@ export default function KidGamesPage() {
   return (
     <div className="min-h-screen p-4 sm:p-6">
       <div className="mb-6 flex items-start gap-3">
-        <Link href={`/kid/${id}`} className="mt-1 rounded-2xl bg-white p-2 shadow-sm transition-shadow hover:shadow-md">
+        <Link href="/screen/tasks" className="mt-1 rounded-2xl bg-white p-2 shadow-sm transition-shadow hover:shadow-md">
           <ArrowLeft size={20} className="text-slate-600" />
         </Link>
         <div className="min-w-0 flex-1">

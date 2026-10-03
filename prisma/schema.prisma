@@ -246,6 +246,8 @@ model GameSetting {
   rewardTickets          Int      @default(0)
   requiresChoresComplete Boolean  @default(false)
   dailyPlayLimit         Int      @default(3)
+  ageMin                 Int      @default(0)
+  ageMax                 Int      @default(120)
   createdAt              DateTime @default(now())
   updatedAt              DateTime @default(now()) @updatedAt
 

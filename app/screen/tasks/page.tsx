@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Award, BookOpen, CalendarDays, Camera, CheckCircle2, Download, Gift, GraduationCap, Heart, ListPlus, LogOut, Pencil, Plus, RefreshCw, Send, ShieldCheck, Sparkles, Star, Utensils } from "lucide-react";
+import { Award, BookOpen, CalendarDays, Camera, CheckCircle2, Download, Gamepad2, Gift, GraduationCap, Heart, ListPlus, LogOut, Pencil, Plus, RefreshCw, Send, ShieldCheck, Sparkles, Star, Utensils } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -153,6 +153,8 @@ export default function TaskScreenPage() {
   const [educationResult, setEducationResult] = useState<EducationResult | null>(null);
   const [educationLoading, setEducationLoading] = useState(false);
   const [educationSaving, setEducationSaving] = useState(false);
+  const [showGamePicker, setShowGamePicker] = useState(false);
+  const [requestingTicketId, setRequestingTicketId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const [sessionRes, tasksRes, dashboardRes] = await Promise.all([
@@ -499,6 +501,28 @@ export default function TaskScreenPage() {
     });
   }
 
+  function openGames(memberId?: string) {
+    const targetId = memberId ?? (device?.mode === "member" ? device.member?.id : dashboard?.members[0]?.id);
+    if (!targetId) return toast.error("No kid profile is available for games yet");
+    router.push(`/kid/${targetId}/games`);
+  }
+
+  async function requestRedemption(ticketId: string) {
+    setRequestingTicketId(ticketId);
+    try {
+      const res = await fetch("/api/kid-device/tickets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ticketId }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) return toast.error(data?.error ?? "Could not notify your parent");
+      toast.success("Your parent has been notified to redeem this reward!");
+    } finally {
+      setRequestingTicketId(null);
+    }
+  }
+
   if (loading) {
     return <div className="flex min-h-screen items-center justify-center text-xl font-black text-slate-500">Loading tasks...</div>;
   }
@@ -525,6 +549,13 @@ export default function TaskScreenPage() {
                 className="flex items-center gap-2 rounded-2xl bg-amber-100 px-4 py-2 text-sm font-black text-amber-700 transition-colors hover:bg-amber-200"
               >
                 <Gift size={16} /> Add Wish
+              </button>
+              <button
+                type="button"
+                onClick={() => device?.mode === "member" ? openGames() : setShowGamePicker(true)}
+                className="flex items-center gap-2 rounded-2xl bg-emerald-100 px-4 py-2 text-sm font-black text-emerald-700 transition-colors hover:bg-emerald-200"
+              >
+                <Gamepad2 size={16} /> Games
               </button>
               <button
                 type="button"
@@ -593,7 +624,7 @@ export default function TaskScreenPage() {
             </DashboardPanel>
 
             <DashboardPanel icon={<Gift size={20} />} title="Rewards" color="amber">
-              {dashboard.rewards.map((item) => <DashboardRow key={item.id} icon={item.rewardEmoji} title={`${item.member.avatar} ${item.rewardTitle}`} detail={`${item.status} · earned from ${item.project.title}`} />)}
+              {dashboard.rewards.map((item) => <DashboardRow key={item.id} icon={item.rewardEmoji} title={`${item.member.avatar} ${item.rewardTitle}`} detail={`${item.status} · earned from ${item.project.title}`} action={item.status === "pending" ? () => requestRedemption(item.id) : undefined} actionLabel={requestingTicketId === item.id ? "Notifying…" : "Redeem"} />)}
               {dashboard.rewards.length === 0 && <EmptyRow text="No reward tickets yet" />}
             </DashboardPanel>
 
@@ -1154,6 +1185,19 @@ export default function TaskScreenPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={showGamePicker} onOpenChange={setShowGamePicker}>
+        <DialogContent className="max-w-sm rounded-3xl">
+          <DialogHeader><DialogTitle className="font-black">Who is playing?</DialogTitle></DialogHeader>
+          <div className="grid gap-2">
+            {dashboard?.members.map((member) => (
+              <button key={member.id} type="button" onClick={() => openGames(member.id)} className="flex items-center gap-3 rounded-2xl bg-emerald-50 p-4 text-left font-black text-emerald-800 hover:bg-emerald-100">
+                <span className="text-3xl">{member.avatar}</span>{member.name}
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!educationAssignment || educationLoading} onOpenChange={(open) => !open && setEducationAssignment(null)}>
         <DialogContent className="max-h-[92vh] max-w-3xl overflow-y-auto rounded-3xl">
           <DialogHeader>
@@ -1208,11 +1252,12 @@ function DashboardPanel({ icon, title, color, children }: { icon: React.ReactNod
   </section>;
 }
 
-function DashboardRow({ icon, title, detail, onClick }: { icon: string; title: string; detail: string; onClick?: () => void }) {
+function DashboardRow({ icon, title, detail, onClick, action, actionLabel }: { icon: string; title: string; detail: string; onClick?: () => void; action?: () => void; actionLabel?: string }) {
   const Component = onClick ? "button" : "div";
-  return <Component {...(onClick ? { type: "button" as const, onClick } : {})} className="flex w-full gap-3 rounded-2xl bg-slate-50 p-3 text-left hover:bg-slate-100">
+  return <Component {...(onClick ? { type: "button" as const, onClick } : {})} className="flex w-full items-center gap-3 rounded-2xl bg-slate-50 p-3 text-left hover:bg-slate-100">
     <span className="text-2xl">{icon}</span>
-    <div className="min-w-0"><p className="font-black text-slate-700">{title}</p><p className="text-xs font-bold text-slate-400">{detail}</p></div>
+    <div className="min-w-0 flex-1"><p className="font-black text-slate-700">{title}</p><p className="text-xs font-bold text-slate-400">{detail}</p></div>
+    {action && <button type="button" onClick={action} className="shrink-0 rounded-xl bg-amber-400 px-3 py-2 text-xs font-black text-white hover:bg-amber-500">{actionLabel ?? "Action"}</button>}
   </Component>;
 }
 

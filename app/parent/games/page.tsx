@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { BookOpen, ChefHat, Crown, Gamepad2, Grid3X3, KeyRound, Puzzle, RefreshCw, Save, Shapes, Swords, TreePine } from "lucide-react";
 import { toast } from "sonner";
 import { ParentPageHeader } from "@/components/parent-management-shell";
@@ -25,7 +26,11 @@ type GameSetting = {
   rewardTickets: number;
   requiresChoresComplete: boolean;
   dailyPlayLimit: number;
+  ageMin: number;
+  ageMax: number;
 };
+
+type Member = { id: string; name: string; avatar: string };
 
 type GameSession = {
   id: string;
@@ -66,11 +71,14 @@ function gameLabel(key: string) {
 }
 
 export default function ParentGamesPage() {
+  const router = useRouter();
   const [games, setGames] = useState<Game[]>([]);
   const [settings, setSettings] = useState<Record<string, GameSetting>>({});
   const [sessions, setSessions] = useState<GameSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState("");
+  const [members, setMembers] = useState<Member[]>([]);
+  const [launchMemberId, setLaunchMemberId] = useState("");
 
   const enabledCount = useMemo(() => Object.values(settings).filter((setting) => setting.enabled).length, [settings]);
   const pointsRewardCount = useMemo(() => Object.values(settings).filter((setting) => setting.rewardType === "points" && setting.rewardPoints > 0).length, [settings]);
@@ -91,6 +99,9 @@ export default function ParentGamesPage() {
     }
     setSettings(nextSettings);
     setSessions(Array.isArray(data?.recentSessions) ? data.recentSessions : []);
+    const nextMembers = Array.isArray(data?.members) ? data.members : [];
+    setMembers(nextMembers);
+    setLaunchMemberId((current) => current || nextMembers[0]?.id || "");
     setLoading(false);
   }, []);
 
@@ -132,15 +143,10 @@ export default function ParentGamesPage() {
       <ParentPageHeader
         title="Games"
         description="Manage simple kid games, chore gates, daily limits, and point rewards."
-        actions={
-          <button
-            type="button"
-            onClick={load}
-            className="flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50"
-          >
-            <RefreshCw size={18} /> Refresh
-          </button>
-        }
+        actions={<div className="flex flex-wrap items-center gap-2">
+          {members.length > 0 && <><select value={launchMemberId} onChange={(event) => setLaunchMemberId(event.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700"><option value="">Choose a player</option>{members.map((member) => <option key={member.id} value={member.id}>{member.avatar} {member.name}</option>)}</select><button type="button" disabled={!launchMemberId} onClick={() => router.push(`/kid/${launchMemberId}/games`)} className="flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"><Gamepad2 size={18} /> Launch games</button></>}
+          <button type="button" onClick={load} className="flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50"><RefreshCw size={18} /> Refresh</button>
+        </div>}
       />
 
       <div className="mb-6 grid gap-3 sm:grid-cols-3">
@@ -179,7 +185,7 @@ export default function ParentGamesPage() {
                         <h2 className="font-black text-slate-950">{game.title}</h2>
                         <p className="mt-1 text-sm font-semibold leading-5 text-slate-500">{game.description}</p>
                         <p className="mt-2 text-xs font-black uppercase tracking-wide text-slate-400">
-                          Ages {game.ageMin}-{game.ageMax} · {game.playTime}
+                          Ages {setting.ageMin}-{setting.ageMax} · {game.playTime}
                         </p>
                       </div>
                     </div>
@@ -194,7 +200,7 @@ export default function ParentGamesPage() {
                     </label>
                   </div>
 
-                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
                     <label className="block">
                       <span className="text-xs font-black uppercase tracking-wide text-slate-400">Reward</span>
                       <select
@@ -206,6 +212,14 @@ export default function ParentGamesPage() {
                         <option value="points">Points</option>
                         <option value="tickets">Tickets</option>
                       </select>
+                    </label>
+                    <label className="block">
+                      <span className="text-xs font-black uppercase tracking-wide text-slate-400">Minimum age</span>
+                      <input type="number" min={0} max={120} value={setting.ageMin} onChange={(event) => updateSetting(game.key, { ageMin: Number(event.target.value) })} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 outline-none focus:border-slate-400" />
+                    </label>
+                    <label className="block">
+                      <span className="text-xs font-black uppercase tracking-wide text-slate-400">Maximum age</span>
+                      <input type="number" min={0} max={120} value={setting.ageMax} onChange={(event) => updateSetting(game.key, { ageMax: Number(event.target.value) })} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 outline-none focus:border-slate-400" />
                     </label>
                     <label className="block">
                       <span className="text-xs font-black uppercase tracking-wide text-slate-400">Points</span>

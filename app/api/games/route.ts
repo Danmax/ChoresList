@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireParentSession, requireSession, withErrors } from "@/lib/api";
 import { canAccessMember, childAccessWhere } from "@/lib/child-access";
+import { getActiveDeviceSession, type DeviceSessionPayload } from "@/lib/device-session";
 import { getLevelFromPoints } from "@/lib/points";
 import { DEFAULT_GAME_SETTINGS, GAME_DEFINITIONS, gameByKey, type GameRewardType } from "@/lib/games";
 import { isMonthlyChoreOpen, startOfMonth } from "@/lib/chore-schedule";
@@ -75,6 +76,8 @@ async function ensureSettings(householdId: string) {
             householdId,
             gameKey: game.key,
             ...defaults,
+            ageMin: game.ageMin,
+            ageMax: game.ageMax,
           },
         });
       })
@@ -107,16 +110,47 @@ async function openChoreCount(householdId: string, memberId: string) {
   }).length;
 }
 
+async function gameActor(req: NextRequest) {
+  const device = await getActiveDeviceSession(req);
+  if (device) return { householdId: device.householdId, parentId: null as string | null, device };
+  const parent = requireSession(req);
+  return { householdId: parent.householdId, parentId: parent.parentId, device: null as DeviceSessionPayload | null };
+}
+
+async function accessibleMember(actor: Awaited<ReturnType<typeof gameActor>>, memberId: string) {
+  if (actor.device) {
+    if (actor.device.mode === "member" && actor.device.memberId !== memberId) return null;
+    return prisma.familyMember.findFirst({
+      where: { id: memberId, householdId: actor.householdId, role: { in: ["child", "young-adult"] } },
+      select: { id: true, name: true, avatar: true, avatarConfig: true, avatarImageUrl: true, color: true, totalPoints: true, age: true },
+    });
+  }
+  if (!actor.parentId || !(await canAccessMember(actor.parentId, actor.householdId, memberId))) return null;
+  return prisma.familyMember.findFirst({
+    where: { id: memberId, householdId: actor.householdId },
+    select: { id: true, name: true, avatar: true, avatarConfig: true, avatarImageUrl: true, color: true, totalPoints: true, age: true },
+  });
+}
+
 export const GET = withErrors(async (req: NextRequest) => {
-  const { householdId, parentId } = requireSession(req);
+  const actor = await gameActor(req);
+  const { householdId } = actor;
   const { searchParams } = new URL(req.url);
   const memberId = searchParams.get("memberId");
-  if (memberId && !(await canAccessMember(parentId, householdId, memberId))) {
+  const selectedMember = memberId ? await accessibleMember(actor, memberId) : null;
+  if (memberId && !selectedMember) {
     return NextResponse.json({ error: "You do not have access to this family member" }, { status: 403 });
   }
-  const memberAccess = await childAccessWhere(parentId, householdId);
+  const memberAccess = actor.device
+    ? { role: { in: ["child", "young-adult"] }, ...(actor.device.mode === "member" && actor.device.memberId ? { id: actor.device.memberId } : {}) }
+    : await childAccessWhere(actor.parentId!, householdId);
 
   const settings = await ensureSettings(householdId);
+  const members = await prisma.familyMember.findMany({
+    where: { householdId, ...memberAccess },
+    select: { id: true, name: true, avatar: true, avatarConfig: true, avatarImageUrl: true, color: true, totalPoints: true, age: true },
+    orderBy: { name: "asc" },
+  });
   const recentSessions = await prisma.gameSession.findMany({
     where: {
       householdId,
@@ -135,9 +169,8 @@ export const GET = withErrors(async (req: NextRequest) => {
 
   const today = todayStart();
   let availability: Record<string, { playsToday: number; openChores: number; available: boolean; reason: string | null }> = {};
-  if (memberId && await canAccessMember(parentId, householdId, memberId)) {
-    const member = await prisma.familyMember.findFirst({ where: { id: memberId, householdId }, select: { age: true } });
-    if (!member) return NextResponse.json({ error: "Family member not found" }, { status: 404 });
+  if (memberId && selectedMember) {
+    const member = selectedMember;
     const openChores = await openChoreCount(householdId, memberId);
     const plays = await prisma.gameSession.groupBy({
       by: ["gameKey"],
@@ -150,8 +183,7 @@ export const GET = withErrors(async (req: NextRequest) => {
       const playsToday = playsByKey.get(setting.gameKey) ?? 0;
       const limitReached = setting.dailyPlayLimit > 0 && playsToday >= setting.dailyPlayLimit;
       const choresBlocked = setting.requiresChoresComplete && openChores > 0;
-      const ageRestricted = game?.key === "codebreaker-quest" || game?.key === "burger-rush";
-      const ageBlocked = ageRestricted && Boolean(game) && (member.age < game.ageMin || member.age > game.ageMax);
+      const ageBlocked = member.age < setting.ageMin || member.age > setting.ageMax;
       const available = setting.enabled && !limitReached && !choresBlocked && !ageBlocked;
       return [setting.gameKey, {
         playsToday,
@@ -160,7 +192,7 @@ export const GET = withErrors(async (req: NextRequest) => {
         reason: !setting.enabled
           ? "This game is turned off"
           : ageBlocked
-            ? `For ages ${game?.ageMin}-${game?.ageMax}`
+            ? `For ages ${setting.ageMin}-${setting.ageMax}`
           : limitReached
             ? "Daily play limit reached"
             : choresBlocked
@@ -170,7 +202,7 @@ export const GET = withErrors(async (req: NextRequest) => {
     }));
   }
 
-  return NextResponse.json({ games: GAME_DEFINITIONS, settings, recentSessions, availability, chessStats: chessStats(completedChessSessions) });
+  return NextResponse.json({ games: GAME_DEFINITIONS, settings, members, member: selectedMember, recentSessions, availability, chessStats: chessStats(completedChessSessions) });
 });
 
 export const PUT = withErrors(async (req: NextRequest) => {
@@ -181,6 +213,8 @@ export const PUT = withErrors(async (req: NextRequest) => {
 
   const defaults = DEFAULT_GAME_SETTINGS[game.key];
   const rewardType = cleanRewardType(body.rewardType);
+  const ageMin = clampInt(body.ageMin, 0, 120, game.ageMin);
+  const ageMax = Math.max(ageMin, clampInt(body.ageMax, 0, 120, game.ageMax));
   const setting = await prisma.gameSetting.upsert({
     where: { householdId_gameKey: { householdId, gameKey: game.key } },
     create: {
@@ -192,6 +226,8 @@ export const PUT = withErrors(async (req: NextRequest) => {
       rewardTickets: clampInt(body.rewardTickets, 0, 10, defaults.rewardTickets),
       requiresChoresComplete: Boolean(body.requiresChoresComplete),
       dailyPlayLimit: clampInt(body.dailyPlayLimit, 0, 20, defaults.dailyPlayLimit),
+      ageMin,
+      ageMax,
     },
     update: {
       enabled: Boolean(body.enabled),
@@ -200,6 +236,8 @@ export const PUT = withErrors(async (req: NextRequest) => {
       rewardTickets: clampInt(body.rewardTickets, 0, 10, defaults.rewardTickets),
       requiresChoresComplete: Boolean(body.requiresChoresComplete),
       dailyPlayLimit: clampInt(body.dailyPlayLimit, 0, 20, defaults.dailyPlayLimit),
+      ageMin,
+      ageMax,
     },
   });
 
@@ -207,28 +245,26 @@ export const PUT = withErrors(async (req: NextRequest) => {
 });
 
 export const POST = withErrors(async (req: NextRequest) => {
-  const { householdId, parentId } = requireSession(req);
+  const actor = await gameActor(req);
+  const { householdId } = actor;
   const body = await req.json();
   const game = gameByKey(body.gameKey);
   const memberId = typeof body.memberId === "string" ? body.memberId : "";
   if (!game || !memberId) return NextResponse.json({ error: "Game and member are required" }, { status: 400 });
-  if (!(await canAccessMember(parentId, householdId, memberId))) {
+  const member = await accessibleMember(actor, memberId);
+  if (!member) {
     return NextResponse.json({ error: "You do not have access to this family member" }, { status: 403 });
   }
-
-  const member = await prisma.familyMember.findFirst({ where: { id: memberId, householdId }, select: { id: true, totalPoints: true, age: true } });
-  if (!member) return NextResponse.json({ error: "Family member not found" }, { status: 404 });
-  if ((game.key === "codebreaker-quest" || game.key === "burger-rush") && (member.age < game.ageMin || member.age > game.ageMax)) {
-    return NextResponse.json({ error: `${game.title} is for ages ${game.ageMin}-${game.ageMax}` }, { status: 403 });
-  }
-
   const defaults = DEFAULT_GAME_SETTINGS[game.key];
   const setting = await prisma.gameSetting.upsert({
     where: { householdId_gameKey: { householdId, gameKey: game.key } },
-    create: { householdId, gameKey: game.key, ...defaults },
+    create: { householdId, gameKey: game.key, ...defaults, ageMin: game.ageMin, ageMax: game.ageMax },
     update: {},
   });
   if (!setting.enabled) return NextResponse.json({ error: "This game is turned off" }, { status: 403 });
+  if (member.age < setting.ageMin || member.age > setting.ageMax) {
+    return NextResponse.json({ error: `${game.title} is for ages ${setting.ageMin}-${setting.ageMax}` }, { status: 403 });
+  }
 
   const openChores = await openChoreCount(householdId, memberId);
   if (setting.requiresChoresComplete && openChores > 0) {
