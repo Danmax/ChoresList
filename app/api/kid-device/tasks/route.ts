@@ -10,7 +10,7 @@ export const GET = withErrors(async (req: NextRequest) => {
 
   const { searchParams } = new URL(req.url);
   if (searchParams.get("catalog") === "1") {
-    const [members, chores] = await Promise.all([
+    const [members, chores, assignments] = await Promise.all([
       prisma.familyMember.findMany({
         where: {
           householdId: session.householdId,
@@ -33,6 +33,14 @@ export const GET = withErrors(async (req: NextRequest) => {
         },
         orderBy: [{ category: "asc" }, { name: "asc" }],
       }),
+      prisma.choreAssignment.findMany({
+        where: {
+          householdId: session.householdId,
+          isActive: true,
+          member: { role: "child", ...(session.mode === "member" && session.memberId ? { id: session.memberId } : {}) },
+        },
+        select: { memberId: true, choreId: true },
+      }),
     ]);
 
     await prisma.householdDevice.update({
@@ -40,7 +48,11 @@ export const GET = withErrors(async (req: NextRequest) => {
       data: { lastSeenAt: new Date() },
     });
 
-    return NextResponse.json({ members, chores });
+    const assignedMemberIdsByChore = new Map<string, string[]>();
+    for (const assignment of assignments) {
+      assignedMemberIdsByChore.set(assignment.choreId, [...(assignedMemberIdsByChore.get(assignment.choreId) ?? []), assignment.memberId]);
+    }
+    return NextResponse.json({ members, chores: chores.map((chore) => ({ ...chore, assignedMemberIds: assignedMemberIdsByChore.get(chore.id) ?? [] })) });
   }
 
   const today = startOfDay();
@@ -93,6 +105,24 @@ export const GET = withErrors(async (req: NextRequest) => {
 export const POST = withErrors(async (req: NextRequest) => {
   const session = await getActiveDeviceSession(req);
   if (!session) return NextResponse.json({ error: "Device access revoked" }, { status: 401 });
+  const body = await req.json();
+  const requestedMemberId = typeof body.memberId === "string" ? body.memberId : "";
+  const memberId = session.mode === "member" && session.memberId ? session.memberId : requestedMemberId;
+  const choreId = typeof body.choreId === "string" ? body.choreId : "";
+  if (!memberId || !choreId) return NextResponse.json({ error: "Choose a child and task" }, { status: 400 });
 
-  return NextResponse.json({ error: "Add tasks from the parent panel" }, { status: 403 });
+  const [member, chore, existing] = await Promise.all([
+    prisma.familyMember.findFirst({ where: { id: memberId, householdId: session.householdId, role: "child" }, select: { id: true } }),
+    prisma.chore.findFirst({ where: { id: choreId, householdId: session.householdId }, select: { id: true } }),
+    prisma.choreAssignment.findFirst({ where: { householdId: session.householdId, memberId, choreId, isActive: true }, select: { id: true } }),
+  ]);
+  if (!member || !chore) return NextResponse.json({ error: "Child or task not found" }, { status: 404 });
+  if (existing) return NextResponse.json({ error: "That task is already on this child’s list" }, { status: 409 });
+
+  const assignment = await prisma.choreAssignment.create({
+    data: { householdId: session.householdId, memberId, choreId, frequency: "one-time", dueDate: startOfDay() },
+    include: { chore: true, member: true },
+  });
+  await prisma.householdDevice.update({ where: { id: session.deviceId }, data: { lastSeenAt: new Date() } });
+  return NextResponse.json(assignment, { status: 201 });
 });

@@ -66,6 +66,7 @@ type CatalogChore = {
   pointsValue: number;
   category: string;
   requiresPhoto: boolean;
+  assignedMemberIds: string[];
 };
 
 type DeviceGiftList = { id: string; memberId: string; title: string; type: WishListType; _count: { items: number } };
@@ -549,6 +550,13 @@ export default function TaskScreenPage() {
                 className="flex items-center gap-2 rounded-2xl bg-amber-100 px-4 py-2 text-sm font-black text-amber-700 transition-colors hover:bg-amber-200"
               >
                 <Gift size={16} /> Add Wish
+              </button>
+              <button
+                type="button"
+                onClick={openTaskPicker}
+                className="flex items-center gap-2 rounded-2xl bg-violet-100 px-4 py-2 text-sm font-black text-violet-700 transition-colors hover:bg-violet-200"
+              >
+                <ListPlus size={16} /> Add Task
               </button>
               <button
                 type="button"
@@ -1049,7 +1057,7 @@ export default function TaskScreenPage() {
               <div>
                 <Label className="font-bold text-slate-600">Existing task</Label>
                 <div className="mt-2 max-h-72 space-y-2 overflow-y-auto rounded-2xl bg-slate-50 p-2">
-                  {catalogChores.map((chore) => (
+                  {catalogChores.filter((chore) => !chore.assignedMemberIds.includes(taskMemberId)).map((chore) => (
                     <button
                       key={chore.id}
                       type="button"
@@ -1072,8 +1080,8 @@ export default function TaskScreenPage() {
                       </span>
                     </button>
                   ))}
-                  {catalogChores.length === 0 && (
-                    <p className="py-8 text-center text-sm font-bold text-slate-400">No existing tasks found.</p>
+                  {catalogChores.filter((chore) => !chore.assignedMemberIds.includes(taskMemberId)).length === 0 && (
+                    <p className="py-8 text-center text-sm font-bold text-slate-400">Every existing task is already on this child’s list.</p>
                   )}
                 </div>
               </div>
@@ -1081,7 +1089,7 @@ export default function TaskScreenPage() {
               <button
                 type="button"
                 onClick={addOneTimeTask}
-                disabled={addingTask || catalogChores.length === 0}
+                disabled={addingTask || !taskChoreId || !catalogChores.some((chore) => chore.id === taskChoreId && !chore.assignedMemberIds.includes(taskMemberId))}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 py-3 font-black text-white transition-colors hover:bg-emerald-600 disabled:bg-slate-200 disabled:text-slate-400"
               >
                 <ListPlus size={18} /> {addingTask ? "Adding" : "Add for Today"}
