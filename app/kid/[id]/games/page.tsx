@@ -1,6 +1,6 @@
 "use client";
 
-import { type DragEvent, type MouseEvent as ReactMouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type DragEvent, type MouseEvent as ReactMouseEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft, BookOpen, CheckCircle2, ChefHat, Circle, Crown, FileText, Gamepad2, Grid3X3, KeyRound, Puzzle, RefreshCw, Scissors, Shapes, Swords, TreePine, Trophy } from "lucide-react";
@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { MemberAvatar } from "@/components/member-avatar";
 import { JungleVineSwing } from "@/components/jungle-runner";
 import { ChessQuest, type ChessStats } from "@/components/chess-quest";
+import { FamilyMultiplayerGame } from "@/components/family-multiplayer-games";
 import { createTriviaRound, type TriviaLevel } from "@/lib/bible-trivia";
 
 type Member = {
@@ -196,13 +197,13 @@ export default function KidGamesPage() {
       ) : activeGame === "bible-trivia" ? (
         <BibleTrivia age={member.age} onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("bible-trivia", score, duration, metadata)} />
       ) : activeGame === "rock-paper-scissors-shoot" ? (
-        <RockPaperScissorsShoot onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("rock-paper-scissors-shoot", score, duration, metadata)} />
+        <MultiplayerGamePicker gameKey="rock-paper-scissors-shoot" player={{ id: member.id, name: member.name }} opponents={chessPlayers.filter((familyMember) => familyMember.id !== member.id)} onExit={() => setActiveGame(null)} localGame={<RockPaperScissorsShoot onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("rock-paper-scissors-shoot", score, duration, metadata)} />} />
       ) : activeGame === "shape-safari" ? (
         <ShapeSafari onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("shape-safari", score, duration, metadata)} />
       ) : activeGame === "codebreaker-quest" ? (
         <CodebreakerQuest onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("codebreaker-quest", score, duration, metadata)} />
       ) : activeGame === "tic-tac-toe" ? (
-        <TicTacToe onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("tic-tac-toe", score, duration, metadata)} />
+        <MultiplayerGamePicker gameKey="tic-tac-toe" player={{ id: member.id, name: member.name }} opponents={chessPlayers.filter((familyMember) => familyMember.id !== member.id)} onExit={() => setActiveGame(null)} localGame={<TicTacToe onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("tic-tac-toe", score, duration, metadata)} />} />
       ) : activeGame === "burger-rush" ? (
         <BurgerRush onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("burger-rush", score, duration, metadata)} />
       ) : activeGame === "jungle-vine-swing" ? (
@@ -317,6 +318,14 @@ function JohnnyAdventureMenu({ onBack, onStart }: { onBack: () => void; onStart:
       </div>
     </section>
   );
+}
+
+function MultiplayerGamePicker({ gameKey, player, opponents, onExit, localGame }: { gameKey: "tic-tac-toe" | "rock-paper-scissors-shoot"; player: { id: string; name: string }; opponents: Array<{ id: string; name: string }>; onExit: () => void; localGame: ReactNode }) {
+  const [mode, setMode] = useState<"choose" | "local" | "live">("choose");
+  if (mode === "local") return <>{localGame}</>;
+  if (mode === "live") return <FamilyMultiplayerGame gameKey={gameKey} player={player} opponents={opponents} onBack={() => setMode("choose")} />;
+  const title = gameKey === "tic-tac-toe" ? "Tic-Tac-Toe" : "Rock Paper Scissors Shoot";
+  return <section className="rounded-3xl bg-white p-5 shadow-sm"><button type="button" onClick={onExit} className="text-sm font-black text-slate-600">← Games</button><h2 className="mt-3 text-2xl font-black text-slate-800">{title}</h2><p className="mt-1 text-sm font-semibold text-slate-500">Choose whether to share one device or play live with a family member on their own device.</p><div className="mt-5 grid gap-3 sm:grid-cols-2"><button type="button" onClick={() => setMode("local")} className="rounded-2xl bg-slate-100 p-5 text-left transition hover:bg-slate-200"><span className="block text-lg font-black text-slate-800">Play on this device</span><span className="mt-1 block text-sm font-semibold text-slate-500">Take turns and pass the screen.</span></button><button type="button" disabled={opponents.length === 0} onClick={() => setMode("live")} className="rounded-2xl bg-violet-700 p-5 text-left text-white transition hover:bg-violet-800 disabled:opacity-50"><span className="block text-lg font-black">Play live together</span><span className="mt-1 block text-sm font-semibold text-violet-100">Each player uses their own paired device.</span></button></div>{opponents.length === 0 && <p className="mt-3 text-sm font-bold text-amber-700">Pair another family member’s device to unlock live play.</p>}</section>;
 }
 
 function choiceIcon(choice: string) {

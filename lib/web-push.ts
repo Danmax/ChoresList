@@ -33,10 +33,12 @@ export async function sendPushToDevices(deviceIds: string[], message: PushMessag
   }));
 }
 
-export async function sendChessPush(householdId: string, memberId: string, message: PushMessage) {
+export async function sendPushToFamilyMember(householdId: string, memberId: string, message: PushMessage) {
   const devices = await prisma.householdDevice.findMany({
     where: { householdId, revokedAt: null, OR: [{ memberId }, { mode: "household" }] },
     select: { id: true },
   });
   await sendPushToDevices(devices.map((device) => device.id), message);
 }
+
+export const sendChessPush = sendPushToFamilyMember;

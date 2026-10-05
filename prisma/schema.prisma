@@ -110,6 +110,7 @@ model Household {
   gameSettings             GameSetting[]
   gameSessions             GameSession[]
   familyChessMatches       FamilyChessMatch[]
+  familyMultiplayerMatches FamilyMultiplayerMatch[]
 }
 
 model HouseholdPlugin {
@@ -232,6 +233,8 @@ model FamilyMember {
   gameSessions          GameSession[]
   whiteChessMatches     FamilyChessMatch[] @relation("FamilyChessWhite")
   blackChessMatches     FamilyChessMatch[] @relation("FamilyChessBlack")
+  firstMultiplayerMatches  FamilyMultiplayerMatch[] @relation("FamilyGamePlayerOne")
+  secondMultiplayerMatches FamilyMultiplayerMatch[] @relation("FamilyGamePlayerTwo")
 
   @@index([householdId, role])
 }
@@ -314,6 +317,42 @@ model FamilyChessMove {
   match FamilyChessMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
 
   @@unique([matchId, ply])
+}
+
+model FamilyMultiplayerMatch {
+  id            String   @id @default(uuid()) @db.Char(36)
+  householdId   String   @db.Char(36)
+  gameKey       String   @db.VarChar(64)
+  playerOneId   String   @db.Char(36)
+  playerTwoId   String   @db.Char(36)
+  currentTurn   String   @default("player-one") @db.VarChar(32)
+  status        String   @default("active") @db.VarChar(32)
+  state         Json
+  result        String?  @db.VarChar(32)
+  lastMoveAt    DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  household Household    @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  playerOne FamilyMember @relation("FamilyGamePlayerOne", fields: [playerOneId], references: [id], onDelete: Cascade)
+  playerTwo FamilyMember @relation("FamilyGamePlayerTwo", fields: [playerTwoId], references: [id], onDelete: Cascade)
+  moves     FamilyMultiplayerMove[]
+
+  @@index([householdId, gameKey, status, lastMoveAt])
+  @@index([playerOneId, playerTwoId, status])
+}
+
+model FamilyMultiplayerMove {
+  id        String   @id @default(uuid()) @db.Char(36)
+  matchId   String   @db.Char(36)
+  memberId  String   @db.Char(36)
+  turn      Int
+  data      Json
+  createdAt DateTime @default(now())
+
+  match FamilyMultiplayerMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, turn])
 }
 
 model WellbeingCheckIn {
