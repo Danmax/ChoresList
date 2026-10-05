@@ -207,6 +207,7 @@ export default function KidGamesPage() {
         <JungleVineSwing onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("jungle-vine-swing", score, duration, metadata)} />
       ) : activeGame === "chess-quest" ? (
         <ChessQuest
+          playerId={member.id}
           playerName={member.name}
           opponents={familyMembers.filter((familyMember) => familyMember.id !== id).map((familyMember) => ({ id: familyMember.id, name: familyMember.name }))}
           stats={chessStats}
