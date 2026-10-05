@@ -5,6 +5,7 @@ import { canAccessMember } from "@/lib/child-access";
 import { AuthError, requireSession, withErrors } from "@/lib/api";
 import { deviceSession, getActiveDeviceSession, type DeviceSessionPayload } from "@/lib/device-session";
 import { publishChessMatchUpdate } from "@/lib/chess-realtime";
+import { sendChessPush } from "@/lib/web-push";
 
 const id = (value: unknown) => typeof value === "string" ? value.trim() : "";
 
@@ -37,19 +38,20 @@ export const POST = withErrors(async (req: NextRequest) => {
   if (action === "start") {
     const whiteMemberId = id(body.whiteMemberId); const blackMemberId = id(body.blackMemberId);
     const [white, black] = await Promise.all([
-      prisma.familyMember.findFirst({ where: { id: whiteMemberId, householdId }, select: { id: true } }),
-      prisma.familyMember.findFirst({ where: { id: blackMemberId, householdId }, select: { id: true } }),
+      prisma.familyMember.findFirst({ where: { id: whiteMemberId, householdId }, select: { id: true, name: true } }),
+      prisma.familyMember.findFirst({ where: { id: blackMemberId, householdId }, select: { id: true, name: true } }),
     ]);
     if (!whiteMemberId || !blackMemberId || whiteMemberId === blackMemberId || !white || !black || !(await canPlayAs(actor, whiteMemberId))) return NextResponse.json({ error: "Choose yourself and another family member" }, { status: 400 });
     const existing = await prisma.familyChessMatch.findFirst({ where: { householdId, status: "active", OR: [{ whiteMemberId, blackMemberId }, { whiteMemberId: blackMemberId, blackMemberId: whiteMemberId }] }, orderBy: { lastMoveAt: "desc" } });
     if (existing) return NextResponse.json({ match: existing });
     const match = await prisma.familyChessMatch.create({ data: { householdId, whiteMemberId, blackMemberId, fen: new Chess().fen() } });
     publishChessMatchUpdate(match.id);
+    await sendChessPush(householdId, blackMemberId, { title: "Your chess game is ready", body: `${white.name} started a live family chess game. It is your turn.`, url: `/kid/${blackMemberId}/games` }).catch((error) => console.error("[chess push] invite", error));
     return NextResponse.json({ match }, { status: 201 });
   }
   if (action === "move") {
     const matchId = id(body.matchId); const memberId = id(body.memberId); const from = id(body.from); const to = id(body.to); const promotion = id(body.promotion) || undefined;
-    const match = await prisma.familyChessMatch.findFirst({ where: { id: matchId, householdId, status: "active" }, include: { moves: { select: { ply: true } } } });
+    const match = await prisma.familyChessMatch.findFirst({ where: { id: matchId, householdId, status: "active" }, include: { moves: { select: { ply: true } }, white: { select: { name: true } }, black: { select: { name: true } } } });
     if (!match || !(await canPlayAs(actor, memberId)) || ![match.whiteMemberId, match.blackMemberId].includes(memberId)) return NextResponse.json({ error: "Match not found" }, { status: 404 });
     if ((match.currentTurn === "white" ? match.whiteMemberId : match.blackMemberId) !== memberId) return NextResponse.json({ error: "It is not this player’s turn" }, { status: 403 });
     const chess = new Chess(match.fen); let move: { san: string; from: string; to: string; promotion?: string };
@@ -59,6 +61,14 @@ export const POST = withErrors(async (req: NextRequest) => {
     if (!update.count) return NextResponse.json({ error: "The board changed. Refresh and try again." }, { status: 409 });
     await prisma.familyChessMove.create({ data: { matchId, memberId, ply: match.moves.length + 1, san: move.san, from: move.from, to: move.to, promotion: move.promotion ?? null, fen } });
     publishChessMatchUpdate(matchId);
+    const nextMemberId = chess.turn() === "w" ? match.whiteMemberId : match.blackMemberId;
+    const nextPlayerName = chess.turn() === "w" ? match.white.name : match.black.name;
+    const movingPlayerName = memberId === match.whiteMemberId ? match.white.name : match.black.name;
+    if (complete) {
+      await Promise.all([match.whiteMemberId, match.blackMemberId].map((recipientId) => sendChessPush(householdId, recipientId, { title: "Chess game complete", body: result === "draw" ? "Your family chess game ended in a draw." : `${result === "white-won" ? match.white.name : match.black.name} won the game.`, url: `/kid/${recipientId}/games` }).catch((error) => console.error("[chess push] result", error))));
+    } else {
+      await sendChessPush(householdId, nextMemberId, { title: "Your chess turn", body: `${movingPlayerName} made a move. It is ${nextPlayerName}'s turn.`, url: `/kid/${nextMemberId}/games` }).catch((error) => console.error("[chess push] turn", error));
+    }
     return NextResponse.json({ fen, currentTurn: chess.turn() === "w" ? "white" : "black", status: complete ? "completed" : "active", result });
   }
   return NextResponse.json({ error: "Unknown chess action" }, { status: 400 });

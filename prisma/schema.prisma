@@ -1584,6 +1584,21 @@ model HouseholdDevice {
   member            FamilyMember?       @relation(fields: [memberId], references: [id], onDelete: SetNull)
   wellbeingCheckIns WellbeingCheckIn[]
   pairingCodes      DevicePairingCode[]
+  pushSubscriptions DevicePushSubscription[]
+}
+
+model DevicePushSubscription {
+  id        String   @id @default(uuid()) @db.Char(36)
+  deviceId  String   @db.Char(36)
+  endpoint  String   @unique @db.VarChar(1024)
+  p256dh    String   @db.Text
+  auth      String   @db.VarChar(255)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  device HouseholdDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId])
 }
 
 model DevicePairingCode {
