@@ -96,6 +96,7 @@ export default function KidGamesPage() {
   const { id } = useParams<{ id: string }>();
   const [member, setMember] = useState<Member | null>(null);
   const [familyMembers, setFamilyMembers] = useState<Member[]>([]);
+  const [chessPlayers, setChessPlayers] = useState<Array<Pick<Member, "id" | "name">>>([]);
   const [games, setGames] = useState<Game[]>([]);
   const [settings, setSettings] = useState<Record<string, GameSetting>>({});
   const [availability, setAvailability] = useState<Availability>({});
@@ -112,6 +113,7 @@ export default function KidGamesPage() {
     if (gamesRes.ok) {
       const members = Array.isArray(gamesData?.members) ? gamesData.members : [];
       setFamilyMembers(members);
+      setChessPlayers(Array.isArray(gamesData?.chessPlayers) ? gamesData.chessPlayers : members);
       setMember(gamesData?.member ?? members.find((item: Member) => item.id === id) ?? null);
       setGames(Array.isArray(gamesData?.games) ? gamesData.games : []);
       const nextSettings: Record<string, GameSetting> = {};
@@ -209,7 +211,7 @@ export default function KidGamesPage() {
         <ChessQuest
           playerId={member.id}
           playerName={member.name}
-          opponents={familyMembers.filter((familyMember) => familyMember.id !== id).map((familyMember) => ({ id: familyMember.id, name: familyMember.name }))}
+          opponents={chessPlayers.filter((familyMember) => familyMember.id !== id)}
           stats={chessStats}
           onExit={() => setActiveGame(null)}
           onFinish={(score, duration, metadata) => recordSession("chess-quest", score, duration, metadata)}

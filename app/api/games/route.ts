@@ -156,6 +156,16 @@ export const GET = withErrors(async (req: NextRequest) => {
     select: { id: true, name: true, avatar: true, avatarConfig: true, avatarImageUrl: true, color: true, totalPoints: true, age: true },
     orderBy: { name: "asc" },
   });
+  // A member-paired device normally sees only its assigned child profile. Chess
+  // is the exception: it needs the other eligible family players so a child can
+  // invite one of them to a private, household-only live game.
+  const chessPlayers = actor.device
+    ? await prisma.familyMember.findMany({
+      where: { householdId, role: { in: ["child", "young-adult"] } },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    })
+    : members.map((member) => ({ id: member.id, name: member.name }));
   const recentSessions = await prisma.gameSession.findMany({
     where: {
       householdId,
@@ -207,7 +217,7 @@ export const GET = withErrors(async (req: NextRequest) => {
     }));
   }
 
-  return NextResponse.json({ games: GAME_DEFINITIONS, settings, members, member: selectedMember, recentSessions, availability, chessStats: chessStats(completedChessSessions) });
+  return NextResponse.json({ games: GAME_DEFINITIONS, settings, members, member: selectedMember, recentSessions, availability, chessPlayers, chessStats: chessStats(completedChessSessions) });
 });
 
 export const PUT = withErrors(async (req: NextRequest) => {
