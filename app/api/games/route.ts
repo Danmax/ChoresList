@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireParentSession, requireSession, withErrors } from "@/lib/api";
 import { canAccessMember, childAccessWhere } from "@/lib/child-access";
-import { getActiveDeviceSession, type DeviceSessionPayload } from "@/lib/device-session";
+import { deviceSession, getActiveDeviceSession, type DeviceSessionPayload } from "@/lib/device-session";
 import { getLevelFromPoints } from "@/lib/points";
 import { DEFAULT_GAME_SETTINGS, GAME_DEFINITIONS, gameByKey, type GameRewardType } from "@/lib/games";
 import { isMonthlyChoreOpen, startOfMonth } from "@/lib/chore-schedule";
@@ -111,8 +111,13 @@ async function openChoreCount(householdId: string, memberId: string) {
 }
 
 async function gameActor(req: NextRequest) {
-  const device = await getActiveDeviceSession(req);
-  if (device) return { householdId: device.householdId, parentId: null as string | null, device };
+  // The games API is shared by the kid-device screen and the parent dashboard.
+  // `getActiveDeviceSession` intentionally throws when its cookie is absent, so
+  // only call it for requests that are actually coming from a paired device.
+  if (req.cookies.has(deviceSession.name)) {
+    const device = await getActiveDeviceSession(req);
+    if (device) return { householdId: device.householdId, parentId: null as string | null, device };
+  }
   const parent = requireSession(req);
   return { householdId: parent.householdId, parentId: parent.parentId, device: null as DeviceSessionPayload | null };
 }
