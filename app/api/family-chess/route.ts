@@ -29,7 +29,7 @@ export const GET = withErrors(async (req: NextRequest) => {
   const { householdId } = actor;
   const memberId = new URL(req.url).searchParams.get("memberId") ?? "";
   if (!memberId || !(await canPlayAs(actor, memberId))) return NextResponse.json({ error: "You do not have access to this player" }, { status: 403 });
-  const matches = await prisma.familyChessMatch.findMany({ where: { householdId, OR: [{ whiteMemberId: memberId }, { blackMemberId: memberId }] }, include: { white: { select: { id: true, name: true } }, black: { select: { id: true, name: true } }, moves: { orderBy: { ply: "asc" }, select: { san: true, ply: true } } }, orderBy: { lastMoveAt: "desc" }, take: 20 });
+  const matches = await prisma.familyChessMatch.findMany({ where: { householdId, OR: [{ whiteMemberId: memberId }, { blackMemberId: memberId }] }, include: { white: { select: { id: true, name: true } }, black: { select: { id: true, name: true } }, moves: { orderBy: { ply: "asc" }, select: { san: true, ply: true, from: true, to: true } } }, orderBy: { lastMoveAt: "desc" }, take: 20 });
   return NextResponse.json({ matches });
 });
 
@@ -77,7 +77,7 @@ export const POST = withErrors(async (req: NextRequest) => {
     } else {
       void sendChessPush(householdId, nextMemberId, { title: "Your chess turn", body: `${movingPlayerName} made a move. It is ${nextPlayerName}'s turn.`, url: `/kid/${nextMemberId}/games` }).catch((error) => console.error("[chess push] turn", error));
     }
-    return NextResponse.json({ fen, currentTurn: chess.turn() === "w" ? "white" : "black", status: complete ? "completed" : "active", result });
+    return NextResponse.json({ fen, currentTurn: chess.turn() === "w" ? "white" : "black", status: complete ? "completed" : "active", result, move: { san: move.san, ply: match.moves.length + 1, from: move.from, to: move.to } });
   }
   return NextResponse.json({ error: "Unknown chess action" }, { status: 400 });
 });
