@@ -57,6 +57,19 @@ export const POST = withErrors(async (req: NextRequest) => {
     publishChessMatchUpdate(match.id);
     return NextResponse.json({ match: updated });
   }
+  if (action === "resign") {
+    const matchId = id(body.matchId); const memberId = id(body.memberId);
+    const match = await prisma.familyChessMatch.findFirst({ where: { id: matchId, householdId, status: "active" }, include: { white: { select: { name: true } }, black: { select: { name: true } } } });
+    if (!match || !(await canPlayAs(actor, memberId)) || ![match.whiteMemberId, match.blackMemberId].includes(memberId)) return NextResponse.json({ error: "Match not found" }, { status: 404 });
+    const result = memberId === match.whiteMemberId ? "black-won" : "white-won";
+    const update = await prisma.familyChessMatch.updateMany({ where: { id: match.id, status: "active" }, data: { status: "completed", result, lastMoveAt: new Date() } });
+    if (!update.count) return NextResponse.json({ error: "The game has already ended. Refresh to see the result." }, { status: 409 });
+    publishChessMatchUpdate(match.id);
+    const winner = result === "white-won" ? match.white.name : match.black.name;
+    const resigningPlayer = memberId === match.whiteMemberId ? match.white.name : match.black.name;
+    void Promise.all([match.whiteMemberId, match.blackMemberId].map((recipientId) => sendChessPush(householdId, recipientId, { title: "Chess game complete", body: `${resigningPlayer} resigned. ${winner} wins the game.`, url: `/kid/${recipientId}/games` }).catch((error) => console.error("[chess push] resignation", error))));
+    return NextResponse.json({ fen: match.fen, currentTurn: match.currentTurn, status: "completed", result });
+  }
   if (action === "move") {
     const matchId = id(body.matchId); const memberId = id(body.memberId); const from = id(body.from); const to = id(body.to); const promotion = id(body.promotion) || undefined;
     const match = await prisma.familyChessMatch.findFirst({ where: { id: matchId, householdId, status: "active" }, include: { moves: { select: { ply: true } }, white: { select: { name: true } }, black: { select: { name: true } } } });
