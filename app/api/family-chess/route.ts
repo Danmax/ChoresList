@@ -42,12 +42,20 @@ export const POST = withErrors(async (req: NextRequest) => {
       prisma.familyMember.findFirst({ where: { id: blackMemberId, householdId }, select: { id: true, name: true } }),
     ]);
     if (!whiteMemberId || !blackMemberId || whiteMemberId === blackMemberId || !white || !black || !(await canPlayAs(actor, whiteMemberId))) return NextResponse.json({ error: "Choose yourself and another family member" }, { status: 400 });
-    const existing = await prisma.familyChessMatch.findFirst({ where: { householdId, status: "active", OR: [{ whiteMemberId, blackMemberId }, { whiteMemberId: blackMemberId, blackMemberId: whiteMemberId }] }, orderBy: { lastMoveAt: "desc" } });
+    const existing = await prisma.familyChessMatch.findFirst({ where: { householdId, status: { in: ["pending", "active"] }, OR: [{ whiteMemberId, blackMemberId }, { whiteMemberId: blackMemberId, blackMemberId: whiteMemberId }] }, orderBy: { lastMoveAt: "desc" } });
     if (existing) return NextResponse.json({ match: existing });
-    const match = await prisma.familyChessMatch.create({ data: { householdId, whiteMemberId, blackMemberId, fen: new Chess().fen() } });
+    const match = await prisma.familyChessMatch.create({ data: { householdId, whiteMemberId, blackMemberId, status: "pending", fen: new Chess().fen() } });
     publishChessMatchUpdate(match.id);
-    await sendChessPush(householdId, blackMemberId, { title: "Your chess game is ready", body: `${white.name} started a live family chess game. It is your turn.`, url: `/kid/${blackMemberId}/games` }).catch((error) => console.error("[chess push] invite", error));
+    void sendChessPush(householdId, blackMemberId, { title: "Family chess invitation", body: `${white.name} invited you to a live family chess game. Open Chess Quest to accept.`, url: `/kid/${blackMemberId}/games` }).catch((error) => console.error("[chess push] invite", error));
     return NextResponse.json({ match }, { status: 201 });
+  }
+  if (action === "accept") {
+    const matchId = id(body.matchId); const memberId = id(body.memberId);
+    const match = await prisma.familyChessMatch.findFirst({ where: { id: matchId, householdId, status: "pending" } });
+    if (!match || match.blackMemberId !== memberId || !(await canPlayAs(actor, memberId))) return NextResponse.json({ error: "Chess invitation not found" }, { status: 404 });
+    const updated = await prisma.familyChessMatch.update({ where: { id: match.id }, data: { status: "active", lastMoveAt: new Date() } });
+    publishChessMatchUpdate(match.id);
+    return NextResponse.json({ match: updated });
   }
   if (action === "move") {
     const matchId = id(body.matchId); const memberId = id(body.memberId); const from = id(body.from); const to = id(body.to); const promotion = id(body.promotion) || undefined;
@@ -65,9 +73,9 @@ export const POST = withErrors(async (req: NextRequest) => {
     const nextPlayerName = chess.turn() === "w" ? match.white.name : match.black.name;
     const movingPlayerName = memberId === match.whiteMemberId ? match.white.name : match.black.name;
     if (complete) {
-      await Promise.all([match.whiteMemberId, match.blackMemberId].map((recipientId) => sendChessPush(householdId, recipientId, { title: "Chess game complete", body: result === "draw" ? "Your family chess game ended in a draw." : `${result === "white-won" ? match.white.name : match.black.name} won the game.`, url: `/kid/${recipientId}/games` }).catch((error) => console.error("[chess push] result", error))));
+      void Promise.all([match.whiteMemberId, match.blackMemberId].map((recipientId) => sendChessPush(householdId, recipientId, { title: "Chess game complete", body: result === "draw" ? "Your family chess game ended in a draw." : `${result === "white-won" ? match.white.name : match.black.name} won the game.`, url: `/kid/${recipientId}/games` }).catch((error) => console.error("[chess push] result", error))));
     } else {
-      await sendChessPush(householdId, nextMemberId, { title: "Your chess turn", body: `${movingPlayerName} made a move. It is ${nextPlayerName}'s turn.`, url: `/kid/${nextMemberId}/games` }).catch((error) => console.error("[chess push] turn", error));
+      void sendChessPush(householdId, nextMemberId, { title: "Your chess turn", body: `${movingPlayerName} made a move. It is ${nextPlayerName}'s turn.`, url: `/kid/${nextMemberId}/games` }).catch((error) => console.error("[chess push] turn", error));
     }
     return NextResponse.json({ fen, currentTurn: chess.turn() === "w" ? "white" : "black", status: complete ? "completed" : "active", result });
   }

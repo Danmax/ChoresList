@@ -67,12 +67,21 @@ export const POST = withErrors(async (req: NextRequest) => {
       prisma.familyMember.findFirst({ where: { id: playerTwoId, householdId: current.householdId }, select: { id: true, name: true } }),
     ]);
     if (!playerOne || !playerTwo) return NextResponse.json({ error: "Choose a family opponent" }, { status: 400 });
-    const existing = await prisma.familyMultiplayerMatch.findFirst({ where: { householdId: current.householdId, gameKey, status: "active", OR: [{ playerOneId, playerTwoId }, { playerOneId: playerTwoId, playerTwoId: playerOneId }] }, orderBy: { lastMoveAt: "desc" } });
+    const existing = await prisma.familyMultiplayerMatch.findFirst({ where: { householdId: current.householdId, gameKey, status: { in: ["pending", "active"] }, OR: [{ playerOneId, playerTwoId }, { playerOneId: playerTwoId, playerTwoId: playerOneId }] }, orderBy: { lastMoveAt: "desc" } });
     if (existing) return NextResponse.json({ match: visibleMatch(existing, playerOneId) });
-    const match = await prisma.familyMultiplayerMatch.create({ data: { householdId: current.householdId, gameKey, playerOneId, playerTwoId, state: startState(gameKey) } });
+    const match = await prisma.familyMultiplayerMatch.create({ data: { householdId: current.householdId, gameKey, playerOneId, playerTwoId, status: "pending", state: startState(gameKey) } });
     publishChessMatchUpdate(match.id);
-    await sendPushToFamilyMember(current.householdId, playerTwoId, { title: "A family game is ready", body: `${playerOne.name} started ${gameKey === "tic-tac-toe" ? "Tic-Tac-Toe" : "Rock Paper Scissors"}. You go second!`, url: `/kid/${playerTwoId}/games` }).catch((error) => console.error("[family-game push] invite", error));
+    void sendPushToFamilyMember(current.householdId, playerTwoId, { title: "Family game invitation", body: `${playerOne.name} invited you to ${gameKey === "tic-tac-toe" ? "Tic-Tac-Toe" : "Rock Paper Scissors"}. Open Chess Quest to accept.`, url: `/kid/${playerTwoId}/games` }).catch((error) => console.error("[family-game push] invite", error));
     return NextResponse.json({ match }, { status: 201 });
+  }
+
+  if (action === "accept") {
+    const matchId = clean(body.matchId); const memberId = clean(body.memberId);
+    const match = await prisma.familyMultiplayerMatch.findFirst({ where: { id: matchId, householdId: current.householdId, status: "pending" } });
+    if (!match || match.playerTwoId !== memberId || !(await canPlayAs(current, memberId))) return NextResponse.json({ error: "Game invitation not found" }, { status: 404 });
+    const updated = await prisma.familyMultiplayerMatch.update({ where: { id: match.id }, data: { status: "active", lastMoveAt: new Date() } });
+    publishChessMatchUpdate(match.id);
+    return NextResponse.json({ match: updated });
   }
 
   if (action !== "move") return NextResponse.json({ error: "Unknown family game action" }, { status: 400 });
@@ -109,6 +118,6 @@ export const POST = withErrors(async (req: NextRequest) => {
   await prisma.familyMultiplayerMove.create({ data: { matchId: match.id, memberId, turn: match.moves.length + 1, data: moveData } });
   publishChessMatchUpdate(match.id);
   const targetId = result ? null : nextTurn === "player-one" ? match.playerOneId : match.playerTwoId;
-  if (targetId) await sendPushToFamilyMember(current.householdId, targetId, { title: "Your family game turn", body: `${memberId === match.playerOneId ? match.playerOne.name : match.playerTwo.name} made a move in ${match.gameKey === "tic-tac-toe" ? "Tic-Tac-Toe" : "Rock Paper Scissors"}.`, url: `/kid/${targetId}/games` }).catch((error) => console.error("[family-game push] turn", error));
+  if (targetId) void sendPushToFamilyMember(current.householdId, targetId, { title: "Your family game turn", body: `${memberId === match.playerOneId ? match.playerOne.name : match.playerTwo.name} made a move in ${match.gameKey === "tic-tac-toe" ? "Tic-Tac-Toe" : "Rock Paper Scissors"}.`, url: `/kid/${targetId}/games` }).catch((error) => console.error("[family-game push] turn", error));
   return NextResponse.json({ state: nextState, currentTurn: nextTurn, status: result ? "completed" : "active", result });
 });

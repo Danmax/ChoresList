@@ -187,6 +187,11 @@ export default function KidGamesPage() {
         </div>
       )}
 
+      <FamilyGameInvitationAlert
+        playerId={member.id}
+        onOpen={(gameKey) => { setReward(null); setShowJohnnyMenu(false); setActiveGame(gameKey); }}
+      />
+
       {showJohnnyMenu ? (
         <JohnnyAdventureMenu
           onBack={() => setShowJohnnyMenu(false)}
@@ -323,9 +328,38 @@ function JohnnyAdventureMenu({ onBack, onStart }: { onBack: () => void; onStart:
 function MultiplayerGamePicker({ gameKey, player, opponents, onExit, localGame }: { gameKey: "tic-tac-toe" | "rock-paper-scissors-shoot"; player: { id: string; name: string }; opponents: Array<{ id: string; name: string }>; onExit: () => void; localGame: ReactNode }) {
   const [mode, setMode] = useState<"choose" | "local" | "live">("choose");
   if (mode === "local") return <>{localGame}</>;
-  if (mode === "live") return <FamilyMultiplayerGame gameKey={gameKey} player={player} opponents={opponents} onBack={() => setMode("choose")} />;
+  if (mode === "live") return <FamilyMultiplayerGame gameKey={gameKey} player={player} opponents={opponents} onBack={() => setMode("choose")} onGameOver={onExit} />;
   const title = gameKey === "tic-tac-toe" ? "Tic-Tac-Toe" : "Rock Paper Scissors Shoot";
   return <section className="rounded-3xl bg-white p-5 shadow-sm"><button type="button" onClick={onExit} className="text-sm font-black text-slate-600">← Games</button><h2 className="mt-3 text-2xl font-black text-slate-800">{title}</h2><p className="mt-1 text-sm font-semibold text-slate-500">Choose whether to share one device or play live with a family member on their own device.</p><div className="mt-5 grid gap-3 sm:grid-cols-2"><button type="button" onClick={() => setMode("local")} className="rounded-2xl bg-slate-100 p-5 text-left transition hover:bg-slate-200"><span className="block text-lg font-black text-slate-800">Play on this device</span><span className="mt-1 block text-sm font-semibold text-slate-500">Take turns and pass the screen.</span></button><button type="button" disabled={opponents.length === 0} onClick={() => setMode("live")} className="rounded-2xl bg-violet-700 p-5 text-left text-white transition hover:bg-violet-800 disabled:opacity-50"><span className="block text-lg font-black">Play live together</span><span className="mt-1 block text-sm font-semibold text-violet-100">Each player uses their own paired device.</span></button></div>{opponents.length === 0 && <p className="mt-3 text-sm font-bold text-amber-700">Pair another family member’s device to unlock live play.</p>}</section>;
+}
+
+function FamilyGameInvitationAlert({ playerId, onOpen }: { playerId: string; onOpen: (gameKey: "chess-quest" | "tic-tac-toe" | "rock-paper-scissors-shoot") => void }) {
+  const [invite, setInvite] = useState<{ id: string; gameKey: "chess-quest" | "tic-tac-toe" | "rock-paper-scissors-shoot"; inviter: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(async () => {
+    const [gamesResponse, chessResponse] = await Promise.all([
+      fetch(`/api/family-games?memberId=${encodeURIComponent(playerId)}`),
+      fetch(`/api/family-chess?memberId=${encodeURIComponent(playerId)}`),
+    ]);
+    const games = gamesResponse.ok ? await gamesResponse.json().catch(() => null) : null;
+    const chess = chessResponse.ok ? await chessResponse.json().catch(() => null) : null;
+    const gameInvite = (games?.matches ?? []).find((match: { status: string; playerTwoId: string; id: string; gameKey: string; playerOne: { name: string } }) => match.status === "pending" && match.playerTwoId === playerId);
+    const chessInvite = (chess?.matches ?? []).find((match: { status: string; blackMemberId: string; id: string; white: { name: string } }) => match.status === "pending" && match.blackMemberId === playerId);
+    setInvite(gameInvite ? { id: gameInvite.id, gameKey: gameInvite.gameKey, inviter: gameInvite.playerOne.name } : chessInvite ? { id: chessInvite.id, gameKey: "chess-quest", inviter: chessInvite.white.name } : null);
+  }, [playerId]);
+  useEffect(() => { void load(); const timer = window.setInterval(() => void load(), 1500); return () => window.clearInterval(timer); }, [load]);
+  async function accept() {
+    if (!invite) return;
+    setBusy(true);
+    const endpoint = invite.gameKey === "chess-quest" ? "/api/family-chess" : "/api/family-games";
+    const response = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "accept", matchId: invite.id, memberId: playerId }) });
+    setBusy(false);
+    if (!response.ok) return toast.error((await response.json().catch(() => null))?.error ?? "Could not accept the invitation");
+    onOpen(invite.gameKey); toast.success("Game invitation accepted!"); await load();
+  }
+  if (!invite) return null;
+  const title = invite.gameKey === "chess-quest" ? "Chess" : invite.gameKey === "tic-tac-toe" ? "Tic-Tac-Toe" : "Rock Paper Scissors";
+  return <section className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-3xl border-2 border-amber-300 bg-amber-50 p-4 shadow-sm"><div><p className="text-xs font-black uppercase tracking-wide text-amber-700">Game invitation</p><p className="mt-1 font-black text-slate-800">{invite.inviter} invited you to {title}.</p></div><button type="button" disabled={busy} onClick={() => void accept()} className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-black text-white disabled:opacity-50">{busy ? "Accepting…" : "Accept & play"}</button></section>;
 }
 
 function choiceIcon(choice: string) {
