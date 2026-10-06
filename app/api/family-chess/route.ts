@@ -57,6 +57,20 @@ export const POST = withErrors(async (req: NextRequest) => {
     publishChessMatchUpdate(match.id);
     return NextResponse.json({ match: updated });
   }
+  if (action === "decline" || action === "cancel") {
+    const matchId = id(body.matchId); const memberId = id(body.memberId);
+    const match = await prisma.familyChessMatch.findFirst({ where: { id: matchId, householdId, status: "pending" }, include: { white: { select: { name: true } }, black: { select: { name: true } } } });
+    const expectedMemberId = action === "decline" ? match?.blackMemberId : match?.whiteMemberId;
+    if (!match || expectedMemberId !== memberId || !(await canPlayAs(actor, memberId))) return NextResponse.json({ error: "Chess invitation not found" }, { status: 404 });
+    const result = action === "decline" ? "declined" : "cancelled";
+    const update = await prisma.familyChessMatch.updateMany({ where: { id: match.id, status: "pending" }, data: { status: "completed", result, lastMoveAt: new Date() } });
+    if (!update.count) return NextResponse.json({ error: "This invitation is no longer available." }, { status: 409 });
+    publishChessMatchUpdate(match.id);
+    const recipientId = action === "decline" ? match.whiteMemberId : match.blackMemberId;
+    const actorName = action === "decline" ? match.black.name : match.white.name;
+    void sendChessPush(householdId, recipientId, { title: "Chess invitation updated", body: action === "decline" ? `${actorName} declined the chess invitation.` : `${actorName} cancelled the chess invitation.`, url: `/kid/${recipientId}/games` }).catch((error) => console.error("[chess push] invitation", error));
+    return NextResponse.json({ status: "completed", result });
+  }
   if (action === "resign") {
     const matchId = id(body.matchId); const memberId = id(body.memberId);
     const match = await prisma.familyChessMatch.findFirst({ where: { id: matchId, householdId, status: "active" }, include: { white: { select: { name: true } }, black: { select: { name: true } } } });

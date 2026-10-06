@@ -84,6 +84,21 @@ export const POST = withErrors(async (req: NextRequest) => {
     return NextResponse.json({ match: updated });
   }
 
+  if (action === "decline" || action === "cancel") {
+    const matchId = clean(body.matchId); const memberId = clean(body.memberId);
+    const match = await prisma.familyMultiplayerMatch.findFirst({ where: { id: matchId, householdId: current.householdId, status: "pending" }, include: { playerOne: { select: { name: true } }, playerTwo: { select: { name: true } } } });
+    const expectedMemberId = action === "decline" ? match?.playerTwoId : match?.playerOneId;
+    if (!match || expectedMemberId !== memberId || !(await canPlayAs(current, memberId))) return NextResponse.json({ error: "Game invitation not found" }, { status: 404 });
+    const result = action === "decline" ? "declined" : "cancelled";
+    const update = await prisma.familyMultiplayerMatch.updateMany({ where: { id: match.id, status: "pending" }, data: { status: "completed", result, lastMoveAt: new Date() } });
+    if (!update.count) return NextResponse.json({ error: "This invitation is no longer available." }, { status: 409 });
+    publishChessMatchUpdate(match.id);
+    const recipientId = action === "decline" ? match.playerOneId : match.playerTwoId;
+    const actorName = action === "decline" ? match.playerTwo.name : match.playerOne.name;
+    void sendPushToFamilyMember(current.householdId, recipientId, { title: "Family game invitation updated", body: action === "decline" ? `${actorName} declined the invitation.` : `${actorName} cancelled the invitation.`, url: `/kid/${recipientId}/games` }).catch((error) => console.error("[family-game push] invitation", error));
+    return NextResponse.json({ status: "completed", result });
+  }
+
   if (action !== "move") return NextResponse.json({ error: "Unknown family game action" }, { status: 400 });
   const matchId = clean(body.matchId); const memberId = clean(body.memberId);
   const match = await prisma.familyMultiplayerMatch.findFirst({ where: { id: matchId, householdId: current.householdId, status: "active" }, include: { playerOne: { select: { name: true } }, playerTwo: { select: { name: true } }, moves: { select: { turn: true } } } });
