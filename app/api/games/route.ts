@@ -126,7 +126,7 @@ async function accessibleMember(actor: Awaited<ReturnType<typeof gameActor>>, me
   if (actor.device) {
     if (actor.device.mode === "member" && actor.device.memberId !== memberId) return null;
     return prisma.familyMember.findFirst({
-      where: { id: memberId, householdId: actor.householdId, role: { in: ["child", "young-adult"] } },
+      where: { id: memberId, householdId: actor.householdId, ...(actor.device.mode === "household" ? { role: { in: ["child", "young-adult"] } } : {}) },
       select: { id: true, name: true, avatar: true, avatarConfig: true, avatarImageUrl: true, color: true, totalPoints: true, age: true },
     });
   }
@@ -147,7 +147,7 @@ export const GET = withErrors(async (req: NextRequest) => {
     return NextResponse.json({ error: "You do not have access to this family member" }, { status: 403 });
   }
   const memberAccess = actor.device
-    ? { role: { in: ["child", "young-adult"] }, ...(actor.device.mode === "member" && actor.device.memberId ? { id: actor.device.memberId } : {}) }
+    ? { ...(actor.device.mode === "household" ? { role: { in: ["child", "young-adult"] } } : {}), ...(actor.device.mode === "member" && actor.device.memberId ? { id: actor.device.memberId } : {}) }
     : await childAccessWhere(actor.parentId!, householdId);
 
   const settings = await ensureSettings(householdId);
@@ -156,16 +156,14 @@ export const GET = withErrors(async (req: NextRequest) => {
     select: { id: true, name: true, avatar: true, avatarConfig: true, avatarImageUrl: true, color: true, totalPoints: true, age: true },
     orderBy: { name: "asc" },
   });
-  // A member-paired device normally sees only its assigned child profile. Chess
-  // is the exception: it needs the other eligible family players so a child can
-  // invite one of them to a private, household-only live game.
-  const chessPlayers = actor.device
-    ? await prisma.familyMember.findMany({
-      where: { householdId, role: { in: ["child", "young-adult"] } },
-      select: { id: true, name: true },
-      orderBy: { name: "asc" },
-    })
-    : members.map((member) => ({ id: member.id, name: member.name }));
+  // Live family games need the complete household roster. A paired screen can
+  // still act only as its assigned profile, but may invite a parent, sibling,
+  // or other household member as the opponent.
+  const chessPlayers = await prisma.familyMember.findMany({
+    where: { householdId },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
   const recentSessions = await prisma.gameSession.findMany({
     where: {
       householdId,

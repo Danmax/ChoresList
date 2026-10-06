@@ -44,7 +44,7 @@ export default function DevicesPage() {
   const [editMode, setEditMode] = useState<"household" | "member">("household");
   const [editMemberId, setEditMemberId] = useState("");
 
-  const childMembers = useMemo(() => members.filter((member) => member.role === "child"), [members]);
+  const playableMembers = useMemo(() => members, [members]);
 
   const load = useCallback(async () => {
     const [membersRes, devicesRes] = await Promise.all([
@@ -66,7 +66,7 @@ export default function DevicesPage() {
     const nextMode = device ? device.mode === "member" ? "member" : "household" : mode;
     const nextMemberId = device ? device.memberId ?? "" : memberId;
     if (nextMode === "member" && !nextMemberId) {
-      toast.error("Choose a child for this screen");
+      toast.error("Choose a family member for this screen");
       return;
     }
 
@@ -112,7 +112,7 @@ export default function DevicesPage() {
 
   async function saveDevice(id: string) {
     if (editMode === "member" && !editMemberId) {
-      toast.error("Choose a child for this screen");
+      toast.error("Choose a family member for this screen");
       return;
     }
 
@@ -217,7 +217,7 @@ export default function DevicesPage() {
               <div className="mt-2 grid grid-cols-2 gap-2">
                 {[
                   { value: "household", label: "All kids" },
-                  { value: "member", label: "One child" },
+                  { value: "member", label: "One family member" },
                 ].map((option) => (
                   <button
                     key={option.value}
@@ -237,14 +237,14 @@ export default function DevicesPage() {
 
             {mode === "member" && (
               <label className="block">
-                <span className="text-sm font-bold text-slate-600">Child</span>
+                <span className="text-sm font-bold text-slate-600">Family member</span>
                 <select
                   value={memberId}
                   onChange={(event) => setMemberId(event.target.value)}
                   className="mt-1 w-full rounded-2xl border-2 border-slate-100 bg-slate-50 px-3 py-2 font-semibold text-slate-800 outline-none focus:border-violet-300"
                 >
-                  <option value="">Choose child</option>
-                  {childMembers.map((member) => (
+                  <option value="">Choose family member</option>
+                  {playableMembers.map((member) => (
                     <option key={member.id} value={member.id}>
                       {member.avatar} {member.name}
                     </option>
@@ -292,7 +292,7 @@ export default function DevicesPage() {
               <div key={device.id} className="rounded-2xl border border-slate-100 p-3">
                 {editingId === device.id ? (
                   <DeviceEditFields
-                    childMembers={childMembers}
+                    playableMembers={playableMembers}
                     editName={editName}
                     editMode={editMode}
                     editMemberId={editMemberId}
@@ -367,7 +367,7 @@ export default function DevicesPage() {
                             className="rounded-xl border-2 border-slate-100 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800 outline-none focus:border-violet-300"
                           >
                             <option value="household">All kids</option>
-                            <option value="member">One child</option>
+                            <option value="member">One family member</option>
                           </select>
                           {editMode === "member" && (
                             <select
@@ -375,8 +375,8 @@ export default function DevicesPage() {
                               onChange={(event) => setEditMemberId(event.target.value)}
                               className="rounded-xl border-2 border-slate-100 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800 outline-none focus:border-violet-300"
                             >
-                              <option value="">Choose child</option>
-                              {childMembers.map((member) => (
+                              <option value="">Choose family member</option>
+                              {playableMembers.map((member) => (
                                 <option key={member.id} value={member.id}>
                                   {member.avatar} {member.name}
                                 </option>
@@ -429,7 +429,7 @@ export default function DevicesPage() {
 }
 
 function DeviceEditFields({
-  childMembers,
+  playableMembers,
   editName,
   editMode,
   editMemberId,
@@ -437,7 +437,7 @@ function DeviceEditFields({
   setEditMode,
   setEditMemberId,
 }: {
-  childMembers: Member[];
+  playableMembers: Member[];
   editName: string;
   editMode: "household" | "member";
   editMemberId: string;
@@ -463,19 +463,19 @@ function DeviceEditFields({
           className="mt-1 w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800 outline-none focus:border-violet-300"
         >
           <option value="household">All kids</option>
-          <option value="member">One child</option>
+          <option value="member">One family member</option>
         </select>
       </label>
       {editMode === "member" && (
         <label className="block">
-          <span className="text-xs font-black uppercase text-slate-400">Child</span>
+          <span className="text-xs font-black uppercase text-slate-400">Family member</span>
           <select
             value={editMemberId}
             onChange={(event) => setEditMemberId(event.target.value)}
             className="mt-1 w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800 outline-none focus:border-violet-300"
           >
-            <option value="">Choose child</option>
-            {childMembers.map((member) => (
+            <option value="">Choose family member</option>
+            {playableMembers.map((member) => (
               <option key={member.id} value={member.id}>
                 {member.avatar} {member.name}
               </option>

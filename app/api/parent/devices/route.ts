@@ -14,9 +14,9 @@ function cleanMode(value: unknown) {
   return value === "member" ? "member" : "household";
 }
 
-async function validateChild(householdId: string, mode: string, memberId: string | null) {
+async function validateMember(householdId: string, mode: string, memberId: string | null) {
   if (mode !== "member") return null;
-  const member = await prisma.familyMember.findFirst({ where: { id: memberId ?? "", householdId, role: "child" } });
+  const member = await prisma.familyMember.findFirst({ where: { id: memberId ?? "", householdId } });
   return member ? member.id : null;
 }
 
@@ -86,9 +86,9 @@ export const POST = withErrors(async (req: NextRequest) => {
   const deviceName = cleanDeviceName(body.deviceName);
   const deviceId = typeof body.deviceId === "string" ? body.deviceId : null;
 
-  const validMemberId = await validateChild(householdId, mode, memberId);
+  const validMemberId = await validateMember(householdId, mode, memberId);
   if (mode === "member" && !validMemberId) {
-    return NextResponse.json({ error: "Child not found" }, { status: 404 });
+    return NextResponse.json({ error: "Family member not found" }, { status: 404 });
   }
 
   if (deviceId) {
@@ -113,9 +113,9 @@ export const PATCH = withErrors(async (req: NextRequest) => {
   const memberId = mode === "member" && typeof body.memberId === "string" ? body.memberId : null;
   const deviceName = cleanDeviceName(body.deviceName);
 
-  const validMemberId = await validateChild(householdId, mode, memberId);
+  const validMemberId = await validateMember(householdId, mode, memberId);
   if (mode === "member" && !validMemberId) {
-    return NextResponse.json({ error: "Child not found" }, { status: 404 });
+    return NextResponse.json({ error: "Family member not found" }, { status: 404 });
   }
 
   const device = await prisma.householdDevice.update({
