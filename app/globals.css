@@ -133,3 +133,158 @@
     @apply font-sans;
   }
 }
+
+.rps-duel {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 1rem;
+  min-height: 8.25rem;
+  margin-top: 0.75rem;
+}
+
+.rps-duel__fighter {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  color: #475569;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.rps-duel__token {
+  display: grid;
+  width: 5rem;
+  height: 5rem;
+  place-items: center;
+  border: 3px solid #fff;
+  border-radius: 1.25rem;
+  background: rgb(255 255 255 / 88%);
+  box-shadow: 0 8px 18px rgb(127 29 29 / 12%);
+  font-size: 3.3rem;
+  line-height: 1;
+  transform-origin: center;
+}
+
+.rps-duel__fighter--winner .rps-duel__token {
+  box-shadow: 0 0 0 4px #86efac, 0 10px 22px rgb(22 163 74 / 20%);
+}
+
+.rps-duel__burst {
+  position: absolute;
+  z-index: 3;
+  top: 1.6rem;
+  left: calc(50% - 1rem);
+  color: #f97316;
+  font-size: 2.25rem;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.rps-duel__cut-paper {
+  position: relative;
+  display: block;
+  width: 1.15em;
+  height: 1.15em;
+}
+
+.rps-duel__cut-paper > span {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
+.rps-duel__cut-paper > span:first-child { clip-path: inset(0 50% 0 0); }
+.rps-duel__cut-paper > span:last-child { clip-path: inset(0 0 0 50%); }
+
+.rps-duel--rock-beats-scissors .rps-duel__burst,
+.rps-duel--scissors-beats-paper .rps-duel__burst,
+.rps-duel--paper-beats-rock .rps-duel__burst {
+  animation: rps-burst 1.65s ease-out both;
+}
+
+.rps-duel--winner-left.rps-duel--rock-beats-scissors .rps-duel__fighter--rock .rps-duel__token,
+.rps-duel--winner-left.rps-duel--scissors-beats-paper .rps-duel__fighter--scissors .rps-duel__token,
+.rps-duel--winner-left.rps-duel--paper-beats-rock .rps-duel__fighter--paper .rps-duel__token {
+  animation: rps-strike-right 1.7s cubic-bezier(.2,.8,.2,1) both;
+}
+
+.rps-duel--winner-right.rps-duel--rock-beats-scissors .rps-duel__fighter--rock .rps-duel__token,
+.rps-duel--winner-right.rps-duel--scissors-beats-paper .rps-duel__fighter--scissors .rps-duel__token,
+.rps-duel--winner-right.rps-duel--paper-beats-rock .rps-duel__fighter--paper .rps-duel__token {
+  animation: rps-strike-left 1.7s cubic-bezier(.2,.8,.2,1) both;
+}
+
+.rps-duel--rock-beats-scissors .rps-duel__fighter--scissors .rps-duel__token { animation: rps-stunned 1.7s ease-out both; }
+.rps-duel--scissors-beats-paper .rps-duel__fighter--paper .rps-duel__cut-paper > span:first-child { animation: rps-paper-left 1.7s ease-out both; }
+.rps-duel--scissors-beats-paper .rps-duel__fighter--paper .rps-duel__cut-paper > span:last-child { animation: rps-paper-right 1.7s ease-out both; }
+.rps-duel--paper-beats-rock .rps-duel__fighter--paper .rps-duel__token { z-index: 2; }
+.rps-duel--paper-beats-rock .rps-duel__fighter--rock .rps-duel__token { animation: rps-swallowed 1.7s ease-in both; }
+.rps-duel--tie .rps-duel__token { animation: rps-tie 0.5s ease-in-out 3 both; }
+
+@keyframes rps-strike-right {
+  0%, 15% { transform: translateX(0) scale(1); }
+  38% { transform: translateX(3.9rem) scale(1.2) rotate(12deg); }
+  52% { transform: translateX(3.2rem) scale(1.08) rotate(4deg); }
+  68% { transform: translateX(2.6rem) scale(1.16) rotate(0); }
+  82% { transform: translateX(1.7rem) scale(1.05); }
+  100% { transform: translateX(0) scale(1); }
+}
+
+@keyframes rps-strike-left {
+  0%, 15% { transform: translateX(0) scale(1); }
+  38% { transform: translateX(-3.9rem) scale(1.2) rotate(-12deg); }
+  52% { transform: translateX(-3.2rem) scale(1.08) rotate(-4deg); }
+  68% { transform: translateX(-2.6rem) scale(1.16) rotate(0); }
+  82% { transform: translateX(-1.7rem) scale(1.05); }
+  100% { transform: translateX(0) scale(1); }
+}
+
+@keyframes rps-stunned {
+  0%, 28% { transform: translateX(0) rotate(0); }
+  42% { transform: translateX(0.45rem) rotate(18deg) scale(.88); }
+  58% { transform: translateX(-0.45rem) rotate(-20deg) scale(.82); }
+  76% { transform: translateY(.6rem) rotate(35deg) scale(.72); opacity: .72; }
+  100% { transform: translateY(.9rem) rotate(48deg) scale(.68); opacity: .48; }
+}
+
+@keyframes rps-paper-left {
+  0%, 34% { transform: translate(0) rotate(0); opacity: 1; }
+  52% { transform: translate(-1.25rem, -.35rem) rotate(-22deg); opacity: .95; }
+  100% { transform: translate(-2rem, .85rem) rotate(-42deg); opacity: .45; }
+}
+
+@keyframes rps-paper-right {
+  0%, 34% { transform: translate(0) rotate(0); opacity: 1; }
+  52% { transform: translate(1.25rem, -.35rem) rotate(22deg); opacity: .95; }
+  100% { transform: translate(2rem, .85rem) rotate(42deg); opacity: .45; }
+}
+
+@keyframes rps-swallowed {
+  0%, 28% { transform: scale(1); opacity: 1; }
+  48% { transform: scale(.65); opacity: .9; }
+  68% { transform: scale(.24) rotate(40deg); opacity: .65; }
+  100% { transform: scale(.02) rotate(90deg); opacity: 0; }
+}
+
+@keyframes rps-burst {
+  0%, 30% { transform: scale(.1) rotate(0); opacity: 0; }
+  42% { transform: scale(1.5) rotate(60deg); opacity: 1; }
+  58% { transform: scale(.85) rotate(110deg); opacity: .8; }
+  100% { transform: scale(2.1) rotate(170deg); opacity: 0; }
+}
+
+@keyframes rps-tie {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  25% { transform: translateY(-.35rem) rotate(-7deg); }
+  75% { transform: translateY(-.35rem) rotate(7deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rps-duel *, .rps-duel__burst { animation: none !important; }
+}
