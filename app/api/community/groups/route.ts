@@ -27,6 +27,18 @@ function cleanVisibility(value: unknown) {
   return typeof value === "string" && VISIBILITIES.has(value) ? value : "private";
 }
 
+function cleanOrganizationDomain(value: unknown) {
+  if (typeof value !== "string") return null;
+  const domain = value.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
+  return /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/.test(domain) ? domain : null;
+}
+
+function domainVerification(email: string, emailVerified: boolean, domain: string | null) {
+  const emailDomain = email.split("@")[1]?.toLowerCase();
+  if (domain && emailVerified && emailDomain === domain) return { verificationStatus: "verified", verificationMethod: "domain", verifiedAt: new Date() };
+  return { verificationStatus: "pending", verificationMethod: null, verifiedAt: null };
+}
+
 function cleanId(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
@@ -209,7 +221,7 @@ export const GET = withErrors(async (req: NextRequest) => {
       where: {
         id,
         OR: [
-          { visibility: "public" },
+          { visibility: "public", verificationStatus: "verified" },
           eventId
             ? { events: { some: { id: eventId, visibility: "public" } } }
             : { events: { some: { visibility: "public" } } },
@@ -263,7 +275,7 @@ export const GET = withErrors(async (req: NextRequest) => {
     where: discover
       ? {
           OR: [
-            { visibility: "public" },
+            { visibility: "public", verificationStatus: "verified" },
             { events: { some: { visibility: "public", date: { gte: new Date() } } } },
             ...(parentId ? [{ members: { some: { parentId, status: "active" } } }] : []),
           ],
@@ -275,7 +287,7 @@ export const GET = withErrors(async (req: NextRequest) => {
       events: {
         where: {
           date: { gte: new Date() },
-          ...(discover ? { visibility: "public" } : {}),
+          ...(discover ? { visibility: "public", verificationStatus: "verified" } : {}),
         },
         orderBy: { date: "asc" },
         take: 3,
@@ -315,6 +327,16 @@ export const POST = withErrors(async (req: NextRequest) => {
     location = locationGroup.location;
   }
 
+  const visibility = cleanVisibility(body.visibility);
+  const organizationDomain = cleanOrganizationDomain(body.organizationDomain);
+  if (visibility === "public" && typeof body.organizationDomain === "string" && body.organizationDomain.trim() && !organizationDomain) {
+    return NextResponse.json({ error: "Use a valid organization email domain, such as example.org" }, { status: 400 });
+  }
+  const creator = await prisma.parentAccount.findUnique({ where: { id: parentId }, select: { email: true, emailVerified: true } });
+  const verification = visibility === "public"
+    ? domainVerification(creator?.email ?? "", Boolean(creator?.emailVerified), organizationDomain)
+    : { verificationStatus: "not_required", verificationMethod: null, verifiedAt: null };
+
   const group = await prisma.$transaction(async (tx) => {
     const created = await tx.communityGroup.create({
       data: {
@@ -323,7 +345,9 @@ export const POST = withErrors(async (req: NextRequest) => {
         groupType: cleanType(body.groupType),
         description: cleanText(body.description, 1000),
         location,
-        visibility: cleanVisibility(body.visibility),
+        visibility,
+        organizationDomain,
+        ...verification,
       },
     });
     await tx.communityMember.create({
@@ -351,6 +375,16 @@ export const PUT = withErrors(async (req: NextRequest) => {
   const name = body.name !== undefined ? cleanRequiredText(body.name, 120) : undefined;
   if (name !== undefined && !name) return NextResponse.json({ error: "Group name is required" }, { status: 400 });
 
+  const existing = await prisma.communityGroup.findUnique({ where: { id }, select: { visibility: true, organizationDomain: true, verificationStatus: true } });
+  if (!existing) return NextResponse.json({ error: "Group not found" }, { status: 404 });
+  const nextVisibility = body.visibility !== undefined ? cleanVisibility(body.visibility) : existing.visibility;
+  const nextDomain = body.organizationDomain !== undefined ? cleanOrganizationDomain(body.organizationDomain) : existing.organizationDomain;
+  if (body.organizationDomain !== undefined && typeof body.organizationDomain === "string" && body.organizationDomain.trim() && !nextDomain) return NextResponse.json({ error: "Use a valid organization email domain, such as example.org" }, { status: 400 });
+  const actor = await prisma.parentAccount.findUnique({ where: { id: parentId }, select: { email: true, emailVerified: true } });
+  const verification = nextVisibility === "public"
+    ? (existing.verificationStatus === "verified" && nextDomain === existing.organizationDomain ? {} : domainVerification(actor?.email ?? "", Boolean(actor?.emailVerified), nextDomain))
+    : { verificationStatus: "not_required", verificationMethod: null, verificationNote: null, verifiedAt: null, verifiedByParentId: null };
+
   const group = await prisma.communityGroup.update({
     where: { id },
     data: {
@@ -358,7 +392,9 @@ export const PUT = withErrors(async (req: NextRequest) => {
       ...(body.groupType !== undefined && { groupType: cleanType(body.groupType) }),
       ...(body.description !== undefined && { description: cleanText(body.description, 1000) }),
       ...(body.location !== undefined && { location: cleanText(body.location, 180) }),
-      ...(body.visibility !== undefined && { visibility: cleanVisibility(body.visibility) }),
+      ...(body.visibility !== undefined && { visibility: nextVisibility }),
+      ...(body.organizationDomain !== undefined && { organizationDomain: nextDomain }),
+      ...verification,
     },
     include: groupInclude,
   });

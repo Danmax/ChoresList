@@ -60,6 +60,14 @@ reflow or split the board after a move. Family chess also supports six friendly
 live emotes. Apply `20261008170000_chess_emotes` with `npm run db:deploy` to
 enable the persistent emote history.
 
+Public community organizations require verification before discovery and open
+joining. A creator whose verified account email matches the claimed
+organization domain is approved automatically; otherwise the group enters the
+admin review queue at `/parent/community-verification`. Configure
+`COMMUNITY_VERIFICATION_ADMIN_EMAILS` as a comma-separated list of reviewer
+emails, and apply `20261008180000_community_public_verification` with
+`npm run db:deploy`. Private community groups never require verification.
+
 Feed dumplings, bathe, finish a treat-memory game and a lesson, and take a full
 30-second nap to earn a daily care badge. Needs decay gradually with a gentle
 floor while away; the server calculates sleep and daily resets in the household's

@@ -1109,6 +1109,12 @@ model CommunityGroup {
   description      String?  @db.Text
   location         String?  @db.VarChar(255)
   visibility       String   @default("private") @db.VarChar(64)
+  organizationDomain String? @db.VarChar(255)
+  verificationStatus String  @default("not_required") @db.VarChar(32)
+  verificationMethod String? @db.VarChar(32)
+  verificationNote   String? @db.VarChar(500)
+  verifiedAt         DateTime?
+  verifiedByParentId String? @db.Char(36)
   googleCalendarId String?  @db.VarChar(255)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @default(now()) @updatedAt
@@ -1126,6 +1132,8 @@ model CommunityGroup {
   socialConnections    CommunityParentConnection[]
   childFriendships     CommunityChildFriendship[]
   chessMatches         CommunityChessMatch[]
+
+  @@index([visibility, verificationStatus])
 }
 
 model CommunityMember {

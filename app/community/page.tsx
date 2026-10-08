@@ -18,6 +18,8 @@ type CommunityGroup = {
   description: string | null;
   location: string | null;
   visibility: string;
+  organizationDomain: string | null;
+  verificationStatus: string;
   currentMembership: { id: string; parentId: string; role: CommunityRole } | null;
   events: { id: string; title: string; date: string; location: string | null }[];
   _count?: { members: number; events: number };
@@ -60,6 +62,7 @@ const BLANK_GROUP = {
   location: "",
   locationGroupId: "",
   visibility: "private",
+  organizationDomain: "",
 };
 
 function typeMeta(type: string) {
@@ -176,7 +179,7 @@ export default function CommunityPage() {
       toast.error(data?.error ?? "Could not create group");
       return;
     }
-    toast.success("Community group created");
+    toast.success(data?.verificationStatus === "pending" ? "Group created and submitted for public verification" : "Community group created");
     setForm(BLANK_GROUP);
     setShowCreate(false);
     await load();
@@ -291,6 +294,7 @@ export default function CommunityPage() {
                 </SelectContent>
               </Select>
             </div>
+            {form.visibility === "public" && <div className="lg:col-span-2 rounded-2xl border border-amber-200 bg-amber-50 p-4"><Label className="text-sm font-black text-amber-900">Official organization email domain <span className="font-semibold">(recommended)</span></Label><Input value={form.organizationDomain} onChange={(event) => setForm((current) => ({ ...current, organizationDomain: event.target.value }))} placeholder="yourchurch.org" className="mt-2 rounded-2xl bg-white" /><p className="mt-2 text-xs font-semibold leading-5 text-amber-800">Public groups are available for anyone to join only after verification. Use the domain of your verified account email for immediate authorization, or submit it for platform-admin approval. Private groups never need approval.</p></div>}
             <div className="lg:col-span-2">
               <Label className="text-sm font-bold">Description</Label>
               <Textarea

@@ -23,10 +23,13 @@ export const POST = withErrors(async (req: NextRequest) => {
   const role = cleanCommunityRole(body.role);
 
   if (!email) {
-    const group = await prisma.communityGroup.findUnique({ where: { id: groupId }, select: { id: true, visibility: true } });
+    const group = await prisma.communityGroup.findUnique({ where: { id: groupId }, select: { id: true, visibility: true, verificationStatus: true } });
     if (!group) return NextResponse.json({ error: "Community group not found" }, { status: 404 });
     if (group.visibility !== "public") {
       return NextResponse.json({ error: "This group is private" }, { status: 403 });
+    }
+    if (group.verificationStatus !== "verified") {
+      return NextResponse.json({ error: "This public organization is awaiting verification and cannot be joined yet." }, { status: 403 });
     }
     const member = await prisma.communityMember.upsert({
       where: { groupId_parentId: { groupId, parentId } },
