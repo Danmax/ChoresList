@@ -1,8 +1,8 @@
 export const PET_SPECIES = [
-  { id: "dog", label: "Dog", name: "Mochi", personality: "A loyal little sunshine who loves to play.", emoji: "🐶" },
-  { id: "cat", label: "Cat", name: "Miso", personality: "A curious cuddlebug with a soft spot for naps.", emoji: "🐱" },
-  { id: "monkey", label: "Monkey", name: "Kiki", personality: "A clever adventurer who learns with you.", emoji: "🐒" },
-  { id: "guinea-pig", label: "Guinea pig", name: "Pudding", personality: "A gentle fluffball who adores dumplings.", emoji: "🐹" },
+  { id: "dog", label: "Dog", name: "Mochi", names: ["Mochi", "Biscuit", "Waffles", "Teddy", "Pippin", "Nugget", "Peaches", "Bubbles", "Coco", "Sunny", "Toffee", "Button"], personality: "A loyal little sunshine who loves to play.", emoji: "🐶" },
+  { id: "cat", label: "Cat", name: "Miso", names: ["Miso", "Moonbeam", "Nori", "Sprinkle", "Muffin", "Pebble", "Lulu", "Poppy", "Socks", "Tinker", "Cinnamon", "Twinkle"], personality: "A curious cuddlebug with a soft spot for naps.", emoji: "🐱" },
+  { id: "monkey", label: "Monkey", name: "Kiki", names: ["Kiki", "Banjo", "Ziggy", "Boo", "Pickle", "Pip", "Jellybean", "Tango", "Chai", "Doodle", "Mango", "Nibbles"], personality: "A clever adventurer who learns with you.", emoji: "🐒" },
+  { id: "guinea-pig", label: "Guinea pig", name: "Pudding", names: ["Pudding", "Biscotti", "Clover", "Fuzzball", "Marshmallow", "Pumpkin", "Bunny", "Truffle", "Pompom", "Daisy", "Cookie", "Honey"], personality: "A gentle fluffball who adores dumplings.", emoji: "🐹" },
 ] as const;
 export type PetSpecies = typeof PET_SPECIES[number]["id"];
 export const CARE_TASKS = ["feed", "clean", "play", "learn", "sleep"] as const;

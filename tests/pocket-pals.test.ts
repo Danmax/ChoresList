@@ -1,10 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { advancePet, applyPetAction, completeDailyCare, createPet, currentLesson, petDay, publicChallenge } from "../lib/pocket-pals";
+import { advancePet, applyPetAction, completeDailyCare, createPet, currentLesson, petDay, PET_SPECIES, publicChallenge } from "../lib/pocket-pals";
 
 const day = "2026-10-08";
 const now = Date.parse("2026-10-08T16:00:00Z");
 const id = "12345678-abcd-4321-9876-123456789abc";
+
+test("each Pocket Pal species offers a varied set of cute name ideas", () => {
+  for (const species of PET_SPECIES) {
+    assert.ok(species.names.length >= 10);
+    assert.ok((species.names as readonly string[]).includes(species.name));
+    assert.equal(new Set(species.names).size, species.names.length);
+  }
+});
 
 test("elapsed care is calculated from the saved baseline and never drains a pet to zero", () => {
   const saved = createPet("cat", "Miso", now, day);

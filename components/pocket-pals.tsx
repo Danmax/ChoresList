@@ -100,6 +100,8 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
 
   async function adopt(event: FormEvent) { event.preventDefault(); await act("adopt", { species, name }); }
 
+  const selectedSpecies = PET_SPECIES.find((petSpecies) => petSpecies.id === species)!;
+
   if (loading) return <section className={styles.game}><div className={styles.loading}><Loader2 className="animate-spin" /> Finding your little friend…</div></section>;
   if (!data && error) return <section className={styles.game}><div className={styles.loading}><p role="alert">{error}</p><button className={styles.primary} onClick={() => void load()}>Try again</button><button onClick={onExit}>Back to games</button></div></section>;
 
@@ -119,6 +121,10 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
         <form onSubmit={adopt} className={styles.adoptForm}>
           <label htmlFor="pal-name">Give your pal a name</label>
           <div><input id="pal-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={24} required placeholder="Your pal's name" /><button className={styles.primary} disabled={busy || !name.trim()}>{busy ? "Making a cozy home…" : "Bring my pal home"}<Heart size={17} /></button></div>
+          <fieldset className={styles.nameSuggestions}>
+            <legend>Sweet {selectedSpecies.label.toLowerCase()} name ideas</legend>
+            <div>{selectedSpecies.names.map((suggestion) => <button key={suggestion} type="button" aria-pressed={name === suggestion} onClick={() => setName(suggestion)}>{suggestion}</button>)}</div>
+          </fieldset>
         </form>
         {error && <p className={styles.error} role="alert">{error}</p>}
         <p className={styles.smallNote}>Your pet saves automatically. Four fresh dumplings arrive each new day.</p>
