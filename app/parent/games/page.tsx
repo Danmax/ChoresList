@@ -231,7 +231,7 @@ export default function ParentGamesPage() {
                       <div>
                         <h2 className="font-black text-slate-950">{game.title}</h2>
                         <p className="mt-1 text-sm font-semibold leading-5 text-slate-500">{game.description}</p>
-                        {game.key === "pocket-pals" && <p className="mt-2 text-xs font-bold text-rose-600">Rewards apply once a day after feeding, cleaning, playing, learning, and a full nap. Care stays available after collecting the badge.</p>}
+                        {game.key === "pocket-pals" && <p className="mt-2 text-xs font-bold text-rose-600">Rewards apply once a day after feeding, cleaning, playing, learning, and a full nap. Care stays available after collecting the badge. <a href="/parent/pocket-pals" className="underline">Manage family Pals →</a></p>}
                         <p className="mt-2 text-xs font-black uppercase tracking-wide text-slate-400">
                           Ages {setting.ageMin}-{setting.ageMax} · {game.playTime}
                         </p>

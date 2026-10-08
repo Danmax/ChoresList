@@ -44,10 +44,16 @@ npm run db:deploy
 
 ## Pocket Pals
 
-Pocket Pals lives in each player's Games screen and saves one dog, cat, monkey,
-or guinea pig per family member. Apply the `20261008120000_add_pocket_pals`
-migration with `npm run db:deploy` before running this version. Adoption and care
-use the existing parent/paired-device access rules.
+Pocket Pals lives in each player's Games screen. Each Pal has a permanent
+`PP-…` serial and a serialized appearance profile (color, pattern, texture,
+eyes, and special marking), so their identity, items, progress, and story stay
+intact. A primary guardian can keep up to three Pals; parents can move a Pal to
+another family member, optionally keep the prior guardian as a co-carer, and
+approve or remove other caregivers at Parent → Games → Manage family Pals.
+Apply the `20261008120000_add_pocket_pals` and
+`20261008153000_pocket_pal_mobility` migrations with `npm run db:deploy`
+before running this version. Adoption and care use the existing parent/paired-
+device access rules.
 
 Feed dumplings, bathe, finish a treat-memory game and a lesson, and take a full
 30-second nap to earn a daily care badge. Needs decay gradually with a gentle

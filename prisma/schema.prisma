@@ -254,7 +254,9 @@ model FamilyMember {
   educationAttempts     EducationAttempt[]
   educationProjects     EducationProject[]
   gameSessions          GameSession[]
-  virtualPet            VirtualPet?
+  primaryVirtualPets    VirtualPet[]             @relation("PrimaryPal")
+  palCaregiving         PetCaregiver[]
+  palActivities         PetActivity[]
   whiteChessMatches     FamilyChessMatch[] @relation("FamilyChessWhite")
   blackChessMatches     FamilyChessMatch[] @relation("FamilyChessBlack")
   firstMultiplayerMatches  FamilyMultiplayerMatch[] @relation("FamilyGamePlayerOne")
@@ -266,16 +268,52 @@ model FamilyMember {
 model VirtualPet {
   id          String   @id @default(uuid()) @db.Char(36)
   householdId String   @db.Char(36)
-  memberId    String   @unique @db.Char(36)
+  memberId    String   @db.Char(36)
+  serialNumber String  @unique @db.VarChar(32)
+  appearance  Json
+  status      String   @default("active") @db.VarChar(24)
   state       Json
   version     Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
 
   household Household    @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  member    FamilyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  member    FamilyMember @relation("PrimaryPal", fields: [memberId], references: [id], onDelete: Cascade)
+  caregivers PetCaregiver[]
+  activities PetActivity[]
 
   @@index([householdId])
+  @@index([memberId])
+  @@index([householdId, memberId])
+}
+
+model PetCaregiver {
+  id           String       @id @default(uuid()) @db.Char(36)
+  virtualPetId String       @db.Char(36)
+  memberId     String       @db.Char(36)
+  role         String       @default("caregiver") @db.VarChar(24)
+  createdAt    DateTime     @default(now())
+
+  virtualPet VirtualPet    @relation(fields: [virtualPetId], references: [id], onDelete: Cascade)
+  member     FamilyMember  @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([virtualPetId, memberId])
+  @@index([memberId])
+}
+
+model PetActivity {
+  id           String       @id @default(uuid()) @db.Char(36)
+  virtualPetId String       @db.Char(36)
+  actorMemberId String?     @db.Char(36)
+  type         String       @db.VarChar(48)
+  details      Json?
+  createdAt    DateTime     @default(now())
+
+  virtualPet VirtualPet     @relation(fields: [virtualPetId], references: [id], onDelete: Cascade)
+  actorMember FamilyMember? @relation(fields: [actorMemberId], references: [id], onDelete: SetNull)
+
+  @@index([virtualPetId, createdAt])
+  @@index([actorMemberId])
 }
 
 model GameSetting {

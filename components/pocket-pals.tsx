@@ -6,7 +6,8 @@ import { CARE_TASKS, PET_SHOP, PET_SPECIES, PLAY_SYMBOLS, petLevel, petMood, typ
 import styles from "./pocket-pals.module.css";
 
 type Challenge = { id: string; kind: "play" | "learn"; startedAt: number; sequence?: number[]; topic?: string; question?: string; choices?: string[] };
-type PetResponse = { pet: PetState | null; version: number; serverNow: number; challenge: Challenge | null; message?: string; completed?: boolean; reward?: { points: number; tickets: number } | null };
+type RosterPal = { id: string; name: string; species: PetSpecies; serialNumber: string; primaryGuardianId: string };
+type PetResponse = { pet: PetState | null; palId: string | null; version: number | null; serverNow: number; roster: RosterPal[]; challenge: Challenge | null; message?: string; completed?: boolean; reward?: { points: number; tickets: number } | null };
 const TASK_LABELS = { feed: "Dumpling", clean: "Bath", play: "Play", learn: "Learn", sleep: "Rest" };
 const TASK_EMOJIS = { feed: "🥟", clean: "🫧", play: "🧸", learn: "📖", sleep: "🌙" };
 const STAT_META = [
@@ -24,6 +25,8 @@ function PetArt({ species, name, className = "" }: { species: PetSpecies; name: 
 
 export function PocketPals({ memberId, playerName, onExit }: { memberId: string; playerName: string; onExit: () => void }) {
   const [data, setData] = useState<PetResponse | null>(null);
+  const [selectedPalId, setSelectedPalId] = useState("");
+  const [adopting, setAdopting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -44,13 +47,14 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch(`/api/pocket-pals?memberId=${encodeURIComponent(memberId)}`, { cache: "no-store" });
+      const palQuery = selectedPalId ? `&palId=${encodeURIComponent(selectedPalId)}` : "";
+      const res = await fetch(`/api/pocket-pals?memberId=${encodeURIComponent(memberId)}${palQuery}`, { cache: "no-store" });
       const result = await res.json();
       if (!res.ok) throw new Error(result.error ?? "Your pal couldn't load. Try again.");
-      if (alive.current) { serverOffset.current = result.serverNow - Date.now(); setData(result); setError(""); }
+      if (alive.current) { serverOffset.current = result.serverNow - Date.now(); setData(result); if (result.palId && result.palId !== selectedPalId) setSelectedPalId(result.palId); setError(""); }
     } catch (e) { if (alive.current) setError(e instanceof Error ? e.message : "Couldn't reach your pal."); }
     finally { if (alive.current) setLoading(false); }
-  }, [memberId]);
+  }, [memberId, selectedPalId]);
 
   useEffect(() => { alive.current = true; void load(); return () => { alive.current = false; }; }, [load]);
   useEffect(() => { const timer = window.setInterval(() => setClock(Date.now()), 500); return () => window.clearInterval(timer); }, []);
@@ -68,7 +72,7 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
     requestInFlight.current = true; setBusy(true); setError("");
     try {
       const res = await fetch("/api/pocket-pals", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ memberId, version: data?.version, action, ...extra }) });
+        body: JSON.stringify({ memberId, palId: data?.palId, version: data?.version, action, ...extra }) });
       const result = await res.json();
       if (!res.ok) {
         if (res.status === 409) await load();
@@ -76,7 +80,7 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
       }
       if (!alive.current) return false;
       serverOffset.current = result.serverNow - Date.now();
-      setData(result); setMessage(result.message || "Looking lovely!"); setActivity(action);
+      setData(result); if (result.palId) setSelectedPalId(result.palId); if (action === "adopt") setAdopting(false); setMessage(result.message || "Looking lovely!"); setActivity(action);
       if (result.challenge?.kind === "play") { setWatchUntil(Date.now() + 4000); setSelectedTreats([]); }
       if (result.completed) {
         setBadge(true);
@@ -87,7 +91,7 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
       if (alive.current) setError(e instanceof Error ? e.message : "Couldn't save. Please try again.");
       return false;
     } finally { requestInFlight.current = false; if (alive.current) setBusy(false); }
-  }, [memberId, data?.version, load]);
+  }, [memberId, data?.palId, data?.version, load]);
 
   const pet = data?.pet;
   // Use the server clock offset so a device with an incorrect clock cannot
@@ -105,9 +109,9 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
   if (loading) return <section className={styles.game}><div className={styles.loading}><Loader2 className="animate-spin" /> Finding your little friend…</div></section>;
   if (!data && error) return <section className={styles.game}><div className={styles.loading}><p role="alert">{error}</p><button className={styles.primary} onClick={() => void load()}>Try again</button><button onClick={onExit}>Back to games</button></div></section>;
 
-  if (!pet) return (
+  if (!pet || adopting) return (
     <section className={styles.game}>
-      <div className={styles.header}><button onClick={onExit} className={styles.back}><ArrowLeft size={18} /> Games</button><span className={styles.eyebrow}><PawPrint size={15} /> A tiny friend. A big adventure.</span></div>
+      <div className={styles.header}><button onClick={adopting ? () => setAdopting(false) : onExit} className={styles.back}><ArrowLeft size={18} /> {adopting ? "Back to roster" : "Games"}</button><span className={styles.eyebrow}><PawPrint size={15} /> A tiny friend. A big adventure.</span></div>
       <div className={styles.adoption}>
         <span className={styles.pill}><Sparkles size={14} /> Your friendship starts here</span>
         <h2>Meet your <em>Pocket Pal.</em></h2>
@@ -148,10 +152,11 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
         <span className={styles.brand}><PawPrint size={19} /> Pocket Pals</span>
         <div className={styles.wallet}><span aria-label={`${pet.dumplings} dumplings`}>🥟 {pet.dumplings}</span><span aria-label={`${pet.coins} coins`}>🪙 {pet.coins}</span><button onClick={() => setShowShop(true)} aria-label="Open pet shop"><ShoppingBag size={18} /></button></div>
       </div>
+      {data?.roster && <div className={styles.roster} aria-label="Your Pocket Pal roster">{data.roster.map((rosterPal) => <button key={rosterPal.id} type="button" aria-pressed={rosterPal.id === data.palId} onClick={() => { setSelectedPalId(rosterPal.id); setShowShop(false); setRenaming(false); }}><PetArt species={rosterPal.species} name={rosterPal.name} /><span><strong>{rosterPal.name}</strong><small>{rosterPal.serialNumber}</small></span></button>)}{data.roster.length < 3 && <button type="button" className={styles.addPal} onClick={() => setAdopting(true)}><span>＋</span><strong>Adopt another</strong><small>Up to 3 pals</small></button>}</div>}
       <div className={styles.layout}>
         <div className={styles.main}>
           <div className={styles.petHeading}>
-            <div><span className={styles.eyebrow}>{playerName}&apos;s little companion</span><h2>{pet.name}<button onClick={() => { setName(pet.name); setRenaming(!renaming); }} aria-label="Rename your pet">✎</button></h2></div>
+            <div><span className={styles.eyebrow}>{playerName}&apos;s little companion · {pet.serialNumber}</span><h2>{pet.name}<button onClick={() => { setName(pet.name); setRenaming(!renaming); }} aria-label="Rename your pet">✎</button></h2>{pet.appearance && <p className={styles.passport}>{pet.appearance.baseColor} · {pet.appearance.pattern} · {pet.appearance.texture} · {pet.appearance.eyeColor} eyes</p>}</div>
             <span className={styles.level}><Star size={15} /> Level {level}</span>
           </div>
           {renaming && <form className={styles.rename} onSubmit={async (e) => { e.preventDefault(); if (await act("rename", { name })) setRenaming(false); }}><input aria-label="New pet name" value={name} onChange={(e) => setName(e.target.value)} maxLength={24} required /><button disabled={busy || !name.trim()}>Save</button><button type="button" onClick={() => setRenaming(false)}>Cancel</button></form>}

@@ -4,7 +4,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "../lib/prisma";
 import { createSessionToken, parentSession } from "../lib/session";
 import { createDeviceSessionToken, deviceSession } from "../lib/device-session";
-import { createPet, petDay, type PetState } from "../lib/pocket-pals";
+import { createPet, createPetAppearance, petDay, type PetState } from "../lib/pocket-pals";
 import { GET, POST } from "../app/api/pocket-pals/route";
 
 // Replace only database calls: real route handlers, authentication, permissions,
@@ -14,7 +14,7 @@ function fixture(t: TestContext) {
   const day = petDay(now, "America/New_York");
   const member = { id: "child-1", householdId: "home-1", parentAccountId: null, role: "child", name: "Alex", age: 7, totalPoints: 10 };
   const setting = { enabled: true, ageMin: 3, ageMax: 18, rewardType: "points", rewardPoints: 5, rewardTickets: 0, requiresChoresComplete: false, dailyPlayLimit: 0 };
-  let saved: { id: string; householdId: string; memberId: string; version: number; state: PetState } | null = null;
+  let saved: { id: string; householdId: string; memberId: string; serialNumber: string; appearance: ReturnType<typeof createPetAppearance>; status: string; version: number; state: PetState } | null = null;
   let conflict = false;
   const sessions: Array<{ playedAt: Date; rewardPoints: number }> = [];
   const stub = (target: object, method: string, fn: (...args: any[]) => any) => {
@@ -32,8 +32,10 @@ function fixture(t: TestContext) {
   stub(prisma.gameSetting, "upsert", async () => setting);
   stub(prisma.choreAssignment, "findMany", async () => [{ frequency: "daily", completions: [] }]);
   stub(prisma.virtualPet, "findFirst", async () => saved ? structuredClone(saved) : null);
+  stub(prisma.virtualPet, "findMany", async () => saved ? [structuredClone(saved)] : []);
   stub(prisma.virtualPet, "findUnique", async () => saved ? structuredClone(saved) : null);
-  stub(prisma.virtualPet, "create", async ({ data }) => { saved = { id: "pet-1", version: 0, ...structuredClone(data) }; return saved; });
+  stub(prisma.virtualPet, "count", async () => saved ? 1 : 0);
+  stub(prisma.virtualPet, "create", async ({ data }) => { saved = { id: data.id ?? "pet-1", version: 0, status: "active", ...structuredClone(data) }; return saved; });
   stub(prisma.virtualPet, "updateMany", async ({ where, data }) => {
     if (conflict || !saved || saved.version !== where.version) return { count: 0 };
     saved.state = structuredClone(data.state); saved.version++;
@@ -41,6 +43,7 @@ function fixture(t: TestContext) {
   });
   stub(prisma.gameSession, "findMany", async () => sessions);
   stub(prisma.gameSession, "create", async ({ data }) => { const session = { ...data, playedAt: new Date() }; sessions.push(session); return session; });
+  stub(prisma.petActivity, "create", async ({ data }) => data);
   stub(prisma.familyMember, "update", async ({ data }) => { if (data.totalPoints) member.totalPoints += data.totalPoints.increment; return member; });
   stub(prisma, "$transaction", async (fn) => fn(prisma));
   const token = createSessionToken({ id: "parent-1", householdId: "home-1", email: "parent@example.test" });
@@ -50,7 +53,7 @@ function fixture(t: TestContext) {
     ...(body && { body: JSON.stringify({ memberId: "child-1", ...body }) }),
   });
   return { request, setting, sessions, member, getSaved: () => saved, forceConflict: () => { conflict = true; },
-    seed: () => { saved = { id: "pet-1", householdId: "home-1", memberId: "child-1", version: 0, state: createPet("dog", "Mochi", now - 5000, day) }; return saved; } };
+    seed: () => { const appearance = createPetAppearance("dog", now); saved = { id: "pet-1", householdId: "home-1", memberId: "child-1", serialNumber: "PP-PET1", appearance, status: "active", version: 0, state: createPet("dog", "Mochi", now - 5000, day, "PP-PET1", appearance) }; return saved; } };
 }
 
 test("an unauthenticated visitor cannot read or adopt a pet", async () => {

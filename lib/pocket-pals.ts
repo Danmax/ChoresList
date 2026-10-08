@@ -5,6 +5,48 @@ export const PET_SPECIES = [
   { id: "guinea-pig", label: "Guinea pig", name: "Pudding", names: ["Pudding", "Biscotti", "Clover", "Fuzzball", "Marshmallow", "Pumpkin", "Bunny", "Truffle", "Pompom", "Daisy", "Cookie", "Honey"], personality: "A gentle fluffball who adores dumplings.", emoji: "🐹" },
 ] as const;
 export type PetSpecies = typeof PET_SPECIES[number]["id"];
+export type PetAppearance = {
+  version: 1;
+  baseColor: string;
+  accentColor: string;
+  pattern: string;
+  texture: string;
+  eyeColor: string;
+  specialMark: string | null;
+};
+
+const APPEARANCE_OPTIONS: Record<PetSpecies, Omit<PetAppearance, "version">[]> = {
+  dog: [
+    { baseColor: "golden", accentColor: "cream", pattern: "socks", texture: "fluffy", eyeColor: "brown", specialMark: "heart-patch" },
+    { baseColor: "cocoa", accentColor: "caramel", pattern: "mask", texture: "velvety", eyeColor: "hazel", specialMark: null },
+    { baseColor: "snow", accentColor: "apricot", pattern: "ear-tips", texture: "cloud-soft", eyeColor: "blue", specialMark: "star-patch" },
+  ],
+  cat: [
+    { baseColor: "cream", accentColor: "cinnamon", pattern: "tabby", texture: "silky", eyeColor: "amber", specialMark: "heart-patch" },
+    { baseColor: "midnight", accentColor: "silver", pattern: "tuxedo", texture: "plush", eyeColor: "green", specialMark: null },
+    { baseColor: "peach", accentColor: "white", pattern: "calico", texture: "fluffy", eyeColor: "blue", specialMark: "star-patch" },
+  ],
+  monkey: [
+    { baseColor: "cocoa", accentColor: "peach", pattern: "face-mask", texture: "soft", eyeColor: "brown", specialMark: "heart-patch" },
+    { baseColor: "golden", accentColor: "cream", pattern: "ear-rings", texture: "fuzzy", eyeColor: "hazel", specialMark: null },
+    { baseColor: "chestnut", accentColor: "apricot", pattern: "freckles", texture: "velvety", eyeColor: "amber", specialMark: "star-patch" },
+  ],
+  "guinea-pig": [
+    { baseColor: "caramel", accentColor: "white", pattern: "patchwork", texture: "fluffy", eyeColor: "brown", specialMark: "heart-patch" },
+    { baseColor: "smoke", accentColor: "cream", pattern: "rosette", texture: "plush", eyeColor: "black", specialMark: null },
+    { baseColor: "honey", accentColor: "cinnamon", pattern: "stripe", texture: "silky", eyeColor: "amber", specialMark: "star-patch" },
+  ],
+};
+
+export function createPetAppearance(species: PetSpecies, seed = Date.now()): PetAppearance {
+  const options = APPEARANCE_OPTIONS[species];
+  const selected = options[Math.abs(seed) % options.length];
+  return { version: 1, ...selected };
+}
+
+export function petSerial(id: string) {
+  return `PP-${id.replaceAll("-", "").slice(0, 12).toUpperCase()}`;
+}
 export const CARE_TASKS = ["feed", "clean", "play", "learn", "sleep"] as const;
 export type CareTask = typeof CARE_TASKS[number];
 export const PET_SHOP = [
@@ -32,6 +74,7 @@ const LESSONS: Lesson[] = [
 
 export type PetState = {
   species: PetSpecies; name: string; adoptedAt: number; updatedAt: number;
+  serialNumber?: string; appearance?: PetAppearance;
   hunger: number; happiness: number; cleanliness: number; energy: number; smarts: number; bond: number;
   xp: number; coins: number; dumplings: number; lessonsLearned: number; gamesPlayed: number;
   owned: string[]; accessory: string | null; room: string; sleepingUntil: number | null;
@@ -53,9 +96,10 @@ function markTask(pet: PetState, task: CareTask) {
     pet.bond = clamp(pet.bond + 4);
   }
 }
-export function createPet(species: PetSpecies, name: string, now: number, day: string): PetState {
+export function createPet(species: PetSpecies, name: string, now: number, day: string, serialNumber?: string, appearance = createPetAppearance(species, now)): PetState {
   return { species, name, adoptedAt: now, updatedAt: now, hunger: 65, happiness: 75, cleanliness: 60, energy: 70, smarts: 0, bond: 10,
     xp: 0, coins: 20, dumplings: 6, lessonsLearned: 0, gamesPlayed: 0, owned: [], accessory: null, room: "home",
+    serialNumber, appearance,
     sleepingUntil: null, lastActionAt: 0, lastCareDay: null, streak: 0,
     daily: { day, startedAt: now, tasks: [], rewarded: false, playRewards: 0, learnRewards: 0 }, challenge: null };
 }

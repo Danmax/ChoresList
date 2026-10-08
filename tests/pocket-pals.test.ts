@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { advancePet, applyPetAction, completeDailyCare, createPet, currentLesson, petDay, PET_SPECIES, publicChallenge } from "../lib/pocket-pals";
+import { advancePet, applyPetAction, completeDailyCare, createPet, createPetAppearance, currentLesson, petDay, petSerial, PET_SPECIES, publicChallenge } from "../lib/pocket-pals";
 
 const day = "2026-10-08";
 const now = Date.parse("2026-10-08T16:00:00Z");
@@ -12,6 +12,16 @@ test("each Pocket Pal species offers a varied set of cute name ideas", () => {
     assert.ok((species.names as readonly string[]).includes(species.name));
     assert.equal(new Set(species.names).size, species.names.length);
   }
+});
+
+test("a Pal has a durable serial and serializable visual identity", () => {
+  const serial = petSerial("12345678-abcd-4321-9876-123456789abc");
+  const appearance = createPetAppearance("cat", 17);
+  const pet = createPet("cat", "Miso", now, day, serial, appearance);
+  assert.equal(serial, "PP-12345678ABCD");
+  assert.deepEqual(JSON.parse(JSON.stringify(pet.appearance)), appearance);
+  assert.equal(pet.serialNumber, serial);
+  assert.ok(appearance.baseColor && appearance.pattern && appearance.texture && appearance.eyeColor);
 });
 
 test("elapsed care is calculated from the saved baseline and never drains a pet to zero", () => {
