@@ -144,6 +144,18 @@ export const DELETE = withErrors(async (req: NextRequest) => {
   const { householdId, parentId } = await requireParentSession(req);
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id") ?? "";
+  const memberId = searchParams.get("memberId") ?? "";
+  if (searchParams.get("all") === "1") {
+    if (!memberId) return NextResponse.json({ error: "Choose a family member first" }, { status: 400 });
+    if (!(await canAccessMember(parentId, householdId, memberId))) {
+      return NextResponse.json({ error: "You do not have access to this family member" }, { status: 403 });
+    }
+    const result = await prisma.choreAssignment.updateMany({
+      where: { householdId, memberId, isActive: true },
+      data: { isActive: false },
+    });
+    return NextResponse.json({ ok: true, removed: result.count });
+  }
   const assignment = await prisma.choreAssignment.findFirst({ where: { id, householdId }, select: { memberId: true } });
   if (!assignment) return NextResponse.json({ error: "Assignment not found" }, { status: 404 });
   if (!(await canAccessMember(parentId, householdId, assignment.memberId))) {

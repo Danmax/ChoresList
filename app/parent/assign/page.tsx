@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { Camera, Check, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
+import { Camera, Check, Plus, RefreshCw, Search, Trash2, Trash } from "lucide-react";
 import { toast } from "sonner";
 import { ParentPageHeader } from "@/components/parent-management-shell";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -158,6 +158,18 @@ export default function AssignPage() {
     load();
   }
 
+  async function removeAllForMember() {
+    const member = members.find((item) => item.id === selectedMember);
+    if (!member) return;
+    const count = filteredAssignments.length;
+    if (!window.confirm(`Remove all ${count} active assignment${count === 1 ? "" : "s"} for ${member.name}? Completion history will be kept.`)) return;
+    const res = await fetch(`/api/assignments?all=1&memberId=${encodeURIComponent(member.id)}`, { method: "DELETE" });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) return toast.error(data?.error ?? "Could not remove assignments");
+    toast.success(`${data?.removed ?? count} assignment${(data?.removed ?? count) === 1 ? "" : "s"} removed for ${member.name}`);
+    await load();
+  }
+
   async function complete(assignment: Assignment, proofPhoto?: File | null) {
     if (assignment.chore.requiresPhoto && !proofPhoto) {
       toast.error("Add a proof photo before completing this chore");
@@ -301,6 +313,8 @@ export default function AssignPage() {
           </button>
         ))}
       </div>
+
+      {selectedMember && filteredAssignments.length > 0 && <div className="mb-6 flex justify-end"><button type="button" onClick={() => void removeAllForMember()} className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-bold text-red-600 transition-colors hover:bg-red-50"><Trash size={16} /> Remove all for {members.find((member) => member.id === selectedMember)?.name}</button></div>}
 
       {teenProposals.length > 0 && <section className="mb-6 rounded-2xl border-2 border-amber-200 bg-amber-50 p-4"><div className="mb-3"><h2 className="font-black text-amber-900">Teen task approvals</h2><p className="text-sm font-semibold text-amber-800">Approve to create the task and add it to the teen’s chore list.</p></div><div className="space-y-2">{teenProposals.map((proposal) => <div key={proposal.id} className="flex flex-col gap-3 rounded-xl bg-white p-3 sm:flex-row sm:items-center"><span className="text-2xl">{proposal.icon}</span><div className="min-w-0 flex-1"><p className="font-black text-slate-800">{proposal.title} <span className="font-semibold text-slate-500">for {proposal.member.name}</span></p><p className="text-xs font-semibold text-slate-500">{proposal.frequency}{proposal.description ? ` · ${proposal.description}` : ""}</p></div><div className="flex gap-2"><button disabled={reviewingId === proposal.id} onClick={() => void reviewTeenTask(proposal, "approve")} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-black text-white disabled:opacity-40">Approve</button><button disabled={reviewingId === proposal.id} onClick={() => void reviewTeenTask(proposal, "decline")} className="rounded-lg bg-rose-100 px-3 py-2 text-xs font-black text-rose-700 disabled:opacity-40">Decline</button></div></div>)}</div></section>}
 
