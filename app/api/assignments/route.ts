@@ -76,12 +76,16 @@ export const POST = withErrors(async (req: NextRequest) => {
     return NextResponse.json({ error: "Choose at least one chore" }, { status: 400 });
   }
 
-  const [members, chores] = await Promise.all([
+  const [members, chores, household] = await Promise.all([
     prisma.familyMember.findMany({ where: { id: { in: memberIds }, householdId } }),
-    prisma.chore.findMany({ where: { id: { in: choreIds }, householdId }, select: { id: true, ageMin: true, ageMax: true } }),
+    prisma.chore.findMany({ where: { id: { in: choreIds }, householdId }, select: { id: true, ageMin: true, ageMax: true, category: true } }),
+    prisma.household.findUnique({ where: { id: householdId }, select: { hasHouseholdPet: true } }),
   ]);
   if (members.length !== memberIds.length || chores.length !== choreIds.length) {
     return NextResponse.json({ error: "A family member or chore was not found" }, { status: 404 });
+  }
+  if (!household?.hasHouseholdPet && chores.some((chore) => chore.category === "pets")) {
+    return NextResponse.json({ error: "Add a household pet in Settings before assigning Pet Care chores." }, { status: 409 });
   }
 
   const frequency = typeof body.frequency === "string" ? body.frequency : "daily";

@@ -33,6 +33,7 @@ interface Assignment {
   completions?: { id: string }[];
 }
 interface TeenProposal { id: string; title: string; description?: string | null; icon: string; frequency: string; member: Member; createdAt: string }
+interface HouseholdSettings { hasHouseholdPet?: boolean; householdPetName?: string | null }
 
 const AGE_GROUPS = [
   { id: "little", label: "Little helpers", detail: "Ages 3–5", min: 3, max: 5 },
@@ -73,6 +74,7 @@ export default function AssignPage() {
   const [completionProofPhoto, setCompletionProofPhoto] = useState<File | null>(null);
   const [completingId, setCompletingId] = useState<string | null>(null);
   const [teenProposals, setTeenProposals] = useState<TeenProposal[]>([]);
+  const [householdSettings, setHouseholdSettings] = useState<HouseholdSettings>({});
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [choreSearch, setChoreSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -81,17 +83,19 @@ export default function AssignPage() {
   });
 
   const load = useCallback(async () => {
-    const [mRes, cRes, aRes, proposalRes] = await Promise.all([
+    const [mRes, cRes, aRes, proposalRes, settingsRes] = await Promise.all([
       fetch("/api/members"),
       fetch("/api/chores"),
       fetch("/api/assignments?scope=all"),
       fetch("/api/teen-tasks"),
+      fetch("/api/parent/settings"),
     ]);
-    const [membersData, choresData, assignmentsData, proposalsData] = await Promise.all([
+    const [membersData, choresData, assignmentsData, proposalsData, settingsData] = await Promise.all([
       mRes.json().catch(() => []),
       cRes.json().catch(() => []),
       aRes.json().catch(() => []),
       proposalRes.json().catch(() => []),
+      settingsRes.json().catch(() => ({})),
     ]);
     const nextMembers = Array.isArray(membersData) ? membersData : Array.isArray(membersData?.members) ? membersData.members : [];
     if (!Array.isArray(membersData) && !Array.isArray(membersData?.members)) toast.error(membersData.error ?? "Could not load members");
@@ -99,6 +103,7 @@ export default function AssignPage() {
     setChores(Array.isArray(choresData) ? choresData : []);
     setAssignments(Array.isArray(assignmentsData) ? assignmentsData : []);
     setTeenProposals(Array.isArray(proposalsData) ? proposalsData.filter((proposal) => proposal.status === "pending") : []);
+    setHouseholdSettings(settingsRes.ok ? settingsData : {});
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -225,12 +230,12 @@ export default function AssignPage() {
     ? members.filter((member) => !["mom", "dad", "parent", "grandparent"].includes(member.role) && selectedAgeGroup && member.age >= selectedAgeGroup.min && member.age <= selectedAgeGroup.max)
     : selectedMemberObj ? [selectedMemberObj] : [];
   const targetMemberIds = targetMembers.map((member) => member.id);
-  const availableChores = targetMembers.length > 0
+  const availableChores = (targetMembers.length > 0
     ? chores.filter((chore) => targetMembers.some((member) => {
         const adult = ["parent", "mom", "dad", "grandparent"].includes(member.role);
         return adult || (chore.ageMin <= member.age && chore.ageMax >= member.age);
       }))
-    : chores;
+    : chores).filter((chore) => householdSettings.hasHouseholdPet || chore.category !== "pets");
   const visibleChores = availableChores.filter((chore) => {
     const query = choreSearch.trim().toLowerCase();
     return (!query || `${chore.name} ${chore.description ?? ""} ${chore.category}`.toLowerCase().includes(query)) && (categoryFilter === "all" || chore.category === categoryFilter);
@@ -417,7 +422,7 @@ export default function AssignPage() {
       </Dialog>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-md rounded-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-4xl rounded-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-black">Assign Chores</DialogTitle>
           </DialogHeader>
@@ -473,6 +478,7 @@ export default function AssignPage() {
                 )}
               </div>
               <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_150px]"><label className="relative"><Search size={16} className="absolute left-3 top-3 text-slate-400" /><Input value={choreSearch} onChange={(event) => setChoreSearch(event.target.value)} placeholder="Search chores…" className="rounded-xl pl-9" /></label><select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700"><option value="all">All categories</option>{CHORE_CATEGORIES.map((category) => <option key={category.value} value={category.value}>{category.icon} {category.label}</option>)}</select></div>
+              {!householdSettings.hasHouseholdPet && <p className="mt-2 rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-800">🐾 Pet Care chores are hidden because no household pet is enabled. <a href="/parent/settings" className="font-black underline">Update household settings</a> to make them available.</p>}
               <div className="mt-2 max-h-64 space-y-2 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 p-2">
                 {visibleChores.length === 0 ? (
                   <p className="px-2 py-6 text-center text-sm font-semibold text-slate-400">

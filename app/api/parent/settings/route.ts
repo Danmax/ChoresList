@@ -18,6 +18,10 @@ function bool(value: unknown) {
   return Boolean(value);
 }
 
+function petName(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim().slice(0, 64) : null;
+}
+
 export const GET = withErrors(async (req: NextRequest) => {
   const { householdId, parentId } = await requireParentSession(req);
   const [household, parent] = await Promise.all([
@@ -77,6 +81,8 @@ export const PUT = withErrors(async (req: NextRequest) => {
       privacyAllowKidWishlist: bool(body.privacyAllowKidWishlist),
       privacyStoreCompletionPhotos: bool(body.privacyStoreCompletionPhotos),
       privacyAnalyticsOptIn: bool(body.privacyAnalyticsOptIn),
+      hasHouseholdPet: bool(body.hasHouseholdPet),
+      householdPetName: bool(body.hasHouseholdPet) ? petName(body.householdPetName) : null,
     },
   });
 

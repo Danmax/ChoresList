@@ -34,6 +34,8 @@ type Settings = {
   privacyAllowKidWishlist: boolean;
   privacyStoreCompletionPhotos: boolean;
   privacyAnalyticsOptIn: boolean;
+  hasHouseholdPet: boolean;
+  householdPetName: string;
   googleCalendarConnection?: {
     googleAccountEmail: string | null;
     calendarId: string;
@@ -149,6 +151,8 @@ const DEFAULT_SETTINGS: Settings = {
   privacyAllowKidWishlist: true,
   privacyStoreCompletionPhotos: true,
   privacyAnalyticsOptIn: false,
+  hasHouseholdPet: false,
+  householdPetName: "",
   googleCalendarConnection: null,
 };
 
@@ -580,6 +584,17 @@ export default function ParentSettingsPage() {
             {plugins.length === 0 && (
               <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-400">No plugins are available yet.</p>
             )}
+          </div>
+        </section>
+
+        <section className="rounded-3xl bg-white p-5 shadow-sm">
+          <div className="mb-4 flex items-center gap-3">
+            <div className="rounded-2xl bg-orange-100 p-3 text-orange-600">🐾</div>
+            <div><h2 className="font-black text-slate-800">Household Pet</h2><p className="text-sm font-semibold text-slate-500">Enable Pet Care chores only when there is a real household pet to care for.</p></div>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <Toggle label="This household has a pet" checked={settings.hasHouseholdPet} disabled={!canManage} onChange={(value) => update("hasHouseholdPet", value)} />
+            <label className="block"><span className="text-sm font-bold text-slate-600">Pet name <span className="font-normal text-slate-400">(optional)</span></span><input value={settings.householdPetName} onChange={(event) => update("householdPetName", event.target.value)} disabled={!canManage || !settings.hasHouseholdPet} maxLength={64} placeholder="Mochi, Buddy, Luna…" className="mt-1 w-full rounded-2xl border-2 border-slate-100 bg-slate-50 px-3 py-2 font-semibold text-slate-800 outline-none focus:border-orange-300 disabled:opacity-50" /></label>
           </div>
         </section>
 
