@@ -62,8 +62,11 @@ export const GET = withErrors(async (req: NextRequest) => {
 export const POST = withErrors(async (req: NextRequest) => {
   const { householdId, parentId } = await requireParentSession(req);
   const body = await req.json();
-  if (!(await canAccessMember(parentId, householdId, String(body.memberId ?? "")))) {
-    return NextResponse.json({ error: "You do not have access to this family member" }, { status: 403 });
+  const requestedMemberIds: unknown[] = Array.isArray(body.memberIds) ? body.memberIds : [body.memberId];
+  const memberIds = Array.from(new Set(requestedMemberIds.filter((id): id is string => typeof id === "string" && id.length > 0)));
+  if (memberIds.length === 0) return NextResponse.json({ error: "Choose at least one family member" }, { status: 400 });
+  if (!(await Promise.all(memberIds.map((memberId) => canAccessMember(parentId, householdId, memberId)))).every(Boolean)) {
+    return NextResponse.json({ error: "You do not have access to one or more family members" }, { status: 403 });
   }
   const requestedChoreIds: unknown[] = Array.isArray(body.choreIds) ? body.choreIds : [body.choreId];
   const choreIds: string[] = Array.from(new Set(
@@ -73,12 +76,12 @@ export const POST = withErrors(async (req: NextRequest) => {
     return NextResponse.json({ error: "Choose at least one chore" }, { status: 400 });
   }
 
-  const [member, chores] = await Promise.all([
-    prisma.familyMember.findFirst({ where: { id: body.memberId, householdId } }),
-    prisma.chore.findMany({ where: { id: { in: choreIds }, householdId }, select: { id: true } }),
+  const [members, chores] = await Promise.all([
+    prisma.familyMember.findMany({ where: { id: { in: memberIds }, householdId } }),
+    prisma.chore.findMany({ where: { id: { in: choreIds }, householdId }, select: { id: true, ageMin: true, ageMax: true } }),
   ]);
-  if (!member || chores.length !== choreIds.length) {
-    return NextResponse.json({ error: "Member or chore not found" }, { status: 404 });
+  if (members.length !== memberIds.length || chores.length !== choreIds.length) {
+    return NextResponse.json({ error: "A family member or chore was not found" }, { status: 404 });
   }
 
   const frequency = typeof body.frequency === "string" ? body.frequency : "daily";
@@ -100,20 +103,33 @@ export const POST = withErrors(async (req: NextRequest) => {
     return NextResponse.json({ error: "Choose a date" }, { status: 400 });
   }
 
-  const data = choreIds.flatMap((choreId) =>
-    weeklyDays.map((dayOfWeek) => ({
-      householdId,
-      memberId: body.memberId,
-      choreId,
-      frequency,
-      dueDate,
-      dayOfWeek,
-      monthlyCompletionTarget,
-    }))
-  );
+  const memberById = new Map(members.map((member) => [member.id, member]));
+  const choresById = new Map(chores.map((chore) => [chore.id, chore]));
+  const eligible = memberIds.flatMap((memberId) => choreIds.flatMap((choreId) => {
+    const member = memberById.get(memberId)!;
+    const chore = choresById.get(choreId)!;
+    // Adults may receive any household task. For children, do not quietly put
+    // an age-inappropriate task into an age-group batch.
+    const adult = ["mom", "dad", "parent", "grandparent"].includes(member.role);
+    return adult || (member.age >= chore.ageMin && member.age <= chore.ageMax)
+      ? weeklyDays.map((dayOfWeek) => ({ householdId, memberId, choreId, frequency, dueDate, dayOfWeek, monthlyCompletionTarget }))
+      : [];
+  }));
+  if (eligible.length === 0) return NextResponse.json({ error: "None of the selected chores match the selected members' ages" }, { status: 400 });
+
+  if (frequency === "daily" && body.allowDuplicateDaily !== true) {
+    const existing = await prisma.choreAssignment.findMany({
+      where: { householdId, isActive: true, frequency: "daily", memberId: { in: memberIds }, choreId: { in: choreIds } },
+      include: { member: { select: { name: true } }, chore: { select: { name: true } } },
+    });
+    if (existing.length > 0) {
+      const names = existing.slice(0, 4).map((assignment) => `${assignment.chore.name} for ${assignment.member.name}`);
+      return NextResponse.json({ error: `Daily assignment already exists: ${names.join(", ")}${existing.length > names.length ? "…" : ""}. Enable another daily copy only if you really need it.` }, { status: 409 });
+    }
+  }
 
   const assignments = await prisma.$transaction(
-    data.map((assignmentData) =>
+    eligible.map((assignmentData) =>
       prisma.choreAssignment.create({
         data: assignmentData,
         include: { chore: true, member: true },
@@ -121,7 +137,7 @@ export const POST = withErrors(async (req: NextRequest) => {
     )
   );
 
-  return NextResponse.json(assignments.length === 1 ? assignments[0] : assignments, { status: 201 });
+  return NextResponse.json({ assignments, skippedCount: memberIds.length * choreIds.length * weeklyDays.length - eligible.length }, { status: 201 });
 });
 
 export const DELETE = withErrors(async (req: NextRequest) => {

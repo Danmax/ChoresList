@@ -311,14 +311,13 @@ export default function ParentTasksPage() {
           {completionAssignment?.chore.requiresPhoto && (
             <div className="rounded-2xl border-2 border-blue-100 bg-blue-50 p-3">
               <div className="mb-2 flex items-center gap-2 text-sm font-black text-blue-700">
-                <Camera size={16} /> Proof photo required
+                <Camera size={16} /> Proof attachment required
               </div>
               <label className="block cursor-pointer rounded-xl bg-white px-3 py-2 text-center text-sm font-black text-blue-700 shadow-sm">
-                {completionProofPhoto ? completionProofPhoto.name : "Choose or take photo"}
+                {completionProofPhoto ? completionProofPhoto.name : "Choose an image or file"}
                 <input
                   type="file"
-                  accept="image/*"
-                  capture="environment"
+                  accept="image/*,.pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
                   className="sr-only"
                   onChange={(event) => setCompletionProofPhoto(event.target.files?.[0] ?? null)}
                 />

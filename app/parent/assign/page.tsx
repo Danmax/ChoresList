@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { Camera, Check, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { Camera, Check, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ParentPageHeader } from "@/components/parent-management-shell";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { CHORE_CATEGORIES } from "@/types";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const FREQUENCY_LABELS: Record<string, string> = {
@@ -18,7 +19,7 @@ const FREQUENCY_LABELS: Record<string, string> = {
 };
 
 interface Member { id: string; name: string; avatar: string; color: string; age: number; role: string }
-interface Chore { id: string; name: string; icon: string; ageMin: number; ageMax: number; pointsValue: number; requiresPhoto: boolean }
+interface Chore { id: string; name: string; icon: string; ageMin: number; ageMax: number; pointsValue: number; requiresPhoto: boolean; category: string; description?: string | null }
 interface Assignment {
   id: string;
   choreId: string;
@@ -32,6 +33,23 @@ interface Assignment {
   completions?: { id: string }[];
 }
 interface TeenProposal { id: string; title: string; description?: string | null; icon: string; frequency: string; member: Member; createdAt: string }
+
+const AGE_GROUPS = [
+  { id: "little", label: "Little helpers", detail: "Ages 3–5", min: 3, max: 5 },
+  { id: "kids", label: "Kids", detail: "Ages 6–8", min: 6, max: 8 },
+  { id: "tweens", label: "Tweens", detail: "Ages 9–12", min: 9, max: 12 },
+  { id: "teens", label: "Teens", detail: "Ages 13–18", min: 13, max: 18 },
+];
+
+function ageGroupFor(member: Member) {
+  if (["mom", "dad", "parent", "grandparent"].includes(member.role)) return { id: "adults", label: "Adults" };
+  return AGE_GROUPS.find((group) => member.age >= group.min && member.age <= group.max) ?? { id: "other", label: "Other ages" };
+}
+
+function categoryLabel(category: string) {
+  const match = CHORE_CATEGORIES.find((item) => item.value === category);
+  return match ? `${match.icon} ${match.label}` : category.replace(/-/g, " ");
+}
 
 function isDueToday(assignment: Assignment) {
   const today = new Date();
@@ -56,8 +74,10 @@ export default function AssignPage() {
   const [completingId, setCompletingId] = useState<string | null>(null);
   const [teenProposals, setTeenProposals] = useState<TeenProposal[]>([]);
   const [reviewingId, setReviewingId] = useState<string | null>(null);
+  const [choreSearch, setChoreSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [form, setForm] = useState({
-    memberId: "", choreIds: [] as string[], frequency: "daily", dueDate: "", dayOfWeeks: ["1"], monthlyCompletionTarget: 1,
+    memberId: "", targetMode: "member" as "member" | "age-group", ageGroupId: "", choreIds: [] as string[], frequency: "daily", dueDate: "", dayOfWeeks: ["1"], monthlyCompletionTarget: 1, allowDuplicateDaily: false,
   });
 
   const load = useCallback(async () => {
@@ -98,7 +118,7 @@ export default function AssignPage() {
   }
 
   async function assign() {
-    if (!form.memberId || form.choreIds.length === 0) { toast.error("Select a member and at least one chore"); return; }
+    if (targetMemberIds.length === 0 || form.choreIds.length === 0) { toast.error("Select a member or age group and at least one chore"); return; }
     if (form.frequency === "weekly" && form.dayOfWeeks.length === 0) {
       toast.error("Choose at least one weekday");
       return;
@@ -109,12 +129,13 @@ export default function AssignPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          memberId: form.memberId,
+          memberIds: targetMemberIds,
           choreIds: form.choreIds,
           frequency: form.frequency,
           dueDate: form.dueDate || null,
           dayOfWeeks: form.frequency === "weekly" ? form.dayOfWeeks.map(Number) : [],
           monthlyCompletionTarget: form.monthlyCompletionTarget,
+          allowDuplicateDaily: form.allowDuplicateDaily,
         }),
       });
       const data = await res.json();
@@ -122,7 +143,8 @@ export default function AssignPage() {
         toast.error(data.error ?? "Could not assign chores");
         return;
       }
-      toast.success(`${form.choreIds.length} ${form.choreIds.length === 1 ? "chore" : "chores"} assigned!`);
+      const created = Array.isArray(data?.assignments) ? data.assignments.length : 0;
+      toast.success(`${created || form.choreIds.length} ${created === 1 ? "assignment" : "assignments"} created${data?.skippedCount ? ` · ${data.skippedCount} age-mismatched choice${data.skippedCount === 1 ? "" : "s"} skipped` : ""}`);
       setOpen(false);
       load();
     } finally {
@@ -186,15 +208,37 @@ export default function AssignPage() {
     : assignments;
 
   const selectedMemberObj = members.find((m) => m.id === form.memberId);
-  const availableChores = selectedMemberObj
-    ? chores.filter((c) => {
-        const isParent = selectedMemberObj.role === "parent" || selectedMemberObj.role === "mom" || selectedMemberObj.role === "dad" || selectedMemberObj.role === "grandparent";
-        return isParent ? true : c.ageMin <= selectedMemberObj.age && c.ageMax >= selectedMemberObj.age;
-      })
+  const selectedAgeGroup = AGE_GROUPS.find((group) => group.id === form.ageGroupId);
+  const targetMembers = form.targetMode === "age-group"
+    ? members.filter((member) => !["mom", "dad", "parent", "grandparent"].includes(member.role) && selectedAgeGroup && member.age >= selectedAgeGroup.min && member.age <= selectedAgeGroup.max)
+    : selectedMemberObj ? [selectedMemberObj] : [];
+  const targetMemberIds = targetMembers.map((member) => member.id);
+  const availableChores = targetMembers.length > 0
+    ? chores.filter((chore) => targetMembers.some((member) => {
+        const adult = ["parent", "mom", "dad", "grandparent"].includes(member.role);
+        return adult || (chore.ageMin <= member.age && chore.ageMax >= member.age);
+      }))
     : chores;
+  const visibleChores = availableChores.filter((chore) => {
+    const query = choreSearch.trim().toLowerCase();
+    return (!query || `${chore.name} ${chore.description ?? ""} ${chore.category}`.toLowerCase().includes(query)) && (categoryFilter === "all" || chore.category === categoryFilter);
+  });
+  const assignmentGroups = useMemo(() => {
+    const grouped = new Map<string, Map<string, Assignment[]>>();
+    for (const assignment of filteredAssignments) {
+      const ageGroup = ageGroupFor(assignment.member).label;
+      const category = assignment.chore.category ?? "other";
+      if (!grouped.has(ageGroup)) grouped.set(ageGroup, new Map());
+      const categories = grouped.get(ageGroup)!;
+      categories.set(category, [...(categories.get(category) ?? []), assignment]);
+    }
+    return [...grouped.entries()].map(([ageGroup, categories]) => ({ ageGroup, categories: [...categories.entries()] }));
+  }, [filteredAssignments]);
 
   function resetForm() {
-    setForm({ memberId: "", choreIds: [], frequency: "daily", dueDate: "", dayOfWeeks: ["1"], monthlyCompletionTarget: 1 });
+    setForm({ memberId: "", targetMode: "member", ageGroupId: "", choreIds: [], frequency: "daily", dueDate: "", dayOfWeeks: ["1"], monthlyCompletionTarget: 1, allowDuplicateDaily: false });
+    setChoreSearch("");
+    setCategoryFilter("all");
   }
 
   function toggleChore(choreId: string) {
@@ -267,8 +311,12 @@ export default function AssignPage() {
         </div>
       )}
 
-      <div className="space-y-3">
-        {filteredAssignments.map((a) => (
+      <div className="space-y-6">
+        {assignmentGroups.map((ageGroup) => <section key={ageGroup.ageGroup}>
+          <div className="mb-2 flex items-center gap-2"><h2 className="text-sm font-black uppercase tracking-wide text-slate-500">{ageGroup.ageGroup}</h2><span className="h-px flex-1 bg-slate-200" /></div>
+          <div className="space-y-4">{ageGroup.categories.map(([category, categoryAssignments]) => <div key={category}>
+            <h3 className="mb-2 text-xs font-black text-slate-400">{categoryLabel(category)}</h3>
+            <div className="space-y-2">{categoryAssignments.map((a) => (
           <div key={a.id} className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:gap-4">
             <div className="text-3xl">{a.chore.icon}</div>
             <div className="min-w-0 flex-1">
@@ -312,7 +360,8 @@ export default function AssignPage() {
               </button>
             </div>
           </div>
-        ))}
+        ))}</div></div>)}</div>
+        </section>)}
       </div>
 
       <Dialog
@@ -330,14 +379,13 @@ export default function AssignPage() {
           </DialogHeader>
           <div className="rounded-2xl border-2 border-blue-100 bg-blue-50 p-3">
             <div className="mb-2 flex items-center gap-2 text-sm font-black text-blue-700">
-              <Camera size={16} /> Proof photo required
+              <Camera size={16} /> Proof attachment required
             </div>
             <label className="block cursor-pointer rounded-xl bg-white px-3 py-2 text-center text-sm font-black text-blue-700 shadow-sm">
-              {completionProofPhoto ? completionProofPhoto.name : "Choose or take photo"}
+              {completionProofPhoto ? completionProofPhoto.name : "Choose an image or file"}
               <input
                 type="file"
-                accept="image/*"
-                capture="environment"
+                accept="image/*,.pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
                 className="sr-only"
                 onChange={(event) => setCompletionProofPhoto(event.target.files?.[0] ?? null)}
               />
@@ -361,6 +409,13 @@ export default function AssignPage() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
+              <Label className="font-bold">Assignment group</Label>
+              <div className="mt-2 grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1">
+                <button type="button" onClick={() => setForm((p) => ({ ...p, targetMode: "member", ageGroupId: "", choreIds: [] }))} className={`rounded-lg px-3 py-2 text-sm font-black ${form.targetMode === "member" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500"}`}>One person</button>
+                <button type="button" onClick={() => setForm((p) => ({ ...p, targetMode: "age-group", memberId: "", choreIds: [] }))} className={`rounded-lg px-3 py-2 text-sm font-black ${form.targetMode === "age-group" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500"}`}>Age group</button>
+              </div>
+            </div>
+            {form.targetMode === "member" ? <div>
               <Label className="font-bold">Family Member</Label>
               <Select value={form.memberId} onValueChange={(v) => setForm((p) => ({ ...p, memberId: v ?? "", choreIds: [] }))}>
                 <SelectTrigger className="mt-1 w-full rounded-xl">
@@ -377,31 +432,39 @@ export default function AssignPage() {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </div> : <div>
+              <Label className="font-bold">Age group</Label>
+              <Select value={form.ageGroupId} onValueChange={(v) => setForm((p) => ({ ...p, ageGroupId: v ?? "", choreIds: [] }))}>
+                <SelectTrigger className="mt-1 w-full rounded-xl"><span className={`flex flex-1 text-left ${selectedAgeGroup ? "" : "text-slate-400"}`}>{selectedAgeGroup ? `${selectedAgeGroup.label} · ${selectedAgeGroup.detail}` : "Select an age group"}</span></SelectTrigger>
+                <SelectContent>{AGE_GROUPS.map((group) => <SelectItem key={group.id} value={group.id}>{group.label} · {group.detail}</SelectItem>)}</SelectContent>
+              </Select>
+              <p className="mt-1 text-xs font-semibold text-slate-500">{targetMembers.length ? `${targetMembers.length} child${targetMembers.length === 1 ? "" : "ren"} selected: ${targetMembers.map((member) => member.name).join(", ")}` : "Choose an age group to add every child in it."}</p>
+            </div>}
             <div>
               <div className="flex items-center justify-between gap-3">
                 <Label className="font-bold">Chores</Label>
-                {availableChores.length > 0 && (
+                {visibleChores.length > 0 && (
                   <button
                     type="button"
                     onClick={() => setForm((previous) => ({
                       ...previous,
-                      choreIds: previous.choreIds.length === availableChores.length
+                      choreIds: previous.choreIds.length === visibleChores.length
                         ? []
-                        : availableChores.map((chore) => chore.id),
+                        : visibleChores.map((chore) => chore.id),
                     }))}
                     className="text-xs font-black text-emerald-600 hover:text-emerald-700"
                   >
-                    {form.choreIds.length === availableChores.length ? "Clear all" : "Select all"}
+                    {form.choreIds.length === visibleChores.length ? "Clear all" : "Select all"}
                   </button>
                 )}
               </div>
+              <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_150px]"><label className="relative"><Search size={16} className="absolute left-3 top-3 text-slate-400" /><Input value={choreSearch} onChange={(event) => setChoreSearch(event.target.value)} placeholder="Search chores…" className="rounded-xl pl-9" /></label><select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700"><option value="all">All categories</option>{CHORE_CATEGORIES.map((category) => <option key={category.value} value={category.value}>{category.icon} {category.label}</option>)}</select></div>
               <div className="mt-2 max-h-64 space-y-2 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 p-2">
-                {availableChores.length === 0 ? (
+                {visibleChores.length === 0 ? (
                   <p className="px-2 py-6 text-center text-sm font-semibold text-slate-400">
-                    {form.memberId ? "No age-appropriate chores available" : "Select a family member first"}
+                    {targetMembers.length ? "No matching chores found" : "Select a person or age group first"}
                   </p>
-                ) : availableChores.map((chore) => {
+                ) : visibleChores.map((chore) => {
                   const selected = form.choreIds.includes(chore.id);
                   return (
                     <button
@@ -424,7 +487,7 @@ export default function AssignPage() {
                       <span className="text-2xl" aria-hidden="true">{chore.icon}</span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-black text-slate-700">{chore.name}</span>
-                        <span className="block text-xs font-semibold text-slate-400">⭐ {chore.pointsValue} points</span>
+                        <span className="block text-xs font-semibold text-slate-400">{categoryLabel(chore.category)} · ⭐ {chore.pointsValue} points · ages {chore.ageMin}–{chore.ageMax}</span>
                       </span>
                     </button>
                   );
@@ -450,6 +513,7 @@ export default function AssignPage() {
                 </SelectContent>
               </Select>
             </div>
+            {form.frequency === "daily" && <label className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-900"><input type="checkbox" checked={form.allowDuplicateDaily} onChange={(event) => setForm((p) => ({ ...p, allowDuplicateDaily: event.target.checked }))} className="mt-0.5 accent-amber-600" /><span><strong className="block">Add another daily copy</strong>Normally, an existing daily chore is protected from duplicates. Only enable this if the same chore genuinely needs to appear twice each day.</span></label>}
             {form.frequency === "weekly" && (
               <div>
                 <Label className="font-bold">Days of Week</Label>

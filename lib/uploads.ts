@@ -19,6 +19,10 @@ export function uploadContentType(filePath: string) {
     case ".jpg": return "image/jpeg";
     case ".png": return "image/png";
     case ".webp": return "image/webp";
+    case ".pdf": return "application/pdf";
+    case ".txt": return "text/plain; charset=utf-8";
+    case ".doc": return "application/msword";
+    case ".docx": return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
     default: return null;
   }
 }
