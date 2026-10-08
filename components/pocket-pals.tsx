@@ -143,6 +143,16 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
   const ready = !busy && !sleeping && serverClock - pet.lastActionAt >= 2000;
   const watching = clock < watchUntil;
   const accessory = PET_SHOP.find((i) => i.id === pet.accessory);
+  const accessoryClass = ({
+    bow: styles.bow,
+    "sunny-cap": styles.sunnyCap,
+    "bookish-glasses": styles.bookishGlasses,
+    crown: styles.crown,
+    "cozy-scarf": styles.cozyScarf,
+    "tiny-backpack": styles.tinyBackpack,
+    sparkles: styles.sparkles,
+    "rainbow-cape": styles.rainbowCape,
+  } as Record<string, string | undefined>)[pet.accessory ?? ""] ?? "";
   const roomName = pet.room === "garden" ? "Garden nook" : pet.room === "library" ? "Storybook room" : "Our cozy home";
 
   return (
@@ -167,7 +177,7 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
             <span className={styles.decorRight}>{pet.room === "garden" ? "🌻" : pet.room === "library" ? "📖" : "🧸"}</span>
             <div className={styles.rug} />
             <div className={`${styles.petFigure} ${sleeping ? styles.sleeping : ""} ${activity === "feed" ? styles.munching : activity === "clean" ? styles.wiggling : ["affection", "finish-play", "answer"].includes(activity) ? styles.bouncing : ""}`}>
-              {accessory && <span className={`${styles.accessory} ${pet.accessory === "bow" ? styles.bow : ""}`}>{accessory.emoji}</span>}
+              {accessory && <span className={`${styles.accessory} ${accessoryClass}`}>{accessory.emoji}</span>}
               <button disabled={!ready} onClick={() => void act("affection")} aria-label={`Cuddle ${pet.name}`} className={styles.petButton}><PetArt species={pet.species} name={pet.name} /></button>
               {sleeping && <span className={styles.sleepMarks}>z z Z</span>}
               {activity === "feed" && <span className={styles.treat}>🥟</span>}

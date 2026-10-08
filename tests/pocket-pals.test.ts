@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { advancePet, applyPetAction, completeDailyCare, createPet, createPetAppearance, currentLesson, petDay, petSerial, PET_SPECIES, publicChallenge } from "../lib/pocket-pals";
+import { advancePet, applyPetAction, completeDailyCare, createPet, createPetAppearance, currentLesson, petDay, petSerial, PET_SHOP, PET_SPECIES, publicChallenge } from "../lib/pocket-pals";
 
 const day = "2026-10-08";
 const now = Date.parse("2026-10-08T16:00:00Z");
@@ -142,6 +142,12 @@ test("shop prevents negative balances, duplicate purchases, and equipping unowne
   applyPetAction(pet, "refill", {}, now, 7, id);
   assert.equal(pet.dumplings, 12);
   assert.equal(pet.coins, 55);
+});
+
+test("shop offers a varied collection of Pocket Pal accessories", () => {
+  const accessories = PET_SHOP.filter((item) => item.kind === "accessory");
+  assert.deepEqual(accessories.map((item) => item.id), ["bow", "sunny-cap", "bookish-glasses", "crown", "cozy-scarf", "tiny-backpack", "sparkles", "rainbow-cape"]);
+  assert.ok(accessories.every((item) => item.cost > 0));
 });
 
 test("daily care uses the household time zone across a daylight saving boundary", () => {

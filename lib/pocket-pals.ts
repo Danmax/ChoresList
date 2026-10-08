@@ -51,8 +51,13 @@ export const CARE_TASKS = ["feed", "clean", "play", "learn", "sleep"] as const;
 export type CareTask = typeof CARE_TASKS[number];
 export const PET_SHOP = [
   { id: "bow", name: "Cherry bow", cost: 40, kind: "accessory", emoji: "🎀" },
+  { id: "sunny-cap", name: "Sunny cap", cost: 45, kind: "accessory", emoji: "🧢" },
+  { id: "bookish-glasses", name: "Bookish glasses", cost: 55, kind: "accessory", emoji: "👓" },
   { id: "crown", name: "Little crown", cost: 60, kind: "accessory", emoji: "👑" },
+  { id: "cozy-scarf", name: "Cozy scarf", cost: 65, kind: "accessory", emoji: "🧣" },
+  { id: "tiny-backpack", name: "Tiny backpack", cost: 75, kind: "accessory", emoji: "🎒" },
   { id: "sparkles", name: "Star halo", cost: 80, kind: "accessory", emoji: "✨" },
+  { id: "rainbow-cape", name: "Rainbow cape", cost: 90, kind: "accessory", emoji: "🦸" },
   { id: "garden", name: "Garden nook", cost: 100, kind: "room", emoji: "🌷" },
   { id: "library", name: "Storybook room", cost: 150, kind: "room", emoji: "📚" },
 ] as const;
