@@ -2,7 +2,7 @@
 
 import { type DragEvent, type MouseEvent as ReactMouseEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { ArrowLeft, BookOpen, CheckCircle2, ChefHat, Circle, Crown, FileText, Gamepad2, Grid3X3, KeyRound, PawPrint, Puzzle, RefreshCw, Scissors, Shapes, Swords, TreePine, Trophy } from "lucide-react";
 import { toast } from "sonner";
 import { MemberAvatar } from "@/components/member-avatar";
@@ -99,6 +99,12 @@ function settingText(setting?: GameSetting) {
 
 export default function KidGamesPage() {
   const { id } = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
+  // A parent can preview a child's games from the management portal. Paired
+  // kid screens have no parent portal, so they keep returning to their task board.
+  const launchedFromParent = searchParams.get("returnTo") === "parent-games";
+  const backHref = launchedFromParent ? "/parent/games" : "/screen/tasks";
+  const backLabel = launchedFromParent ? "Back to Games settings" : "Back to task board";
   const [member, setMember] = useState<Member | null>(null);
   const [familyMembers, setFamilyMembers] = useState<Member[]>([]);
   const [chessPlayers, setChessPlayers] = useState<Array<Pick<Member, "id" | "name">>>([]);
@@ -161,7 +167,7 @@ export default function KidGamesPage() {
   return (
     <div className="min-h-screen p-4 sm:p-6">
       <div className="mb-6 flex items-start gap-3">
-        <Link href="/screen/tasks" className="mt-1 rounded-2xl bg-white p-2 shadow-sm transition-shadow hover:shadow-md">
+        <Link href={backHref} aria-label={backLabel} title={backLabel} className="mt-1 rounded-2xl bg-white p-2 shadow-sm transition-shadow hover:shadow-md">
           <ArrowLeft size={20} className="text-slate-600" />
         </Link>
         <div className="min-w-0 flex-1">
