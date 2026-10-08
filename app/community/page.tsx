@@ -383,6 +383,12 @@ export default function CommunityPage() {
                   {group.description && <p className="mb-3 line-clamp-2 text-sm font-semibold text-slate-600">{group.description}</p>}
                   <div className="flex flex-wrap gap-2 text-xs font-bold text-slate-500">
                     <span className="rounded-full bg-white/70 px-2 py-1">{group.currentMembership?.role ?? "member"}</span>
+                    {group.visibility === "public" && group.verificationStatus === "pending" && (
+                      <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-800">Awaiting verification</span>
+                    )}
+                    {group.visibility === "public" && group.verificationStatus === "rejected" && (
+                      <span className="rounded-full bg-red-100 px-2 py-1 text-red-800">Verification declined</span>
+                    )}
                     <span className="rounded-full bg-white/70 px-2 py-1">{group._count?.members ?? 0} members</span>
                     <span className="rounded-full bg-white/70 px-2 py-1">{group._count?.events ?? 0} events</span>
                   </div>

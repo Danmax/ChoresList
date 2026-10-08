@@ -10,6 +10,13 @@ import { createCommunityInviteToken } from "@/lib/session";
 const GROUP_TYPES = new Set(["church", "nonprofit", "sports", "school", "hobby", "neighborhood", "other"]);
 const VISIBILITIES = new Set(["private", "public"]);
 const MANAGER_ROLES = new Set(["owner", "manager"]);
+// A verified address at a shared consumer provider establishes control of an
+// inbox, not of an organization. Those groups can still enter the admin queue.
+const PUBLIC_EMAIL_DOMAINS = new Set([
+  "aol.com", "gmail.com", "gmx.com", "hotmail.com", "icloud.com", "live.com",
+  "mail.com", "mac.com", "me.com", "outlook.com", "proton.me", "protonmail.com",
+  "yahoo.com", "yandex.com",
+]);
 
 function cleanText(value: unknown, max: number) {
   return typeof value === "string" && value.trim() ? value.trim().slice(0, max) : null;
@@ -35,7 +42,9 @@ function cleanOrganizationDomain(value: unknown) {
 
 function domainVerification(email: string, emailVerified: boolean, domain: string | null) {
   const emailDomain = email.split("@")[1]?.toLowerCase();
-  if (domain && emailVerified && emailDomain === domain) return { verificationStatus: "verified", verificationMethod: "domain", verifiedAt: new Date() };
+  if (domain && !PUBLIC_EMAIL_DOMAINS.has(domain) && emailVerified && emailDomain === domain) {
+    return { verificationStatus: "verified", verificationMethod: "domain", verifiedAt: new Date() };
+  }
   return { verificationStatus: "pending", verificationMethod: null, verifiedAt: null };
 }
 
@@ -223,8 +232,8 @@ export const GET = withErrors(async (req: NextRequest) => {
         OR: [
           { visibility: "public", verificationStatus: "verified" },
           eventId
-            ? { events: { some: { id: eventId, visibility: "public" } } }
-            : { events: { some: { visibility: "public" } } },
+            ? { visibility: "private", events: { some: { id: eventId, visibility: "public" } } }
+            : { visibility: "private", events: { some: { visibility: "public" } } },
           ...(parentId ? [{ members: { some: { parentId, status: "active" } } }] : []),
         ],
       },
@@ -276,7 +285,7 @@ export const GET = withErrors(async (req: NextRequest) => {
       ? {
           OR: [
             { visibility: "public", verificationStatus: "verified" },
-            { events: { some: { visibility: "public", date: { gte: new Date() } } } },
+            { visibility: "private", events: { some: { visibility: "public", date: { gte: new Date() } } } },
             ...(parentId ? [{ members: { some: { parentId, status: "active" } } }] : []),
           ],
         }
@@ -287,7 +296,7 @@ export const GET = withErrors(async (req: NextRequest) => {
       events: {
         where: {
           date: { gte: new Date() },
-          ...(discover ? { visibility: "public", verificationStatus: "verified" } : {}),
+          ...(discover ? { visibility: "public" } : {}),
         },
         orderBy: { date: "asc" },
         take: 3,
@@ -364,7 +373,8 @@ export const POST = withErrors(async (req: NextRequest) => {
 });
 
 export const PUT = withErrors(async (req: NextRequest) => {
-  const { parentId } = requireSession(req);
+  const { householdId, parentId } = requireSession(req);
+  await requirePluginAccess(householdId, parentId, "community-events");
   const body = await req.json();
   const id = typeof body.id === "string" ? body.id : "";
   if (!id) {

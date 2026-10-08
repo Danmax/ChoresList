@@ -61,9 +61,9 @@ live emotes. Apply `20261008170000_chess_emotes` with `npm run db:deploy` to
 enable the persistent emote history.
 
 Public community organizations require verification before discovery and open
-joining. A creator whose verified account email matches the claimed
-organization domain is approved automatically; otherwise the group enters the
-admin review queue at `/parent/community-verification`. Configure
+joining. A creator whose verified account email matches a claimed custom
+organization domain is approved automatically; consumer email domains always
+enter the admin review queue at `/parent/community-verification`. Configure
 `COMMUNITY_VERIFICATION_ADMIN_EMAILS` as a comma-separated list of reviewer
 emails, and apply `20261008180000_community_public_verification` with
 `npm run db:deploy`. Private community groups never require verification.
