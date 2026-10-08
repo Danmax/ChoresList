@@ -60,6 +60,14 @@ export const PET_SHOP = [
   { id: "rainbow-cape", name: "Rainbow cape", cost: 90, kind: "accessory", emoji: "🦸" },
   { id: "garden", name: "Garden nook", cost: 100, kind: "room", emoji: "🌷" },
   { id: "library", name: "Storybook room", cost: 150, kind: "room", emoji: "📚" },
+  { id: "stargazer", name: "Stargazer room", cost: 180, kind: "room", emoji: "🌌" },
+  { id: "sunroom", name: "Sunny sunroom", cost: 210, kind: "room", emoji: "☀️" },
+  { id: "flower-wall", name: "Flower wall art", cost: 35, kind: "decor", emoji: "🖼️" },
+  { id: "potted-palm", name: "Potted palm", cost: 45, kind: "decor", emoji: "🌿" },
+  { id: "cozy-sofa", name: "Cozy sofa", cost: 70, kind: "decor", emoji: "🛋️" },
+  { id: "reading-lamp", name: "Reading lamp", cost: 55, kind: "decor", emoji: "💡" },
+  { id: "tea-table", name: "Tea table", cost: 60, kind: "decor", emoji: "🪑" },
+  { id: "wall-shelves", name: "Wall shelves", cost: 80, kind: "decor", emoji: "🗄️" },
 ] as const;
 export const PLAY_SYMBOLS = ["🍓", "🌸", "🍡", "⭐"];
 
@@ -240,7 +248,8 @@ export function applyPetAction(pet: PetState, action: PetAction, input: Record<s
       if (pet.owned.includes(item.id)) throw new PetActionError("You already own this item.");
       if (pet.coins < item.cost) throw new PetActionError("Keep caring for your pal to earn more coins.");
       pet.coins -= item.cost; pet.owned.push(item.id);
-      if (item.kind === "accessory") pet.accessory = item.id; else pet.room = item.id;
+      if (item.kind === "accessory") pet.accessory = item.id;
+      if (item.kind === "room") pet.room = item.id;
       message = `${item.name} unlocked!`; break;
     }
     case "equip": {
@@ -248,8 +257,9 @@ export function applyPetAction(pet: PetState, action: PetAction, input: Record<s
       if (input.itemId === "none") { pet.accessory = null; break; }
       const item = PET_SHOP.find((i) => i.id === input.itemId);
       if (!item || !pet.owned.includes(item.id)) throw new PetActionError("Unlock this item first.");
-      if (item.kind === "accessory") pet.accessory = item.id; else pet.room = item.id;
-      message = `${item.name} equipped.`; break;
+      if (item.kind === "accessory") { pet.accessory = item.id; message = `${item.name} equipped.`; break; }
+      if (item.kind === "room") { pet.room = item.id; message = `${pet.name} moved to the ${item.name}.`; break; }
+      throw new PetActionError("Decorations are placed automatically in every room.");
     }
     case "rename": {
       const name = typeof input.name === "string" ? input.name.trim().slice(0, 24) : "";

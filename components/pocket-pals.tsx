@@ -18,6 +18,12 @@ const STAT_META = [
   { key: "smarts", label: "Smarts", emoji: "📖", color: "#90ba85" },
   { key: "bond", label: "Our bond", emoji: "💕", color: "#da8b9f" },
 ] as const;
+const ROOM_NAMES: Record<string, string> = { home: "Our cozy home", garden: "Garden nook", library: "Storybook room", stargazer: "Stargazer room", sunroom: "Sunny sunroom" };
+const ROOM_CLASSES: Record<string, string | undefined> = { garden: styles.garden, library: styles.library, stargazer: styles.stargazer, sunroom: styles.sunroom };
+const DECOR_CLASSES: Record<string, string | undefined> = {
+  "flower-wall": styles.flowerWall, "potted-palm": styles.pottedPalm, "cozy-sofa": styles.cozySofa,
+  "reading-lamp": styles.readingLamp, "tea-table": styles.teaTable, "wall-shelves": styles.wallShelves,
+};
 
 function PetArt({ species, name, className = "" }: { species: PetSpecies; name: string; className?: string }) {
   return <img src={`/games/pocket-pals/${species}.webp`} alt={`${name}, your anime ${PET_SPECIES.find((s) => s.id === species)?.label.toLowerCase()}`} className={className} draggable={false} />;
@@ -153,7 +159,9 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
     sparkles: styles.sparkles,
     "rainbow-cape": styles.rainbowCape,
   } as Record<string, string | undefined>)[pet.accessory ?? ""] ?? "";
-  const roomName = pet.room === "garden" ? "Garden nook" : pet.room === "library" ? "Storybook room" : "Our cozy home";
+  const roomName = ROOM_NAMES[pet.room] ?? ROOM_NAMES.home;
+  const decorations = PET_SHOP.filter((item) => item.kind === "decor" && pet.owned.includes(item.id));
+  const rooms = PET_SHOP.filter((item) => item.kind === "room");
 
   return (
     <section className={styles.game} aria-busy={busy}>
@@ -170,11 +178,12 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
             <span className={styles.level}><Star size={15} /> Level {level}</span>
           </div>
           {renaming && <form className={styles.rename} onSubmit={async (e) => { e.preventDefault(); if (await act("rename", { name })) setRenaming(false); }}><input aria-label="New pet name" value={name} onChange={(e) => setName(e.target.value)} maxLength={24} required /><button disabled={busy || !name.trim()}>Save</button><button type="button" onClick={() => setRenaming(false)}>Cancel</button></form>}
-          <div className={`${styles.room} ${pet.room === "garden" ? styles.garden : pet.room === "library" ? styles.library : ""} ${sleeping ? styles.night : ""}`}>
+          <div className={`${styles.room} ${ROOM_CLASSES[pet.room] ?? ""} ${sleeping ? styles.night : ""}`}>
             <div className={styles.roomLabel}>{sleeping ? <Moon size={14} /> : <Sun size={14} />}{roomName}</div>
             <div className={styles.window}><span>{sleeping ? "🌙" : "☀️"}</span><i /><i /></div>
             <span className={styles.decorLeft}>{pet.room === "garden" ? "🌷" : pet.room === "library" ? "📚" : "🪴"}</span>
             <span className={styles.decorRight}>{pet.room === "garden" ? "🌻" : pet.room === "library" ? "📖" : "🧸"}</span>
+            {decorations.map((item) => <span key={item.id} className={`${styles.roomDecoration} ${DECOR_CLASSES[item.id] ?? ""}`} aria-label={item.name}>{item.emoji}</span>)}
             <div className={styles.rug} />
             <div className={`${styles.petFigure} ${sleeping ? styles.sleeping : ""} ${activity === "feed" ? styles.munching : activity === "clean" ? styles.wiggling : ["affection", "finish-play", "answer"].includes(activity) ? styles.bouncing : ""}`}>
               {accessory && <span className={`${styles.accessory} ${accessoryClass}`}>{accessory.emoji}</span>}
@@ -210,12 +219,12 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
           <div className={styles.statusCard}><h3>A little love, every day <Heart size={16} /></h3><p>How your little friend is feeling</p><div className={styles.stats}>{STAT_META.map((stat) => <div key={stat.key}><div><span>{stat.emoji} {stat.label}</span><strong>{Math.round(pet[stat.key])}%</strong></div><div className={styles.meter} role="progressbar" aria-label={stat.label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pet[stat.key])}><span style={{ width: `${pet[stat.key]}%`, background: stat.color }} /></div></div>)}</div></div>
           <div className={styles.dailyCard}><span className={styles.eyebrow}><Sparkles size={14} /> Daily care trail</span><h3>Five little moments.</h3><p>Complete each activity for 30 coins and a friendship boost.</p><div className={styles.dailyTasks}>{CARE_TASKS.map((task) => <div key={task} className={pet.daily.tasks.includes(task) ? styles.done : ""}><span>{TASK_EMOJIS[task]}</span>{TASK_LABELS[task]}{pet.daily.tasks.includes(task) && <Check size={14} />}</div>)}</div>{pet.daily.rewarded ? <div className={styles.dailyDone}><Check size={16} /> Today&apos;s care badge collected!</div> : CARE_TASKS.every((t) => pet.daily.tasks.includes(t)) && <button className={styles.primary} disabled={busy} onClick={() => void act("wake")}>Collect care badge</button>}<div className={styles.streak}>🌱 {pet.streak} day{pet.streak === 1 ? "" : "s"} of growing together</div></div>
           <div className={styles.journal}><BookOpen size={18} /><div><strong>Our little story</strong><p>{pet.lessonsLearned} lessons · {pet.gamesPlayed} play dates</p><span>Next level in {60 - pet.xp % 60} friendship XP</span></div></div>
-          <button onClick={() => setShowShop(true)} className={styles.shopBanner}><ShoppingBag size={21} /><span><strong>The cozy corner</strong><small>Dumplings, accessories & rooms</small></span><span>→</span></button>
+          <button onClick={() => setShowShop(true)} className={styles.shopBanner}><ShoppingBag size={21} /><span><strong>The cozy corner</strong><small>Accessories, décor & rooms</small></span><span>→</span></button>
           <p className={styles.smallNote}>Every activity saves automatically. Your pal rests while you&apos;re away and is always happy to welcome you back.</p>
         </aside>
       </div>
       {badge && <div className={styles.celebration}><span>🌟</span><div><strong>A day full of love!</strong><p>You and {pet.name} earned your daily care badge.</p></div><button aria-label="Dismiss celebration" onClick={() => setBadge(false)}><X size={18} /></button></div>}
-      {showShop && <dialog ref={shopDialog} className={styles.shopDialog} aria-labelledby="pet-shop-title" onCancel={() => setShowShop(false)}><div className={styles.shopContent}><div className={styles.panelHeading}><div><span className={styles.eyebrow}>A treat for your best friend</span><h3 id="pet-shop-title">The cozy corner</h3></div><button aria-label="Close shop" onClick={() => setShowShop(false)}><X size={21} /></button></div><p>You have 🪙 {pet.coins} coins. Play, learn, and finish daily care to earn more.</p>{error && <p className={styles.error} role="alert">{error}</p>}<button className={styles.refill} disabled={busy || pet.coins < 5 || pet.dumplings > 14} onClick={() => void act("refill")}><span>🥟</span><div><strong>Dumpling basket</strong><small>Six warm dumplings</small></div><strong>🪙 5</strong></button><div className={styles.shopGrid}>{PET_SHOP.map((item) => { const owned = pet.owned.includes(item.id); const equipped = pet.accessory === item.id || pet.room === item.id; return <button key={item.id} disabled={busy || equipped || (!owned && pet.coins < item.cost)} onClick={() => void act(owned ? "equip" : "buy", { itemId: item.id })}><span>{item.emoji}</span><strong>{item.name}</strong><small>{equipped ? "Equipped ✓" : owned ? "Use this" : `🪙 ${item.cost}`}</small></button>; })}</div><div className={styles.playButtons}><button disabled={busy} onClick={() => void act("equip", { itemId: "none" })}>Remove accessory</button><button disabled={busy} onClick={() => void act("equip", { itemId: "home" })}>Cozy home</button></div></div></dialog>}
+      {showShop && <dialog ref={shopDialog} className={styles.shopDialog} aria-labelledby="pet-shop-title" onCancel={() => setShowShop(false)}><div className={styles.shopContent}><div className={styles.panelHeading}><div><span className={styles.eyebrow}>A treat for your best friend</span><h3 id="pet-shop-title">The cozy corner</h3></div><button aria-label="Close shop" onClick={() => setShowShop(false)}><X size={21} /></button></div><p>You have 🪙 {pet.coins} coins. Play, learn, and finish daily care to earn more.</p>{error && <p className={styles.error} role="alert">{error}</p>}<button className={styles.refill} disabled={busy || pet.coins < 5 || pet.dumplings > 14} onClick={() => void act("refill")}><span>🥟</span><div><strong>Dumpling basket</strong><small>Six warm dumplings</small></div><strong>🪙 5</strong></button><h4 className={styles.shopSection}>Move rooms</h4><div className={styles.roomChoices}><button disabled={busy || pet.room === "home"} onClick={() => void act("equip", { itemId: "home" })}><span>🏠</span><strong>Cozy home</strong><small>{pet.room === "home" ? "Here now ✓" : "Move here"}</small></button>{rooms.map((item) => { const owned = pet.owned.includes(item.id); const current = pet.room === item.id; return <button key={item.id} disabled={busy || current || (!owned && pet.coins < item.cost)} onClick={() => void act(owned ? "equip" : "buy", { itemId: item.id })}><span>{item.emoji}</span><strong>{item.name}</strong><small>{current ? "Here now ✓" : owned ? "Move here" : `🪙 ${item.cost}`}</small></button>; })}</div><h4 className={styles.shopSection}>Room décor</h4><p className={styles.shopHint}>Decorations are placed automatically and travel with your pal to every room.</p><div className={styles.shopGrid}>{PET_SHOP.filter((item) => item.kind !== "room").map((item) => { const owned = pet.owned.includes(item.id); const equipped = pet.accessory === item.id; const decor = item.kind === "decor"; return <button key={item.id} disabled={busy || equipped || owned || (!owned && pet.coins < item.cost)} onClick={() => void act(owned ? "equip" : "buy", { itemId: item.id })}><span>{item.emoji}</span><strong>{item.name}</strong><small>{equipped ? "Wearing ✓" : owned && decor ? "Placed ✓" : owned ? "Use this" : `🪙 ${item.cost}`}</small></button>; })}</div><div className={styles.playButtons}><button disabled={busy} onClick={() => void act("equip", { itemId: "none" })}>Remove accessory</button></div></div></dialog>}
     </section>
   );
 }
