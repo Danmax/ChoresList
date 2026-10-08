@@ -171,6 +171,21 @@ test("shop offers a varied collection of Pocket Pal accessories", () => {
   assert.ok(accessories.every((item) => item.cost > 0));
 });
 
+test("pals can furnish every room and move between unlocked rooms", () => {
+  const pet = createPet("cat", "Miso", now, day);
+  pet.coins = 500;
+  applyPetAction(pet, "buy", { itemId: "potted-palm" }, now, 7, id);
+  assert.ok(pet.owned.includes("potted-palm"));
+  assert.equal(pet.room, "home");
+  applyPetAction(pet, "buy", { itemId: "stargazer" }, now + 1, 7, id);
+  assert.equal(pet.room, "stargazer");
+  applyPetAction(pet, "equip", { itemId: "home" }, now + 2, 7, id);
+  assert.equal(pet.room, "home");
+  applyPetAction(pet, "equip", { itemId: "stargazer" }, now + 3, 7, id);
+  assert.equal(pet.room, "stargazer");
+  assert.throws(() => applyPetAction(pet, "equip", { itemId: "potted-palm" }, now + 4, 7, id));
+});
+
 test("daily care uses the household time zone across a daylight saving boundary", () => {
   assert.equal(petDay(Date.parse("2026-10-09T03:59:59Z"), "America/New_York"), "2026-10-08");
   assert.equal(petDay(Date.parse("2026-10-09T04:00:00Z"), "America/New_York"), "2026-10-09");

@@ -71,7 +71,9 @@ emails, and apply `20261008180000_community_public_verification` with
 Feed dumplings, bathe, finish a treat-memory game and a lesson, and take a full
 30-second nap to earn a daily care badge. Needs decay gradually with a gentle
 floor while away; the server calculates sleep and daily resets in the household's
-time zone. Four dumplings arrive daily. Coins unlock accessories and two rooms.
+time zone. Four dumplings arrive daily. Coins unlock accessories, four rooms,
+and room décor such as wall art, plants, furniture, lamps, and shelves. Once a
+room is unlocked, a Pal can move between it and the cozy home from the shop.
 Care coins are separate from household points. Parents can enable optional
 points or ticket rewards under Parent → Games; those rewards are issued once
 per completed daily badge. Care remains available afterward. Like other games,
