@@ -84,7 +84,18 @@ export const GET = withErrors(async (req: NextRequest) => {
     );
     const nextPath = cleanInternalPath(req.nextUrl.searchParams.get("next"));
     if (nextPath) redirectUrl.searchParams.set("next", nextPath);
-    return NextResponse.redirect(redirectUrl);
+    const response = NextResponse.redirect(redirectUrl);
+    // The confirmation link proves email ownership, so establish the session
+    // here. This lets a new household continue straight into a community/event
+    // invitation instead of requiring a second sign-in step.
+    if (result.ok && result.sessionParent) {
+      response.cookies.set({
+        name: parentSession.name,
+        value: createSessionToken(result.sessionParent),
+        ...sessionCookieOptions(parentSession.maxAge),
+      });
+    }
+    return response;
   }
 
   const token = req.cookies.get(parentSession.name)?.value;
@@ -136,17 +147,47 @@ export const POST = withErrors(async (req: NextRequest) => {
 
     const existing = await prisma.parentAccount.findUnique({ where: { email: normalizedEmail } });
     if (existing) {
-      if (invite && !existing.emailVerified) {
-        await prisma.parentAccount.update({
-          where: { id: existing.id },
-          data: {
-            householdId: invite.householdId,
-            accountRole: invite.accountRole,
-            parentType: invite.parentType,
-            relationshipLabel: invite.relationshipLabel ?? null,
-            childAccessMode: invite.childAccessMode,
-            childAccessMemberIds: invite.childAccessMode === "selected" ? invite.childAccessMemberIds : [],
-          },
+      if (!existing.emailVerified) {
+        const { token: confirmationToken, tokenHash } = createConfirmationToken();
+        const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24);
+        await prisma.$transaction(async (tx) => {
+          if (invite) {
+            await tx.parentAccount.update({
+              where: { id: existing.id },
+              data: {
+                householdId: invite.householdId,
+                accountRole: invite.accountRole,
+                parentType: invite.parentType,
+                relationshipLabel: invite.relationshipLabel ?? null,
+                childAccessMode: invite.childAccessMode,
+                childAccessMemberIds: invite.childAccessMode === "selected" ? invite.childAccessMemberIds : [],
+              },
+            });
+          }
+          await tx.emailConfirmationToken.updateMany({
+            where: { parentId: existing.id, usedAt: null },
+            data: { usedAt: new Date() },
+          });
+          await tx.emailConfirmationToken.create({
+            data: { parentId: existing.id, tokenHash, expiresAt },
+          });
+        });
+
+        const confirmUrl = new URL("/api/parent/auth", getBaseUrl(req));
+        confirmUrl.searchParams.set("confirm", confirmationToken);
+        appendCommunityInviteParams(confirmUrl, communityInviteToken, communityReturnTo);
+        const nextPath = cleanInternalPath(next);
+        if (nextPath) confirmUrl.searchParams.set("next", nextPath);
+        const emailResult = await sendConfirmationEmail({ to: normalizedEmail, confirmUrl: confirmUrl.toString() });
+        return NextResponse.json({
+          ok: true,
+          needsConfirmation: true,
+          message: emailResult.sent
+            ? GENERIC_SIGNUP_MESSAGE
+            : process.env.NODE_ENV === "production"
+              ? GENERIC_SIGNUP_MESSAGE
+              : "Account created. SMTP is not configured, so use the development confirmation link.",
+          confirmUrl: !emailResult.sent && process.env.NODE_ENV !== "production" ? confirmUrl.toString() : undefined,
         });
       }
       return NextResponse.json({
@@ -251,7 +292,7 @@ export const PUT = withErrors(async (req: NextRequest) => {
   const token = searchParams.get("confirm");
   if (!token) return NextResponse.json({ ok: false, error: "Missing confirmation token." }, { status: 400 });
 
-  const result = await confirmEmail(token);
+  const { sessionParent: _sessionParent, ...result } = await confirmEmail(token);
   return NextResponse.json(result, { status: result.ok ? 200 : 400 });
 });
 
@@ -271,7 +312,11 @@ async function confirmEmail(token: string) {
   ]);
   const parent = await finalizeVerifiedParentAccount(record.parent);
 
-  return { ok: true, accountRole: parent.accountRole };
+  return {
+    ok: true,
+    accountRole: parent.accountRole,
+    sessionParent: { id: parent.id, householdId: parent.householdId, email: parent.email },
+  };
 }
 
 export const DELETE = withErrors(async () => {

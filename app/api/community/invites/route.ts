@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getBaseUrl } from "@/lib/base-url";
 import { requireSession, withErrors } from "@/lib/api";
 import { requireCommunityRole } from "@/lib/community";
+import { enqueueRsvpConfirmation, syncOneTimeEventReminders } from "@/lib/community-notifications";
 import { sendCommunityInviteEmail } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
 import { createCommunityInviteToken, verifyCommunityInviteToken } from "@/lib/session";
@@ -148,16 +149,40 @@ export const PUT = withErrors(async (req: NextRequest) => {
   const existingRole = cleanRole(existing?.role);
   const role = existing && ROLE_RANK[existingRole] > ROLE_RANK[invite.role] ? existingRole : invite.role;
 
-  const member = await prisma.communityMember.upsert({
-    where: { groupId_parentId: { groupId: invite.groupId, parentId } },
-    create: { groupId: invite.groupId, parentId, role, status: "active" },
-    update: { role, status: "active" },
-    include: { parent: { select: { id: true, email: true } } },
+  const { member, registeredForEvent } = await prisma.$transaction(async (tx) => {
+    const joinedMember = await tx.communityMember.upsert({
+      where: { groupId_parentId: { groupId: invite.groupId, parentId } },
+      create: { groupId: invite.groupId, parentId, role, status: "active" },
+      update: { role, status: "active" },
+      include: { parent: { select: { id: true, email: true } } },
+    });
+
+    // An event-specific link is an RSVP invitation as well as a group invite.
+    // Preserve a guest's existing response if they revisit the link later.
+    if (!invite.eventId) return { member: joinedMember, registeredForEvent: false };
+    const existingRsvp = await tx.communityRsvp.findUnique({
+      where: { eventId_parentId: { eventId: invite.eventId, parentId } },
+      select: { id: true },
+    });
+    if (existingRsvp) return { member: joinedMember, registeredForEvent: false };
+
+    await tx.communityRsvp.create({
+      data: { eventId: invite.eventId, parentId, status: "going", guests: 0 },
+    });
+    return { member: joinedMember, registeredForEvent: true };
   });
+
+  if (invite.eventId && registeredForEvent) {
+    await Promise.all([
+      enqueueRsvpConfirmation(invite.eventId, parentId, "going"),
+      syncOneTimeEventReminders(invite.eventId, parentId),
+    ]).catch((error) => console.error("[community invite RSVP]", error));
+  }
 
   return NextResponse.json({
     ok: true,
     member,
+    registeredForEvent,
     returnTo: communityPath(invite.groupId, invite.eventId),
   });
 });

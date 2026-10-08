@@ -157,11 +157,16 @@ function publicEvent(
   groupId: string,
   event: Prisma.CommunityEventGetPayload<{ include: typeof groupInclude.events.include }>,
   showEmail: boolean,
-  showRoster: boolean
+  showRoster: boolean,
+  canInvite: boolean
 ) {
   return {
     ...event,
     publicInviteUrl: event.visibility === "public" ? publicInviteUrl(req, groupId, event.id) : null,
+    // Managers can share a signed event-specific link even when the group or
+    // event itself is private. This intentionally stays out of regular member
+    // responses so only event organizers can distribute admission links.
+    inviteUrl: canInvite ? publicInviteUrl(req, groupId, event.id) : null,
     rsvps: event.rsvps.map((rsvp) => ({
       ...rsvp,
       parent: publicParent(rsvp.parent, showEmail),
@@ -216,6 +221,7 @@ export const GET = withErrors(async (req: NextRequest) => {
     if (!group) return NextResponse.json({ error: "Community group not found" }, { status: 404 });
     const currentMembership = parentId ? group.members.find((member) => member.parentId === parentId) ?? null : null;
     const showEmails = canViewEmails(currentMembership?.role);
+    const canInvite = Boolean(currentMembership && MANAGER_ROLES.has(currentMembership.role));
     const visibleEvents = currentMembership
       ? group.events
       : group.events.filter((event) => event.visibility === "public");
@@ -227,7 +233,7 @@ export const GET = withErrors(async (req: NextRequest) => {
       creator: publicParent(group.creator, showEmails),
       members: currentMembership ? group.members.map((member) => publicMembership(member, showEmails)) : [],
       participants: currentMembership ? group.participants.map((participant) => publicParticipant(participant, showEmails)) : [],
-      events: visibleEvents.map((event) => publicEvent(req, group.id, event, showEmails, Boolean(currentMembership))),
+      events: visibleEvents.map((event) => publicEvent(req, group.id, event, showEmails, Boolean(currentMembership), canInvite)),
       meritBadges: currentMembership ? group.meritBadges : [],
       groupInviteUrl: currentMembership && ["owner", "manager"].includes(currentMembership.role)
         ? publicInviteUrl(req, group.id)

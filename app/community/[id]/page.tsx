@@ -138,6 +138,7 @@ type CommunityEvent = {
   visibility: string;
   notes: string | null;
   publicInviteUrl: string | null;
+  inviteUrl: string | null;
   rsvps: CommunityRsvp[];
   items: CommunityItem[];
   messages: CommunityMessage[];
@@ -612,7 +613,7 @@ export default function CommunityGroupPage() {
   }
 
   function eventShareUrl(event: CommunityEvent) {
-    if (event.publicInviteUrl) return event.publicInviteUrl;
+    if (event.inviteUrl || event.publicInviteUrl) return event.inviteUrl ?? event.publicInviteUrl!;
     const path = eventSharePath(event.id);
     return origin ? `${origin}${path}` : path;
   }
@@ -2195,6 +2196,11 @@ export default function CommunityGroupPage() {
                   {activeEventTab(event.id) === "share" && <div id={`${event.id}-share-panel`} role="tabpanel" aria-labelledby={`${event.id}-share-tab`} className="m-3 grid min-w-0 gap-3 rounded-2xl bg-violet-50 p-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,150px)]">
                     <div className="min-w-0">
                       <p className="mb-1 flex items-center gap-2 text-sm font-black text-violet-900"><Share2 size={15} /> Share event</p>
+                      {canManage && event.inviteUrl && (
+                        <p className="mb-2 text-xs font-bold leading-5 text-violet-700">
+                          This guest link creates a household if needed, joins {group.name}, and marks the guest as going.
+                        </p>
+                      )}
                       <p className="truncate rounded-xl bg-white px-3 py-2 text-xs font-bold text-slate-500">{shareUrl}</p>
                       <div className="mt-2 flex flex-wrap gap-2">
                         <button
