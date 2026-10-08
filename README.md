@@ -55,6 +55,11 @@ Apply the `20261008120000_add_pocket_pals` and
 before running this version. Adoption and care use the existing parent/paired-
 device access rules.
 
+Family and private online chess boards use a fixed 8×8 grid so pieces cannot
+reflow or split the board after a move. Family chess also supports six friendly
+live emotes. Apply `20261008170000_chess_emotes` with `npm run db:deploy` to
+enable the persistent emote history.
+
 Feed dumplings, bathe, finish a treat-memory game and a lesson, and take a full
 30-second nap to earn a daily care badge. Needs decay gradually with a gentle
 floor while away; the server calculates sleep and daily resets in the household's

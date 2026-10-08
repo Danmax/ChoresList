@@ -259,6 +259,7 @@ model FamilyMember {
   palActivities         PetActivity[]
   whiteChessMatches     FamilyChessMatch[] @relation("FamilyChessWhite")
   blackChessMatches     FamilyChessMatch[] @relation("FamilyChessBlack")
+  chessEmotes           FamilyChessEmote[]
   firstMultiplayerMatches  FamilyMultiplayerMatch[] @relation("FamilyGamePlayerOne")
   secondMultiplayerMatches FamilyMultiplayerMatch[] @relation("FamilyGamePlayerTwo")
 
@@ -374,6 +375,7 @@ model FamilyChessMatch {
   white     FamilyMember @relation("FamilyChessWhite", fields: [whiteMemberId], references: [id], onDelete: Cascade)
   black     FamilyMember @relation("FamilyChessBlack", fields: [blackMemberId], references: [id], onDelete: Cascade)
   moves     FamilyChessMove[]
+  emotes    FamilyChessEmote[]
 
   @@index([householdId, status, lastMoveAt])
   @@index([whiteMemberId, blackMemberId, status])
@@ -394,6 +396,19 @@ model FamilyChessMove {
   match FamilyChessMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
 
   @@unique([matchId, ply])
+}
+
+model FamilyChessEmote {
+  id        String   @id @default(uuid()) @db.Char(36)
+  matchId   String   @db.Char(36)
+  memberId  String   @db.Char(36)
+  emoji     String   @db.VarChar(16)
+  createdAt DateTime @default(now())
+
+  match  FamilyChessMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  member FamilyMember     @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([matchId, createdAt])
 }
 
 model FamilyMultiplayerMatch {

@@ -8,6 +8,7 @@ import { publishChessMatchUpdate } from "@/lib/chess-realtime";
 import { sendChessPush, sendGameInviteNotification } from "@/lib/web-push";
 
 const id = (value: unknown) => typeof value === "string" ? value.trim() : "";
+const CHESS_EMOTES = new Set(["👏", "😄", "😮", "🤔", "🔥", "💜"]);
 
 async function chessActor(req: NextRequest) {
   if (req.cookies.has(deviceSession.name)) {
@@ -29,7 +30,7 @@ export const GET = withErrors(async (req: NextRequest) => {
   const { householdId } = actor;
   const memberId = new URL(req.url).searchParams.get("memberId") ?? "";
   if (!memberId || !(await canPlayAs(actor, memberId))) return NextResponse.json({ error: "You do not have access to this player" }, { status: 403 });
-  const matches = await prisma.familyChessMatch.findMany({ where: { householdId, OR: [{ whiteMemberId: memberId }, { blackMemberId: memberId }] }, include: { white: { select: { id: true, name: true } }, black: { select: { id: true, name: true } }, moves: { orderBy: { ply: "asc" }, select: { san: true, ply: true, from: true, to: true } } }, orderBy: { lastMoveAt: "desc" }, take: 20 });
+  const matches = await prisma.familyChessMatch.findMany({ where: { householdId, OR: [{ whiteMemberId: memberId }, { blackMemberId: memberId }] }, include: { white: { select: { id: true, name: true } }, black: { select: { id: true, name: true } }, moves: { orderBy: { ply: "asc" }, select: { san: true, ply: true, from: true, to: true } }, emotes: { orderBy: { createdAt: "desc" }, take: 1, include: { member: { select: { id: true, name: true } } } } }, orderBy: { lastMoveAt: "desc" }, take: 20 });
   return NextResponse.json({ matches });
 });
 
@@ -56,6 +57,15 @@ export const POST = withErrors(async (req: NextRequest) => {
     const updated = await prisma.familyChessMatch.update({ where: { id: match.id }, data: { status: "active", lastMoveAt: new Date() } });
     publishChessMatchUpdate(match.id);
     return NextResponse.json({ match: updated });
+  }
+  if (action === "emote") {
+    const matchId = id(body.matchId); const memberId = id(body.memberId); const emoji = id(body.emoji);
+    if (!CHESS_EMOTES.has(emoji)) return NextResponse.json({ error: "Choose one of the friendly chess emotes." }, { status: 400 });
+    const match = await prisma.familyChessMatch.findFirst({ where: { id: matchId, householdId, status: "active" } });
+    if (!match || ![match.whiteMemberId, match.blackMemberId].includes(memberId) || !(await canPlayAs(actor, memberId))) return NextResponse.json({ error: "Match not found" }, { status: 404 });
+    const emote = await prisma.familyChessEmote.create({ data: { matchId, memberId, emoji }, include: { member: { select: { id: true, name: true } } } });
+    publishChessMatchUpdate(matchId);
+    return NextResponse.json({ emote });
   }
   if (action === "decline" || action === "cancel") {
     const matchId = id(body.matchId); const memberId = id(body.memberId);
