@@ -1,5 +1,6 @@
 import webpush from "web-push";
 import { prisma } from "@/lib/prisma";
+import { createAppNotification } from "@/lib/app-notifications";
 
 type PushMessage = { title: string; body: string; url: string };
 
@@ -42,3 +43,18 @@ export async function sendPushToFamilyMember(householdId: string, memberId: stri
 }
 
 export const sendChessPush = sendPushToFamilyMember;
+
+// Family games are played by a child profile, but the household's adults need
+// a durable in-app record as well as the device alert (which may be missed).
+export async function sendGameInviteNotification(householdId: string, recipientMemberId: string, message: PushMessage, dedupeKey: string) {
+  await sendPushToFamilyMember(householdId, recipientMemberId, message);
+  const parents = await prisma.parentAccount.findMany({ where: { householdId }, select: { id: true } });
+  await Promise.all(parents.map((parent) => createAppNotification({
+    recipientParentId: parent.id,
+    type: "family-game-invite",
+    title: message.title,
+    body: message.body,
+    url: message.url,
+    dedupeKey: `${dedupeKey}:${parent.id}`,
+  })));
+}

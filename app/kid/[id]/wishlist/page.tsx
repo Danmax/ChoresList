@@ -197,6 +197,8 @@ export default function KidWishlistPage() {
         </button>
       </div>
 
+      {activeList?.type === "christmas" && <div className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800">🎄 Your wishes join the family’s giant Christmas list. Pick a category when you add one so it’s easy for everyone to shop.</div>}
+
       {lists.length > 0 && <div className="mb-6 flex gap-2 overflow-x-auto pb-2">
         {lists.map((list) => <button key={list.id} onClick={() => setActiveListId(list.id)} className={`shrink-0 rounded-2xl px-4 py-2 text-sm font-black transition-colors ${activeListId === list.id ? "bg-slate-800 text-white" : "bg-white text-slate-600"}`}>
           {WISH_LIST_TYPE_META[list.type].emoji} {list.title} <span className="opacity-60">({list._count.items})</span>

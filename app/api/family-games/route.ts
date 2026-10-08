@@ -5,7 +5,7 @@ import { canAccessMember } from "@/lib/child-access";
 import { AuthError, requireSession, withErrors } from "@/lib/api";
 import { deviceSession, getActiveDeviceSession, type DeviceSessionPayload } from "@/lib/device-session";
 import { publishChessMatchUpdate } from "@/lib/chess-realtime";
-import { sendPushToFamilyMember } from "@/lib/web-push";
+import { sendGameInviteNotification, sendPushToFamilyMember } from "@/lib/web-push";
 
 const GAME_KEYS = new Set(["tic-tac-toe", "rock-paper-scissors-shoot"]);
 const RPS = new Set(["rock", "paper", "scissors"]);
@@ -71,7 +71,7 @@ export const POST = withErrors(async (req: NextRequest) => {
     if (existing) return NextResponse.json({ match: visibleMatch(existing, playerOneId) });
     const match = await prisma.familyMultiplayerMatch.create({ data: { householdId: current.householdId, gameKey, playerOneId, playerTwoId, status: "pending", state: startState(gameKey) } });
     publishChessMatchUpdate(match.id);
-    void sendPushToFamilyMember(current.householdId, playerTwoId, { title: "Family game invitation", body: `${playerOne.name} invited you to ${gameKey === "tic-tac-toe" ? "Tic-Tac-Toe" : "Rock Paper Scissors"}. Open Chess Quest to accept.`, url: `/kid/${playerTwoId}/games` }).catch((error) => console.error("[family-game push] invite", error));
+    void sendGameInviteNotification(current.householdId, playerTwoId, { title: "Family game invitation", body: `${playerOne.name} invited you to ${gameKey === "tic-tac-toe" ? "Tic-Tac-Toe" : "Rock Paper Scissors"}. Open Games to accept.`, url: `/kid/${playerTwoId}/games` }, `family-game-invite:${match.id}`).catch((error) => console.error("[family-game invite] notification", error));
     return NextResponse.json({ match }, { status: 201 });
   }
 

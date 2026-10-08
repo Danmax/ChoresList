@@ -15,6 +15,8 @@ import { ProductUrlInput } from "@/components/product-url-input";
 import { HolidayDraftImport } from "@/components/holiday-draft-import";
 import type { AmazonProduct } from "@/lib/amazon-creators";
 
+const FAMILY_CHRISTMAS_LIST = "__family-christmas__";
+
 interface Member { id: string; name: string; avatar: string; color: string; birthdayMonth?: number | null; birthdayDay?: number | null }
 
 interface GiftList {
@@ -238,7 +240,9 @@ export default function ParentWishlistPage() {
   }
 
   const filtered = items.filter((i) => {
-    if (activeListId && i.listId !== activeListId) return false;
+    const familyChristmasMode = activeListId === FAMILY_CHRISTMAS_LIST;
+    if (familyChristmasMode && !lists.some((list) => list.id === i.listId && list.type === "christmas")) return false;
+    if (!familyChristmasMode && activeListId && i.listId !== activeListId) return false;
     if (filter && i.memberId !== filter) return false;
     if (catFilter && i.category !== catFilter) return false;
     return true;
@@ -247,6 +251,8 @@ export default function ParentWishlistPage() {
   const pending = filtered.filter((i) => i.status === "pending");
   const granted = filtered.filter((i) => i.status === "granted");
   const activeList = lists.find((list) => list.id === activeListId);
+  const familyChristmasMode = activeListId === FAMILY_CHRISTMAS_LIST;
+  const christmasLists = lists.filter((list) => list.type === "christmas");
   const selectedMember = members.find((member) => member.id === newList.memberId);
   const visibleLists = lists.filter((list) => !filter || list.memberId === filter);
   const orderedCount = filtered.filter((item) => item.purchaseStatus === "ordered").length;
@@ -307,6 +313,7 @@ export default function ParentWishlistPage() {
         ))}
       </div>
       <div className="mb-5 flex flex-wrap items-center gap-2">
+        {christmasLists.length > 0 && <button onClick={() => { setFilter(""); setActiveListId(FAMILY_CHRISTMAS_LIST); }} className={`rounded-2xl px-4 py-2 text-sm font-black ${familyChristmasMode ? "bg-emerald-700 text-white" : "bg-emerald-50 text-emerald-700"}`}>🎄 Family Christmas List <span className="opacity-60">({items.filter((item) => christmasLists.some((list) => list.id === item.listId)).length})</span></button>}
         {visibleLists.map((list) => <button key={list.id} onClick={() => setActiveListId(list.id)} className={`rounded-2xl px-4 py-2 text-sm font-black ${activeListId === list.id ? "bg-slate-800 text-white" : "bg-white text-slate-600"}`}>
           {WISH_LIST_TYPE_META[list.type].emoji} {list.title} <span className="opacity-60">({list._count.items})</span>
         </button>)}
@@ -320,7 +327,8 @@ export default function ParentWishlistPage() {
         <button onClick={() => activeList.publicToken ? setSharing(false) : setSharing(true)} className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-black ${activeList.publicToken ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-700"}`}><Share2 size={15} /> {activeList.publicToken ? "Stop Sharing" : "Share Publicly"}</button>
         {activeList.publicToken && <button onClick={() => setSharing(true)} className="rounded-xl bg-slate-100 px-3 py-2 text-sm font-black text-slate-600">Share Details</button>}
       </div>}
-      {activeList && <div className="mb-6 grid gap-3 sm:grid-cols-3">
+      {familyChristmasMode && <div className="mb-6 rounded-3xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-red-50 p-5"><p className="text-lg font-black text-emerald-900">🎄 One giant family Christmas list</p><p className="mt-1 text-sm font-semibold text-emerald-800">Every child’s Christmas wishes are together here. Category filters keep shopping organized, while each wish keeps its child’s name.</p></div>}
+      {(activeList || familyChristmasMode) && <div className="mb-6 grid gap-3 sm:grid-cols-3">
         <div className="rounded-2xl border border-violet-100 bg-white p-4 shadow-sm"><p className="flex items-center gap-2 text-xs font-black uppercase tracking-wide text-slate-400"><DollarSign size={15} className="text-violet-500" /> Estimated total</p><p className="mt-1 text-2xl font-black text-slate-800">{formatCost(estimatedTotal)}</p></div>
         <div className="rounded-2xl border border-amber-100 bg-white p-4 shadow-sm"><p className="flex items-center gap-2 text-xs font-black uppercase tracking-wide text-slate-400"><ShoppingCart size={15} className="text-amber-500" /> Ordered</p><p className="mt-1 text-2xl font-black text-slate-800">{orderedCount}</p></div>
         <div className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm"><p className="flex items-center gap-2 text-xs font-black uppercase tracking-wide text-slate-400"><PackageCheck size={15} className="text-emerald-500" /> Ready to give</p><p className="mt-1 text-2xl font-black text-slate-800">{obtainedCount}</p></div>

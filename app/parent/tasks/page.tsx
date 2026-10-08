@@ -32,6 +32,7 @@ type Assignment = {
     icon: string;
     color: string;
     pointsValue: number;
+    category: string;
     requiresPhoto: boolean;
   };
   completions: { id: string; completedAt: string; reactionEmoji?: string | null; completionNote?: string | null }[];
@@ -163,6 +164,11 @@ export default function ParentTasksPage() {
   const isComplete = (assignment: Assignment) => assignment.completions.length >= (assignment.frequency === "monthly" ? assignment.monthlyCompletionTarget : 1);
   const openCount = assignments.filter((assignment) => !isComplete(assignment)).length;
   const doneCount = assignments.length - openCount;
+  const categorizedAssignments = Object.entries(assignments.reduce<Record<string, Assignment[]>>((groups, assignment) => {
+    const category = assignment.chore.category || "other";
+    (groups[category] ??= []).push(assignment);
+    return groups;
+  }, {})).sort(([a], [b]) => a.localeCompare(b));
 
   return (
     <>
@@ -239,8 +245,10 @@ export default function ParentTasksPage() {
               </Link>
             </div>
           ) : (
-            <div className="space-y-3">
-              {assignments.map((assignment) => {
+            <div className="space-y-6">
+              {categorizedAssignments.map(([category, categoryAssignments]) => <section key={category}>
+                <h2 className="mb-3 flex items-center gap-2 text-sm font-black uppercase tracking-wide text-slate-500"><span className="rounded-lg bg-violet-100 px-2 py-1 text-violet-700">{category.replaceAll("-", " ")}</span><span>{categoryAssignments.length} task{categoryAssignments.length === 1 ? "" : "s"}</span></h2>
+                <div className="space-y-3">{categoryAssignments.map((assignment) => {
                 const done = isComplete(assignment);
                 const dateLabel = taskDateLabel(assignment);
 
@@ -289,7 +297,8 @@ export default function ParentTasksPage() {
                     </div>
                   </div>
                 );
-              })}
+                })}</div>
+              </section>)}
             </div>
           )}
         </>

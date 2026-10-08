@@ -5,7 +5,7 @@ import { canAccessMember } from "@/lib/child-access";
 import { AuthError, requireSession, withErrors } from "@/lib/api";
 import { deviceSession, getActiveDeviceSession, type DeviceSessionPayload } from "@/lib/device-session";
 import { publishChessMatchUpdate } from "@/lib/chess-realtime";
-import { sendChessPush } from "@/lib/web-push";
+import { sendChessPush, sendGameInviteNotification } from "@/lib/web-push";
 
 const id = (value: unknown) => typeof value === "string" ? value.trim() : "";
 
@@ -46,7 +46,7 @@ export const POST = withErrors(async (req: NextRequest) => {
     if (existing) return NextResponse.json({ match: existing });
     const match = await prisma.familyChessMatch.create({ data: { householdId, whiteMemberId, blackMemberId, status: "pending", fen: new Chess().fen() } });
     publishChessMatchUpdate(match.id);
-    void sendChessPush(householdId, blackMemberId, { title: "Family chess invitation", body: `${white.name} invited you to a live family chess game. Open Chess Quest to accept.`, url: `/kid/${blackMemberId}/games` }).catch((error) => console.error("[chess push] invite", error));
+    void sendGameInviteNotification(householdId, blackMemberId, { title: "Family chess invitation", body: `${white.name} invited you to a live family chess game. Open Chess Quest to accept.`, url: `/kid/${blackMemberId}/games` }, `chess-invite:${match.id}`).catch((error) => console.error("[chess invite] notification", error));
     return NextResponse.json({ match }, { status: 201 });
   }
   if (action === "accept") {
