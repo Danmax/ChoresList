@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, ChefHat, Crown, Gamepad2, Grid3X3, KeyRound, Puzzle, RefreshCw, Save, Shapes, Swords, TreePine } from "lucide-react";
+import { BookOpen, ChefHat, Crown, Gamepad2, Grid3X3, KeyRound, PawPrint, Puzzle, RefreshCw, Save, Shapes, Swords, TreePine } from "lucide-react";
 import { toast } from "sonner";
 import { ParentPageHeader } from "@/components/parent-management-shell";
 
@@ -45,6 +45,7 @@ type GameSession = {
 };
 
 function iconForGame(key: string) {
+  if (key === "pocket-pals") return PawPrint;
   if (key === "rock-paper-scissors-shoot") return Swords;
   if (key === "bible-trivia") return BookOpen;
   if (key === "memory-match") return Puzzle;
@@ -58,6 +59,7 @@ function iconForGame(key: string) {
 }
 
 function gameLabel(key: string) {
+  if (key === "pocket-pals") return "Pocket Pals";
   if (key === "rock-paper-scissors-shoot") return "Rock Paper Scissors Shoot";
   if (key === "bible-trivia") return "Bible Trivia";
   if (key === "memory-match") return "Memory Match";
@@ -184,6 +186,7 @@ export default function ParentGamesPage() {
                       <div>
                         <h2 className="font-black text-slate-950">{game.title}</h2>
                         <p className="mt-1 text-sm font-semibold leading-5 text-slate-500">{game.description}</p>
+                        {game.key === "pocket-pals" && <p className="mt-2 text-xs font-bold text-rose-600">Rewards apply once a day after feeding, cleaning, playing, learning, and a full nap. Care stays available after collecting the badge.</p>}
                         <p className="mt-2 text-xs font-black uppercase tracking-wide text-slate-400">
                           Ages {setting.ageMin}-{setting.ageMax} · {game.playTime}
                         </p>

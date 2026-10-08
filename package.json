@@ -18,7 +18,9 @@
     "price-alerts:run": "tsx scripts/process-price-alerts.ts",
     "test:plugins": "node --import tsx --test tests/plugins-registry.test.ts",
     "test:surveys": "node --import tsx --test tests/community-surveys.test.ts",
-    "test:secret-santa": "node --import tsx --test tests/secret-santa.test.ts"
+    "test:secret-santa": "node --import tsx --test tests/secret-santa.test.ts",
+    "test:pocket-pals": "node --import tsx --test tests/pocket-pals*.test.ts",
+    "test:pocket-pals:browser": "node --import tsx tests/pocket-pals.browser.ts"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"
@@ -60,7 +62,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "dotenv": "^17.4.2",
-    "shadcn": "^1.0.0",
+    "shadcn": "^4.21.4",
     "tailwindcss": "^4",
     "tsx": "^4.22.3",
     "typescript": "^5"

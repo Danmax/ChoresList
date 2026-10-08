@@ -42,6 +42,30 @@ npm run db:deploy
 
 `GIPHY_API_KEY` is optional and enables GIF search on event message boards. Members can still paste an HTTPS GIF URL when it is not configured.
 
+## Pocket Pals
+
+Pocket Pals lives in each player's Games screen and saves one dog, cat, monkey,
+or guinea pig per family member. Apply the `20261008120000_add_pocket_pals`
+migration with `npm run db:deploy` before running this version. Adoption and care
+use the existing parent/paired-device access rules.
+
+Feed dumplings, bathe, finish a treat-memory game and a lesson, and take a full
+30-second nap to earn a daily care badge. Needs decay gradually with a gentle
+floor while away; the server calculates sleep and daily resets in the household's
+time zone. Four dumplings arrive daily. Coins unlock accessories and two rooms.
+Care coins are separate from household points. Parents can enable optional
+points or ticket rewards under Parent → Games; those rewards are issued once
+per completed daily badge. Care remains available afterward. Like other games,
+zero daily plays means no additional cap; Pocket Pals always limits badges to
+one per day. Age restrictions, enabled settings, and chore gates are checked on
+every request.
+
+Run `npm run test:pocket-pals` for the care, sleep, shop, and reward checks.
+For isolated browser coverage, start the app on port 3017 and run
+`npm run test:pocket-pals:browser` (`POCKET_PALS_TEST_URL` can override the URL).
+Browser screenshots are written to `/tmp/pocket-pals-preview` by default.
+Original artwork and the generation prompts live in `public/games/pocket-pals/`.
+
 First, run the development server:
 
 ```bash

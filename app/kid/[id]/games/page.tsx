@@ -3,13 +3,16 @@
 import { type DragEvent, type MouseEvent as ReactMouseEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, BookOpen, CheckCircle2, ChefHat, Circle, Crown, FileText, Gamepad2, Grid3X3, KeyRound, Puzzle, RefreshCw, Scissors, Shapes, Swords, TreePine, Trophy } from "lucide-react";
+import { ArrowLeft, BookOpen, CheckCircle2, ChefHat, Circle, Crown, FileText, Gamepad2, Grid3X3, KeyRound, PawPrint, Puzzle, RefreshCw, Scissors, Shapes, Swords, TreePine, Trophy } from "lucide-react";
 import { toast } from "sonner";
 import { MemberAvatar } from "@/components/member-avatar";
 import { JungleVineSwing } from "@/components/jungle-runner";
 import { ChessQuest, type ChessStats } from "@/components/chess-quest";
 import { FamilyMultiplayerGame } from "@/components/family-multiplayer-games";
 import { createTriviaRound, type TriviaLevel } from "@/lib/bible-trivia";
+import { PocketPals } from "@/components/pocket-pals";
+import { PET_SPECIES } from "@/lib/pocket-pals";
+import type { GameKey } from "@/lib/games";
 
 type Member = {
   id: string;
@@ -23,7 +26,7 @@ type Member = {
 };
 
 type Game = {
-  key: "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot" | "shape-safari" | "codebreaker-quest" | "tic-tac-toe" | "burger-rush" | "jungle-vine-swing" | "chess-quest";
+  key: GameKey;
   title: string;
   description: string;
   ageMin: number;
@@ -75,6 +78,7 @@ function shuffle<T>(items: T[]) {
 }
 
 function iconForGame(key: string) {
+  if (key === "pocket-pals") return PawPrint;
   if (key === "rock-paper-scissors-shoot") return Swords;
   if (key === "bible-trivia") return BookOpen;
   if (key === "memory-match") return Puzzle;
@@ -197,6 +201,8 @@ export default function KidGamesPage() {
           onBack={() => setShowJohnnyMenu(false)}
           onStart={() => { setShowJohnnyMenu(false); setReward(null); setActiveGame("jungle-vine-swing"); }}
         />
+      ) : activeGame === "pocket-pals" ? (
+        <PocketPals memberId={member.id} playerName={member.name} onExit={() => { setActiveGame(null); void load(); }} />
       ) : activeGame === "memory-match" ? (
         <MemoryMatch onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("memory-match", score, duration, metadata)} />
       ) : activeGame === "bible-trivia" ? (
@@ -229,6 +235,14 @@ export default function KidGamesPage() {
             const status = availability[game.key];
             const Icon = iconForGame(game.key);
             const locked = !status?.available;
+            if (game.key === "pocket-pals") {
+              return <button key={game.key} type="button" disabled={locked} onClick={() => { setReward(null); setActiveGame("pocket-pals"); }} className="group overflow-hidden rounded-3xl border-2 border-rose-200 bg-[#fff8f0] p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md disabled:opacity-65">
+                <span className="inline-flex items-center gap-2 rounded-full bg-rose-100 px-3 py-1 text-xs font-black text-rose-700"><PawPrint size={14} /> A little love, every day</span>
+                <span className="mt-3 flex justify-center gap-2">{PET_SPECIES.map((species) => <img key={species.id} src={`/games/pocket-pals/${species.id}.webp`} alt={species.label} className="h-24 w-[22%] object-contain transition-transform group-hover:-translate-y-1" />)}</span>
+                <span className="mt-2 block text-2xl font-black text-[#684f45]">Pocket Pals</span><span className="mt-1 block text-sm font-bold text-[#a18977]">Dumplings, cuddles, and a friend who grows with you.</span>
+                <span className="mt-3 block text-xs font-black text-rose-600">{locked ? status?.reason ?? "Locked" : "Meet your little pal →"}</span>
+              </button>;
+            }
             if (game.key === "jungle-vine-swing") {
               return (
                 <button

@@ -1,20 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireParentSession, requireSession, withErrors } from "@/lib/api";
-import { canAccessMember, childAccessWhere } from "@/lib/child-access";
-import { deviceSession, getActiveDeviceSession, type DeviceSessionPayload } from "@/lib/device-session";
+import { requireParentSession, withErrors } from "@/lib/api";
+import { childAccessWhere } from "@/lib/child-access";
 import { getLevelFromPoints } from "@/lib/points";
 import { DEFAULT_GAME_SETTINGS, GAME_DEFINITIONS, gameByKey, type GameRewardType } from "@/lib/games";
-import { isMonthlyChoreOpen, startOfMonth } from "@/lib/chore-schedule";
+import { accessibleMember, gameActor, openChoreCount, todayStart } from "@/lib/game-access";
 
 const REWARD_TYPES = new Set<GameRewardType>(["none", "points", "tickets"]);
-
-function todayStart() {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return today;
-}
 
 function clampInt(value: unknown, min: number, max: number, fallback: number) {
   const n = Number(value);
@@ -50,19 +43,6 @@ function chessStats(sessions: { metadata: Prisma.JsonValue | null }[]) {
   return stats;
 }
 
-function isDueToday(assignment: {
-  frequency: string;
-  dayOfWeek: number | null;
-  dueDate: Date | null;
-}) {
-  const today = todayStart();
-  if (assignment.frequency === "daily") return true;
-  if (assignment.frequency === "weekly") return assignment.dayOfWeek === today.getDay();
-  if (!assignment.dueDate) return false;
-  if (assignment.frequency === "monthly") return isMonthlyChoreOpen(assignment.dueDate, today);
-  return assignment.frequency === "one-time" && assignment.dueDate >= today;
-}
-
 async function ensureSettings(householdId: string) {
   const existing = await prisma.gameSetting.findMany({ where: { householdId } });
   const existingKeys = new Set(existing.map((setting) => setting.gameKey));
@@ -84,57 +64,6 @@ async function ensureSettings(householdId: string) {
     );
   }
   return prisma.gameSetting.findMany({ where: { householdId }, orderBy: { gameKey: "asc" } });
-}
-
-async function openChoreCount(householdId: string, memberId: string) {
-  const assignments = await prisma.choreAssignment.findMany({
-    where: { householdId, memberId, isActive: true },
-    select: {
-      frequency: true,
-      dayOfWeek: true,
-      dueDate: true,
-      monthlyCompletionTarget: true,
-      completions: {
-        where: { completedAt: { gte: startOfMonth() } },
-        select: { completedAt: true },
-      },
-    },
-  });
-  const today = todayStart();
-  return assignments.filter((assignment) => {
-    if (!isDueToday(assignment)) return false;
-    const completions = assignment.frequency === "monthly"
-      ? assignment.completions.length
-      : assignment.completions.filter((completion) => completion.completedAt >= today).length;
-    return completions < (assignment.frequency === "monthly" ? assignment.monthlyCompletionTarget : 1);
-  }).length;
-}
-
-async function gameActor(req: NextRequest) {
-  // The games API is shared by the kid-device screen and the parent dashboard.
-  // `getActiveDeviceSession` intentionally throws when its cookie is absent, so
-  // only call it for requests that are actually coming from a paired device.
-  if (req.cookies.has(deviceSession.name)) {
-    const device = await getActiveDeviceSession(req);
-    if (device) return { householdId: device.householdId, parentId: null as string | null, device };
-  }
-  const parent = requireSession(req);
-  return { householdId: parent.householdId, parentId: parent.parentId, device: null as DeviceSessionPayload | null };
-}
-
-async function accessibleMember(actor: Awaited<ReturnType<typeof gameActor>>, memberId: string) {
-  if (actor.device) {
-    if (actor.device.mode === "member" && actor.device.memberId !== memberId) return null;
-    return prisma.familyMember.findFirst({
-      where: { id: memberId, householdId: actor.householdId, ...(actor.device.mode === "household" ? { role: { in: ["child", "young-adult"] } } : {}) },
-      select: { id: true, name: true, avatar: true, avatarConfig: true, avatarImageUrl: true, color: true, totalPoints: true, age: true },
-    });
-  }
-  if (!actor.parentId || !(await canAccessMember(actor.parentId, actor.householdId, memberId))) return null;
-  return prisma.familyMember.findFirst({
-    where: { id: memberId, householdId: actor.householdId },
-    select: { id: true, name: true, avatar: true, avatarConfig: true, avatarImageUrl: true, color: true, totalPoints: true, age: true },
-  });
 }
 
 export const GET = withErrors(async (req: NextRequest) => {
@@ -194,7 +123,9 @@ export const GET = withErrors(async (req: NextRequest) => {
     availability = Object.fromEntries(settings.map((setting) => {
       const game = gameByKey(setting.gameKey);
       const playsToday = playsByKey.get(setting.gameKey) ?? 0;
-      const limitReached = setting.dailyPlayLimit > 0 && playsToday >= setting.dailyPlayLimit;
+      // Pocket Pals counts completed daily care for rewards; children can still
+      // visit and care for their pet after earning that day's badge.
+      const limitReached = setting.gameKey !== "pocket-pals" && setting.dailyPlayLimit > 0 && playsToday >= setting.dailyPlayLimit;
       const choresBlocked = setting.requiresChoresComplete && openChores > 0;
       const ageBlocked = member.age < setting.ageMin || member.age > setting.ageMax;
       const available = setting.enabled && !limitReached && !choresBlocked && !ageBlocked;
@@ -264,6 +195,9 @@ export const POST = withErrors(async (req: NextRequest) => {
   const game = gameByKey(body.gameKey);
   const memberId = typeof body.memberId === "string" ? body.memberId : "";
   if (!game || !memberId) return NextResponse.json({ error: "Game and member are required" }, { status: 400 });
+  if (game.key === "pocket-pals") {
+    return NextResponse.json({ error: "Pocket Pals rewards come from completing daily care in the game." }, { status: 400 });
+  }
   const member = await accessibleMember(actor, memberId);
   if (!member) {
     return NextResponse.json({ error: "You do not have access to this family member" }, { status: 403 });

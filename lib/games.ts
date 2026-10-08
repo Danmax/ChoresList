@@ -1,4 +1,4 @@
-export type GameKey = "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot" | "shape-safari" | "codebreaker-quest" | "tic-tac-toe" | "burger-rush" | "jungle-vine-swing" | "chess-quest";
+export type GameKey = "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot" | "shape-safari" | "codebreaker-quest" | "tic-tac-toe" | "burger-rush" | "jungle-vine-swing" | "chess-quest" | "pocket-pals";
 export type GameRewardType = "none" | "points" | "tickets";
 
 export type GameDefinition = {
@@ -14,6 +14,17 @@ export type GameDefinition = {
 };
 
 export const GAME_DEFINITIONS: GameDefinition[] = [
+  {
+    key: "pocket-pals",
+    title: "Pocket Pals",
+    description: "Adopt an anime pet, feed dumplings, splash in the bath, play, rest, and learn together. Your little friend remembers you!",
+    icon: "PawPrint",
+    ageMin: 3,
+    ageMax: 18,
+    playTime: "A little care each day",
+    color: "#db2777",
+    bg: "#fce7f3",
+  },
   {
     key: "memory-match",
     title: "Memory Match",
@@ -123,6 +134,14 @@ export const DEFAULT_GAME_SETTINGS: Record<GameKey, {
   requiresChoresComplete: boolean;
   dailyPlayLimit: number;
 }> = {
+  "pocket-pals": {
+    enabled: true,
+    rewardType: "none",
+    rewardPoints: 5,
+    rewardTickets: 0,
+    requiresChoresComplete: false,
+    dailyPlayLimit: 0,
+  },
   "memory-match": {
     enabled: true,
     rewardType: "points",
