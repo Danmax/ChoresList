@@ -116,6 +116,27 @@ test("lessons hide answers, teach after mistakes, and cannot replay rewards", ()
   assert.throws(() => applyPetAction(pet, "answer", { challengeId: id, choice: lesson.answer }, now + 9000, 7, id));
 });
 
+test("learning questions stay in an age-appropriate set for every student", () => {
+  const expectations = [
+    { age: 4, topics: new Set(["Counting", "Shapes", "Nature", "Kindness", "Colors", "Sky", "Body", "Comparing"]) },
+    { age: 7, topics: new Set(["Math", "Nature", "Patterns", "Reading", "Science", "Time", "Habitats", "Words"]) },
+    { age: 10, topics: new Set(["Fractions", "Science", "Geometry", "Ecosystems", "Math", "Reading", "Logic"]) },
+    { age: 15, topics: new Set(["Math", "Algebra", "Research", "Science", "Data", "Digital safety", "Graphs", "Decision-making"]) },
+  ];
+
+  for (const { age, topics } of expectations) {
+    const pet = createPet("cat", "Miso", now, day);
+    const questions = new Set<string>();
+    for (let lessonNumber = 0; lessonNumber < 8; lessonNumber++) {
+      pet.lessonsLearned = lessonNumber;
+      const lesson = currentLesson(pet, age);
+      assert.ok(topics.has(lesson.topic), `age ${age} received an out-of-band ${lesson.topic} lesson`);
+      questions.add(lesson.question);
+    }
+    assert.equal(questions.size, 8, `age ${age} should have a full, varied question set`);
+  }
+});
+
 test("repeat play and learning coins have a daily ceiling", () => {
   const pet = createPet("dog", "Mochi", now, day);
   for (let i = 0; i < 5; i++) {

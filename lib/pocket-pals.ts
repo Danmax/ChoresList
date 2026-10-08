@@ -63,18 +63,47 @@ export const PET_SHOP = [
 ] as const;
 export const PLAY_SYMBOLS = ["🍓", "🌸", "🍡", "⭐"];
 
-type Lesson = { id: string; topic: string; question: string; choices: string[]; answer: number; explanation: string; minAge: number };
+type Lesson = { id: string; topic: string; question: string; choices: string[]; answer: number; explanation: string; minAge: number; maxAge: number };
 const LESSONS: Lesson[] = [
-  { id: "two-paws", topic: "Counting", question: "One dumpling plus one dumpling makes…", choices: ["One", "Two", "Three"], answer: 1, explanation: "1 + 1 = 2. Two dumplings to share!", minAge: 0 },
-  { id: "growing", topic: "Nature", question: "What helps a little plant grow?", choices: ["Water and sunlight", "Only darkness", "Candy"], answer: 0, explanation: "Plants use sunlight and water to grow.", minAge: 0 },
-  { id: "kindness", topic: "Kindness", question: "Your friend is sad. What could you do?", choices: ["Ignore them", "Laugh at them", "Listen and offer help"], answer: 2, explanation: "Listening and offering help is a kind way to care for a friend.", minAge: 0 },
-  { id: "shapes", topic: "Shapes", question: "How many sides does a triangle have?", choices: ["Four", "Three", "Five"], answer: 1, explanation: "A triangle has three straight sides.", minAge: 0 },
-  { id: "sharing", topic: "Math", question: "You have 8 dumplings. Share them equally with your pet. How many each?", choices: ["Two", "Six", "Four"], answer: 2, explanation: "8 ÷ 2 = 4. Four dumplings each!", minAge: 6 },
-  { id: "butterfly", topic: "Nature", question: "What does a caterpillar turn into?", choices: ["A butterfly or moth", "A fish", "A spider"], answer: 0, explanation: "Caterpillars grow into butterflies or moths through metamorphosis.", minAge: 6 },
-  { id: "pattern", topic: "Patterns", question: "3, 6, 9, 12… what comes next?", choices: ["14", "15", "18"], answer: 1, explanation: "Add 3 each time. 12 + 3 = 15.", minAge: 6 },
-  { id: "fraction", topic: "Fractions", question: "You eat 3 of 12 dumplings. What fraction did you eat?", choices: ["One half", "One third", "One quarter"], answer: 2, explanation: "3/12 simplifies to 1/4: one quarter.", minAge: 9 },
-  { id: "gravity", topic: "Science", question: "What keeps your pet's ball coming back to the ground?", choices: ["Gravity", "Sound", "Sunlight"], answer: 0, explanation: "Gravity pulls objects toward Earth.", minAge: 9 },
-  { id: "code", topic: "Logic", question: "A loop repeats a task 4 times and gives 2 treats each time. How many treats?", choices: ["6", "8", "12"], answer: 1, explanation: "4 repeats × 2 treats = 8 treats.", minAge: 9 },
+  // Ages 3–5: concrete, short prompts with familiar ideas.
+  { id: "count-three", topic: "Counting", question: "Mochi has 2 treats. You give 1 more. How many treats now?", choices: ["2", "3", "4"], answer: 1, explanation: "2 treats plus 1 treat makes 3 treats.", minAge: 3, maxAge: 5 },
+  { id: "triangle-sides", topic: "Shapes", question: "How many sides does a triangle have?", choices: ["Two", "Three", "Four"], answer: 1, explanation: "A triangle has three straight sides.", minAge: 3, maxAge: 5 },
+  { id: "plant-needs", topic: "Nature", question: "What does a little plant need to grow?", choices: ["Water and sunlight", "Candy", "A pillow"], answer: 0, explanation: "Plants use water and sunlight to grow.", minAge: 3, maxAge: 5 },
+  { id: "kind-friend", topic: "Kindness", question: "A friend drops their crayons. What is kind to do?", choices: ["Help pick them up", "Hide them", "Laugh"], answer: 0, explanation: "Helping is a kind way to care for a friend.", minAge: 3, maxAge: 5 },
+  { id: "color-mix", topic: "Colors", question: "What color can you make with red and yellow?", choices: ["Green", "Orange", "Purple"], answer: 1, explanation: "Red and yellow mix to make orange.", minAge: 3, maxAge: 5 },
+  { id: "day-sun", topic: "Sky", question: "What do you usually see in the sky during the day?", choices: ["The sun", "The moon", "Fireflies"], answer: 0, explanation: "The sun lights the sky during the day.", minAge: 3, maxAge: 5 },
+  { id: "five-fingers", topic: "Body", question: "How many fingers are on one hand?", choices: ["3", "5", "10"], answer: 1, explanation: "One hand has five fingers.", minAge: 3, maxAge: 5 },
+  { id: "sort-big", topic: "Comparing", question: "Which is bigger: an elephant or a mouse?", choices: ["A mouse", "They are the same", "An elephant"], answer: 2, explanation: "An elephant is much bigger than a mouse.", minAge: 3, maxAge: 5 },
+
+  // Ages 6–8: early elementary math, science, and reading skills.
+  { id: "share-eight", topic: "Math", question: "You have 8 dumplings and share them equally with your pal. How many does each get?", choices: ["2", "4", "6"], answer: 1, explanation: "8 split between 2 is 4 each.", minAge: 6, maxAge: 8 },
+  { id: "butterfly-change", topic: "Nature", question: "What can a caterpillar grow into?", choices: ["A butterfly or moth", "A fish", "A frog"], answer: 0, explanation: "Caterpillars change into butterflies or moths.", minAge: 6, maxAge: 8 },
+  { id: "pattern-fives", topic: "Patterns", question: "5, 10, 15, 20… what comes next?", choices: ["21", "25", "30"], answer: 1, explanation: "The pattern adds 5 each time, so 20 + 5 = 25.", minAge: 6, maxAge: 8 },
+  { id: "sentence-punctuation", topic: "Reading", question: "Which mark belongs at the end of a question?", choices: ["?", ".", "!"], answer: 0, explanation: "A question mark shows that a sentence is asking something.", minAge: 6, maxAge: 8 },
+  { id: "solid-ice", topic: "Science", question: "What happens when water gets very cold and freezes?", choices: ["It becomes ice", "It becomes a cloud", "It disappears"], answer: 0, explanation: "Frozen water is ice, a solid.", minAge: 6, maxAge: 8 },
+  { id: "quarter-hour", topic: "Time", question: "How many minutes are in a quarter of an hour?", choices: ["10", "15", "25"], answer: 1, explanation: "An hour has 60 minutes, and one quarter of 60 is 15.", minAge: 6, maxAge: 8 },
+  { id: "habitat-fish", topic: "Habitats", question: "Where does a fish usually live?", choices: ["In water", "In a nest", "In a tree"], answer: 0, explanation: "Fish live in water, such as ponds, rivers, lakes, and oceans.", minAge: 6, maxAge: 8 },
+  { id: "word-synonym", topic: "Words", question: "Which word means almost the same as “happy”?", choices: ["Glad", "Sleepy", "Tiny"], answer: 0, explanation: "Glad is another word for happy.", minAge: 6, maxAge: 8 },
+
+  // Ages 9–12: upper-elementary reasoning and curriculum-friendly concepts.
+  { id: "fraction-quarter", topic: "Fractions", question: "You eat 3 of 12 dumplings. What fraction did you eat?", choices: ["One half", "One third", "One quarter"], answer: 2, explanation: "3/12 simplifies to 1/4, or one quarter.", minAge: 9, maxAge: 12 },
+  { id: "gravity-ball", topic: "Science", question: "What force brings a ball back to the ground after it is tossed?", choices: ["Gravity", "Sound", "Sunlight"], answer: 0, explanation: "Gravity pulls objects toward Earth.", minAge: 9, maxAge: 12 },
+  { id: "perimeter-garden", topic: "Geometry", question: "A square garden has sides that are 4 feet long. What is its perimeter?", choices: ["8 feet", "12 feet", "16 feet"], answer: 2, explanation: "A square has four equal sides: 4 + 4 + 4 + 4 = 16 feet.", minAge: 9, maxAge: 12 },
+  { id: "ecosystem-role", topic: "Ecosystems", question: "What do plants provide for many animals in an ecosystem?", choices: ["Food and oxygen", "Only shadows", "Metal"], answer: 0, explanation: "Plants can provide food and release oxygen that animals use.", minAge: 9, maxAge: 12 },
+  { id: "decimal-money", topic: "Math", question: "A toy costs $3.75. You pay $5.00. How much change should you get?", choices: ["$1.25", "$1.75", "$2.25"], answer: 0, explanation: "$5.00 − $3.75 = $1.25.", minAge: 9, maxAge: 12 },
+  { id: "main-idea", topic: "Reading", question: "What is the main idea of a paragraph?", choices: ["Its most important point", "The first word", "Every tiny detail"], answer: 0, explanation: "The main idea is the central message the paragraph is mostly about.", minAge: 9, maxAge: 12 },
+  { id: "code-loop", topic: "Logic", question: "A loop repeats a task 4 times and gives 2 treats each time. How many treats are given?", choices: ["6", "8", "12"], answer: 1, explanation: "4 groups of 2 equals 8 treats.", minAge: 9, maxAge: 12 },
+  { id: "states-matter", topic: "Science", question: "Which state of matter has a fixed shape and fixed volume?", choices: ["Solid", "Liquid", "Gas"], answer: 0, explanation: "A solid keeps both its shape and volume.", minAge: 9, maxAge: 12 },
+
+  // Ages 13–18: middle/high-school level analysis, numeracy, and digital literacy.
+  { id: "percent-discount", topic: "Math", question: "A $40 backpack is 25% off. What is the sale price?", choices: ["$10", "$30", "$35"], answer: 1, explanation: "25% of $40 is $10, so the sale price is $30.", minAge: 13, maxAge: 18 },
+  { id: "variable-solve", topic: "Algebra", question: "Solve 3x + 5 = 20. What is x?", choices: ["3", "5", "7"], answer: 1, explanation: "Subtract 5 to get 3x = 15, then divide by 3: x = 5.", minAge: 13, maxAge: 18 },
+  { id: "claim-evidence", topic: "Research", question: "What best supports a claim in a school project?", choices: ["A reliable source and evidence", "A guess", "The loudest opinion"], answer: 0, explanation: "Claims are strongest when they are backed by credible evidence.", minAge: 13, maxAge: 18 },
+  { id: "carbon-cycle", topic: "Science", question: "Which process moves carbon dioxide from the air into plants?", choices: ["Photosynthesis", "Evaporation", "Erosion"], answer: 0, explanation: "During photosynthesis, plants take in carbon dioxide.", minAge: 13, maxAge: 18 },
+  { id: "average-data", topic: "Data", question: "What is the mean of 6, 8, and 10?", choices: ["7", "8", "9"], answer: 1, explanation: "(6 + 8 + 10) ÷ 3 = 8.", minAge: 13, maxAge: 18 },
+  { id: "password-safety", topic: "Digital safety", question: "Which is the safest choice for a new password?", choices: ["A long, unique passphrase", "Your first name", "123456"], answer: 0, explanation: "Long, unique passphrases are much harder for others to guess.", minAge: 13, maxAge: 18 },
+  { id: "slope-change", topic: "Graphs", question: "On a distance-versus-time graph, what does a steeper upward line usually show?", choices: ["Faster speed", "No movement", "Less time"], answer: 0, explanation: "A steeper upward distance line means distance is increasing more quickly.", minAge: 13, maxAge: 18 },
+  { id: "opportunity-cost", topic: "Decision-making", question: "What is an opportunity cost?", choices: ["The next-best option you give up", "A free reward", "A type of tax"], answer: 0, explanation: "Choosing one option means giving up the next-best alternative.", minAge: 13, maxAge: 18 },
 ];
 
 export type PetState = {
@@ -134,7 +163,11 @@ export function advancePet(saved: PetState, now: number, day: string): PetState 
   return pet;
 }
 export function currentLesson(pet: PetState, age: number) {
-  const available = LESSONS.filter((l) => l.minAge <= age);
+  // Keep each learner in their own age band instead of mixing in questions
+  // written for younger students as they get older. Clamping also keeps the
+  // game safe if a household config allows an age outside its normal 3–18 range.
+  const lessonAge = Math.min(18, Math.max(3, age));
+  const available = LESSONS.filter((l) => l.minAge <= lessonAge && lessonAge <= l.maxAge);
   return available[pet.lessonsLearned % available.length];
 }
 export function publicChallenge(pet: PetState, age: number) {
