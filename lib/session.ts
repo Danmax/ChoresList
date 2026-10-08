@@ -31,6 +31,14 @@ export type CommunityInvitePayload = {
   expiresAt: number;
 };
 
+export type GameInvitePayload = {
+  householdId: string;
+  inviterParentId: string;
+  groupId?: string;
+  eventId?: string;
+  expiresAt: number;
+};
+
 const PLACEHOLDER_SECRETS = new Set([
   "",
   "dev-secret-change-me",
@@ -193,6 +201,45 @@ export function verifyHouseholdInviteToken(token?: string): HouseholdInvitePaylo
       childAccessMemberIds: cleanChildAccessMemberIds(parsed.childAccessMemberIds),
       expiresAt: parsed.expiresAt,
     };
+  } catch {
+    return null;
+  }
+}
+
+export function createGameInviteToken({
+  householdId,
+  inviterParentId,
+  groupId,
+  eventId,
+}: {
+  householdId: string;
+  inviterParentId: string;
+  groupId?: string | null;
+  eventId?: string | null;
+}) {
+  const expiresAt = Math.floor(Date.now() / 1000) + INVITE_TTL_SECONDS;
+  const payload = Buffer.from(JSON.stringify({
+    purpose: "game-invite", householdId, inviterParentId,
+    ...(groupId ? { groupId } : {}),
+    ...(eventId ? { eventId } : {}),
+    expiresAt,
+  })).toString("base64url");
+  return `${payload}.${sign(payload)}`;
+}
+
+export function verifyGameInviteToken(token?: string): GameInvitePayload | null {
+  if (!token) return null;
+  const [payload, signature] = token.split(".");
+  if (!payload || !signature || !signatureMatches(payload, signature)) return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
+      purpose?: unknown; householdId?: unknown; inviterParentId?: unknown; groupId?: unknown; eventId?: unknown; expiresAt?: unknown;
+    };
+    if (parsed.purpose !== "game-invite" || typeof parsed.householdId !== "string" || typeof parsed.inviterParentId !== "string" || typeof parsed.expiresAt !== "number" || parsed.expiresAt <= Math.floor(Date.now() / 1000)) return null;
+    const groupId = typeof parsed.groupId === "string" && parsed.groupId ? parsed.groupId : undefined;
+    const eventId = typeof parsed.eventId === "string" && parsed.eventId ? parsed.eventId : undefined;
+    if (eventId && !groupId) return null;
+    return { householdId: parsed.householdId, inviterParentId: parsed.inviterParentId, ...(groupId ? { groupId } : {}), ...(eventId ? { eventId } : {}), expiresAt: parsed.expiresAt };
   } catch {
     return null;
   }

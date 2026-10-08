@@ -2,7 +2,7 @@
 
 import { type FormEvent, useState, useEffect } from "react";
 import Link from "next/link";
-import { Users, ListChecks, CalendarDays, DollarSign, BarChart2, Gift, Wrench, Ticket, Mail, LockKeyhole, MonitorSmartphone, Settings, CheckCircle2, ShoppingCart, Network, GraduationCap, ChefHat, HeartHandshake, Gamepad2 } from "lucide-react";
+import { Users, ListChecks, CalendarDays, DollarSign, BarChart2, Gift, Wrench, Ticket, Mail, LockKeyhole, MonitorSmartphone, Settings, CheckCircle2, ShoppingCart, Network, GraduationCap, ChefHat, HeartHandshake, Gamepad2, ShieldCheck } from "lucide-react";
 import { ParentManagementShell, ParentPageHeader } from "@/components/parent-management-shell";
 
 type AccountRole = "owner" | "parent" | "grandparent";
@@ -42,6 +42,14 @@ type CommunityInvitePreview = {
   } | null;
 };
 
+type GameInvitePreview = {
+  household: { id: string; name: string };
+  inviter: { name: string };
+  group: { id: string; name: string } | null;
+  event: { id: string; title: string; date: string } | null;
+  returnTo: string;
+};
+
 export default function ParentPanel() {
   const [unlocked, setUnlocked] = useState(false);
   const [accountRole, setAccountRole] = useState<AccountRole>("parent");
@@ -59,6 +67,9 @@ export default function ParentPanel() {
   const [communityInviteToken, setCommunityInviteToken] = useState("");
   const [communityReturnTo, setCommunityReturnTo] = useState("");
   const [communityInvitePreview, setCommunityInvitePreview] = useState<CommunityInvitePreview | null>(null);
+  const [gameInviteToken, setGameInviteToken] = useState("");
+  const [gameReturnTo, setGameReturnTo] = useState("");
+  const [gameInvitePreview, setGameInvitePreview] = useState<GameInvitePreview | null>(null);
   const [pinResetToken, setPinResetToken] = useState("");
   const [plugins, setPlugins] = useState<Plugin[]>([]);
   const [nextPath, setNextPath] = useState("");
@@ -96,6 +107,17 @@ export default function ParentPanel() {
         .then((data) => setCommunityInvitePreview(data?.invite ?? null))
         .catch(() => setCommunityInvitePreview(null));
     }
+    const gameInvite = params.get("gameInvite");
+    if (gameInvite) {
+      setGameInviteToken(gameInvite);
+      setGameReturnTo(params.get("returnTo") ?? "");
+      setMode("signup");
+      setNotice("Create an account to join this household's game network.");
+      fetch(`/api/game-invites?token=${encodeURIComponent(gameInvite)}`)
+        .then((res) => res.ok ? res.json() : null)
+        .then((data) => setGameInvitePreview(data?.invite ?? null))
+        .catch(() => setGameInvitePreview(null));
+    }
     const nextPinResetToken = params.get("pinReset") ?? "";
     if (nextPinResetToken) {
       setPinResetToken(nextPinResetToken);
@@ -105,6 +127,10 @@ export default function ParentPanel() {
     fetch("/api/parent/auth")
       .then((res) => res.json())
       .then(({ ok, accountRole: nextAccountRole }) => {
+        if (ok && gameInvite) {
+          acceptGameInvite(gameInvite, params.get("returnTo") ?? "");
+          return;
+        }
         if (ok && communityInvite) {
           acceptCommunityInvite(communityInvite, params.get("returnTo") ?? "");
           return;
@@ -161,7 +187,7 @@ export default function ParentPanel() {
       const res = await fetch("/api/parent/auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, mode, householdName, inviteToken, communityInviteToken, communityReturnTo, next: nextPath }),
+        body: JSON.stringify({ email, password, mode, householdName, inviteToken, communityInviteToken, communityReturnTo, gameInviteToken, gameReturnTo, next: nextPath }),
       });
       const data = await res.json();
       if (data.ok && data.needsConfirmation) {
@@ -172,6 +198,10 @@ export default function ParentPanel() {
         setPassword("");
         setError("");
       } else if (data.ok) {
+        if (gameInviteToken) {
+          await acceptGameInvite();
+          return;
+        }
         if (communityInviteToken) {
           await acceptCommunityInvite();
           return;
@@ -224,6 +254,35 @@ export default function ParentPanel() {
     } catch {
       setUnlocked(true);
       setError("Could not accept the community invite.");
+      return false;
+    }
+  }
+
+  async function acceptGameInvite(token = gameInviteToken, returnTo = gameReturnTo) {
+    try {
+      const res = await fetch("/api/game-invites", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setUnlocked(true);
+        setError(data?.error ?? "Could not join the game network.");
+        return false;
+      }
+      const destination = data?.returnTo ?? returnTo;
+      if (typeof destination === "string" && destination.startsWith("/")) {
+        window.location.assign(destination);
+        return true;
+      }
+      setGameInviteToken(""); setGameReturnTo("");
+      window.history.replaceState({}, "", "/parent");
+      setUnlocked(true); setError(""); setNotice("Game household connection created.");
+      return false;
+    } catch {
+      setUnlocked(true);
+      setError("Could not join the game network.");
       return false;
     }
   }
@@ -284,7 +343,7 @@ export default function ParentPanel() {
       const res = await fetch("/api/parent/resend-confirmation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, communityInviteToken, communityReturnTo }),
+        body: JSON.stringify({ email, password, communityInviteToken, communityReturnTo, gameInviteToken, gameReturnTo }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -322,11 +381,22 @@ export default function ParentPanel() {
 
   if (!unlocked) {
     const isCommunityInvite = Boolean(communityInviteToken);
+    const isGameInvite = Boolean(gameInviteToken);
+    const isAnyInvite = isCommunityInvite || isGameInvite;
     const inviteEvent = communityInvitePreview?.event;
     const isCommunityEventInvite = Boolean(inviteEvent);
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
-        <div className={`grid w-full gap-4 ${isCommunityInvite ? "max-w-5xl lg:grid-cols-[minmax(0,1fr)_400px]" : "max-w-sm"}`}>
+        <div className={`grid w-full gap-4 ${isAnyInvite ? "max-w-5xl lg:grid-cols-[minmax(0,1fr)_400px]" : "max-w-sm"}`}>
+          {isGameInvite && (
+            <section className="overflow-hidden rounded-3xl bg-white p-6 text-left shadow-xl sm:p-8">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-indigo-100 px-3 py-1 text-sm font-black text-indigo-700"><Gamepad2 size={16} /> Game network invite</div>
+              <h1 className="text-3xl font-black text-slate-800">Play together with {gameInvitePreview?.household.name ?? "a household"}</h1>
+              <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">{gameInvitePreview?.inviter.name ?? "A parent"} invited your household to connect for parent-approved games.</p>
+              {gameInvitePreview?.group && <div className="mt-5 rounded-2xl bg-violet-50 p-4"><p className="font-black text-violet-900">{gameInvitePreview.group.name}</p><p className="mt-1 text-sm font-semibold text-violet-700">{gameInvitePreview.event ? `You’ll join ${gameInvitePreview.event.title} and its game community.` : "You’ll join the group’s parent game network."}</p></div>}
+              <div className="mt-5 grid gap-3 sm:grid-cols-2"><div className="rounded-2xl bg-slate-50 p-4"><Users size={20} className="mb-2 text-indigo-500"/><p className="text-sm font-black text-slate-800">Households connect</p><p className="mt-1 text-xs font-semibold text-slate-500">Both parents chose this connection.</p></div><div className="rounded-2xl bg-slate-50 p-4"><ShieldCheck size={20} className="mb-2 text-emerald-500"/><p className="text-sm font-black text-slate-800">Children stay protected</p><p className="mt-1 text-xs font-semibold text-slate-500">Child friendships still need parent approval.</p></div></div>
+            </section>
+          )}
           {isCommunityInvite && (
             <section className="overflow-hidden rounded-3xl bg-white text-left shadow-xl">
               {inviteEvent?.imageUrl?.startsWith("/uploads/") && (
@@ -383,10 +453,11 @@ export default function ParentPanel() {
         <div className="bg-white rounded-3xl shadow-xl p-8 w-full text-center">
           <div className="text-6xl mb-4">🔒</div>
           <h1 className="text-2xl font-black text-slate-800 mb-2">
-            {isCommunityInvite && mode === "signup" ? (isCommunityEventInvite ? "Join Event" : "Join Group") : mode === "signup" ? "Create Household" : mode === "forgot" ? "Reset Password" : mode === "reset" ? "New Password" : "Parent Panel"}
+            {isGameInvite && mode === "signup" ? "Join Game Network" : isCommunityInvite && mode === "signup" ? (isCommunityEventInvite ? "Join Event" : "Join Group") : mode === "signup" ? "Create Household" : mode === "forgot" ? "Reset Password" : mode === "reset" ? "New Password" : "Parent Panel"}
           </h1>
           <p className="text-slate-500 font-semibold mb-6">
-            {isCommunityInvite && mode === "signup"
+            {isGameInvite && mode === "signup" ? "Create an account to connect your household and start playing together"
+              : isCommunityInvite && mode === "signup"
               ? isCommunityEventInvite ? "Create an account to RSVP and participate" : "Create an account to join this community group"
               : mode === "signup"
               ? "Start a private family workspace"
@@ -407,7 +478,7 @@ export default function ParentPanel() {
                   onChange={(event) => setHouseholdName(event.target.value)}
                   autoComplete="organization"
                   className="mt-1 w-full rounded-2xl border-2 border-slate-200 bg-slate-50 px-3 py-2 font-semibold text-slate-800 outline-none focus:border-violet-400"
-                  placeholder={isCommunityInvite ? "Your family or name" : "The Johnson Family"}
+                  placeholder={isAnyInvite ? "Your family or name" : "The Johnson Family"}
                 />
               </label>
             )}
@@ -451,7 +522,7 @@ export default function ParentPanel() {
               disabled={checking || (mode === "forgot" && !email) || (mode === "reset" && !password)}
               className="w-full bg-violet-500 hover:bg-violet-600 text-white rounded-2xl py-3 text-lg font-bold transition-colors disabled:opacity-40"
             >
-              {checking ? "Checking..." : mode === "forgot" ? "Send Reset Link" : mode === "reset" ? "Update Password" : mode === "signup" ? (isCommunityInvite ? "Create Account & Join" : "Create Account") : "Sign In"}
+              {checking ? "Checking..." : mode === "forgot" ? "Send Reset Link" : mode === "reset" ? "Update Password" : mode === "signup" ? (isGameInvite ? "Create Account & Connect" : isCommunityInvite ? "Create Account & Join" : "Create Account") : "Sign In"}
             </button>
           </form>
 
@@ -478,7 +549,7 @@ export default function ParentPanel() {
               type="button"
               onClick={() => {
                 setMode((current) => (current === "login" ? "signup" : "login"));
-                if (!communityInviteToken) {
+                if (!communityInviteToken && !gameInviteToken) {
                   setInviteToken("");
                   window.history.replaceState({}, "", "/parent");
                 }
@@ -488,7 +559,7 @@ export default function ParentPanel() {
               }}
               className="mt-4 text-sm font-bold text-violet-500 hover:text-violet-700"
             >
-              {mode === "signup" ? "Already have an account? Sign in" : isCommunityInvite ? "Create an account to join" : "Create a household account"}
+              {mode === "signup" ? "Already have an account? Sign in" : isAnyInvite ? "Create an account to join" : "Create a household account"}
             </button>
           )}
 

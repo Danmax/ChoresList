@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, ChefHat, Crown, Gamepad2, Grid3X3, KeyRound, PawPrint, Puzzle, RefreshCw, Save, Shapes, Swords, TreePine } from "lucide-react";
+import { BookOpen, ChefHat, Copy, Crown, Gamepad2, Grid3X3, KeyRound, PawPrint, Puzzle, QrCode, RefreshCw, Save, Shapes, Swords, TreePine, Users } from "lucide-react";
 import { toast } from "sonner";
+import { LocalQrCode } from "@/components/local-qr-code";
 import { ParentPageHeader } from "@/components/parent-management-shell";
 
 type Game = {
@@ -44,6 +45,9 @@ type GameSession = {
   member: { id: string; name: string; avatar: string; color: string };
 };
 
+type GameShareGroup = { id: string; name: string; events: Array<{ id: string; title: string; date: string }> };
+type GameConnection = { id: string; householdName: string; createdAt: string };
+
 function iconForGame(key: string) {
   if (key === "pocket-pals") return PawPrint;
   if (key === "rock-paper-scissors-shoot") return Swords;
@@ -81,13 +85,19 @@ export default function ParentGamesPage() {
   const [savingKey, setSavingKey] = useState("");
   const [members, setMembers] = useState<Member[]>([]);
   const [launchMemberId, setLaunchMemberId] = useState("");
+  const [shareGroups, setShareGroups] = useState<GameShareGroup[]>([]);
+  const [connections, setConnections] = useState<GameConnection[]>([]);
+  const [shareGroupId, setShareGroupId] = useState("");
+  const [shareEventId, setShareEventId] = useState("");
+  const [gameInviteUrl, setGameInviteUrl] = useState("");
+  const [creatingInvite, setCreatingInvite] = useState(false);
 
   const enabledCount = useMemo(() => Object.values(settings).filter((setting) => setting.enabled).length, [settings]);
   const pointsRewardCount = useMemo(() => Object.values(settings).filter((setting) => setting.rewardType === "points" && setting.rewardPoints > 0).length, [settings]);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await fetch("/api/games");
+    const [res, inviteRes] = await Promise.all([fetch("/api/games"), fetch("/api/game-invites")]);
     const data = await res.json().catch(() => null);
     if (!res.ok) {
       toast.error(data?.error ?? "Could not load games");
@@ -104,6 +114,11 @@ export default function ParentGamesPage() {
     const nextMembers = Array.isArray(data?.members) ? data.members : [];
     setMembers(nextMembers);
     setLaunchMemberId((current) => current || nextMembers[0]?.id || "");
+    const inviteData = await inviteRes.json().catch(() => null);
+    if (inviteRes.ok) {
+      setShareGroups(Array.isArray(inviteData?.groups) ? inviteData.groups : []);
+      setConnections(Array.isArray(inviteData?.connections) ? inviteData.connections : []);
+    }
     setLoading(false);
   }, []);
 
@@ -140,6 +155,25 @@ export default function ParentGamesPage() {
     }
   }
 
+  const shareEvents = shareGroups.find((group) => group.id === shareGroupId)?.events ?? [];
+
+  async function createGameInvite() {
+    setCreatingInvite(true);
+    try {
+      const res = await fetch("/api/game-invites", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ groupId: shareGroupId || null, eventId: shareEventId || null }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.inviteUrl) return toast.error(data?.error ?? "Could not create a game invite");
+      setGameInviteUrl(data.inviteUrl);
+      toast.success("Game invite QR code is ready");
+    } finally {
+      setCreatingInvite(false);
+    }
+  }
+
   return (
     <>
       <ParentPageHeader
@@ -165,6 +199,17 @@ export default function ParentGamesPage() {
           <p className="mt-1 text-2xl font-black text-slate-950">{sessions.length}</p>
         </div>
       </div>
+
+      <section className="mb-6 overflow-hidden rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-violet-50 p-5 shadow-sm">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div className="max-w-2xl"><div className="inline-flex items-center gap-2 rounded-full bg-indigo-100 px-3 py-1 text-xs font-black uppercase tracking-wide text-indigo-700"><QrCode size={15}/> Game invite</div><h2 className="mt-3 text-xl font-black text-slate-900">Invite another household to play</h2><p className="mt-2 text-sm font-semibold leading-6 text-slate-600">Share a QR code with a parent. They can create an account in one flow, and their household becomes a game connection. If you choose a group event, they’ll also join that group and event.</p><p className="mt-2 text-xs font-bold leading-5 text-slate-500">Child friendships and private multiplayer still require each parent’s approval.</p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2"><label><span className="text-xs font-black uppercase tracking-wide text-slate-500">Group (optional)</span><select value={shareGroupId} onChange={(event) => { setShareGroupId(event.target.value); setShareEventId(""); setGameInviteUrl(""); }} className="mt-1 w-full rounded-xl border border-indigo-200 bg-white px-3 py-2 text-sm font-bold text-slate-700"><option value="">Just connect households</option>{shareGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label><label><span className="text-xs font-black uppercase tracking-wide text-slate-500">Group game event (optional)</span><select disabled={!shareGroupId} value={shareEventId} onChange={(event) => { setShareEventId(event.target.value); setGameInviteUrl(""); }} className="mt-1 w-full rounded-xl border border-indigo-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 disabled:opacity-50"><option value="">No specific event</option>{shareEvents.map((event) => <option key={event.id} value={event.id}>{event.title}</option>)}</select></label></div>
+            <button type="button" disabled={creatingInvite} onClick={() => void createGameInvite()} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-700 px-4 py-2.5 text-sm font-black text-white hover:bg-indigo-800 disabled:opacity-50"><QrCode size={17}/>{creatingInvite ? "Creating invite…" : "Create QR invite"}</button>
+            {connections.length > 0 && <p className="mt-4 inline-flex items-center gap-2 text-sm font-black text-indigo-800"><Users size={17}/> {connections.length} connected game {connections.length === 1 ? "household" : "households"}: {connections.slice(0, 3).map((connection) => connection.householdName).join(", ")}{connections.length > 3 ? "…" : ""}</p>}
+          </div>
+          {gameInviteUrl && <div className="w-full max-w-60 rounded-2xl border border-indigo-100 bg-white p-3 text-center shadow-sm"><LocalQrCode value={gameInviteUrl} alt="QR code to join this household's game network" size={208} className="mx-auto aspect-square w-full rounded-xl bg-white object-contain"/><button type="button" onClick={() => void navigator.clipboard.writeText(gameInviteUrl).then(() => toast.success("Invite link copied"))} className="mt-3 inline-flex items-center gap-2 text-sm font-black text-indigo-700 hover:text-indigo-900"><Copy size={16}/> Copy link</button><p className="mt-2 break-all text-[10px] font-semibold leading-4 text-slate-400">Expires in 14 days</p></div>}
+        </div>
+      </section>
 
       {loading ? (
         <div className="py-16 text-center font-bold text-slate-400">Loading games...</div>

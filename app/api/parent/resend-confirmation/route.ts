@@ -5,7 +5,7 @@ import { getBaseUrl } from "@/lib/base-url";
 import { sendConfirmationEmail } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
-import { verifyCommunityInviteToken } from "@/lib/session";
+import { verifyCommunityInviteToken, verifyGameInviteToken } from "@/lib/session";
 
 export const runtime = "nodejs";
 
@@ -20,11 +20,17 @@ function appendCommunityInviteParams(url: URL, inviteToken: unknown, returnTo: u
   if (cleanReturnTo) url.searchParams.set("returnTo", cleanReturnTo);
 }
 
+function appendGameInviteParams(url: URL, inviteToken: unknown, returnTo: unknown) {
+  if (typeof inviteToken !== "string" || !verifyGameInviteToken(inviteToken)) return;
+  url.searchParams.set("gameInvite", inviteToken);
+  if (typeof returnTo === "string" && returnTo.startsWith("/") && !returnTo.startsWith("//")) url.searchParams.set("returnTo", returnTo);
+}
+
 export const POST = withErrors(async (req: NextRequest) => {
   const limited = rateLimit(req, { key: "resend-confirm", limit: 5, windowMs: 60 * 60_000 });
   if (limited) return limited;
 
-  const { email, password, communityInviteToken, communityReturnTo } = await req.json();
+  const { email, password, communityInviteToken, communityReturnTo, gameInviteToken, gameReturnTo } = await req.json();
 
   if (typeof email !== "string" || typeof password !== "string") {
     return NextResponse.json({ ok: false }, { status: 400 });
@@ -59,6 +65,7 @@ export const POST = withErrors(async (req: NextRequest) => {
   const confirmUrl = new URL("/api/parent/auth", getBaseUrl(req));
   confirmUrl.searchParams.set("confirm", token);
   appendCommunityInviteParams(confirmUrl, communityInviteToken, communityReturnTo);
+  appendGameInviteParams(confirmUrl, gameInviteToken, gameReturnTo);
   const emailResult = await sendConfirmationEmail({ to: parent.email, confirmUrl: confirmUrl.toString() });
 
   return NextResponse.json({
