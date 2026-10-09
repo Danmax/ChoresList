@@ -10,9 +10,11 @@ import { advancePet, applyPetAction, completeDailyCare, createPet, currentLesson
 async function main() {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1280, height: 1100 } });
+  page.setDefaultTimeout(10_000);
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.clock.install();
+  await page.clock.pauseAt(new Date());
   const screenshotDir = process.env.POCKET_PALS_SCREENSHOT_DIR ?? "/tmp/pocket-pals-preview";
   await mkdir(screenshotDir, { recursive: true });
   let saved: PetState | null = null;
@@ -69,11 +71,12 @@ async function main() {
     await expect(page.getByRole("heading", { name: /Pudding/ })).toBeVisible();
     await page.getByRole("button", { name: /Feed Dumpling/ }).click();
     await expect(page.getByRole("status")).toContainText("Nom nom");
+    await expect(page.getByRole("img", { name: "Pudding eating", exact: true })).toBeVisible();
     await page.clock.fastForward(2500);
     await page.getByRole("button", { name: /Clean Fresh/ }).click();
     await expect(page.getByRole("status")).toContainText("Fresh and fluffy");
     await page.clock.fastForward(2500);
-    await page.getByRole("button", { name: /Play Treat/ }).click();
+    await page.getByRole("button", { name: /Play Choose/ }).click();
     await page.getByRole("button", { name: /Treat memory Remember/ }).click();
     await expect(page.getByRole("heading", { name: "Treat memory" })).toBeVisible();
     await page.clock.fastForward(4500);
@@ -91,6 +94,7 @@ async function main() {
     await page.clock.fastForward(2500);
     await page.getByRole("button", { name: /Sleep A cozy/ }).click();
     await expect(page.getByRole("status")).toContainText("cozy dreaming");
+    await expect(page.getByRole("img", { name: "Pudding sleeping", exact: true })).toBeVisible();
     await page.clock.fastForward(31_000);
     await expect(page.getByText("Today's care badge collected!")).toBeVisible();
     assert.equal(completions, 1);
@@ -98,7 +102,7 @@ async function main() {
     const shop = page.getByRole("dialog");
     await expect(shop).toBeVisible();
     await shop.getByRole("button", { name: /Cherry bow/ }).click();
-    await expect(shop.getByRole("button", { name: /Cherry bow/ })).toContainText("Equipped");
+    await expect(shop.getByRole("button", { name: /Cherry bow/ })).toContainText("Wearing");
     await page.keyboard.press("Escape");
     await expect(shop).not.toBeVisible();
     await page.screenshot({ path: `${screenshotDir}/care-desktop.png`, fullPage: true });
@@ -110,17 +114,37 @@ async function main() {
     await page.getByRole("button", { name: /Play Choose/ }).click();
     await page.getByRole("button", { name: /Bubble Catch Catch/ }).click();
     await expect(page.getByLabel("Catch bubble 1")).toBeVisible();
+    await expect(page.getByRole("img", { name: "Pudding playing", exact: true })).toBeVisible();
+    await page.screenshot({ path: `${screenshotDir}/bubble-room.png`, fullPage: true });
     await page.clock.fastForward(4500);
-    for (let index = 1; index <= saved!.challenge!.bubbleIds!.length; index++) await page.getByLabel(`Catch bubble ${index}`).click();
+    for (let index = 1; index <= saved!.challenge!.bubbleIds!.length; index++) {
+      const bubble = page.getByLabel(`Catch bubble ${index}`);
+      // Bubbles are moving targets; click their current location without waiting
+      // for the floating animation to become stationary.
+      await bubble.click({ force: true });
+      await page.clock.fastForward(300);
+      await expect(bubble).toHaveCount(0);
+    }
+    const roomBox = await page.getByLabel("Pocket Pal room").boundingBox();
+    const finishBox = await page.getByRole("button", { name: "Finish catch!" }).boundingBox();
+    assert.ok(roomBox && finishBox && finishBox.y >= roomBox.y + roomBox.height, "Finish control is below the room");
     await page.getByRole("button", { name: "Finish catch!" }).click();
     await expect(page.getByRole("status")).toContainText("Bubble bonanza");
     await page.clock.fastForward(2500);
     await page.getByRole("button", { name: /Play Choose/ }).click();
-    await page.getByRole("button", { name: /Hide-and-Seek Find/ }).click();
-    await expect(page.getByText("Find Pudding!")).toBeVisible();
-    const hideTargets = ["Look behind the plant", "Look by the window", "Look under the rug", "Look beside the bookshelf", "Look behind the sofa"];
-    await page.getByLabel(hideTargets[saved!.challenge!.hideSpot!]).click();
-    await expect(page.getByRole("status")).toContainText("You found Pudding");
+    await expect(page.getByRole("button", { name: /Hide-and-Seek/ })).toHaveCount(0);
+    await page.getByRole("button", { name: /Rhythm Paws Listen/ }).click();
+    await page.clock.fastForward(2500);
+    await page.getByLabel("Quiet play").check();
+    await page.getByRole("button", { name: "Listen to the beat" }).click();
+    const offsets = saved!.challenge!.rhythmOffsets!;
+    await page.clock.fastForward(offsets.at(-1)! + 1500);
+    for (let index = 0; index < offsets.length; index++) {
+      if (index) await page.clock.runFor(offsets[index] - offsets[index - 1]);
+      await page.getByRole("button", { name: "Tap rhythm" }).click({ force: true });
+    }
+    await page.getByRole("button", { name: "Check rhythm" }).click();
+    await expect(page.getByRole("status")).toContainText("Pawsome rhythm");
     for (const width of [390, 320]) {
       await page.setViewportSize({ width, height: 900 });
       await expect(page.getByRole("button", { name: /Learn Grow/ })).toBeVisible();
@@ -132,4 +156,6 @@ async function main() {
     console.log(`Browser flow passed: four species, adoption, five care activities, rewards, shop, reload, and phone widths. Screenshots: ${screenshotDir}`);
   } finally { await browser.close(); }
 }
-main().catch((error) => { console.error(error); process.exitCode = 1; });
+// Keep pending browser operations alive and fail explicitly on a hung flow.
+const watchdog = setTimeout(() => { console.error("Pocket Pals browser flow timed out"); process.exit(1); }, 120_000);
+main().catch((error) => { console.error(error); process.exitCode = 1; }).finally(() => clearTimeout(watchdog));

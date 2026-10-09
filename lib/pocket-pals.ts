@@ -122,7 +122,7 @@ export type PetState = {
   owned: string[]; accessory: string | null; room: string; sleepingUntil: number | null;
   lastActionAt: number; lastCareDay: string | null; streak: number;
   daily: { day: string; startedAt: number; tasks: CareTask[]; rewarded: boolean; playRewards: number; learnRewards: number };
-  challenge: { kind: "play" | "bubble" | "hide" | "balance" | "learn"; id: string; startedAt: number; sequence?: number[]; lessonId?: string; bubbleIds?: string[]; hideSpot?: number; hideSpotCount?: number; balanceSequence?: number[] } | null;
+  challenge: { kind: "play" | "bubble" | "rhythm" | "hide" | "balance" | "learn"; id: string; startedAt: number; sequence?: number[]; lessonId?: string; bubbleIds?: string[]; hideSpot?: number; hideSpotCount?: number; balanceSequence?: number[]; rhythmOffsets?: number[]; rhythmTolerance?: number } | null;
 };
 export class PetActionError extends Error {}
 export function petDay(now: number, timeZone: string) {
@@ -166,8 +166,8 @@ export function advancePet(saved: PetState, now: number, day: string): PetState 
       markTask(pet, "sleep");
     }
   } else { pet.energy = Math.max(20, pet.energy - hours * 2); }
-  // Balance Builder was retired. Clear an unfinished legacy round cleanly.
-  if (pet.challenge?.kind === "balance") pet.challenge = null;
+  // Clear unfinished rounds of retired games without affecting earned progress.
+  if (pet.challenge?.kind === "balance" || pet.challenge?.kind === "hide") pet.challenge = null;
   if (pet.challenge && now - pet.challenge.startedAt > 300_000) pet.challenge = null;
   pet.updatedAt = Math.max(now, pet.updatedAt);
   return pet;
@@ -183,14 +183,14 @@ export function currentLesson(pet: PetState, age: number) {
 export function publicChallenge(pet: PetState, age: number) {
   const challenge = pet.challenge;
   if (!challenge) return null;
-  if (challenge.kind === "play") return { ...challenge };
+  if (challenge.kind === "play") return { id: challenge.id, kind: challenge.kind, startedAt: challenge.startedAt, sequence: challenge.sequence };
   if (challenge.kind === "bubble") return { id: challenge.id, kind: challenge.kind, startedAt: challenge.startedAt, bubbles: challenge.bubbleIds ?? [] };
-  if (challenge.kind === "hide") return { id: challenge.id, kind: challenge.kind, startedAt: challenge.startedAt, hidingSpot: challenge.hideSpot, hidingSpotCount: challenge.hideSpotCount };
-  if (challenge.kind === "balance") return null;
+  if (challenge.kind === "rhythm") return { id: challenge.id, kind: challenge.kind, startedAt: challenge.startedAt, rhythmOffsets: challenge.rhythmOffsets ?? [], rhythmTolerance: challenge.rhythmTolerance ?? 300 };
+  if (challenge.kind === "balance" || challenge.kind === "hide") return null;
   const lesson = LESSONS.find((l) => l.id === challenge.lessonId) ?? currentLesson(pet, age);
   return { id: challenge.id, kind: challenge.kind, startedAt: challenge.startedAt, topic: lesson.topic, question: lesson.question, choices: lesson.choices };
 }
-export type PetAction = "feed" | "clean" | "sleep" | "wake" | "affection" | "start-play" | "finish-play" | "start-bubble" | "finish-bubble" | "start-hide" | "guess-hide" | "start-learn" | "answer" | "buy" | "equip" | "refill" | "rename";
+export type PetAction = "feed" | "clean" | "sleep" | "wake" | "affection" | "start-play" | "finish-play" | "start-bubble" | "finish-bubble" | "start-rhythm" | "finish-rhythm" | "start-learn" | "answer" | "buy" | "equip" | "refill" | "rename";
 function challengeNumber(challengeId: string, index: number) {
   return parseInt(challengeId.replaceAll("-", "").slice(index * 2, index * 2 + 2), 16) || 0;
 }
@@ -205,7 +205,7 @@ export function applyPetAction(pet: PetState, action: PetAction, input: Record<s
   const administrative = ["buy", "equip", "refill", "rename", "wake"].includes(action);
   if (pet.sleepingUntil && !administrative) throw new PetActionError(`${pet.name} is napping. Let them rest or wake them up.`);
   if (!administrative && now - pet.lastActionAt < 2_000) throw new PetActionError("Give your pal a moment before the next activity.");
-  if (pet.challenge && !administrative && !["answer", "finish-play", "start-play", "start-bubble", "finish-bubble", "start-hide", "guess-hide", "start-learn"].includes(action)) pet.challenge = null;
+  if (pet.challenge && !administrative && !["answer", "finish-play", "start-play", "start-bubble", "finish-bubble", "start-rhythm", "finish-rhythm", "start-learn"].includes(action)) pet.challenge = null;
   switch (action) {
     case "feed":
       if (pet.dumplings <= 0) throw new PetActionError("The dumpling basket is empty. Get a refill in the shop!");
@@ -241,7 +241,7 @@ export function applyPetAction(pet: PetState, action: PetAction, input: Record<s
       if (pet.energy < 15) throw new PetActionError("Time for a nap before playing!");
       const count = age < 6 ? 4 : age < 10 ? 5 : 6;
       pet.challenge = { kind: "bubble", id: challengeId, startedAt: now, bubbleIds: Array.from({ length: count }, (_, index) => `bubble-${index}`) };
-      message = "Catch every bubble before it floats away!"; break;
+      message = "Tap every floating bubble to pop it!"; break;
     }
     case "finish-bubble": {
       const c = pet.challenge;
@@ -252,18 +252,24 @@ export function applyPetAction(pet: PetState, action: PetAction, input: Record<s
       if (!valid) { message = "Keep trying—catch every bubble!"; break; }
       message = finishPlayRound(pet, "Bubble bonanza! Your pal is delighted."); break;
     }
-    case "start-hide": {
+    case "start-rhythm": {
       if (pet.energy < 15) throw new PetActionError("Time for a nap before playing!");
-      const spots = age < 6 ? 3 : age < 10 ? 4 : 5;
-      pet.challenge = { kind: "hide", id: challengeId, startedAt: now, hideSpot: challengeNumber(challengeId, 0) % spots, hideSpotCount: spots };
-      message = `${pet.name} found a clever hiding spot!`; break;
+      const count = age < 6 ? 3 : age < 10 ? 4 : 5;
+      const beat = age < 6 ? 800 : 600;
+      const offsets = [0];
+      for (let i = 1; i < count; i++) offsets.push(offsets[i - 1] + beat * (age < 6 ? 1 : 1 + challengeNumber(challengeId, i) % 2));
+      pet.challenge = { kind: "rhythm", id: challengeId, startedAt: now, rhythmOffsets: offsets, rhythmTolerance: age < 6 ? 400 : 250 };
+      message = `Listen to ${pet.name}'s beat, then tap it back!`; break;
     }
-    case "guess-hide": {
+    case "finish-rhythm": {
       const c = pet.challenge;
-      if (!c || c.kind !== "hide" || c.id !== input.challengeId) throw new PetActionError("Start a Hide-and-Seek round first.");
-      const choice = input.choice;
-      if (!Number.isInteger(choice) || choice !== c.hideSpot) { message = "Not there—try another hiding spot!"; break; }
-      message = finishPlayRound(pet, `You found ${pet.name}! What a great seeker.`); break;
+      if (!c || c.kind !== "rhythm" || c.id !== input.challengeId) throw new PetActionError("Start a Rhythm Paws round first.");
+      const offsets = c.rhythmOffsets ?? [];
+      if (now - c.startedAt < (offsets.at(-1) ?? 0) * 2 + 1500) throw new PetActionError("Listen to the whole beat and tap it back first.");
+      const taps = input.taps;
+      const valid = offsets.length >= 3 && Array.isArray(taps) && taps.length === offsets.length && taps[0] === 0 && taps.every((tap, i) => typeof tap === "number" && Number.isFinite(tap) && (i === 0 || tap > taps[i - 1]) && Math.abs(tap - offsets[i]) <= (c.rhythmTolerance ?? 250));
+      if (!valid) { message = "Nearly! Listen again and match the spaces between the beats."; break; }
+      message = finishPlayRound(pet, "Pawsome rhythm! You and your pal make a great band."); break;
     }
     case "start-learn":
       if (pet.energy < 10) throw new PetActionError("Rest a little before learning.");

@@ -4,8 +4,9 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { ArrowLeft, BookOpen, Check, Heart, Loader2, Moon, PawPrint, RefreshCw, ShoppingBag, Sparkles, Star, Sun, X } from "lucide-react";
 import { CARE_TASKS, PET_SHOP, PET_SPECIES, PLAY_SYMBOLS, petLevel, petMood, type PetAction, type PetSpecies, type PetState } from "@/lib/pocket-pals";
 import styles from "./pocket-pals.module.css";
+import { PocketPalBubble, PocketPalsRhythm } from "./pocket-pals-rhythm";
 
-type Challenge = { id: string; kind: "play" | "bubble" | "hide" | "learn"; startedAt: number; sequence?: number[]; bubbles?: string[]; hidingSpot?: number; hidingSpotCount?: number; topic?: string; question?: string; choices?: string[] };
+type Challenge = { id: string; kind: "play" | "bubble" | "rhythm" | "learn"; startedAt: number; sequence?: number[]; bubbles?: string[]; rhythmOffsets?: number[]; topic?: string; question?: string; choices?: string[] };
 type RosterPal = { id: string; name: string; species: PetSpecies; serialNumber: string; primaryGuardianId: string };
 type PetResponse = { pet: PetState | null; palId: string | null; version: number | null; serverNow: number; roster: RosterPal[]; challenge: Challenge | null; message?: string; completed?: boolean; reward?: { points: number; tickets: number } | null };
 const TASK_LABELS = { feed: "Dumpling", clean: "Bath", play: "Play", learn: "Learn", sleep: "Rest" };
@@ -24,10 +25,8 @@ const DECOR_CLASSES: Record<string, string | undefined> = {
   "flower-wall": styles.flowerWall, "potted-palm": styles.pottedPalm, "cozy-sofa": styles.cozySofa,
   "reading-lamp": styles.readingLamp, "tea-table": styles.teaTable, "wall-shelves": styles.wallShelves,
 };
-const HIDE_CLASSES: Record<number, string | undefined> = { 0: styles.hideByPlant, 1: styles.hideByWindow, 2: styles.hideUnderRug, 3: styles.hideByShelf, 4: styles.hideBySofa };
-const HIDE_TARGETS = ["Look behind the plant", "Look by the window", "Look under the rug", "Look beside the bookshelf", "Look behind the sofa"];
-
-function PetArt({ species, name, className = "" }: { species: PetSpecies; name: string; className?: string }) {
+function PetArt({ species, name, className = "", pose }: { species: PetSpecies; name: string; className?: string; pose?: "sleeping" | "eating" | "playing" }) {
+  if (pose) return <span role="img" aria-label={`${name} ${pose}`} data-pose={pose} className={styles.poseSprite} style={{ backgroundImage: `url(/games/pocket-pals/${species}-actions-v1.png)`, backgroundPosition: `${pose === "sleeping" ? 0 : pose === "eating" ? 50 : 100}% 50%` }} />;
   return <img src={`/games/pocket-pals/${species}.webp`} alt={`${name}, your anime ${PET_SPECIES.find((s) => s.id === species)?.label.toLowerCase()}`} className={className} draggable={false} />;
 }
 
@@ -91,9 +90,9 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
       if (!alive.current) return false;
       serverOffset.current = result.serverNow - Date.now();
       setData(result); if (result.palId) setSelectedPalId(result.palId); if (action === "adopt") setAdopting(false); setMessage(result.message || "Looking lovely!"); setActivity(action);
-      if (["start-play", "start-bubble", "start-hide"].includes(action)) setShowPlayGames(false);
+      if (["start-play", "start-bubble", "start-rhythm"].includes(action)) setShowPlayGames(false);
       if (result.challenge?.kind === "play") { setWatchUntil(Date.now() + 4000); setSelectedTreats([]); }
-      if (result.challenge?.kind === "bubble") setCaughtBubbles([]);
+      if (action === "start-bubble") setCaughtBubbles([]);
       if (result.completed) {
         setBadge(true);
         setMessage(`Daily care complete! +${30 + Math.min(5, result.pet.streak - 1) * 2} coins${result.reward?.points ? ` and ${result.reward.points} family points` : result.reward?.tickets ? ` and ${result.reward.tickets} tickets` : ""}.`);
@@ -106,6 +105,7 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
   }, [memberId, data?.palId, data?.version, load]);
 
   const pet = data?.pet;
+  useEffect(() => { setCaughtBubbles([]); setShowPlayGames(false); }, [data?.palId, data?.challenge?.id]);
   // Use the server clock offset so a device with an incorrect clock cannot
   // wake a pet early or leave it sleeping indefinitely.
   const serverClock = clock + serverOffset.current;
@@ -155,7 +155,8 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
   const ready = !busy && !sleeping && serverClock - pet.lastActionAt >= 2000;
   const watching = clock < watchUntil;
   const bubbleReady = challenge?.kind === "bubble" && serverClock - challenge.startedAt >= 4000;
-  const hiding = challenge?.kind === "hide";
+  const playing = challenge && ["play", "bubble", "rhythm"].includes(challenge.kind);
+  const pose = sleeping ? "sleeping" : activity === "feed" ? "eating" : playing || ["finish-play", "finish-bubble", "finish-rhythm"].includes(activity) ? "playing" : undefined;
   const accessory = PET_SHOP.find((i) => i.id === pet.accessory);
   const accessoryClass = ({
     bow: styles.bow,
@@ -186,26 +187,26 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
             <span className={styles.level}><Star size={15} /> Level {level}</span>
           </div>
           {renaming && <form className={styles.rename} onSubmit={async (e) => { e.preventDefault(); if (await act("rename", { name })) setRenaming(false); }}><input aria-label="New pet name" value={name} onChange={(e) => setName(e.target.value)} maxLength={24} required /><button disabled={busy || !name.trim()}>Save</button><button type="button" onClick={() => setRenaming(false)}>Cancel</button></form>}
-          <div className={`${styles.room} ${ROOM_CLASSES[pet.room] ?? ""} ${sleeping ? styles.night : ""}`}>
+          <div aria-label="Pocket Pal room" className={`${styles.room} ${ROOM_CLASSES[pet.room] ?? ""} ${sleeping ? styles.night : ""}`}>
             <div className={styles.roomLabel}>{sleeping ? <Moon size={14} /> : <Sun size={14} />}{roomName}</div>
             <div className={styles.window}><span>{sleeping ? "🌙" : "☀️"}</span><i /><i /></div>
             <span className={styles.decorLeft}>{pet.room === "garden" ? "🌷" : pet.room === "library" ? "📚" : "🪴"}</span>
             <span className={styles.decorRight}>{pet.room === "garden" ? "🌻" : pet.room === "library" ? "📖" : "🧸"}</span>
             {decorations.map((item) => <span key={item.id} className={`${styles.roomDecoration} ${DECOR_CLASSES[item.id] ?? ""}`} aria-label={item.name}>{item.emoji}</span>)}
             <div className={styles.rug} />
-            <div className={`${styles.petFigure} ${hiding ? `${styles.hidingPal} ${HIDE_CLASSES[challenge.hidingSpot ?? 0] ?? ""}` : ""} ${sleeping ? styles.sleeping : ""} ${activity === "feed" ? styles.munching : activity === "clean" ? styles.wiggling : ["affection", "finish-play", "answer"].includes(activity) ? styles.bouncing : ""}`}>
+            <div className={`${styles.petFigure} ${sleeping ? styles.sleeping : ""} ${activity === "feed" ? styles.munching : activity === "clean" ? styles.wiggling : ["affection", "finish-play", "finish-bubble", "finish-rhythm", "answer"].includes(activity) ? styles.bouncing : ""}`}>
               {accessory && <span className={`${styles.accessory} ${accessoryClass}`}>{accessory.emoji}</span>}
-              <button disabled={!ready || hiding} onClick={() => void act("affection")} aria-label={`Cuddle ${pet.name}`} className={styles.petButton}><PetArt species={pet.species} name={pet.name} /></button>
+              <button disabled={!ready || !!playing} onClick={() => void act("affection")} aria-label={`Cuddle ${pet.name}`} className={styles.petButton}><PetArt species={pet.species} name={pet.name} pose={pose} /></button>
               {sleeping && <span className={styles.sleepMarks}>z z Z</span>}
-              {activity === "feed" && <span className={styles.treat}>🥟</span>}
               {activity === "clean" && <div className={styles.bubbles}><span>🫧</span><span>🫧</span><span>🫧</span></div>}
               {["affection", "finish-play", "answer"].includes(activity) && <span className={styles.love}>💕</span>}
             </div>
-            {challenge?.kind === "bubble" && <><div className={styles.roomBubbles}>{challenge.bubbles?.map((bubble, index) => <button key={bubble} className={caughtBubbles.includes(bubble) ? styles.caughtBubble : ""} disabled={!ready || caughtBubbles.includes(bubble)} onClick={() => setCaughtBubbles((caught) => [...caught, bubble])} style={{ left: `${12 + (index * 29) % 72}%`, top: `${19 + (index * 31) % 52}%` }} aria-label={`Catch bubble ${index + 1}`}>🫧</button>)}</div><div className={styles.bubbleStatus}>{caughtBubbles.length}/{challenge.bubbles?.length ?? 0} bubbles</div>{caughtBubbles.length === challenge.bubbles?.length && <button className={styles.bubbleFinish} disabled={!bubbleReady || !ready} onClick={() => void act("finish-bubble", { challengeId: challenge.id, caught: caughtBubbles })}>{bubbleReady ? "Finish catch!" : "Keep catching…"}</button>}</>}
-            {hiding && <><div className={styles.hidePrompt}>🙈 Find {pet.name}!</div><div className={styles.hideTargets}>{HIDE_TARGETS.slice(0, challenge.hidingSpotCount ?? 3).map((label, index) => <button key={label} aria-label={label} disabled={!ready} onClick={() => void act("guess-hide", { challengeId: challenge.id, choice: index })} />)}</div></>}
+            {challenge?.kind === "bubble" && <div key={challenge.id} className={styles.roomBubbles}>{challenge.bubbles?.map((bubble, index) => <PocketPalBubble key={bubble} index={index} caught={caughtBubbles.includes(bubble)} disabled={busy} onCatch={() => setCaughtBubbles((caught) => caught.includes(bubble) ? caught : [...caught, bubble])} />)}</div>}
             <div className={styles.mood}>{mood.emoji} {mood.label}</div>
             {pet.cleanliness < 40 && !sleeping && <span className={styles.dust}>🍂</span>}
           </div>
+          {challenge?.kind === "bubble" && <div className={styles.roomGameControls}><span>{caughtBubbles.length}/{challenge.bubbles?.length ?? 0} bubbles popped</span><button className={styles.primary} disabled={!bubbleReady || !ready || caughtBubbles.length !== challenge.bubbles?.length} onClick={() => void act("finish-bubble", { challengeId: challenge.id, caught: caughtBubbles })}>Finish catch!</button></div>}
+          {challenge?.kind === "rhythm" && <PocketPalsRhythm key={challenge.id} offsets={challenge.rhythmOffsets ?? []} busy={!ready} onFinish={(taps) => act("finish-rhythm", { challengeId: challenge.id, taps })} />}
           <div className={styles.speech} role="status" aria-live="polite"><Heart size={17} /><p>{sleeping ? `Shhh… ${sleepRemaining}s of cozy dreaming left.` : message}</p>{busy && <Loader2 size={15} className="animate-spin" />}</div>
           {error && <p className={styles.error} role="alert">{error} <button onClick={() => void load()} aria-label="Refresh pet"><RefreshCw size={14} /></button></p>}
           <div className={styles.actions}>
@@ -215,8 +216,8 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
             <button disabled={busy || (!sleeping && !ready)} onClick={() => void act(sleeping ? "wake" : "sleep")}><span>{sleeping ? "☀️" : "🌙"}</span><strong>{sleeping ? "Wake" : "Sleep"}</strong><small>{sleeping ? `${sleepRemaining}s left` : "A cozy nap"}</small></button>
             <button disabled={!ready} onClick={() => void act("start-learn")}><span>📖</span><strong>Learn</strong><small>Grow together</small></button>
           </div>
-          {showPlayGames && !challenge && <div className={styles.gamePicker}><div><span className={styles.eyebrow}>Play together</span><h3>What should {pet.name} play?</h3></div><div>{[{ action: "start-play", emoji: "🧸", title: "Treat memory", detail: "Remember the treat pattern" }, { action: "start-bubble", emoji: "🫧", title: "Bubble Catch", detail: "Catch bubbles in the room" }, { action: "start-hide", emoji: "🙈", title: "Hide-and-Seek", detail: "Find your hidden pal" }].map((game) => <button key={game.action} disabled={!ready} onClick={() => void act(game.action as PetAction)}><span>{game.emoji}</span><strong>{game.title}</strong><small>{game.detail}</small></button>)}</div><small>Each win earns 8 coins, for your first three wins each day.</small></div>}
-          {challenge && !["bubble", "hide"].includes(challenge.kind) && <div className={styles.activityPanel}>
+          {showPlayGames && <div className={styles.gamePicker}><div><span className={styles.eyebrow}>Play together</span><h3>What should {pet.name} play?</h3></div><div>{[{ action: "start-play", emoji: "🧸", title: "Treat memory", detail: "Remember the treat pattern" }, { action: "start-bubble", emoji: "🫧", title: "Bubble Catch", detail: "Catch bubbles in the room" }, { action: "start-rhythm", emoji: "🎵", title: "Rhythm Paws", detail: "Listen and tap the beat" }].map((game) => <button key={game.action} disabled={!ready} onClick={() => void act(game.action as PetAction)}><span>{game.emoji}</span><strong>{game.title}</strong><small>{game.detail}</small></button>)}</div><small>Each win earns 8 coins, for your first three wins each day.</small></div>}
+          {challenge && !["bubble", "rhythm"].includes(challenge.kind) && <div className={styles.activityPanel}>
             <div className={styles.panelHeading}><h3>{challenge.kind === "play" ? "Treat memory" : `${challenge.topic} together`}</h3><span>{challenge.kind === "play" ? "🧸" : "📖"}</span></div>
             {challenge.kind === "play" ? <>
               <p>{watching ? "Look closely! Remember these treats in order." : "Your turn! Tap the treats in the same order."}</p>

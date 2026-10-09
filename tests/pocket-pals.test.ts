@@ -116,16 +116,43 @@ test("Bubble Catch validates issued bubbles and shares the play reward limit", (
   assert.equal(pet.daily.playRewards, 1);
 });
 
-test("Hide-and-Seek publishes a visual hiding spot and rewards a correct in-room find", () => {
+test("Rhythm Paws checks tap timing, retries, replay protection and shared play rewards", () => {
   const pet = createPet("cat", "Miso", now, day);
-  applyPetAction(pet, "start-hide", {}, now, 10, id);
-  const hide = publicChallenge(pet, 10)!;
-  assert.equal(hide.kind, "hide");
-  assert.ok(Number.isInteger(hide.hidingSpot));
-  applyPetAction(pet, "guess-hide", { challengeId: id, choice: 99 }, now + 3_000, 10, id);
-  assert.equal(pet.gamesPlayed, 0);
-  applyPetAction(pet, "guess-hide", { challengeId: id, choice: hide.hidingSpot }, now + 5_000, 10, id);
+  applyPetAction(pet, "start-rhythm", {}, now, 10, id);
+  const rhythm = publicChallenge(pet, 10)!;
+  assert.ok(rhythm.kind === "rhythm");
+  const offsets = rhythm.rhythmOffsets!;
+  assert.equal(rhythm.kind, "rhythm");
+  assert.equal(offsets.length, 5);
+  assert.throws(() => applyPetAction(pet, "finish-rhythm", { challengeId: "forged", taps: offsets }, now + 15_000, 10, id));
+  assert.throws(() => applyPetAction(pet, "finish-rhythm", { challengeId: id, taps: offsets }, now + 2000, 10, id));
+  for (const [index, taps] of [[0, 0, 0, 0, 0], [0, NaN, 1200, 1800, 2400], offsets.slice(1), offsets.map((offset, i) => i ? offset + 1000 : 0)].entries()) {
+    applyPetAction(pet, "finish-rhythm", { challengeId: id, taps }, now + 15_000 + index * 3000, 10, id);
+    assert.equal(pet.gamesPlayed, 0);
+  }
+  pet.daily.playRewards = 2;
+  applyPetAction(pet, "finish-rhythm", { challengeId: id, taps: offsets.map((offset, i) => i ? offset + 100 : 0) }, now + 30_000, 10, id);
   assert.equal(pet.gamesPlayed, 1);
+  assert.equal(pet.coins, 28);
+  assert.equal(pet.daily.playRewards, 3);
+  assert.ok(pet.daily.tasks.includes("play"));
+  assert.throws(() => applyPetAction(pet, "finish-rhythm", { challengeId: id, taps: offsets }, now + 33_000, 10, id));
+  applyPetAction(pet, "start-rhythm", {}, now + 36_000, 5, id);
+  assert.equal(pet.challenge?.rhythmOffsets?.length, 3);
+  applyPetAction(pet, "finish-rhythm", { challengeId: id, taps: pet.challenge?.rhythmOffsets }, now + 48_000, 5, id);
+  assert.equal(pet.coins, 28);
+  assert.equal(pet.gamesPlayed, 2);
+});
+
+test("retired hide and balance challenges clear on reload without losing coins", () => {
+  const pet = createPet("cat", "Miso", now, day);
+  pet.challenge = { kind: "hide", id, startedAt: now, hideSpot: 2 };
+  assert.equal(advancePet(pet, now + 1000, day).challenge, null);
+  pet.challenge = { kind: "balance", id, startedAt: now, balanceSequence: [0, 1, -1] };
+  const advanced = advancePet(pet, now + 1000, day);
+  assert.equal(advanced.challenge, null);
+  assert.equal(advanced.coins, pet.coins);
+  assert.equal(pet.gamesPlayed, 0);
 });
 
 test("lessons hide answers, teach after mistakes, and cannot replay rewards", () => {
