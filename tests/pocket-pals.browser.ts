@@ -156,18 +156,18 @@ async function main() {
     await expect(page.getByRole("img", { name: "Pudding playing", exact: true })).toBeVisible();
     await page.screenshot({ path: `${screenshotDir}/bubble-room.png`, fullPage: true });
     await page.clock.fastForward(4500);
-    for (let index = 1; index <= saved!.challenge!.bubbleIds!.length; index++) {
-      const bubble = page.getByLabel(`Catch bubble ${index}`);
-      // Bubbles are moving targets; click their current location without waiting
-      // for the floating animation to become stationary.
-      await bubble.click({ force: true });
-      await page.clock.fastForward(300);
-      await expect(bubble).toHaveCount(0);
+    for (let wave = 0; wave < 3; wave++) {
+      for (let index = 1; index <= saved!.challenge!.bubbleIds!.length; index++) {
+        const bubble = page.getByLabel(`Catch bubble ${index}`);
+        // Bubbles are moving targets; click their current location without waiting
+        // for the floating animation to become stationary.
+        await bubble.click({ force: true });
+        await page.clock.fastForward(100);
+        await expect(bubble).toHaveCount(0);
+      }
+      await page.clock.fastForward(500);
+      if (wave < 2) await expect(page.getByLabel("Catch bubble 1")).toBeVisible();
     }
-    const roomBox = await page.getByLabel("Pocket Pal room").boundingBox();
-    const finishBox = await page.getByRole("button", { name: "Finish catch!" }).boundingBox();
-    assert.ok(roomBox && finishBox && finishBox.y >= roomBox.y + roomBox.height, "Finish control is below the room");
-    await page.getByRole("button", { name: "Finish catch!" }).click();
     await expect(page.getByRole("status")).toContainText("Bubble bonanza");
     await page.clock.fastForward(2500);
     await page.getByRole("button", { name: /Play Choose/ }).click();
