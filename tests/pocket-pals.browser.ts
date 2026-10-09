@@ -107,6 +107,20 @@ async function main() {
     await expect(page.getByRole("heading", { name: /Pudding/ })).toBeVisible();
     await expect(page.getByText("Today's care badge collected!")).toBeVisible();
     assert.equal((saved as PetState | null)?.accessory, "bow");
+    await page.getByRole("button", { name: /Play Choose/ }).click();
+    await page.getByRole("button", { name: /Bubble Catch Catch/ }).click();
+    await expect(page.getByLabel("Catch bubble 1")).toBeVisible();
+    await page.clock.fastForward(4500);
+    for (let index = 1; index <= saved!.challenge!.bubbleIds!.length; index++) await page.getByLabel(`Catch bubble ${index}`).click();
+    await page.getByRole("button", { name: "Finish catch!" }).click();
+    await expect(page.getByRole("status")).toContainText("Bubble bonanza");
+    await page.clock.fastForward(2500);
+    await page.getByRole("button", { name: /Play Choose/ }).click();
+    await page.getByRole("button", { name: /Hide-and-Seek Find/ }).click();
+    await expect(page.getByText("Find Pudding!")).toBeVisible();
+    const hideTargets = ["Look behind the plant", "Look by the window", "Look under the rug", "Look beside the bookshelf", "Look behind the sofa"];
+    await page.getByLabel(hideTargets[saved!.challenge!.hideSpot!]).click();
+    await expect(page.getByRole("status")).toContainText("You found Pudding");
     for (const width of [390, 320]) {
       await page.setViewportSize({ width, height: 900 });
       await expect(page.getByRole("button", { name: /Learn Grow/ })).toBeVisible();

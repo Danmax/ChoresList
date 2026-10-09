@@ -5,7 +5,7 @@ import { ArrowLeft, BookOpen, Check, Heart, Loader2, Moon, PawPrint, RefreshCw, 
 import { CARE_TASKS, PET_SHOP, PET_SPECIES, PLAY_SYMBOLS, petLevel, petMood, type PetAction, type PetSpecies, type PetState } from "@/lib/pocket-pals";
 import styles from "./pocket-pals.module.css";
 
-type Challenge = { id: string; kind: "play" | "bubble" | "hide" | "balance" | "learn"; startedAt: number; sequence?: number[]; bubbles?: string[]; spots?: string[]; items?: string[]; topic?: string; question?: string; choices?: string[] };
+type Challenge = { id: string; kind: "play" | "bubble" | "hide" | "learn"; startedAt: number; sequence?: number[]; bubbles?: string[]; hidingSpot?: number; hidingSpotCount?: number; topic?: string; question?: string; choices?: string[] };
 type RosterPal = { id: string; name: string; species: PetSpecies; serialNumber: string; primaryGuardianId: string };
 type PetResponse = { pet: PetState | null; palId: string | null; version: number | null; serverNow: number; roster: RosterPal[]; challenge: Challenge | null; message?: string; completed?: boolean; reward?: { points: number; tickets: number } | null };
 const TASK_LABELS = { feed: "Dumpling", clean: "Bath", play: "Play", learn: "Learn", sleep: "Rest" };
@@ -24,6 +24,8 @@ const DECOR_CLASSES: Record<string, string | undefined> = {
   "flower-wall": styles.flowerWall, "potted-palm": styles.pottedPalm, "cozy-sofa": styles.cozySofa,
   "reading-lamp": styles.readingLamp, "tea-table": styles.teaTable, "wall-shelves": styles.wallShelves,
 };
+const HIDE_CLASSES: Record<number, string | undefined> = { 0: styles.hideByPlant, 1: styles.hideByWindow, 2: styles.hideUnderRug, 3: styles.hideByShelf, 4: styles.hideBySofa };
+const HIDE_TARGETS = ["Look behind the plant", "Look by the window", "Look under the rug", "Look beside the bookshelf", "Look behind the sofa"];
 
 function PetArt({ species, name, className = "" }: { species: PetSpecies; name: string; className?: string }) {
   return <img src={`/games/pocket-pals/${species}.webp`} alt={`${name}, your anime ${PET_SPECIES.find((s) => s.id === species)?.label.toLowerCase()}`} className={className} draggable={false} />;
@@ -46,7 +48,6 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
   const [selectedTreats, setSelectedTreats] = useState<number[]>([]);
   const [showPlayGames, setShowPlayGames] = useState(false);
   const [caughtBubbles, setCaughtBubbles] = useState<string[]>([]);
-  const [balancePlacements, setBalancePlacements] = useState<number[]>([]);
   const [watchUntil, setWatchUntil] = useState(0);
   const [badge, setBadge] = useState(false);
   const requestInFlight = useRef(false);
@@ -90,10 +91,9 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
       if (!alive.current) return false;
       serverOffset.current = result.serverNow - Date.now();
       setData(result); if (result.palId) setSelectedPalId(result.palId); if (action === "adopt") setAdopting(false); setMessage(result.message || "Looking lovely!"); setActivity(action);
-      if (["start-play", "start-bubble", "start-hide", "start-balance"].includes(action)) setShowPlayGames(false);
+      if (["start-play", "start-bubble", "start-hide"].includes(action)) setShowPlayGames(false);
       if (result.challenge?.kind === "play") { setWatchUntil(Date.now() + 4000); setSelectedTreats([]); }
       if (result.challenge?.kind === "bubble") setCaughtBubbles([]);
-      if (result.challenge?.kind === "balance") setBalancePlacements([]);
       if (result.completed) {
         setBadge(true);
         setMessage(`Daily care complete! +${30 + Math.min(5, result.pet.streak - 1) * 2} coins${result.reward?.points ? ` and ${result.reward.points} family points` : result.reward?.tickets ? ` and ${result.reward.tickets} tickets` : ""}.`);
@@ -154,6 +154,8 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
   const sleeping = Boolean(pet.sleepingUntil);
   const ready = !busy && !sleeping && serverClock - pet.lastActionAt >= 2000;
   const watching = clock < watchUntil;
+  const bubbleReady = challenge?.kind === "bubble" && serverClock - challenge.startedAt >= 4000;
+  const hiding = challenge?.kind === "hide";
   const accessory = PET_SHOP.find((i) => i.id === pet.accessory);
   const accessoryClass = ({
     bow: styles.bow,
@@ -191,14 +193,16 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
             <span className={styles.decorRight}>{pet.room === "garden" ? "🌻" : pet.room === "library" ? "📖" : "🧸"}</span>
             {decorations.map((item) => <span key={item.id} className={`${styles.roomDecoration} ${DECOR_CLASSES[item.id] ?? ""}`} aria-label={item.name}>{item.emoji}</span>)}
             <div className={styles.rug} />
-            <div className={`${styles.petFigure} ${sleeping ? styles.sleeping : ""} ${activity === "feed" ? styles.munching : activity === "clean" ? styles.wiggling : ["affection", "finish-play", "answer"].includes(activity) ? styles.bouncing : ""}`}>
+            <div className={`${styles.petFigure} ${hiding ? `${styles.hidingPal} ${HIDE_CLASSES[challenge.hidingSpot ?? 0] ?? ""}` : ""} ${sleeping ? styles.sleeping : ""} ${activity === "feed" ? styles.munching : activity === "clean" ? styles.wiggling : ["affection", "finish-play", "answer"].includes(activity) ? styles.bouncing : ""}`}>
               {accessory && <span className={`${styles.accessory} ${accessoryClass}`}>{accessory.emoji}</span>}
-              <button disabled={!ready} onClick={() => void act("affection")} aria-label={`Cuddle ${pet.name}`} className={styles.petButton}><PetArt species={pet.species} name={pet.name} /></button>
+              <button disabled={!ready || hiding} onClick={() => void act("affection")} aria-label={`Cuddle ${pet.name}`} className={styles.petButton}><PetArt species={pet.species} name={pet.name} /></button>
               {sleeping && <span className={styles.sleepMarks}>z z Z</span>}
               {activity === "feed" && <span className={styles.treat}>🥟</span>}
               {activity === "clean" && <div className={styles.bubbles}><span>🫧</span><span>🫧</span><span>🫧</span></div>}
               {["affection", "finish-play", "answer"].includes(activity) && <span className={styles.love}>💕</span>}
             </div>
+            {challenge?.kind === "bubble" && <><div className={styles.roomBubbles}>{challenge.bubbles?.map((bubble, index) => <button key={bubble} className={caughtBubbles.includes(bubble) ? styles.caughtBubble : ""} disabled={!ready || caughtBubbles.includes(bubble)} onClick={() => setCaughtBubbles((caught) => [...caught, bubble])} style={{ left: `${12 + (index * 29) % 72}%`, top: `${19 + (index * 31) % 52}%` }} aria-label={`Catch bubble ${index + 1}`}>🫧</button>)}</div><div className={styles.bubbleStatus}>{caughtBubbles.length}/{challenge.bubbles?.length ?? 0} bubbles</div>{caughtBubbles.length === challenge.bubbles?.length && <button className={styles.bubbleFinish} disabled={!bubbleReady || !ready} onClick={() => void act("finish-bubble", { challengeId: challenge.id, caught: caughtBubbles })}>{bubbleReady ? "Finish catch!" : "Keep catching…"}</button>}</>}
+            {hiding && <><div className={styles.hidePrompt}>🙈 Find {pet.name}!</div><div className={styles.hideTargets}>{HIDE_TARGETS.slice(0, challenge.hidingSpotCount ?? 3).map((label, index) => <button key={label} aria-label={label} disabled={!ready} onClick={() => void act("guess-hide", { challengeId: challenge.id, choice: index })} />)}</div></>}
             <div className={styles.mood}>{mood.emoji} {mood.label}</div>
             {pet.cleanliness < 40 && !sleeping && <span className={styles.dust}>🍂</span>}
           </div>
@@ -211,15 +215,15 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
             <button disabled={busy || (!sleeping && !ready)} onClick={() => void act(sleeping ? "wake" : "sleep")}><span>{sleeping ? "☀️" : "🌙"}</span><strong>{sleeping ? "Wake" : "Sleep"}</strong><small>{sleeping ? `${sleepRemaining}s left` : "A cozy nap"}</small></button>
             <button disabled={!ready} onClick={() => void act("start-learn")}><span>📖</span><strong>Learn</strong><small>Grow together</small></button>
           </div>
-          {showPlayGames && !challenge && <div className={styles.gamePicker}><div><span className={styles.eyebrow}>Play together</span><h3>What should {pet.name} play?</h3></div><div>{[{ action: "start-play", emoji: "🧸", title: "Treat memory", detail: "Remember the treat pattern" }, { action: "start-bubble", emoji: "🫧", title: "Bubble Catch", detail: "Pop every floating bubble" }, { action: "start-hide", emoji: "🙈", title: "Hide-and-Seek", detail: "Find your hidden pal" }, { action: "start-balance", emoji: "🧱", title: "Balance Builder", detail: "Build a steady tower" }].map((game) => <button key={game.action} disabled={!ready} onClick={() => void act(game.action as PetAction)}><span>{game.emoji}</span><strong>{game.title}</strong><small>{game.detail}</small></button>)}</div><small>Each win earns 8 coins, for your first three wins each day.</small></div>}
-          {challenge && <div className={styles.activityPanel}>
-            <div className={styles.panelHeading}><h3>{challenge.kind === "play" ? "Treat memory" : challenge.kind === "bubble" ? "Bubble Catch" : challenge.kind === "hide" ? "Hide-and-Seek" : challenge.kind === "balance" ? "Balance Builder" : `${challenge.topic} together`}</h3><span>{challenge.kind === "play" ? "🧸" : challenge.kind === "bubble" ? "🫧" : challenge.kind === "hide" ? "🙈" : challenge.kind === "balance" ? "🧱" : "📖"}</span></div>
+          {showPlayGames && !challenge && <div className={styles.gamePicker}><div><span className={styles.eyebrow}>Play together</span><h3>What should {pet.name} play?</h3></div><div>{[{ action: "start-play", emoji: "🧸", title: "Treat memory", detail: "Remember the treat pattern" }, { action: "start-bubble", emoji: "🫧", title: "Bubble Catch", detail: "Catch bubbles in the room" }, { action: "start-hide", emoji: "🙈", title: "Hide-and-Seek", detail: "Find your hidden pal" }].map((game) => <button key={game.action} disabled={!ready} onClick={() => void act(game.action as PetAction)}><span>{game.emoji}</span><strong>{game.title}</strong><small>{game.detail}</small></button>)}</div><small>Each win earns 8 coins, for your first three wins each day.</small></div>}
+          {challenge && !["bubble", "hide"].includes(challenge.kind) && <div className={styles.activityPanel}>
+            <div className={styles.panelHeading}><h3>{challenge.kind === "play" ? "Treat memory" : `${challenge.topic} together`}</h3><span>{challenge.kind === "play" ? "🧸" : "📖"}</span></div>
             {challenge.kind === "play" ? <>
               <p>{watching ? "Look closely! Remember these treats in order." : "Your turn! Tap the treats in the same order."}</p>
               <div className={styles.pattern} aria-label={watching ? "Treat sequence to remember" : "Your selected treats"}>{(watching ? challenge.sequence ?? [] : (challenge.sequence ?? []).map((_, i) => selectedTreats[i] ?? -1)).map((s, i) => <span key={i}>{s < 0 ? "?" : PLAY_SYMBOLS[s]}</span>)}</div>
               {!watching && <><div className={styles.treatChoices}>{PLAY_SYMBOLS.map((symbol, i) => <button key={i} disabled={!ready || selectedTreats.length >= (challenge.sequence?.length ?? 0)} onClick={() => setSelectedTreats((prev) => [...prev, i])} aria-label={`Choose ${symbol}`}>{symbol}</button>)}</div><div className={styles.playButtons}><button onClick={() => { setSelectedTreats([]); setWatchUntil(clock + 4000); }} disabled={busy}>Show me again</button><button className={styles.primary} disabled={!ready || selectedTreats.length !== challenge.sequence?.length} onClick={() => void act("finish-play", { challengeId: challenge.id, sequence: selectedTreats })}>Check pattern</button></div></>}
               <small>Earn 8 coins per win for your first three wins each day.</small>
-            </> : challenge.kind === "bubble" ? <><p>Tap every bubble, then celebrate your catch with {pet.name}.</p><div className={styles.bubbleField}>{challenge.bubbles?.map((bubble, index) => <button key={bubble} className={caughtBubbles.includes(bubble) ? styles.caughtBubble : ""} disabled={!ready || caughtBubbles.includes(bubble)} onClick={() => setCaughtBubbles((caught) => [...caught, bubble])} style={{ left: `${10 + (index * 31) % 76}%`, top: `${12 + (index * 37) % 64}%` }} aria-label={`Catch bubble ${index + 1}`}>🫧</button>)}</div><div className={styles.playButtons}><span>{caughtBubbles.length}/{challenge.bubbles?.length ?? 0} caught</span><button className={styles.primary} disabled={!ready || caughtBubbles.length !== challenge.bubbles?.length} onClick={() => void act("finish-bubble", { challengeId: challenge.id, caught: caughtBubbles })}>Finish catch</button></div><small>Earn 8 coins per win for your first three wins each day.</small></> : challenge.kind === "hide" ? <><p>Where did {pet.name} hide?</p><div className={styles.answers}>{challenge.spots?.map((spot, index) => <button key={spot} disabled={!ready} onClick={() => void act("guess-hide", { challengeId: challenge.id, choice: index })}>{spot}</button>)}</div><small>Earn 8 coins per win for your first three wins each day.</small></> : challenge.kind === "balance" ? <><p>Place each item left, center, or right to keep the tower steady.</p><div className={styles.balanceStack}>{challenge.items?.map((item, index) => <span key={`${item}-${index}`} className={balancePlacements[index] === undefined ? styles.unplaced : ""} style={balancePlacements[index] === undefined ? undefined : { transform: `translateX(${balancePlacements[index] * 28}px)` }}>{item}</span>)}</div><div className={styles.balanceControls}>{["Left", "Center", "Right"].map((label, index) => <button key={label} disabled={!ready || balancePlacements.length === challenge.items?.length} onClick={() => setBalancePlacements((placements) => [...placements, index - 1])}>{label}</button>)}</div><div className={styles.playButtons}><span>{balancePlacements.length}/{challenge.items?.length ?? 0} placed</span><button className={styles.primary} disabled={!ready || balancePlacements.length !== challenge.items?.length} onClick={() => void act("finish-balance", { challengeId: challenge.id, placements: balancePlacements })}>Check tower</button></div><small>Earn 8 coins per win for your first three wins each day.</small></> : <><p className={styles.question}>{challenge.question}</p><div className={styles.answers}>{challenge.choices?.map((choice, i) => <button key={i} disabled={!ready} onClick={() => void act("answer", { challengeId: challenge.id, choice: i })}>{choice}</button>)}</div><small>Earn 6 coins per lesson for your first three lessons each day.</small></>}
+            </> : <><p className={styles.question}>{challenge.question}</p><div className={styles.answers}>{challenge.choices?.map((choice, i) => <button key={i} disabled={!ready} onClick={() => void act("answer", { challengeId: challenge.id, choice: i })}>{choice}</button>)}</div><small>Earn 6 coins per lesson for your first three lessons each day.</small></>}
           </div>}
         </div>
         <aside className={styles.sidebar}>

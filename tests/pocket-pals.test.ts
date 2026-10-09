@@ -116,26 +116,16 @@ test("Bubble Catch validates issued bubbles and shares the play reward limit", (
   assert.equal(pet.daily.playRewards, 1);
 });
 
-test("Hide-and-Seek and Balance Builder keep their answers private until the round is complete", () => {
+test("Hide-and-Seek publishes a visual hiding spot and rewards a correct in-room find", () => {
   const pet = createPet("cat", "Miso", now, day);
   applyPetAction(pet, "start-hide", {}, now, 10, id);
   const hide = publicChallenge(pet, 10)!;
   assert.equal(hide.kind, "hide");
-  assert.ok(!("hideSpot" in hide));
+  assert.ok(Number.isInteger(hide.hidingSpot));
   applyPetAction(pet, "guess-hide", { challengeId: id, choice: 99 }, now + 3_000, 10, id);
   assert.equal(pet.gamesPlayed, 0);
-  const privateHideSpot = pet.challenge?.hideSpot;
-  applyPetAction(pet, "guess-hide", { challengeId: id, choice: privateHideSpot }, now + 5_000, 10, id);
+  applyPetAction(pet, "guess-hide", { challengeId: id, choice: hide.hidingSpot }, now + 5_000, 10, id);
   assert.equal(pet.gamesPlayed, 1);
-
-  applyPetAction(pet, "start-balance", {}, now + 8_000, 10, id);
-  const balance = publicChallenge(pet, 10)!;
-  assert.equal(balance.kind, "balance");
-  assert.ok(!("balanceSequence" in balance));
-  assert.throws(() => applyPetAction(pet, "finish-balance", { challengeId: id, placements: pet.challenge?.balanceSequence }, now + 10_000, 10, id));
-  applyPetAction(pet, "finish-balance", { challengeId: id, placements: pet.challenge?.balanceSequence }, now + 13_000, 10, id);
-  assert.equal(pet.gamesPlayed, 2);
-  assert.equal(pet.daily.playRewards, 2);
 });
 
 test("lessons hide answers, teach after mistakes, and cannot replay rewards", () => {
