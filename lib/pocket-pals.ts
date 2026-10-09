@@ -266,7 +266,7 @@ export function applyPetAction(pet: PetState, action: PetAction, input: Record<s
       const caught = input.caught;
       const valid = Array.isArray(caught) && caught.length === c.bubbleIds?.length && new Set(caught).size === caught.length && caught.every((id) => typeof id === "string" && c.bubbleIds?.includes(id));
       if (!valid) { message = "Keep trying—catch every bubble!"; break; }
-      message = finishPlayRound(pet, "Bubble bonanza! Your pal is delighted."); break;
+      message = finishPlayRound(pet, input.wavesCompleted === 3 ? "Bubble bonanza! Three waves cleared and two hidden goodies found." : "Bubble bonanza! Your pal is delighted."); break;
     }
     case "start-rhythm": {
       if (pet.energy < 15) throw new PetActionError("Time for a nap before playing!");

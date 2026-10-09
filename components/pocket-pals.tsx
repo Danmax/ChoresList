@@ -49,6 +49,8 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
   const [selectedTreats, setSelectedTreats] = useState<number[]>([]);
   const [showPlayGames, setShowPlayGames] = useState(false);
   const [caughtBubbles, setCaughtBubbles] = useState<string[]>([]);
+  const [bubbleWave, setBubbleWave] = useState(0);
+  const [bubbleGoodies, setBubbleGoodies] = useState<string[]>([]);
   const [watchUntil, setWatchUntil] = useState(0);
   const [rhythmPreferences, setRhythmPreferences] = useState<RhythmPreferences>({ sound: "drums", volume: 55, muted: false });
   const [badge, setBadge] = useState(false);
@@ -96,7 +98,7 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
       setData(result); if (result.palId) setSelectedPalId(result.palId); if (action === "adopt") setAdopting(false); setMessage(result.message || "Looking lovely!"); setActivity(action);
       if (["start-play", "start-bubble", "start-rhythm", "start-treasure"].includes(action)) setShowPlayGames(false);
       if (result.challenge?.kind === "play") { setWatchUntil(Date.now() + 4000); setSelectedTreats([]); }
-      if (action === "start-bubble") setCaughtBubbles([]);
+      if (action === "start-bubble") { setCaughtBubbles([]); setBubbleWave(0); setBubbleGoodies([]); }
       if (result.completed) {
         setBadge(true);
         setMessage(`Daily care complete! +${30 + Math.min(5, result.pet.streak - 1) * 2} silver coins${result.reward?.points ? ` and ${result.reward.points} family points` : result.reward?.tickets ? ` and ${result.reward.tickets} tickets` : ""}.`);
@@ -121,7 +123,24 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
     const timer = window.setTimeout(() => setMoving(false), 650);
     return () => window.clearTimeout(timer);
   }, [data?.palId, trailId, trailFound, trailChestReady]);
-  useEffect(() => { setCaughtBubbles([]); setShowPlayGames(false); setArrangingRoom(false); }, [data?.palId, data?.challenge?.id]);
+  useEffect(() => { setCaughtBubbles([]); setBubbleWave(0); setBubbleGoodies([]); setShowPlayGames(false); setArrangingRoom(false); }, [data?.palId, data?.challenge?.id]);
+  useEffect(() => {
+    const bubbleChallenge = data?.challenge?.kind === "bubble" ? data.challenge : null;
+    const count = bubbleChallenge?.bubbles?.length ?? 0;
+    if (!bubbleChallenge || count === 0 || caughtBubbles.length !== count || busy) return;
+    if (bubbleWave < 2) {
+      const timer = window.setTimeout(() => {
+        setBubbleWave((wave) => wave + 1);
+        setCaughtBubbles([]);
+        setBubbleGoodies((goodies) => [...goodies, bubbleWave === 0 ? "🍓" : "✨"]);
+        setMessage(bubbleWave === 0 ? "Bonus bubbles! A hidden berry appeared!" : "Final bubble wave! You found a sparkle goodie!");
+      }, 450);
+      return () => window.clearTimeout(timer);
+    }
+    const elapsed = clock + serverOffset.current - bubbleChallenge.startedAt;
+    if (elapsed < 4_000) return;
+    void act("finish-bubble", { challengeId: bubbleChallenge.id, caught: bubbleChallenge.bubbles, wavesCompleted: 3 });
+  }, [act, bubbleWave, busy, caughtBubbles.length, clock, data?.challenge]);
   // Use the server clock offset so a device with an incorrect clock cannot
   // wake a pet early or leave it sleeping indefinitely.
   const serverClock = clock + serverOffset.current;
@@ -226,7 +245,7 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
             {pet.cleanliness < 40 && !sleeping && <span className={styles.dust}>🍂</span>}
           </div>
           {!challenge && <div className={styles.arrangeRoomControls}><button type="button" aria-pressed={arrangingRoom} disabled={busy || sleeping} onClick={() => { setArrangingRoom((value) => !value); setMessage(arrangingRoom ? "Your room layout is saved." : "Drag an item, or focus it and use the arrow keys."); }}>{arrangingRoom ? "Done arranging" : "Arrange room"}</button>{arrangingRoom && <span>Drag items anywhere in the room. Their spots save for this room.</span>}</div>}
-          {challenge?.kind === "bubble" && <div className={styles.roomGameControls}><span>{caughtBubbles.length}/{challenge.bubbles?.length ?? 0} bubbles popped</span><button className={styles.primary} disabled={!bubbleReady || !ready || caughtBubbles.length !== challenge.bubbles?.length} onClick={() => void act("finish-bubble", { challengeId: challenge.id, caught: caughtBubbles })}>Finish catch!</button></div>}
+          {challenge?.kind === "bubble" && <div className={styles.roomGameControls}><span>Wave {bubbleWave + 1}/3 · {caughtBubbles.length}/{challenge.bubbles?.length ?? 0} bubbles popped {bubbleGoodies.join(" ")}</span><span aria-live="polite">{bubbleWave === 2 && caughtBubbles.length === challenge.bubbles?.length ? bubbleReady && ready ? "Round complete!" : "Finishing round…" : bubbleWave ? "Hidden goodies are inside!" : "Two bonus waves unlock hidden goodies."}</span></div>}
           {challenge?.kind === "rhythm" && <PocketPalsRhythm key={challenge.id} offsets={challenge.rhythmOffsets ?? []} patternName={challenge.rhythmName ?? "Your pal's beat"} preferences={rhythmPreferences} onPreferencesChange={setRhythmPreferences} busy={!ready} onNewPattern={() => act("start-rhythm")} onFinish={(taps) => act("finish-rhythm", { challengeId: challenge.id, taps })} />}
           {treasure && <TreasureTrailPanel key={challenge!.id} trail={treasure} />}
           <div className={styles.speech} role="status" aria-live="polite"><Heart size={17} /><p>{sleeping ? `Shhh… ${sleepRemaining}s of cozy dreaming left.` : message}</p>{busy && <Loader2 size={15} className="animate-spin" />}</div>
