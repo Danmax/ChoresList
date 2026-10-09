@@ -725,18 +725,20 @@ export default function MembersPage() {
       )}
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-3xl rounded-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] overflow-y-auto rounded-3xl sm:max-w-5xl lg:p-7">
           <DialogHeader>
             <DialogTitle className="font-black">{editing?.id ? "Edit Member" : "Add Family Member"}</DialogTitle>
           </DialogHeader>
           {editing && (
-            <div className="space-y-4">
+            <div className="grid gap-4 lg:grid-cols-2 lg:gap-x-6">
               {/* Role selector */}
-              <div>
+              <div className="lg:col-span-2">
                 <Label className="font-bold mb-2 block">Who is this?</Label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {ROLE_OPTIONS.map((r) => (
                     <button
+                      type="button"
+                      aria-pressed={editing.role === r.value}
                       key={r.value}
                       onClick={() => setEditing((p) => ({
                         ...p!,
@@ -819,7 +821,7 @@ export default function MembersPage() {
                 />
               )}
 
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-2 lg:col-span-2">
                 <div>
                   <Label className="font-bold">Relationship</Label>
                   <select
@@ -867,7 +869,7 @@ export default function MembersPage() {
               </div>
 
               {!editing.id && isChildRole(editing.role) && (
-                <div className="rounded-2xl bg-violet-50 p-3">
+                <div className="rounded-2xl bg-violet-50 p-4 lg:col-span-2">
                   <label className="flex items-center gap-2">
                     <input
                       type="checkbox"
@@ -891,12 +893,13 @@ export default function MembersPage() {
                                 Choose up to {band.dailyLimit} daily, {band.weeklyLimit} weekly, and {band.monthlyLimit} monthly tasks.
                               </p>
                             </div>
+                            <div className="grid gap-3 md:grid-cols-3">
                             {(["daily", "weekly", "monthly"] as StarterChoreFrequency[]).map((frequency) => {
                               const limit = frequency === "daily" ? band.dailyLimit : frequency === "weekly" ? band.weeklyLimit : band.monthlyLimit;
                               const templates = band.chores.filter((chore) => chore.frequency === frequency);
                               const selectedCount = templates.filter((chore) => starterSelection.has(chore.name)).length;
                               return (
-                                <div key={frequency}>
+                                <div key={frequency} className="rounded-xl border border-violet-100 bg-violet-100/40 p-2">
                                   <p className="mb-1 text-xs font-black uppercase text-slate-400">
                                     {frequency} {selectedCount}/{limit}
                                   </p>
@@ -924,7 +927,8 @@ export default function MembersPage() {
                                 </div>
                               );
                             })}
-                            <div>
+                            </div>
+                            <div className="rounded-xl border border-violet-100 bg-white/70 p-3">
                               <p className="mb-1 text-xs font-black uppercase text-slate-400">Life skills</p>
                               <ul className="space-y-1 text-xs font-bold text-slate-500">
                                 {band.lifeSkills.map((skill) => (
@@ -940,17 +944,20 @@ export default function MembersPage() {
                 </div>
               )}
 
-              <div>
+              <div className="lg:col-span-2">
                 <Label className="font-bold mb-2 block">Photo Avatar</Label>
                 <PhotoAvatarGenerator value={editing.avatarImageUrl} name={editing.name} onChange={(avatarImageUrl) => setEditing((previous) => ({ ...previous!, avatarImageUrl }))} />
-                <details className="mt-3 rounded-xl bg-slate-50 p-3"><summary className="cursor-pointer text-xs font-black text-slate-500">Use a classic emoji instead</summary><div className="mt-3 flex max-h-32 flex-wrap gap-2 overflow-y-auto">{(usesAdultAvatars(editing.role) ? PARENT_AVATARS : AVATAR_OPTIONS).map((a) => <button type="button" key={a} onClick={() => setEditing((p) => ({ ...p!, avatar: a, avatarImageUrl: null, avatarConfig: null }))} className={`rounded-xl p-1.5 text-2xl ${editing.avatar === a && !editing.avatarImageUrl ? "bg-violet-100 ring-2 ring-violet-400" : "hover:bg-white"}`}>{a}</button>)}</div></details>
+                <details className="mt-3 rounded-xl bg-slate-50 p-3"><summary className="cursor-pointer text-xs font-black text-slate-500">Use a classic emoji instead</summary><div className="mt-3 grid max-h-36 grid-cols-6 gap-2 overflow-y-auto sm:grid-cols-10 lg:grid-cols-[repeat(14,minmax(0,1fr))]">{(usesAdultAvatars(editing.role) ? PARENT_AVATARS : AVATAR_OPTIONS).map((a) => <button type="button" aria-label={`Use ${a} avatar`} aria-pressed={editing.avatar === a && !editing.avatarImageUrl} key={a} onClick={() => setEditing((p) => ({ ...p!, avatar: a, avatarImageUrl: null, avatarConfig: null }))} className={`aspect-square rounded-xl p-1.5 text-2xl ${editing.avatar === a && !editing.avatarImageUrl ? "bg-violet-100 ring-2 ring-violet-400" : "hover:bg-white"}`}>{a}</button>)}</div></details>
               </div>
 
-              <div>
+              <div className="lg:col-span-2">
                 <Label className="font-bold mb-2 block">Color</Label>
                 <div className="flex gap-2 flex-wrap">
                   {KID_COLORS.map((c) => (
                     <button
+                      type="button"
+                      aria-label={`Use color ${c}`}
+                      aria-pressed={editing.color === c}
                       key={c}
                       onClick={() => setEditing((p) => ({ ...p!, color: c }))}
                       className={`w-8 h-8 rounded-full transition-all ${
@@ -966,7 +973,7 @@ export default function MembersPage() {
                 type="button"
                 onClick={save}
                 disabled={savingMember}
-                className="w-full bg-violet-500 text-white rounded-xl py-3 font-black flex items-center justify-center gap-2 hover:bg-violet-600 transition-colors disabled:opacity-50"
+                className="w-full bg-violet-500 text-white rounded-xl py-3 font-black flex items-center justify-center gap-2 hover:bg-violet-600 transition-colors disabled:opacity-50 lg:col-span-2"
               >
                 <Save size={18} /> {savingMember ? "Saving…" : "Save Member"}
               </button>
