@@ -65,9 +65,9 @@ export default function ParentWishlistPage() {
 
   const load = useCallback(async () => {
     const [wRes, mRes, lRes] = await Promise.all([
-      fetch("/api/wishlist?parentTools=1"),
-      fetch("/api/members"),
-      fetch("/api/wishlists"),
+      fetch("/api/wishlist?parentTools=1", { cache: "no-store" }),
+      fetch("/api/members", { cache: "no-store" }),
+      fetch("/api/wishlists", { cache: "no-store" }),
     ]);
     if (wRes.ok) setItems(await wRes.json());
     if (mRes.ok) {
@@ -84,29 +84,35 @@ export default function ParentWishlistPage() {
   useEffect(() => { load(); }, [load]);
 
   async function grant(id: string) {
-    await fetch("/api/wishlist", {
+    const res = await fetch("/api/wishlist", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, status: "granted" }),
     });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) return toast.error(data?.error ?? "Could not grant wish");
+    setItems((current) => current.map((item) => item.id === id ? { ...item, status: "granted" } : item));
     toast.success("Wish granted! 🎉");
-    load();
   }
 
   async function ungrant(id: string) {
-    await fetch("/api/wishlist", {
+    const res = await fetch("/api/wishlist", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, status: "pending" }),
     });
-    load();
+    const data = await res.json().catch(() => null);
+    if (!res.ok) return toast.error(data?.error ?? "Could not restore wish");
+    setItems((current) => current.map((item) => item.id === id ? { ...item, status: "pending" } : item));
   }
 
   async function remove(id: string) {
     if (!confirm("Remove this wish?")) return;
-    await fetch(`/api/wishlist?id=${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/wishlist?id=${id}`, { method: "DELETE" });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) return toast.error(data?.error ?? "Could not remove wish");
+    setItems((current) => current.filter((item) => item.id !== id));
     toast.success("Wish removed");
-    load();
   }
 
   function searchAmazon() {
@@ -146,7 +152,7 @@ export default function ParentWishlistPage() {
     if (!res.ok) { toast.error(data?.error ?? "Could not add gift"); return; }
     setGiftOpen(false);
     setNewGift({ title: "", amazonUrl: "", imageUrl: "", note: "", estimatedCost: "", priceAlert: "" });
-    load();
+    await load();
     toast.success("Gift added");
   }
 
@@ -264,7 +270,7 @@ export default function ParentWishlistPage() {
     <div className="min-h-screen p-4 sm:p-6">
       <HolidayDraftImport members={members} onImported={load} />
       <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-        <Link href="/parent" className="bg-white rounded-2xl p-2 shadow-sm hover:shadow-md transition-shadow">
+        <Link href="/parent" aria-label="Back to parent dashboard" className="bg-white rounded-2xl p-2 shadow-sm hover:shadow-md transition-shadow">
           <ArrowLeft size={20} className="text-slate-600" />
         </Link>
         <h1 className="text-2xl sm:text-3xl font-black text-slate-800 flex-1">🎁 Family Gift Lists</h1>
@@ -410,6 +416,8 @@ export default function ParentWishlistPage() {
                       <CheckCircle2 size={15} /> Grant It! 🎉
                     </button>
                     <button
+                      type="button"
+                      aria-label={`Remove ${item.title}`}
                       onClick={() => remove(item.id)}
                       className="p-2 text-red-300 hover:text-red-500 transition-colors rounded-xl hover:bg-red-50"
                     >
@@ -443,6 +451,8 @@ export default function ParentWishlistPage() {
                   Undo
                 </button>
                 <button
+                  type="button"
+                  aria-label={`Remove ${item.title}`}
                   onClick={() => remove(item.id)}
                   className="text-red-300 hover:text-red-500 transition-colors"
                 >
@@ -499,7 +509,7 @@ export default function ParentWishlistPage() {
       </div></DialogContent></Dialog>
 
       <Dialog open={shareOpen} onOpenChange={setShareOpen}><DialogContent className="max-w-lg rounded-3xl"><DialogHeader><DialogTitle className="font-black">Share This List</DialogTitle></DialogHeader><div className="space-y-4">
-        <div><Label className="font-bold">Public link</Label><div className="mt-1 flex gap-2"><Input readOnly value={shareData.publicUrl} className="rounded-xl" /><button onClick={() => copy(shareData.publicUrl, "Link")} className="rounded-xl bg-slate-800 p-3 text-white"><Copy size={17} /></button></div></div>
+        <div><Label className="font-bold">Public link</Label><div className="mt-1 flex gap-2"><Input readOnly value={shareData.publicUrl} className="rounded-xl" /><button type="button" aria-label="Copy public link" onClick={() => copy(shareData.publicUrl, "Link")} className="rounded-xl bg-slate-800 p-3 text-white"><Copy size={17} /></button></div></div>
         <div><Label className="font-bold">Embed HTML</Label><textarea readOnly value={shareData.embedHtml} className="mt-1 min-h-28 w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3 text-xs text-slate-600" /><button onClick={() => copy(shareData.embedHtml, "Embed HTML")} className="mt-2 flex items-center gap-2 rounded-xl bg-violet-500 px-4 py-2 font-black text-white"><Copy size={16} /> Copy Embed HTML</button></div>
         <p className="text-xs font-semibold text-slate-400">Anyone with the link or a site containing the embed can see the list. Granted gifts are hidden.</p>
       </div></DialogContent></Dialog>

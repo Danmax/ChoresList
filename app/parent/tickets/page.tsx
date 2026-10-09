@@ -20,6 +20,7 @@ export default function TicketsPage() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [celebrating, setCelebrating] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>("");
+  const [redeemingId, setRedeemingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/tickets");
@@ -29,16 +30,25 @@ export default function TicketsPage() {
   useEffect(() => { load(); }, [load]);
 
   async function redeem(ticket: Ticket) {
-    setCelebrating(ticket.id);
-    await fetch("/api/tickets", {
+    if (redeemingId) return;
+    setRedeemingId(ticket.id);
+    const res = await fetch("/api/tickets", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: ticket.id, status: "redeemed" }),
     });
+    const updated = await res.json().catch(() => null);
+    if (!res.ok) {
+      setRedeemingId(null);
+      toast.error(updated?.error ?? "Could not redeem ticket");
+      return;
+    }
+    setTickets((current) => current.map((item) => item.id === ticket.id ? { ...item, ...updated, status: "redeemed" } : item));
+    setCelebrating(ticket.id);
+    setRedeemingId(null);
     setTimeout(() => {
       setCelebrating(null);
       toast.success(`${ticket.rewardEmoji} ${ticket.rewardTitle} — redeemed!`);
-      load();
     }, 2500);
   }
 
@@ -84,7 +94,7 @@ export default function TicketsPage() {
       </AnimatePresence>
 
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-        <Link href="/parent" className="bg-white rounded-2xl p-2 shadow-sm hover:shadow-md transition-shadow">
+        <Link href="/parent" aria-label="Back to parent dashboard" className="bg-white rounded-2xl p-2 shadow-sm hover:shadow-md transition-shadow">
           <ArrowLeft size={20} className="text-slate-600" />
         </Link>
         <h1 className="text-2xl sm:text-3xl font-black text-slate-800 flex-1">🎫 Reward Tickets</h1>
@@ -117,7 +127,7 @@ export default function TicketsPage() {
           <h2 className="text-base font-black text-slate-700 mb-4">✨ Ready to Redeem</h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {pending.map((t) => (
-              <TicketCard key={t.id} ticket={t} onRedeem={() => redeem(t)} />
+              <TicketCard key={t.id} ticket={t} disabled={redeemingId === t.id} onRedeem={() => redeem(t)} />
             ))}
           </div>
         </div>
@@ -158,7 +168,7 @@ export default function TicketsPage() {
   );
 }
 
-function TicketCard({ ticket, onRedeem }: { ticket: Ticket; onRedeem: () => void }) {
+function TicketCard({ ticket, onRedeem, disabled }: { ticket: Ticket; onRedeem: () => void; disabled: boolean }) {
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
       className="rounded-3xl overflow-hidden shadow-lg"
@@ -194,9 +204,9 @@ function TicketCard({ ticket, onRedeem }: { ticket: Ticket; onRedeem: () => void
 
       {/* Redeem button */}
       <div className="bg-white px-4 pb-4 pt-3">
-        <button onClick={onRedeem}
-          className="w-full bg-gradient-to-r from-amber-400 to-orange-500 text-white rounded-2xl py-3 font-black text-base hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
-          <Sparkles size={18} /> Redeem Now!
+        <button type="button" disabled={disabled} onClick={onRedeem}
+          className="w-full bg-gradient-to-r from-amber-400 to-orange-500 text-white rounded-2xl py-3 font-black text-base hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-50">
+          <Sparkles size={18} /> {disabled ? "Redeeming…" : "Redeem Now!"}
         </button>
       </div>
     </motion.div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { Camera, Check, Plus, RefreshCw, Search, Trash2, Trash } from "lucide-react";
 import { toast } from "sonner";
 import { ParentPageHeader } from "@/components/parent-management-shell";
@@ -78,11 +78,17 @@ export default function AssignPage() {
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [choreSearch, setChoreSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [loadingMembers, setLoadingMembers] = useState(true);
+  const [membersLoadError, setMembersLoadError] = useState("");
+  const loadRequestId = useRef(0);
   const [form, setForm] = useState({
     memberId: "", targetMode: "member" as "member" | "age-group", ageGroupId: "", choreIds: [] as string[], frequency: "daily", dueDate: "", dayOfWeeks: ["1"], monthlyCompletionTarget: 1, allowDuplicateDaily: false,
   });
 
   const load = useCallback(async () => {
+    const requestId = ++loadRequestId.current;
+    setLoadingMembers(true);
+    try {
     const [mRes, cRes, aRes, proposalRes, settingsRes] = await Promise.all([
       fetch("/api/members"),
       fetch("/api/chores"),
@@ -97,13 +103,27 @@ export default function AssignPage() {
       proposalRes.json().catch(() => []),
       settingsRes.json().catch(() => ({})),
     ]);
-    const nextMembers = Array.isArray(membersData) ? membersData : Array.isArray(membersData?.members) ? membersData.members : [];
-    if (!Array.isArray(membersData) && !Array.isArray(membersData?.members)) toast.error(membersData.error ?? "Could not load members");
-    setMembers(nextMembers);
+    if (requestId !== loadRequestId.current) return;
+    const validMembers = mRes.ok && (Array.isArray(membersData) || Array.isArray(membersData?.members));
+    if (validMembers) {
+      setMembers(Array.isArray(membersData) ? membersData : membersData.members);
+      setMembersLoadError("");
+    } else {
+      const message = membersData?.error ?? "Could not load family members";
+      setMembersLoadError(message);
+      toast.error(message);
+    }
     setChores(Array.isArray(choresData) ? choresData : []);
     setAssignments(Array.isArray(assignmentsData) ? assignmentsData : []);
     setTeenProposals(Array.isArray(proposalsData) ? proposalsData.filter((proposal) => proposal.status === "pending") : []);
     setHouseholdSettings(settingsRes.ok ? settingsData : {});
+    } catch {
+      if (requestId !== loadRequestId.current) return;
+      setMembersLoadError("Could not load family members");
+      toast.error("Could not load assignment data");
+    } finally {
+      if (requestId === loadRequestId.current) setLoadingMembers(false);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -291,7 +311,7 @@ export default function AssignPage() {
               <RefreshCw size={18} /> Refresh
             </button>
             <button
-              onClick={() => { resetForm(); setOpen(true); }}
+              onClick={() => { resetForm(); setOpen(true); if (members.length === 0) void load(); }}
               className="flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-bold text-white transition-colors hover:bg-slate-700"
             >
               <Plus size={18} /> Assign Chore
@@ -374,7 +394,7 @@ export default function AssignPage() {
                   {(a.completions?.length ?? 0) >= (a.frequency === "monthly" ? a.monthlyCompletionTarget : 1) ? "Completed" : completingId === a.id ? "Saving" : a.frequency === "monthly" ? "Complete" : "Complete Today"}
                 </button>
               )}
-              <button onClick={() => unassign(a.id)} className="p-1 text-red-400 transition-colors hover:text-red-600">
+              <button type="button" aria-label={`Remove ${a.chore.name} from ${a.member.name}`} onClick={() => unassign(a.id)} className="p-1 text-red-400 transition-colors hover:text-red-600">
                 <Trash2 size={16} />
               </button>
             </div>
@@ -436,10 +456,11 @@ export default function AssignPage() {
             </div>
             {form.targetMode === "member" ? <div>
               <Label className="font-bold">Family Member</Label>
+              {membersLoadError && <div className="mt-2 flex items-center justify-between gap-3 rounded-xl bg-red-50 px-3 py-2 text-sm font-bold text-red-700"><span>{membersLoadError}</span><button type="button" onClick={() => void load()} className="shrink-0 underline">Try again</button></div>}
               <Select value={form.memberId} onValueChange={(v) => setForm((p) => ({ ...p, memberId: v ?? "", choreIds: [] }))}>
-                <SelectTrigger className="mt-1 w-full rounded-xl">
+                <SelectTrigger disabled={loadingMembers || members.length === 0} className="mt-1 w-full rounded-xl">
                   <span className={`flex flex-1 items-center gap-1.5 truncate text-left ${selectedMemberObj ? "" : "text-slate-400"}`}>
-                    {selectedMemberObj ? `${selectedMemberObj.avatar} ${selectedMemberObj.name}` : "Select a family member"}
+                    {selectedMemberObj ? `${selectedMemberObj.avatar} ${selectedMemberObj.name}` : loadingMembers ? "Loading family members…" : members.length === 0 ? "No family members available" : "Select a family member"}
                   </span>
                 </SelectTrigger>
                 <SelectContent>

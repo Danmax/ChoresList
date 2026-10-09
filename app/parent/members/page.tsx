@@ -213,6 +213,8 @@ export default function MembersPage() {
   });
   const [inviteUrl, setInviteUrl] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
+  const [savingMember, setSavingMember] = useState(false);
+  const [deletingMemberId, setDeletingMemberId] = useState<string | null>(null);
   const [creatingInvite, setCreatingInvite] = useState(false);
   const [editing, setEditing] = useState<Partial<Member> | null>(null);
   const [open, setOpen] = useState(false);
@@ -352,10 +354,13 @@ export default function MembersPage() {
   }
 
   async function save() {
+    if (savingMember) return;
     if (!editing?.name || !editing.age) {
       toast.error("Name and age are required");
       return;
     }
+    setSavingMember(true);
+    try {
     if (editing.id) {
       const res = await fetch("/api/members", {
         method: "PUT",
@@ -379,22 +384,43 @@ export default function MembersPage() {
         toast.error(member.error ?? "Could not add member");
         return;
       }
+      setOpen(false);
+      setEditing(null);
+      await load();
       if (assignStarter && isChildRole(editing.role)) {
-        await assignStarterTasks(member);
-        toast.success("Member added with starter chores!");
-      } else {
-        toast.success("Member added!");
-      }
+        try {
+          await assignStarterTasks(member);
+          toast.success("Member added with starter chores!");
+        } catch (error) {
+          toast.error(`Member added, but starter chores could not be assigned: ${error instanceof Error ? error.message : "Please try again"}`);
+        }
+      } else toast.success("Member added!");
+      return;
     }
     setOpen(false);
-    load();
+    setEditing(null);
+    await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not save member");
+    } finally {
+      setSavingMember(false);
+    }
   }
 
   async function remove(id: string) {
     if (!confirm("Remove this family member and all their chore data?")) return;
-    await fetch(`/api/members?id=${id}`, { method: "DELETE" });
-    toast.success("Member removed");
-    load();
+    setDeletingMemberId(id);
+    try {
+      const res = await fetch(`/api/members?id=${id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return toast.error(data.error ?? "Could not remove member");
+      setMembers((current) => current.filter((member) => member.id !== id));
+      toast.success("Member removed");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not remove member");
+    } finally {
+      setDeletingMemberId(null);
+    }
   }
 
   async function saveParentProfile() {
@@ -667,8 +693,11 @@ export default function MembersPage() {
                 <ClipboardList size={13} /> Tasks
               </Link>
               <button
+                type="button"
+                aria-label={`Remove ${m.name}`}
+                disabled={deletingMemberId === m.id}
                 onClick={(e) => { e.stopPropagation(); remove(m.id); }}
-                className="text-red-400 hover:text-red-600 transition-colors p-1"
+                className="text-red-400 hover:text-red-600 transition-colors p-1 disabled:opacity-40"
               >
                 <Trash2 size={18} />
               </button>
@@ -934,10 +963,12 @@ export default function MembersPage() {
               </div>
 
               <button
+                type="button"
                 onClick={save}
-                className="w-full bg-violet-500 text-white rounded-xl py-3 font-black flex items-center justify-center gap-2 hover:bg-violet-600 transition-colors"
+                disabled={savingMember}
+                className="w-full bg-violet-500 text-white rounded-xl py-3 font-black flex items-center justify-center gap-2 hover:bg-violet-600 transition-colors disabled:opacity-50"
               >
-                <Save size={18} /> Save Member
+                <Save size={18} /> {savingMember ? "Saving…" : "Save Member"}
               </button>
             </div>
           )}

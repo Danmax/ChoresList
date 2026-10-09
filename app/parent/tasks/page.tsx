@@ -162,9 +162,10 @@ export default function ParentTasksPage() {
   }
 
   const isComplete = (assignment: Assignment) => assignment.completions.length >= (assignment.frequency === "monthly" ? assignment.monthlyCompletionTarget : 1);
-  const openCount = assignments.filter((assignment) => !isComplete(assignment)).length;
+  const openAssignments = assignments.filter((assignment) => !isComplete(assignment));
+  const openCount = openAssignments.length;
   const doneCount = assignments.length - openCount;
-  const categorizedAssignments = Object.entries(assignments.reduce<Record<string, Assignment[]>>((groups, assignment) => {
+  const categorizedAssignments = Object.entries(openAssignments.reduce<Record<string, Assignment[]>>((groups, assignment) => {
     const category = assignment.chore.category || "other";
     (groups[category] ??= []).push(assignment);
     return groups;
@@ -235,11 +236,11 @@ export default function ParentTasksPage() {
 
           {loading ? (
             <div className="py-16 text-center font-bold text-slate-400">Loading parent tasks...</div>
-          ) : assignments.length === 0 ? (
+          ) : openAssignments.length === 0 ? (
               <div className="rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm">
               <div className="mb-3 text-5xl">📭</div>
               <h2 className="mb-1 text-xl font-black text-slate-700">No parent chores due</h2>
-              <p className="mb-5 text-sm font-semibold text-slate-500">Assign chores to this parent profile to complete them here.</p>
+              <p className="mb-5 text-sm font-semibold text-slate-500">{assignments.length ? "All chores due for this parent are complete." : "Assign chores to this parent profile to complete them here."}</p>
               <Link href="/parent/assign" className="inline-flex rounded-2xl bg-emerald-500 px-5 py-3 font-black text-white hover:bg-emerald-600">
                 Assign Chores
               </Link>
