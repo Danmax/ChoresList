@@ -53,8 +53,29 @@ test('authored death pits are large and include a swingable vine', () => {
   stepRunner(s, 1 / 120);
   assert.ok(s.savannaPits[0].width >= 360);
   assert.equal(s.savannaVines.length, 1);
-  assert.equal(s.birds.length, 1);
-  assert.ok(['cherry', 'fruit', 'heart', 'star'].includes(s.birds[0].gift));
+});
+
+test('toucans drop goodies in only half of savanna encounters', () => {
+  const s = savanna('easy');
+  s.nextSection = 1;
+  for (let encounter = 0; encounter < 4; encounter++) {
+    stepRunner(s, 1 / 120);
+    s.nextSection = s.distance + 1;
+  }
+  assert.equal(s.birds.length, 2);
+  assert.ok(s.birds.every((bird) => ['cherry', 'fruit', 'heart', 'star'].includes(bird.gift)));
+});
+
+test('the lion pounce crosses the runner and deals damage', () => {
+  const s = savanna('easy');
+  s.savannaBossStarted = true;
+  const lion = createSavannaAnimal('lion', PLAYER_X + 260, 'easy');
+  lion.state = 'attack';
+  s.savannaAnimals = [lion];
+  const startingLives = s.lives;
+  advance(s, 0.7);
+  assert.equal(s.hits, 1);
+  assert.equal(s.lives, startingLives - 1);
 });
 
 test('an airborne runner can grab a savanna vine and swing across a wide pit', () => {

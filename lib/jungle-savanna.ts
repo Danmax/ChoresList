@@ -41,13 +41,15 @@ export function addSavannaSection(s: Runner) {
   const x = s.nextSection;
   const encounter = s.savannaEncounterIndex++ % 4;
   s.section++;
-  const gifts = ['cherry', 'fruit', 'heart', 'star'] as const;
-  s.birds.push({
-    x: x + 430,
-    y: 72 + (s.savannaEncounterIndex % 2) * 24,
-    gift: gifts[(s.savannaEncounterIndex - 1) % gifts.length],
-    dropped: false,
-  });
+  if (encounter % 2 === 0) {
+    const gifts = ['cherry', 'fruit', 'heart', 'star'] as const;
+    s.birds.push({
+      x: x + 430,
+      y: 72 + encounter * 8,
+      gift: gifts[(s.savannaEncounterIndex - 1) % gifts.length],
+      dropped: false,
+    });
+  }
   if (encounter === 0) {
     s.savannaAnimals.push(createSavannaAnimal('giraffe', x + 80, s.difficulty));
     for (let i = 0; i < 7; i++) s.items.push({ x: x + 170 + i * 45, y: FLOOR - 145 - Math.sin(i / 6 * Math.PI) * 65, kind: 'banana' });
@@ -154,7 +156,7 @@ export function stepSavanna(s: Runner, dt: number, previousY: number, hurt: (mes
         if (animal.age >= 0.85) { animal.state = 'recover'; animal.age = 0; animal.y = FLOOR; }
       } else if (animal.state === 'recover' && animal.age > 0.7) { animal.state = 'idle'; animal.age = 0; }
     } else {
-      animal.x = worldX + (animal.state === 'recover' ? 150 : 260);
+      animal.x = worldX + (animal.state === 'attack' ? 260 - Math.min(1, animal.age / 0.72) * 300 : animal.state === 'recover' ? 150 : 260);
       if (animal.state === 'idle') { animal.state = 'warn'; animal.age = 0; }
       else if (animal.state === 'warn' && animal.age >= { easy: 1.2, medium: 0.9, hard: 0.7 }[s.difficulty]) { animal.state = 'attack'; animal.age = 0; }
       else if (animal.state === 'attack') {
