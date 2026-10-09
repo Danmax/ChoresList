@@ -1,4 +1,5 @@
 import { TREASURE_OBJECTS, treasureRoomObjects, type TreasureObjectId, type TreasureView } from "./pocket-pals-treasure";
+import { createRhythmPattern } from "./pocket-pals-rhythm";
 
 export const PET_SPECIES = [
   { id: "dog", label: "Dog", name: "Mochi", names: ["Mochi", "Biscuit", "Waffles", "Teddy", "Pippin", "Nugget", "Peaches", "Bubbles", "Coco", "Sunny", "Toffee", "Button"], personality: "A loyal little sunshine who loves to play.", emoji: "🐶" },
@@ -120,11 +121,11 @@ export type PetState = {
   species: PetSpecies; name: string; adoptedAt: number; updatedAt: number;
   serialNumber?: string; appearance?: PetAppearance;
   hunger: number; happiness: number; cleanliness: number; energy: number; smarts: number; bond: number;
-  xp: number; coins: number; dumplings: number; lessonsLearned: number; gamesPlayed: number;
+  xp: number; coins: number; dumplings: number; lessonsLearned: number; gamesPlayed: number; lastRhythmPattern?: string;
   owned: string[]; accessory: string | null; room: string; sleepingUntil: number | null;
   lastActionAt: number; lastCareDay: string | null; streak: number;
   daily: { day: string; startedAt: number; tasks: CareTask[]; rewarded: boolean; playRewards: number; learnRewards: number };
-  challenge: { kind: "play" | "bubble" | "rhythm" | "treasure" | "hide" | "balance" | "learn"; id: string; startedAt: number; sequence?: number[]; lessonId?: string; bubbleIds?: string[]; hideSpot?: number; hideSpotCount?: number; balanceSequence?: number[]; rhythmOffsets?: number[]; rhythmTolerance?: number; treasure?: { room: string; objectIds: TreasureObjectId[]; targets: TreasureObjectId[]; step: number; age: number } } | null;
+  challenge: { kind: "play" | "bubble" | "rhythm" | "treasure" | "hide" | "balance" | "learn"; id: string; startedAt: number; sequence?: number[]; lessonId?: string; bubbleIds?: string[]; hideSpot?: number; hideSpotCount?: number; balanceSequence?: number[]; rhythmOffsets?: number[]; rhythmTolerance?: number; rhythmName?: string; treasure?: { room: string; objectIds: TreasureObjectId[]; targets: TreasureObjectId[]; step: number; age: number } } | null;
 };
 export class PetActionError extends Error {}
 export function petDay(now: number, timeZone: string) {
@@ -189,7 +190,7 @@ export function publicChallenge(pet: PetState, age: number) {
   if (!challenge) return null;
   if (challenge.kind === "play") return { id: challenge.id, kind: challenge.kind, startedAt: challenge.startedAt, sequence: challenge.sequence };
   if (challenge.kind === "bubble") return { id: challenge.id, kind: challenge.kind, startedAt: challenge.startedAt, bubbles: challenge.bubbleIds ?? [] };
-  if (challenge.kind === "rhythm") return { id: challenge.id, kind: challenge.kind, startedAt: challenge.startedAt, rhythmOffsets: challenge.rhythmOffsets ?? [], rhythmTolerance: challenge.rhythmTolerance ?? 300 };
+  if (challenge.kind === "rhythm") return { id: challenge.id, kind: challenge.kind, startedAt: challenge.startedAt, rhythmOffsets: challenge.rhythmOffsets ?? [], rhythmTolerance: challenge.rhythmTolerance ?? 300, rhythmName: challenge.rhythmName ?? "Your pal's beat" };
   if (challenge.kind === "treasure") {
     const trail = challenge.treasure;
     if (!trail || trail.room !== pet.room) return null;
@@ -267,12 +268,10 @@ export function applyPetAction(pet: PetState, action: PetAction, input: Record<s
     }
     case "start-rhythm": {
       if (pet.energy < 15) throw new PetActionError("Time for a nap before playing!");
-      const count = age < 6 ? 3 : age < 10 ? 4 : 5;
-      const beat = age < 6 ? 800 : 600;
-      const offsets = [0];
-      for (let i = 1; i < count; i++) offsets.push(offsets[i - 1] + beat * (age < 6 ? 1 : 1 + challengeNumber(challengeId, i) % 2));
-      pet.challenge = { kind: "rhythm", id: challengeId, startedAt: now, rhythmOffsets: offsets, rhythmTolerance: age < 6 ? 400 : 250 };
-      message = `Listen to ${pet.name}'s beat, then tap it back!`; break;
+      const pattern = createRhythmPattern(age, challengeNumber(challengeId, 0), pet.lastRhythmPattern);
+      pet.lastRhythmPattern = pattern.id;
+      pet.challenge = { kind: "rhythm", id: challengeId, startedAt: now, rhythmOffsets: pattern.offsets, rhythmTolerance: pattern.tolerance, rhythmName: pattern.name };
+      message = `Let's play ${pattern.name}! Listen to ${pet.name}'s beat, then tap it back.`; break;
     }
     case "finish-rhythm": {
       const c = pet.challenge;

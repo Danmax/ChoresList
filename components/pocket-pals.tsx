@@ -7,8 +7,9 @@ import styles from "./pocket-pals.module.css";
 import { PocketPalBubble, PocketPalsRhythm } from "./pocket-pals-rhythm";
 import { TREASURE_OBJECTS, type TreasureView } from "@/lib/pocket-pals-treasure";
 import { PocketPalRoomObjects, TreasureChest, TreasureTrailPanel } from "./pocket-pals-treasure";
+import type { RhythmPreferences } from "@/lib/pocket-pals-rhythm";
 
-type Challenge = { id: string; kind: "play" | "bubble" | "rhythm" | "treasure" | "learn"; startedAt: number; sequence?: number[]; bubbles?: string[]; rhythmOffsets?: number[]; treasure?: TreasureView; topic?: string; question?: string; choices?: string[] };
+type Challenge = { id: string; kind: "play" | "bubble" | "rhythm" | "treasure" | "learn"; startedAt: number; sequence?: number[]; bubbles?: string[]; rhythmOffsets?: number[]; rhythmName?: string; treasure?: TreasureView; topic?: string; question?: string; choices?: string[] };
 type RosterPal = { id: string; name: string; species: PetSpecies; serialNumber: string; primaryGuardianId: string };
 type PetResponse = { pet: PetState | null; palId: string | null; version: number | null; serverNow: number; roster: RosterPal[]; challenge: Challenge | null; message?: string; completed?: boolean; reward?: { points: number; tickets: number } | null };
 const TASK_LABELS = { feed: "Dumpling", clean: "Bath", play: "Play", learn: "Learn", sleep: "Rest" };
@@ -46,6 +47,7 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
   const [showPlayGames, setShowPlayGames] = useState(false);
   const [caughtBubbles, setCaughtBubbles] = useState<string[]>([]);
   const [watchUntil, setWatchUntil] = useState(0);
+  const [rhythmPreferences, setRhythmPreferences] = useState<RhythmPreferences>({ sound: "drums", volume: 55, muted: false });
   const [badge, setBadge] = useState(false);
   const requestInFlight = useRef(false);
   const alive = useRef(true);
@@ -207,7 +209,7 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
             {pet.cleanliness < 40 && !sleeping && <span className={styles.dust}>🍂</span>}
           </div>
           {challenge?.kind === "bubble" && <div className={styles.roomGameControls}><span>{caughtBubbles.length}/{challenge.bubbles?.length ?? 0} bubbles popped</span><button className={styles.primary} disabled={!bubbleReady || !ready || caughtBubbles.length !== challenge.bubbles?.length} onClick={() => void act("finish-bubble", { challengeId: challenge.id, caught: caughtBubbles })}>Finish catch!</button></div>}
-          {challenge?.kind === "rhythm" && <PocketPalsRhythm key={challenge.id} offsets={challenge.rhythmOffsets ?? []} busy={!ready} onFinish={(taps) => act("finish-rhythm", { challengeId: challenge.id, taps })} />}
+          {challenge?.kind === "rhythm" && <PocketPalsRhythm key={challenge.id} offsets={challenge.rhythmOffsets ?? []} patternName={challenge.rhythmName ?? "Your pal's beat"} preferences={rhythmPreferences} onPreferencesChange={setRhythmPreferences} busy={!ready} onNewPattern={() => act("start-rhythm")} onFinish={(taps) => act("finish-rhythm", { challengeId: challenge.id, taps })} />}
           {treasure && <TreasureTrailPanel key={challenge!.id} trail={treasure} />}
           <div className={styles.speech} role="status" aria-live="polite"><Heart size={17} /><p>{sleeping ? `Shhh… ${sleepRemaining}s of cozy dreaming left.` : message}</p>{busy && <Loader2 size={15} className="animate-spin" />}</div>
           {error && <p className={styles.error} role="alert">{error} <button onClick={() => void load()} aria-label="Refresh pet"><RefreshCw size={14} /></button></p>}

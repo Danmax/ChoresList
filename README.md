@@ -75,8 +75,10 @@ time zone. Four dumplings arrive daily. Coins unlock accessories, four rooms,
 and room décor such as wall art, plants, furniture, lamps, and shelves. Once a
 room is unlocked, a Pal can move between it and the cozy home from the shop.
 Bubble Catch plays in the room with bubbles that burst and disappear. Rhythm
-Paws uses audible and visual beats to repeat, with age-adjusted timing and quiet
-play. All play games share three rewarded wins per day at 8 coins each. Character
+Paws has 18 age-adjusted patterns with pauses and varied tempos, plus selectable
+soft drums, woodblocks, bells, and space notes. Preview sounds, adjust volume,
+repeat the current beat, or request a different pattern. Quiet visual-only play
+is always available. All play games share three rewarded wins per day at 8 coins each. Character
 action sheets show sleeping, eating, and playing poses. Treasure Trail uses actual
 room objects, age-adjusted clues, saved discoveries, and a chest to open after
 collecting every key. Every room includes a free plant, storybook, and teddy;

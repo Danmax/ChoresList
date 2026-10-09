@@ -5,6 +5,7 @@ import { chromium, expect } from "@playwright/test";
 import { DEFAULT_GAME_SETTINGS, GAME_DEFINITIONS } from "../lib/games";
 import { advancePet, applyPetAction, completeDailyCare, createPet, currentLesson, petDay, publicChallenge, type PetState, type PetAction } from "../lib/pocket-pals";
 import { TREASURE_OBJECTS } from "../lib/pocket-pals-treasure";
+import { createRhythmPattern, RHYTHM_SOUNDS } from "../lib/pocket-pals-rhythm";
 
 // Browser coverage uses an isolated in-memory API fixture. It exercises real
 // React rendering and controls without writing test families to the live DB.
@@ -14,6 +15,17 @@ async function main() {
   page.setDefaultTimeout(10_000);
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
+  await page.addInitScript(() => {
+    const instrumented = window as unknown as { rhythmToneLog: { type: string; frequency: number }[] };
+    instrumented.rhythmToneLog = [];
+    const create = AudioContext.prototype.createOscillator;
+    AudioContext.prototype.createOscillator = function () {
+      const oscillator = create.call(this);
+      const start = oscillator.start.bind(oscillator);
+      oscillator.start = (when) => { instrumented.rhythmToneLog.push({ type: oscillator.type, frequency: oscillator.frequency.value }); start(when); };
+      return oscillator;
+    };
+  });
   await page.clock.install();
   await page.clock.pauseAt(new Date());
   const screenshotDir = process.env.POCKET_PALS_SCREENSHOT_DIR ?? "/tmp/pocket-pals-preview";
@@ -44,14 +56,14 @@ async function main() {
             if (!saved) throw new Error("Adopt first");
             if (body.version !== version) { status = 409; throw new Error("Stale version"); }
             saved = advancePet(saved, now, day);
-            message = applyPetAction(saved, body.action as PetAction, body, now, 7, randomUUID());
+            message = applyPetAction(saved, body.action as PetAction, body, now, member.age, randomUUID());
             completed = completeDailyCare(saved);
             if (completed) completions++;
             version++;
           }
         }
         const pet = saved ? advancePet(saved, now, day) : null;
-        response = { pet: pet && { ...pet, challenge: null }, version, challenge: pet ? publicChallenge(pet, 7) : null, serverNow: now, message, completed };
+        response = { pet: pet && { ...pet, challenge: null }, version, challenge: pet ? publicChallenge(pet, member.age) : null, serverNow: now, message, completed };
       } catch (e) { status = status === 409 ? 409 : 400; response = { error: e instanceof Error ? e.message : String(e) }; }
     }
     await route.fulfill({ status, json: response });
@@ -136,14 +148,51 @@ async function main() {
     await expect(page.getByRole("button", { name: /Hide-and-Seek/ })).toHaveCount(0);
     await page.getByRole("button", { name: /Rhythm Paws Listen/ }).click();
     await page.clock.fastForward(2500);
+    const toneLog = () => page.evaluate(() => (window as unknown as { rhythmToneLog: { type: string; frequency: number }[] }).rhythmToneLog);
+    for (const sound of RHYTHM_SOUNDS) {
+      await page.getByRole("button", { name: sound.name, exact: true }).click();
+      await expect(page.getByRole("button", { name: sound.name, exact: true })).toHaveAttribute("aria-pressed", "true");
+      const before = (await toneLog()).length;
+      await page.getByRole("button", { name: "Preview sound", exact: true }).click();
+      await expect.poll(async () => (await toneLog()).length).toBeGreaterThan(before);
+    }
+    await page.getByRole("slider", { name: "Sound volume" }).focus();
+    await page.keyboard.press("Home");
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByRole("slider", { name: "Sound volume" })).toHaveValue("5");
+    const originalPattern = saved!.challenge!.rhythmName!;
+    await page.getByRole("button", { name: "New pattern", exact: true }).click();
+    await expect(page.getByText(originalPattern, { exact: true })).toHaveCount(0);
+    assert.notEqual(saved!.challenge!.rhythmName, originalPattern);
+    await expect(page.getByRole("button", { name: "Space notes", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("slider", { name: "Sound volume" })).toHaveValue("5");
+    await page.clock.fastForward(2500);
+    // Audible playback emits two space-note oscillators for each visual beat.
+    const audibleOffsets = [...saved!.challenge!.rhythmOffsets!];
+    const beforeListen = (await toneLog()).length;
+    await page.getByRole("button", { name: "Listen to the beat", exact: true }).click();
+    await expect(page.getByRole("button", { name: "New pattern", exact: true })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Bells", exact: true })).toBeDisabled();
+    await page.clock.runFor(audibleOffsets.at(-1)! + 1500);
+    assert.equal((await toneLog()).length - beforeListen, audibleOffsets.length * 2);
+    for (const width of [390, 320]) {
+      await page.setViewportSize({ width, height: 900 });
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false, `Rhythm controls fit ${width}px`);
+      await page.screenshot({ path: `${screenshotDir}/rhythm-${width}.png`, fullPage: true });
+    }
+    await page.setViewportSize({ width: 1280, height: 1100 });
     await page.getByLabel("Quiet play").check();
-    await page.getByRole("button", { name: "Listen to the beat" }).click();
+    const beforeQuiet = (await toneLog()).length;
+    await expect(page.getByRole("button", { name: "Preview sound", exact: true })).toBeDisabled();
+    await page.getByRole("button", { name: "Listen again", exact: true }).click();
     const offsets = saved!.challenge!.rhythmOffsets!;
+    assert.deepEqual(offsets, audibleOffsets, "Listen again keeps the current pattern");
     await page.clock.fastForward(offsets.at(-1)! + 1500);
     for (let index = 0; index < offsets.length; index++) {
       if (index) await page.clock.runFor(offsets[index] - offsets[index - 1]);
       await page.getByRole("button", { name: "Tap rhythm" }).click({ force: true });
     }
+    assert.equal((await toneLog()).length, beforeQuiet, "Quiet play emits no listen or tap sounds");
     await page.getByRole("button", { name: "Check rhythm" }).click();
     await expect(page.getByRole("status")).toContainText("Pawsome rhythm");
     await page.clock.fastForward(2500);
@@ -226,6 +275,28 @@ async function main() {
       const response = await page.request.get(`${process.env.POCKET_PALS_TEST_URL ?? "http://localhost:3017"}/games/pocket-pals/treasure-${asset}-v1.png`);
       assert.equal(response.status(), 200, `${asset} artwork is served`);
     }
+    // The longest older-student pattern still fits a small phone. Audio failure
+    // must not block the same visual game or its server-validated result.
+    member.age = 12;
+    const longest = createRhythmPattern(member.age, 5);
+    saved!.lastActionAt = 0;
+    saved!.challenge = { kind: "rhythm", id: randomUUID(), startedAt: await page.evaluate(() => Date.now()), rhythmName: longest.name, rhythmOffsets: longest.offsets, rhythmTolerance: longest.tolerance };
+    await page.reload();
+    await page.getByRole("button", { name: /Pocket Pals/ }).click();
+    await page.setViewportSize({ width: 320, height: 900 });
+    await expect(page.getByLabel("7 beats")).toBeVisible();
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false, "Seven-beat pattern fits 320px");
+    await page.screenshot({ path: `${screenshotDir}/rhythm-seven-beats-320.png`, fullPage: true });
+    await page.evaluate(() => Object.defineProperty(window, "AudioContext", { value: undefined, configurable: true }));
+    await page.getByRole("button", { name: "Listen to the beat", exact: true }).click();
+    await expect(page.getByText("Sound isn't available here. Follow the flashing paws instead.")).toBeVisible();
+    await page.clock.fastForward(longest.offsets.at(-1)! + 1500);
+    for (let index = 0; index < longest.offsets.length; index++) {
+      if (index) await page.clock.runFor(longest.offsets[index] - longest.offsets[index - 1]);
+      await page.getByRole("button", { name: "Tap rhythm", exact: true }).click({ force: true });
+    }
+    await page.getByRole("button", { name: "Check rhythm", exact: true }).click();
+    await expect(page.getByText("Pawsome rhythm! You and your pal make a great band.", { exact: true })).toBeVisible();
     for (const width of [390, 320]) {
       await page.setViewportSize({ width, height: 900 });
       await expect(page.getByRole("button", { name: /Learn Grow/ })).toBeVisible();
