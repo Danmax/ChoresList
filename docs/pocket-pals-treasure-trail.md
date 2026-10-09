@@ -26,6 +26,9 @@ students get directional and two-step clues. Allow replaying the current clue.
   between room rendering and server trail generation. Avoid invisible hotspots.
 - The round freezes its object catalog. Buying more décor adds targets only to
   the next trail. Buying or moving to another room clears the current trail.
+- Room objects can be arranged outside a trail with drag, touch, or arrow keys.
+  Each room saves its own positions. Older-student directional clues are built
+  from those saved positions, and arranging locks while a trail is active.
 - The server creates the trail and advances one correct object at a time;
   only the current clue and progress are published. Challenge ID, step, and
   optimistic version checks reject forged, skipped, stale, or replayed actions.

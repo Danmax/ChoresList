@@ -74,6 +74,8 @@ floor while away; the server calculates sleep and daily resets in the household'
 time zone. Four dumplings arrive daily. Coins unlock accessories, four rooms,
 and room décor such as wall art, plants, furniture, lamps, and shelves. Once a
 room is unlocked, a Pal can move between it and the cozy home from the shop.
+Arrange room lets students drag starter props and purchased decorations, or move
+them with the arrow keys. Placements save independently in every room.
 Bubble Catch plays in the room with bubbles that burst and disappear. Rhythm
 Paws has 18 age-adjusted patterns with pauses and varied tempos, plus selectable
 soft drums, woodblocks, bells, and space notes. Preview sounds, adjust volume,

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { advancePet, applyPetAction, createPet, PET_SHOP, publicChallenge, type PetState } from "../lib/pocket-pals";
-import { TREASURE_OBJECTS, treasureRoomObjects } from "../lib/pocket-pals-treasure";
+import { roomItemPosition, treasureClue, TREASURE_OBJECTS, treasureRoomObjects } from "../lib/pocket-pals-treasure";
 
 const day = "2026-10-08";
 const now = Date.parse("2026-10-08T16:00:00Z");
@@ -47,7 +47,7 @@ test("published trails reveal only the current clue, with age-appropriate hints"
     assert.equal(c.kind, "treasure");
     assert.ok(c.treasure);
     const target = TREASURE_OBJECTS.find((item) => item.id === pet.challenge!.treasure!.targets[0])!;
-    assert.equal(c.treasure.clue, age < 9 ? target.clue : target.olderClue);
+    assert.equal(c.treasure.clue, treasureClue(target, age, roomItemPosition(pet.roomPositions, pet.room, target.id)));
     assert.equal(c.treasure.picture, age < 6 ? target.emoji : null);
     assert.ok(!("targets" in c.treasure));
     assert.ok(!JSON.stringify(c).includes('"answer"'));
@@ -55,6 +55,31 @@ test("published trails reveal only the current clue, with age-appropriate hints"
     assert.equal(publicChallenge(pet, age)!.treasure!.step, 1);
     assert.deepEqual(publicChallenge(pet, age)!.treasure!.found, [target.id]);
   }
+});
+
+test("room items move within safe bounds, persist per room, and update directional clues", () => {
+  const pet = createPet("dog", "Mochi", now, day);
+  const before = pet.lastActionAt;
+  applyPetAction(pet, "move-room-item", { itemId: "trail-plant", x: 88.26, y: 25.74 }, now, 12, id);
+  assert.deepEqual(pet.roomPositions?.home?.["trail-plant"], { x: 88.3, y: 25.7 });
+  assert.equal(pet.lastActionAt, before);
+  applyPetAction(pet, "start-treasure", {}, now + 3000, 12, "00abcdef-abcd-4321-9876-123456789abc");
+  pet.challenge!.treasure!.targets[0] = "trail-plant";
+  assert.match(publicChallenge(pet, 12)!.treasure!.clue, /upper-right/);
+  assert.throws(() => applyPetAction(pet, "move-room-item", { itemId: "trail-book", x: 30, y: 40 }, now + 4000, 12, id));
+  pet.challenge = null;
+  for (const input of [{ itemId: "trail-book", x: 7, y: 50 }, { itemId: "trail-book", x: 50, y: 83 }, { itemId: "trail-book", x: NaN, y: 50 }, { itemId: "cozy-sofa", x: 50, y: 50 }, { itemId: "not-real", x: 50, y: 50 }]) {
+    assert.throws(() => applyPetAction(pet, "move-room-item", input, now + 5000, 12, id));
+  }
+  pet.owned.push("cozy-sofa");
+  applyPetAction(pet, "move-room-item", { itemId: "cozy-sofa", x: 70, y: 70 }, now + 6000, 12, id);
+  pet.room = "garden";
+  assert.deepEqual(roomItemPosition(pet.roomPositions, "garden", "trail-plant"), { x: 18, y: 76 });
+  applyPetAction(pet, "move-room-item", { itemId: "trail-plant", x: 20, y: 30 }, now + 7000, 12, id);
+  assert.deepEqual(pet.roomPositions?.home?.["trail-plant"], { x: 88.3, y: 25.7 });
+  assert.deepEqual(pet.roomPositions?.garden?.["trail-plant"], { x: 20, y: 30 });
+  const saved = JSON.parse(JSON.stringify(pet));
+  assert.deepEqual(saved.roomPositions, pet.roomPositions);
 });
 
 test("wrong objects offer a hint without penalties, then allow the correct find", () => {

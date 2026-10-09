@@ -5,7 +5,7 @@ import { ArrowLeft, BookOpen, Check, Heart, Loader2, Moon, PawPrint, RefreshCw, 
 import { CARE_TASKS, PET_SHOP, PET_SPECIES, PLAY_SYMBOLS, petLevel, petMood, type PetAction, type PetSpecies, type PetState } from "@/lib/pocket-pals";
 import styles from "./pocket-pals.module.css";
 import { PocketPalBubble, PocketPalsRhythm } from "./pocket-pals-rhythm";
-import { TREASURE_OBJECTS, type TreasureView } from "@/lib/pocket-pals-treasure";
+import { roomItemPosition, TREASURE_OBJECTS, type RoomItemPosition, type TreasureObjectId, type TreasureView } from "@/lib/pocket-pals-treasure";
 import { PocketPalRoomObjects, TreasureChest, TreasureTrailPanel } from "./pocket-pals-treasure";
 import type { RhythmPreferences } from "@/lib/pocket-pals-rhythm";
 
@@ -49,6 +49,7 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
   const [watchUntil, setWatchUntil] = useState(0);
   const [rhythmPreferences, setRhythmPreferences] = useState<RhythmPreferences>({ sound: "drums", volume: 55, muted: false });
   const [badge, setBadge] = useState(false);
+  const [arrangingRoom, setArrangingRoom] = useState(false);
   const requestInFlight = useRef(false);
   const alive = useRef(true);
   const serverOffset = useRef(0);
@@ -105,7 +106,7 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
   }, [memberId, data?.palId, data?.version, load]);
 
   const pet = data?.pet;
-  useEffect(() => { setCaughtBubbles([]); setShowPlayGames(false); }, [data?.palId, data?.challenge?.id]);
+  useEffect(() => { setCaughtBubbles([]); setShowPlayGames(false); setArrangingRoom(false); }, [data?.palId, data?.challenge?.id]);
   // Use the server clock offset so a device with an incorrect clock cannot
   // wake a pet early or leave it sleeping indefinitely.
   const serverClock = clock + serverOffset.current;
@@ -159,8 +160,9 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
   const treasure = challenge?.kind === "treasure" ? challenge.treasure : undefined;
   const treasureOpened = activity === "open-treasure";
   const lastDiscovery = TREASURE_OBJECTS.find((object) => object.id === treasure?.found.at(-1));
+  const lastDiscoveryPosition = lastDiscovery ? roomItemPosition(pet.roomPositions, pet.room, lastDiscovery.id) : undefined;
   const exploring = !!treasure || treasureOpened;
-  const explorerPosition = exploring ? { left: `${treasure?.chestReady || treasureOpened ? 50 : lastDiscovery?.x ?? 50}%`, top: `${treasure?.chestReady || treasureOpened ? 48 : (lastDiscovery?.y ?? 64) - 18}%` } : undefined;
+  const explorerPosition = exploring ? { left: `${treasure?.chestReady || treasureOpened ? 39 : lastDiscoveryPosition?.x ?? 50}%`, top: `${treasure?.chestReady || treasureOpened ? 54 : (lastDiscoveryPosition?.y ?? 64) - 18}%` } : undefined;
   const pose = sleeping ? "sleeping" : activity === "feed" ? "eating" : playing || ["finish-play", "finish-bubble", "finish-rhythm", "open-treasure"].includes(activity) ? "playing" : undefined;
   const accessory = PET_SHOP.find((i) => i.id === pet.accessory);
   const accessoryClass = ({
@@ -194,7 +196,7 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
           <div aria-label="Pocket Pal room" className={`${styles.room} ${ROOM_CLASSES[pet.room] ?? ""} ${sleeping ? styles.night : ""}`}>
             <div className={styles.roomLabel}>{sleeping ? <Moon size={14} /> : <Sun size={14} />}{roomName}</div>
             <div className={styles.window}><span>{sleeping ? "🌙" : "☀️"}</span><i /><i /></div>
-            <PocketPalRoomObjects owned={pet.owned} trail={treasure} busy={!ready} onFind={(objectId) => treasure && void act("find-treasure", { challengeId: challenge!.id, step: treasure.step, objectId })} />
+            <PocketPalRoomObjects owned={pet.owned} room={pet.room} positions={pet.roomPositions} trail={treasure} arranging={arrangingRoom} busy={busy} onFind={(objectId) => treasure && void act("find-treasure", { challengeId: challenge!.id, step: treasure.step, objectId })} onMove={(itemId: TreasureObjectId, position: RoomItemPosition) => act("move-room-item", { itemId, ...position })} />
             <div className={styles.rug} />
             <div style={explorerPosition} className={`${styles.petFigure} ${exploring ? styles.exploringPal : ""} ${sleeping ? styles.sleeping : ""} ${activity === "feed" ? styles.munching : activity === "clean" ? styles.wiggling : ["affection", "finish-play", "finish-bubble", "finish-rhythm", "find-treasure", "open-treasure", "answer"].includes(activity) ? styles.bouncing : ""}`}>
               {accessory && <span className={`${styles.accessory} ${accessoryClass}`}>{accessory.emoji}</span>}
@@ -208,17 +210,18 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
             <div className={styles.mood}>{mood.emoji} {mood.label}</div>
             {pet.cleanliness < 40 && !sleeping && <span className={styles.dust}>🍂</span>}
           </div>
+          {!challenge && <div className={styles.arrangeRoomControls}><button type="button" aria-pressed={arrangingRoom} disabled={busy || sleeping} onClick={() => { setArrangingRoom((value) => !value); setMessage(arrangingRoom ? "Your room layout is saved." : "Drag an item, or focus it and use the arrow keys."); }}>{arrangingRoom ? "Done arranging" : "Arrange room"}</button>{arrangingRoom && <span>Drag items anywhere in the room. Their spots save for this room.</span>}</div>}
           {challenge?.kind === "bubble" && <div className={styles.roomGameControls}><span>{caughtBubbles.length}/{challenge.bubbles?.length ?? 0} bubbles popped</span><button className={styles.primary} disabled={!bubbleReady || !ready || caughtBubbles.length !== challenge.bubbles?.length} onClick={() => void act("finish-bubble", { challengeId: challenge.id, caught: caughtBubbles })}>Finish catch!</button></div>}
           {challenge?.kind === "rhythm" && <PocketPalsRhythm key={challenge.id} offsets={challenge.rhythmOffsets ?? []} patternName={challenge.rhythmName ?? "Your pal's beat"} preferences={rhythmPreferences} onPreferencesChange={setRhythmPreferences} busy={!ready} onNewPattern={() => act("start-rhythm")} onFinish={(taps) => act("finish-rhythm", { challengeId: challenge.id, taps })} />}
           {treasure && <TreasureTrailPanel key={challenge!.id} trail={treasure} />}
           <div className={styles.speech} role="status" aria-live="polite"><Heart size={17} /><p>{sleeping ? `Shhh… ${sleepRemaining}s of cozy dreaming left.` : message}</p>{busy && <Loader2 size={15} className="animate-spin" />}</div>
           {error && <p className={styles.error} role="alert">{error} <button onClick={() => void load()} aria-label="Refresh pet"><RefreshCw size={14} /></button></p>}
           <div className={styles.actions}>
-            <button disabled={!ready || pet.dumplings === 0} onClick={() => void act("feed")}><span>🥟</span><strong>Feed</strong><small>Dumpling time</small></button>
-            <button disabled={!ready} onClick={() => void act("clean")}><span>🫧</span><strong>Clean</strong><small>Fresh & fluffy</small></button>
-            <button disabled={!ready} onClick={() => setShowPlayGames((open) => !open)}><span>🧸</span><strong>Play</strong><small>Choose a game</small></button>
-            <button disabled={busy || (!sleeping && !ready)} onClick={() => void act(sleeping ? "wake" : "sleep")}><span>{sleeping ? "☀️" : "🌙"}</span><strong>{sleeping ? "Wake" : "Sleep"}</strong><small>{sleeping ? `${sleepRemaining}s left` : "A cozy nap"}</small></button>
-            <button disabled={!ready} onClick={() => void act("start-learn")}><span>📖</span><strong>Learn</strong><small>Grow together</small></button>
+            <button disabled={!ready || arrangingRoom || pet.dumplings === 0} onClick={() => void act("feed")}><span>🥟</span><strong>Feed</strong><small>Dumpling time</small></button>
+            <button disabled={!ready || arrangingRoom} onClick={() => void act("clean")}><span>🫧</span><strong>Clean</strong><small>Fresh & fluffy</small></button>
+            <button disabled={!ready || arrangingRoom} onClick={() => setShowPlayGames((open) => !open)}><span>🧸</span><strong>Play</strong><small>Choose a game</small></button>
+            <button disabled={arrangingRoom || busy || (!sleeping && !ready)} onClick={() => void act(sleeping ? "wake" : "sleep")}><span>{sleeping ? "☀️" : "🌙"}</span><strong>{sleeping ? "Wake" : "Sleep"}</strong><small>{sleeping ? `${sleepRemaining}s left` : "A cozy nap"}</small></button>
+            <button disabled={!ready || arrangingRoom} onClick={() => void act("start-learn")}><span>📖</span><strong>Learn</strong><small>Grow together</small></button>
           </div>
           {showPlayGames && <div className={styles.gamePicker}><div><span className={styles.eyebrow}>Play together</span><h3>What should {pet.name} play?</h3></div><div>{[{ action: "start-play", emoji: "🧸", title: "Treat memory", detail: "Remember the treat pattern" }, { action: "start-bubble", emoji: "🫧", title: "Bubble Catch", detail: "Catch bubbles in the room" }, { action: "start-rhythm", emoji: "🎵", title: "Rhythm Paws", detail: "Listen and tap the beat" }, { action: "start-treasure", emoji: "🗝️", title: "Treasure Trail", detail: "Follow clues to the treasure" }].map((game) => <button key={game.action} disabled={!ready} onClick={() => void act(game.action as PetAction)}><span>{game.emoji}</span><strong>{game.title}</strong><small>{game.detail}</small></button>)}</div><small>Each win earns 8 coins, for your first three wins each day.</small></div>}
           {challenge && !["bubble", "rhythm", "treasure"].includes(challenge.kind) && <div className={styles.activityPanel}>
@@ -240,7 +243,7 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
         </aside>
       </div>
       {badge && <div className={styles.celebration}><span>🌟</span><div><strong>A day full of love!</strong><p>You and {pet.name} earned your daily care badge.</p></div><button aria-label="Dismiss celebration" onClick={() => setBadge(false)}><X size={18} /></button></div>}
-      {showShop && <dialog ref={shopDialog} className={styles.shopDialog} aria-labelledby="pet-shop-title" onCancel={() => setShowShop(false)}><div className={styles.shopContent}><div className={styles.panelHeading}><div><span className={styles.eyebrow}>A treat for your best friend</span><h3 id="pet-shop-title">The cozy corner</h3></div><button aria-label="Close shop" onClick={() => setShowShop(false)}><X size={21} /></button></div><p>You have 🪙 {pet.coins} coins. Play, learn, and finish daily care to earn more.</p>{error && <p className={styles.error} role="alert">{error}</p>}<button className={styles.refill} disabled={busy || pet.coins < 5 || pet.dumplings > 14} onClick={() => void act("refill")}><span>🥟</span><div><strong>Dumpling basket</strong><small>Six warm dumplings</small></div><strong>🪙 5</strong></button><h4 className={styles.shopSection}>Move rooms</h4><div className={styles.roomChoices}><button disabled={busy || pet.room === "home"} onClick={() => void act("equip", { itemId: "home" })}><span>🏠</span><strong>Cozy home</strong><small>{pet.room === "home" ? "Here now ✓" : "Move here"}</small></button>{rooms.map((item) => { const owned = pet.owned.includes(item.id); const current = pet.room === item.id; return <button key={item.id} disabled={busy || current || (!owned && pet.coins < item.cost)} onClick={() => void act(owned ? "equip" : "buy", { itemId: item.id })}><span>{item.emoji}</span><strong>{item.name}</strong><small>{current ? "Here now ✓" : owned ? "Move here" : `🪙 ${item.cost}`}</small></button>; })}</div><h4 className={styles.shopSection}>Room décor</h4><p className={styles.shopHint}>Decorations are placed automatically and travel with your pal to every room.</p><div className={styles.shopGrid}>{PET_SHOP.filter((item) => item.kind !== "room").map((item) => { const owned = pet.owned.includes(item.id); const equipped = pet.accessory === item.id; const decor = item.kind === "decor"; return <button key={item.id} disabled={busy || equipped || owned || (!owned && pet.coins < item.cost)} onClick={() => void act(owned ? "equip" : "buy", { itemId: item.id })}><span>{item.emoji}</span><strong>{item.name}</strong><small>{equipped ? "Wearing ✓" : owned && decor ? "Placed ✓" : owned ? "Use this" : `🪙 ${item.cost}`}</small></button>; })}</div><div className={styles.playButtons}><button disabled={busy} onClick={() => void act("equip", { itemId: "none" })}>Remove accessory</button></div></div></dialog>}
+      {showShop && <dialog ref={shopDialog} className={styles.shopDialog} aria-labelledby="pet-shop-title" onCancel={() => setShowShop(false)}><div className={styles.shopContent}><div className={styles.panelHeading}><div><span className={styles.eyebrow}>A treat for your best friend</span><h3 id="pet-shop-title">The cozy corner</h3></div><button aria-label="Close shop" onClick={() => setShowShop(false)}><X size={21} /></button></div><p>You have 🪙 {pet.coins} coins. Play, learn, and finish daily care to earn more.</p>{error && <p className={styles.error} role="alert">{error}</p>}<button className={styles.refill} disabled={busy || pet.coins < 5 || pet.dumplings > 14} onClick={() => void act("refill")}><span>🥟</span><div><strong>Dumpling basket</strong><small>Six warm dumplings</small></div><strong>🪙 5</strong></button><h4 className={styles.shopSection}>Move rooms</h4><div className={styles.roomChoices}><button disabled={busy || pet.room === "home"} onClick={() => void act("equip", { itemId: "home" })}><span>🏠</span><strong>Cozy home</strong><small>{pet.room === "home" ? "Here now ✓" : "Move here"}</small></button>{rooms.map((item) => { const owned = pet.owned.includes(item.id); const current = pet.room === item.id; return <button key={item.id} disabled={busy || current || (!owned && pet.coins < item.cost)} onClick={() => void act(owned ? "equip" : "buy", { itemId: item.id })}><span>{item.emoji}</span><strong>{item.name}</strong><small>{current ? "Here now ✓" : owned ? "Move here" : `🪙 ${item.cost}`}</small></button>; })}</div><h4 className={styles.shopSection}>Room décor</h4><p className={styles.shopHint}>Decorations travel with your pal. Use Arrange room to place them wherever you like in each room.</p><div className={styles.shopGrid}>{PET_SHOP.filter((item) => item.kind !== "room").map((item) => { const owned = pet.owned.includes(item.id); const equipped = pet.accessory === item.id; const decor = item.kind === "decor"; return <button key={item.id} disabled={busy || equipped || owned || (!owned && pet.coins < item.cost)} onClick={() => void act(owned ? "equip" : "buy", { itemId: item.id })}><span>{item.emoji}</span><strong>{item.name}</strong><small>{equipped ? "Wearing ✓" : owned && decor ? "Placed ✓" : owned ? "Use this" : `🪙 ${item.cost}`}</small></button>; })}</div><div className={styles.playButtons}><button disabled={busy} onClick={() => void act("equip", { itemId: "none" })}>Remove accessory</button></div></div></dialog>}
     </section>
   );
 }

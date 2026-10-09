@@ -1,4 +1,4 @@
-import { TREASURE_OBJECTS, treasureRoomObjects, type TreasureObjectId, type TreasureView } from "./pocket-pals-treasure";
+import { roomItemPosition, treasureClue, TREASURE_OBJECTS, treasureRoomObjects, type RoomPositions, type TreasureObjectId, type TreasureView } from "./pocket-pals-treasure";
 import { createRhythmPattern } from "./pocket-pals-rhythm";
 
 export const PET_SPECIES = [
@@ -122,7 +122,7 @@ export type PetState = {
   serialNumber?: string; appearance?: PetAppearance;
   hunger: number; happiness: number; cleanliness: number; energy: number; smarts: number; bond: number;
   xp: number; coins: number; dumplings: number; lessonsLearned: number; gamesPlayed: number; lastRhythmPattern?: string;
-  owned: string[]; accessory: string | null; room: string; sleepingUntil: number | null;
+  owned: string[]; accessory: string | null; room: string; roomPositions?: RoomPositions; sleepingUntil: number | null;
   lastActionAt: number; lastCareDay: string | null; streak: number;
   daily: { day: string; startedAt: number; tasks: CareTask[]; rewarded: boolean; playRewards: number; learnRewards: number };
   challenge: { kind: "play" | "bubble" | "rhythm" | "treasure" | "hide" | "balance" | "learn"; id: string; startedAt: number; sequence?: number[]; lessonId?: string; bubbleIds?: string[]; hideSpot?: number; hideSpotCount?: number; balanceSequence?: number[]; rhythmOffsets?: number[]; rhythmTolerance?: number; rhythmName?: string; treasure?: { room: string; objectIds: TreasureObjectId[]; targets: TreasureObjectId[]; step: number; age: number } } | null;
@@ -196,7 +196,7 @@ export function publicChallenge(pet: PetState, age: number) {
     if (!trail || trail.room !== pet.room) return null;
     const object = TREASURE_OBJECTS.find((item) => item.id === trail.targets[trail.step]);
     const treasure: TreasureView = { room: trail.room, objectIds: [...trail.objectIds], found: trail.targets.slice(0, trail.step), step: trail.step, total: trail.targets.length,
-      clue: object ? trail.age < 9 ? object.clue : object.olderClue : "All keys found! Open the treasure chest.",
+      clue: object ? treasureClue(object, trail.age, roomItemPosition(pet.roomPositions, pet.room, object.id)) : "All keys found! Open the treasure chest.",
       hint: object?.hint ?? "Tap the chest in the middle of the room.", picture: trail.age < 6 && object ? object.emoji : null, chestReady: !object };
     return { id: challenge.id, kind: challenge.kind, startedAt: challenge.startedAt, treasure };
   }
@@ -204,7 +204,7 @@ export function publicChallenge(pet: PetState, age: number) {
   const lesson = LESSONS.find((l) => l.id === challenge.lessonId) ?? currentLesson(pet, age);
   return { id: challenge.id, kind: challenge.kind, startedAt: challenge.startedAt, topic: lesson.topic, question: lesson.question, choices: lesson.choices };
 }
-export type PetAction = "feed" | "clean" | "sleep" | "wake" | "affection" | "start-play" | "finish-play" | "start-bubble" | "finish-bubble" | "start-rhythm" | "finish-rhythm" | "start-treasure" | "find-treasure" | "open-treasure" | "start-learn" | "answer" | "buy" | "equip" | "refill" | "rename";
+export type PetAction = "feed" | "clean" | "sleep" | "wake" | "affection" | "start-play" | "finish-play" | "start-bubble" | "finish-bubble" | "start-rhythm" | "finish-rhythm" | "start-treasure" | "find-treasure" | "open-treasure" | "start-learn" | "answer" | "buy" | "equip" | "move-room-item" | "refill" | "rename";
 function challengeNumber(challengeId: string, index: number) {
   return parseInt(challengeId.replaceAll("-", "").slice(index * 2, index * 2 + 2), 16) || 0;
 }
@@ -216,7 +216,7 @@ function finishPlayRound(pet: PetState, message: string) {
 }
 export function applyPetAction(pet: PetState, action: PetAction, input: Record<string, unknown>, now: number, age: number, challengeId: string) {
   let message = "";
-  const administrative = ["buy", "equip", "refill", "rename", "wake"].includes(action);
+  const administrative = ["buy", "equip", "move-room-item", "refill", "rename", "wake"].includes(action);
   if (pet.sleepingUntil && !administrative) throw new PetActionError(`${pet.name} is napping. Let them rest or wake them up.`);
   if (!administrative && now - pet.lastActionAt < 2_000) throw new PetActionError("Give your pal a moment before the next activity.");
   if (pet.challenge && !administrative && !["answer", "finish-play", "start-play", "start-bubble", "finish-bubble", "start-rhythm", "finish-rhythm", "start-treasure", "find-treasure", "open-treasure", "start-learn"].includes(action)) pet.challenge = null;
@@ -350,6 +350,17 @@ export function applyPetAction(pet: PetState, action: PetAction, input: Record<s
       if (item.kind === "accessory") { pet.accessory = item.id; message = `${item.name} equipped.`; break; }
       if (item.kind === "room") { pet.room = item.id; message = `${pet.name} moved to the ${item.name}.`; break; }
       throw new PetActionError("Decorations are placed automatically in every room.");
+    }
+    case "move-room-item": {
+      if (pet.challenge?.kind === "treasure") throw new PetActionError("Finish or switch from Treasure Trail before arranging the room.");
+      const object = TREASURE_OBJECTS.find((item) => item.id === input.itemId);
+      if (!object || (!object.id.startsWith("trail-") && !pet.owned.includes(object.id))) throw new PetActionError("Choose an item that is in this room.");
+      const x = input.x, y = input.y;
+      if (typeof x !== "number" || !Number.isFinite(x) || typeof y !== "number" || !Number.isFinite(y) || x < 8 || x > 92 || y < 20 || y > 82) throw new PetActionError("Keep the item inside the room.");
+      pet.roomPositions ??= {};
+      pet.roomPositions[pet.room] ??= {};
+      pet.roomPositions[pet.room][object.id] = { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 };
+      message = `${object.name} moved.`; break;
     }
     case "rename": {
       const name = typeof input.name === "string" ? input.name.trim().slice(0, 24) : "";

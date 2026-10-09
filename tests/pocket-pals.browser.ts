@@ -14,7 +14,7 @@ async function main() {
   const page = await browser.newPage({ viewport: { width: 1280, height: 1100 } });
   page.setDefaultTimeout(10_000);
   const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("pageerror", (error) => { errors.push(error.message); console.error(`Browser page error: ${error.message}`); });
   await page.addInitScript(() => {
     const instrumented = window as unknown as { rhythmToneLog: { type: string; frequency: number }[] };
     instrumented.rhythmToneLog = [];
@@ -124,6 +124,31 @@ async function main() {
     await expect(page.getByRole("heading", { name: /Pudding/ })).toBeVisible();
     await expect(page.getByText("Today's care badge collected!")).toBeVisible();
     assert.equal((saved as PetState | null)?.accessory, "bow");
+    await page.getByRole("button", { name: "Arrange room", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Done arranging", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: /Play Choose/ })).toBeDisabled();
+    const plant = page.getByRole("button", { name: "Move Little plant", exact: true });
+    await plant.focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByRole("status")).toContainText("Little plant moved");
+    assert.deepEqual(saved!.roomPositions?.home?.["trail-plant"], { x: 20, y: 76 });
+    const bear = page.getByRole("button", { name: "Move Teddy bear", exact: true });
+    const roomForDrag = await page.getByLabel("Pocket Pal room").boundingBox();
+    const bearBefore = await bear.boundingBox();
+    assert.ok(roomForDrag && bearBefore);
+    await page.mouse.move(bearBefore.x + bearBefore.width / 2, bearBefore.y + bearBefore.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(roomForDrag.x + roomForDrag.width * .3, roomForDrag.y + roomForDrag.height * .55, { steps: 5 });
+    await page.mouse.up();
+    await expect(page.getByRole("status")).toContainText("Teddy bear moved");
+    assert.ok(Math.abs(saved!.roomPositions!.home!["trail-bear"]!.x - 30) < 1);
+    assert.ok(Math.abs(saved!.roomPositions!.home!["trail-bear"]!.y - 55) < 1);
+    await page.getByRole("button", { name: "Done arranging", exact: true }).click();
+    await page.reload();
+    await page.getByRole("button", { name: /Pocket Pals/ }).click();
+    const bearAfterReload = await page.getByLabel("Teddy bear", { exact: true }).boundingBox();
+    const roomAfterReload = await page.getByLabel("Pocket Pal room").boundingBox();
+    assert.ok(bearAfterReload && roomAfterReload && Math.abs((bearAfterReload.x + bearAfterReload.width / 2 - roomAfterReload.x) / roomAfterReload.width * 100 - 30) < 1, "Dragged item position survives reload");
     await page.getByRole("button", { name: /Play Choose/ }).click();
     await page.getByRole("button", { name: /Bubble Catch Catch/ }).click();
     await expect(page.getByLabel("Catch bubble 1")).toBeVisible();
@@ -233,6 +258,9 @@ async function main() {
       await expect(page.getByLabel(`${step + 1} of 3 keys found`)).toBeVisible();
     }
     await page.clock.fastForward(2500);
+    const chestBox = await page.getByRole("button", { name: "Open treasure chest", exact: true }).boundingBox();
+    const palAtChest = await page.getByRole("button", { name: "Cuddle Pudding" }).boundingBox();
+    assert.ok(chestBox && palAtChest && (chestBox.x + chestBox.width <= palAtChest.x || palAtChest.x + palAtChest.width <= chestBox.x || chestBox.y + chestBox.height <= palAtChest.y || palAtChest.y + palAtChest.height <= chestBox.y), `Treasure chest sits beside the Pocket Pal: ${JSON.stringify({ chestBox, palAtChest })}`);
     const coinsBeforeChest = saved!.coins;
     await page.getByRole("button", { name: "Open treasure chest", exact: true }).click();
     await expect(page.getByRole("status")).toContainText("Treasure found!");
@@ -241,6 +269,7 @@ async function main() {
     await page.screenshot({ path: `${screenshotDir}/treasure-open.png`, fullPage: true });
 
     // All five rooms work with free starter props and with every purchased item.
+    saved!.roomPositions = {}; // Use the collision-free defaults for this catalog check.
     for (const owned of [[], ["flower-wall", "potted-palm", "cozy-sofa", "reading-lamp", "tea-table", "wall-shelves"]]) {
       for (const room of ["home", "garden", "library", "stargazer", "sunroom"]) {
         saved!.room = room;
