@@ -89,7 +89,7 @@ export function GuestJungleDemo() {
           <div className="max-w-2xl">
             <p className="inline-flex items-center gap-2 rounded-full border border-yellow-200/50 bg-yellow-300/15 px-3 py-1.5 text-xs font-black uppercase tracking-[0.16em] text-yellow-100"><Sparkles size={15} /> Shareable guest demo</p>
             <h1 className="mt-5 text-4xl font-black leading-none drop-shadow-lg sm:text-6xl">Johnny: The People&apos;s Champ</h1>
-            <p className="mt-5 max-w-xl text-base font-bold leading-7 text-emerald-50 sm:text-lg">Run, flip, fight, and gather supplies across seven jungle stages. No account is needed for your first three runs.</p>
+            <p className="mt-5 max-w-xl text-base font-bold leading-7 text-emerald-50 sm:text-lg">Run, flip, fight, and gather supplies across eight jungle stages, including the new Savanna Stampede. No account is needed for your first three runs.</p>
             {!showSignup ? (
               <div className="mt-7 flex flex-wrap items-center gap-3">
                 <button type="button" disabled={runsUsed === null} onClick={() => setPlaying(true)} className="inline-flex items-center gap-2 rounded-2xl bg-yellow-300 px-6 py-3.5 text-lg font-black text-emerald-950 shadow-xl transition-transform hover:scale-[1.02] disabled:opacity-50"><Gamepad2 size={21} /> Play free demo</button>

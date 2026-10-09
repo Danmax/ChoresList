@@ -139,9 +139,11 @@ export function stepDinoLand(s: Runner, dt: number, previousY: number, hurt: (me
         dino.hits += heroDamage(s); dino.hitCooldown = 0.42; gainKi(s, 18); recordHeroHit(s, dino.x - 70, FLOOR - 85, 'heavy');
         s.message = `T. REX COUNTER! ${dino.hits}/${dino.hitPoints}`; s.messageTime = 0.9;
         if (dino.hits >= dino.hitPoints) {
-          dino.knocked = true; s.dinoBossDefeated = true; s.phase = 'victory';
+          dino.knocked = true; s.dinoBossDefeated = true;
+          if (s.endLevel === 6) s.phase = 'victory';
+          else s.elapsed = 7 * { easy: 42, medium: 51, hard: 60 }[s.difficulty];
           starKnockout(s, dino.x, FLOOR - 100, 'T. REX');
-          s.message = 'DINOLAND CLEARED!'; s.messageTime = 3;
+          s.message = s.endLevel === 6 ? 'DINOLAND CLEARED!' : 'DINOLAND CLEARED! SAVANNA AHEAD!'; s.messageTime = 3;
         }
       }
       continue;

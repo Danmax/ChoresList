@@ -1,6 +1,6 @@
 # Jungle Run: Savanna Stampede
 
-Status: level design and generated artwork complete; gameplay integration is planned.
+Status: implemented as selectable stage 8 with generated artwork, savanna encounters, lion finale and oasis victory gate.
 
 Proposed stage 8, after DinoLand. The monkey leaves the jungle for sunlit golden grass, acacia trees and rocky ravines. Friendly giraffes help it survive laughing hyena packs and a wildebeest stampede. A fierce roaring lion guards the last stretch before the Oasis of Victory.
 
@@ -61,14 +61,14 @@ Full generation prompts and the final cliff edit prompt are in `public/games/jun
 
 The generated sprite spacing varies, including some poses extending beyond their intended grid cells. Measure source rectangles and check neighboring-pose contamination before animating; do not slice blindly into equal cells. Preserve native aspect ratios and anchor animals consistently at their feet. The giraffe launch poses change silhouette substantially, so align the gameplay back surface independently of image bounds. The cliff art is decorative; define horizontal platform collision surfaces separately. The oasis image is a finish backdrop, not a seamless scrolling tile. Render the earlier savanna sky and acacia parallax with the established canvas scenery approach.
 
-## Implementation work
+## Implemented integration
 
-1. Add Savanna Stampede to `LEVELS` and a stage gem entry to `GEMS` in `lib/jungle-runner.ts`; keep gem tracking arrays aligned. Proposed gem: Citrine, warm golden yellow.
-2. Add `lib/jungle-savanna.ts` with explicit creature states, ordered encounter scheduling, giraffe supports, cliff collision/respawn and the lion completion gate. Reset prior-stage entities on entry and clean up savanna entities on exit.
-3. Add `lib/jungle-savanna-art.ts` for measured sprite frames and savanna drawing. Load the new local assets in `components/jungle-runner.tsx` and preserve the existing keyboard/touch controls.
-4. Replace assumptions that DinoLand is the last stage. The stage picker currently labels only the final entry as a boss stage; label both DinoLand and Savanna correctly. Update the seven-level canvas description, level count and score metadata for the new stage.
-5. Gate final victory on completed lion encounter and grounded oasis crossing, while retaining the current duration-based progression for earlier levels. Avoid duplicating score submission.
-6. Add behavior tests for state transitions, protection during herds, friendly giraffe launches, feasible cliff crossings, fall recovery, stage resets and finale gating. Playtest Easy/Medium/Hard with keyboard and touch.
+1. Savanna Stampede and its Citrine gem are registered in `lib/jungle-runner.ts`.
+2. `lib/jungle-savanna.ts` owns creature states, encounter scheduling, giraffe launches, cliff recovery and the lion/oasis completion gate.
+3. `lib/jungle-savanna-art.ts` uses measured sprite bounds and draws the savanna, terrain, animals and oasis finish.
+4. The stage picker exposes both DinoLand and Savanna Stampede as boss stages. Adventure Mode requires the T. rex before advancing into the savanna.
+5. Final victory requires defeating the lion and crossing the grounded oasis trigger.
+6. `tests/jungle-savanna.test.ts` covers selection, giraffe help, cliff recovery, warnings, finale gating and the DinoLand transition.
 
 ## Acceptance checks for implementation
 
@@ -81,4 +81,3 @@ The generated sprite spacing varies, including some poses extending beyond their
 - The lion cannot be skipped by waiting out the stage timer.
 - The oasis never spawns enemies, has solid ground, and submits a victory score exactly once.
 
-No gameplay code has been changed as part of this planning and artwork task.

@@ -581,7 +581,7 @@ test('full run spawns exactly one gem per level and bats only at night', () => {
     for (const item of s.items) if (item.kind === 'gem' && !seen.has(item)) { seen.add(item); counts[item.level!]++; }
     if (s.bats.length) { assert.equal(s.level, 4); nightBats = true; }
   }
-  assert.deepEqual(counts, [1, 1, 1, 1, 1, 1, 1]); assert.ok(nightBats); assert.equal(s.phase, 'playing'); assert.equal(s.level, 6);
+  assert.deepEqual(counts, [1, 1, 1, 1, 1, 1, 1, 0]); assert.ok(nightBats); assert.equal(s.phase, 'playing'); assert.equal(s.level, 6);
 });
 
 test('gem collection awards 250 points once per level, and restart clears progress', () => {
@@ -593,8 +593,8 @@ test('gem collection awards 250 points once per level, and restart clears progre
       stepRunner(s, 1 / 120);
     }
   }
-  assert.equal(s.gems, 7); assert.equal(runnerScore(s), 1750); assert.equal(s.bananas, 0);
-  assert.deepEqual(s.gemCollected, [true, true, true, true, true, true, true]); assert.equal(s.gemBursts.length, 7); assert.equal(createRunner().gems, 0);
+  assert.equal(s.gems, LEVELS.length); assert.equal(runnerScore(s), 250 * LEVELS.length); assert.equal(s.bananas, 0);
+  assert.deepEqual(s.gemCollected, LEVELS.map(() => true)); assert.equal(s.gemBursts.length, LEVELS.length); assert.equal(createRunner().gems, 0);
   assert.equal(hasAllGems(s), true);
   s.phase = 'victory'; stepRunner(s, 0.5); assert.equal(s.celebrationTime, 0.5);
 });

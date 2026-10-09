@@ -5,7 +5,7 @@ import { createDino } from '../lib/jungle-dinoland';
 import { dinoAnimationFrame } from '../lib/jungle-dino-art';
 
 function dinoland(difficulty: 'easy' | 'medium' | 'hard' = 'medium') {
-  const s = createRunner(difficulty);
+  const s = createRunner(difficulty, 6, 6);
   s.phase = 'playing'; s.level = 6; s.elapsed = 6 * levelSeconds(s);
   s.items = []; s.nextSection = 100000;
   return s;

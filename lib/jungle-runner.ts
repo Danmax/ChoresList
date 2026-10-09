@@ -1,5 +1,6 @@
 import { createInsect, INSECT_KINDS, stepInsects, type Insect, type InsectKind, type AntRock, type HitReaction } from './jungle-insects';
 import { addDinoSection, stepDinoLand, type Dino, type DinoProjectile, type Eruption, type TarPit } from './jungle-dinoland';
+import { addSavannaSection, isSavannaPit, stepSavanna, type SavannaAnimal, type SavannaPit } from './jungle-savanna';
 export const FLOOR = 310;
 export const PLAYER_X = 150;
 export const RUNNER_DIFFICULTIES = {
@@ -16,6 +17,7 @@ export const LEVELS = [
   { name: 'Moonlit Webs', sky: '#090e29', mist: '#33496b', speed: 445 },
   { name: 'Giant Insect Grove', sky: '#542b79', mist: '#b4efd0', speed: 505 },
   { name: 'DinoLand', sky: '#dc7b58', mist: '#f9ce7c', speed: 565 },
+  { name: 'Savanna Stampede', sky: '#ef9d55', mist: '#ffe4a0', speed: 625 },
 ] as const;
 export const LEVEL_SECONDS = 60;
 export const SLIDE_SECONDS = 1.5;
@@ -32,6 +34,7 @@ export const GEMS = [
   { name: 'Ruby', color: '#ff6e97' }, { name: 'Amber', color: '#ffcb56' },
   { name: 'Moonstone', color: '#d2b7ff' }, { name: 'Peridot', color: '#c4ff57' },
   { name: 'Sunstone', color: '#ff9d52' },
+  { name: 'Citrine', color: '#ffe064' },
 ] as const;
 export function hasAllGems(s: Pick<Runner, 'gemCollected'>) { return s.gemCollected.every(Boolean); }
 export type Hog = { herdX: number; x: number; y: number; vy: number; age: number; jumper: boolean; jumpIn: number; active: boolean; knocked?: boolean };
@@ -192,6 +195,9 @@ export function createRunner(difficulty: RunnerDifficulty = 'medium', startLevel
     insects: [] as Insect[], antRocks: [] as AntRock[], caterpillarBounces: 0,
     dinos: [] as Dino[], tarPits: [] as TarPit[], eruptions: [] as Eruption[], dinoProjectiles: [] as DinoProjectile[],
     dinoEncounterIndex: 0, dinoBossStarted: false, dinoBossDefeated: false, groundShake: 0, tarTime: 0,
+    savannaAnimals: [] as SavannaAnimal[], savannaPits: [] as SavannaPit[], savannaEncounterIndex: 0,
+    savannaBossStarted: false, savannaLionDefeated: false, savannaOasisOpen: false,
+    savannaOasisReached: false, savannaFinishX: null as number | null,
     reaction: 'bonk' as HitReaction, reactionLeft: 0,
     phase: 'ready' as 'ready' | 'playing' | 'over' | 'victory',
     distance: 0, elapsed: initialLevel * RUNNER_DIFFICULTIES[difficulty].seconds, level: initialLevel, endLevel: finalLevel, y: FLOOR, vy: 0, jumps: 0, duck: false, duckHeld: false, hesitating: false, slideLeft: 0, slideCooldown: 0, strongDiveLeft: 0, attackLeft: 0, forwardDashLeft: 0, forwardDashCooldown: 0, combatMove: 'run' as 'run' | 'punch' | 'kick' | 'dash', combatLeft: 0, comboStep: 0, comboWindow: 0, hitCombo: 0, hitComboWindow: 0, hitStreak: 0, hitStreakWindow: 0, bestHitStreak: 0, attackLanded: false, counterLeft: 0, ki: 0, specialLeft: 0, cameraLead: 0, impactShake: 0,
@@ -329,6 +335,7 @@ function hurt(s: Runner, message: string, reaction: HitReaction = 'bonk') {
 // of screen size. Every challenge is followed by a long, safe coin trail.
 function addSection(s: Runner) {
   const x = s.nextSection;
+  if (s.level === 7) { addSavannaSection(s); return; }
   if (s.level === 6) { addDinoSection(s); return; }
   if (s.level === 5) {
     const finale = s.elapsed % levelSeconds(s) >= levelSeconds(s) - 20;
@@ -492,13 +499,19 @@ export function stepRunner(s: Runner, dt: number) {
   }
   s.elapsed += dt;
   if (s.elapsed >= levelSeconds(s) * (s.endLevel + 1)) {
-    // DinoLand remains a boss finale; all other selected stages are complete
-    // as soon as their timer finishes.
-    if (s.endLevel < LEVELS.length - 1 || s.dinoBossDefeated) { s.phase = 'victory'; return; }
-    s.elapsed = levelSeconds(s) * (s.endLevel + 1) - 0.001;
+    const selectedDino = s.endLevel === 6;
+    const selectedSavanna = s.endLevel === 7;
+    if (selectedDino && s.dinoBossDefeated) { s.phase = 'victory'; return; }
+    if (selectedSavanna) s.elapsed = levelSeconds(s) * 8 - 0.001;
+    else if (!selectedDino) { s.phase = 'victory'; return; }
+    else s.elapsed = levelSeconds(s) * 7 - 0.001;
   }
   const level = Math.floor(s.elapsed / levelSeconds(s));
   if (level !== s.level) {
+    // Adventure Mode cannot leave DinoLand until the T. rex is defeated.
+    if (s.level === 6 && level === 7 && !s.dinoBossDefeated) {
+      s.elapsed = levelSeconds(s) * 7 - 0.001;
+    } else {
     if (level === 5) {
       s.items = []; s.rivers = []; s.predators = []; s.hogs = []; s.bats = []; s.herds = []; s.spiders = []; s.orangutans = []; s.pineapples = []; s.guardians = []; s.birds = []; s.sloths = []; s.lemmings = [];
       s.swing = null; s.nextSection = s.distance + 1100;
@@ -507,11 +520,18 @@ export function stepRunner(s: Runner, dt: number) {
       s.items = []; s.insects = []; s.antRocks = []; s.pineapples = [];
       s.nextSection = s.distance + 950;
     }
-    s.level = level; s.section = 0; s.encounterDeck = []; s.insectDeck = []; s.items = s.items.filter(i => i.kind !== 'gem'); s.message = `LEVEL ${level + 1}: ${LEVELS[level].name}`; s.messageTime = 3; }
+    if (level === 7) {
+      s.items = []; s.dinos = []; s.tarPits = []; s.eruptions = []; s.dinoProjectiles = [];
+      s.nextSection = s.distance + 950;
+    }
+    s.level = level; s.section = 0; s.encounterDeck = []; s.insectDeck = []; s.items = s.items.filter(i => i.kind !== 'gem'); s.message = `LEVEL ${level + 1}: ${LEVELS[level].name}`; s.messageTime = 3;
+    }
+  }
   const speed = forwardPace(s);
   const boost = dashBoost(s) + airBoost(s);
   const tarred = s.level === 6 && s.y >= FLOOR - 2 && s.tarPits.some(p => s.distance + PLAYER_X > p.x && s.distance + PLAYER_X < p.x + p.width);
-  if (!s.swing) s.distance += (speed * (tarred ? 0.62 : 1) + boost) * dt;
+  const fallingIntoSavannaPit = isSavannaPit(s, s.distance + PLAYER_X) && s.y >= FLOOR;
+  if (!s.swing && !fallingIntoSavannaPit) s.distance += (speed * (tarred ? 0.62 : 1) + boost) * dt;
   // Camera lags briefly behind a dash: the monkey visibly surges forward while
   // world-space collisions stay aligned with the faster movement.
   s.cameraLead += (boost * 0.2 - s.cameraLead) * (1 - Math.exp(-10 * dt));
@@ -648,7 +668,7 @@ export function stepRunner(s: Runner, dt: number) {
       river.bounceLeft = 0.45;
       s.message = 'HIPPO BOUNCE!'; s.messageTime = 1;
     } else if (s.y > FLOOR + 55 && s.invincible <= 0) hurt(s, river.resident === 'eel' ? 'ZAP! Electric eel!' : 'SPLASH! Stay above the water!', river.resident === 'eel' ? 'zap' : 'bonk');
-  } else if (s.y >= FLOOR) {
+  } else if (s.y >= FLOOR && !isSavannaPit(s, worldX)) {
     s.y = FLOOR; s.vy = 0; s.jumps = 0;
   }
   for (const herd of s.herds) {
@@ -678,6 +698,7 @@ export function stepRunner(s: Runner, dt: number) {
   s.herds = s.herds.filter(h => h.x + 440 > s.distance - 80);
   const height = s.duck && s.y >= FLOOR - 1 ? 30 : 76;
   stepDinoLand(s, dt, previousY, (message, reaction) => hurt(s, message, reaction));
+  stepSavanna(s, dt, previousY, (message, reaction) => hurt(s, message, reaction));
   for (const r of s.rivers) {
     if (r.resident === 'piranha') for (let i = 0; i < 2; i++) {
       if (r.piranhasKnocked?.[i]) continue;

@@ -2,6 +2,7 @@
 
 import { drawInsectGrove, drawInsects, drawReaction } from '@/lib/jungle-insect-art';
 import { drawDinoBackdrop, drawDinoLand, type DinoAnimations } from '@/lib/jungle-dino-art';
+import { drawSavanna, drawSavannaBackdrop, type SavannaSprites } from '@/lib/jungle-savanna-art';
 import { pantherPaw } from '@/lib/jungle-motion';
 import { drawWaterLife, drawOrangutan, drawPineapple } from '@/lib/jungle-water-art';
 import { useEffect, useRef, useState } from 'react';
@@ -265,10 +266,11 @@ function emeraldCelebration(ctx: CanvasRenderingContext2D, s: Runner) {
   ctx.shadowBlur = 0; ctx.fillStyle = '#f4ffe5'; ctx.font = 'bold 15px sans-serif'; ctx.fillText('JUNGLE CROWN CELEBRATION', 400, 101); ctx.restore();
 }
 
-function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElement, fightSprite: HTMLImageElement, predators: HTMLImageElement, wildlife: HTMLImageElement, insects: HTMLImageElement, dinos: HTMLImageElement, dinoAnimations: DinoAnimations, coffeeBear: HTMLImageElement, allySprites: { orangutan: HTMLImageElement; eel: HTMLImageElement; sloth: HTMLImageElement; lemming: HTMLImageElement; scorpion: HTMLImageElement }) {
+function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElement, fightSprite: HTMLImageElement, predators: HTMLImageElement, wildlife: HTMLImageElement, insects: HTMLImageElement, dinos: HTMLImageElement, dinoAnimations: DinoAnimations, coffeeBear: HTMLImageElement, allySprites: { orangutan: HTMLImageElement; eel: HTMLImageElement; sloth: HTMLImageElement; lemming: HTMLImageElement; scorpion: HTMLImageElement }, savannaSprites: SavannaSprites) {
   const W = 800, H = 400;
   const night = s.level === 4;
   const dinoZone = s.level === 6;
+  const savannaZone = s.level === 7;
   const cameraDistance = s.distance - s.cameraLead;
   const playerX = PLAYER_X + s.cameraLead;
   const animal = (row: number, frame: number, x: number, y: number, width: number, height: number, flip = false) => {
@@ -285,6 +287,7 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
   const sky = ctx.createLinearGradient(0, 0, 0, H);
   sky.addColorStop(0, LEVELS[s.level].sky); sky.addColorStop(1, LEVELS[s.level].mist);
   ctx.fillStyle = sky; ctx.fillRect(-8, -8, W + 16, H + 16);
+  if (savannaZone) drawSavannaBackdrop(ctx, s, savannaSprites.oasis, cameraDistance);
   if (night) {
     ctx.fillStyle = '#d4e6ff';
     for (let i = 0; i < 45; i++) { ctx.globalAlpha = 0.45 + Math.sin(s.elapsed * 1.5 + i) * 0.3; ctx.beginPath(); ctx.arc((i * 137) % W, 12 + (i * 43) % 170, i % 3 === 0 ? 1.7 : 1, 0, Math.PI * 2); ctx.fill(); }
@@ -294,7 +297,7 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
   ctx.fillStyle = night ? '#e0eaff' : '#fff5b6'; ctx.beginPath(); ctx.arc(650, 65, 38, 0, Math.PI * 2); ctx.fill();
   if (night) { ctx.fillStyle = '#a6b8d477'; for (const [x, y, r] of [[637, 50, 8], [665, 76, 11], [635, 80, 5]]) { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); } }
   // Three independent speeds create depth without moving the collision plane.
-  if (!dinoZone) for (let layer = 0; layer < 3; layer++) {
+  if (!dinoZone && !savannaZone) for (let layer = 0; layer < 3; layer++) {
     const spacing = [240, 190, 330][layer];
     const offset = (cameraDistance * [0.12, 0.35, 0.65][layer]) % spacing;
     for (let i = -1; i < 6; i++) {
@@ -317,9 +320,9 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
   }
   if (s.level === 5) drawInsectGrove(ctx, cameraDistance, s.elapsed);
   if (dinoZone) drawDinoBackdrop(ctx, cameraDistance, s.elapsed);
-  ctx.fillStyle = dinoZone ? '#5c403c' : night ? '#303b50' : '#956337'; ctx.fillRect(0, FLOOR, W, H - FLOOR);
-  ctx.fillStyle = dinoZone ? '#e6a05e' : night ? '#7b9fae' : '#8bc34b'; ctx.fillRect(0, FLOOR, W, 9);
-  ctx.fillStyle = dinoZone ? '#9c705c' : night ? '#53667d' : '#bc884b';
+  ctx.fillStyle = dinoZone ? '#5c403c' : savannaZone ? '#9b5e32' : night ? '#303b50' : '#956337'; ctx.fillRect(0, FLOOR, W, H - FLOOR);
+  ctx.fillStyle = dinoZone ? '#e6a05e' : savannaZone ? '#e7b64d' : night ? '#7b9fae' : '#8bc34b'; ctx.fillRect(0, FLOOR, W, 9);
+  ctx.fillStyle = dinoZone ? '#9c705c' : savannaZone ? '#c98642' : night ? '#53667d' : '#bc884b';
   for (let i = -1; i < 24; i++) ctx.fillRect(i * 45 - cameraDistance % 45, FLOOR + 30 + i % 3 * 10, 18, 5);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   for (const r of s.rivers) {
@@ -567,6 +570,7 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
   }
   drawInsects(ctx, s, insects, cameraDistance, allySprites.scorpion);
   if (dinoZone) drawDinoLand(ctx, s, dinos, dinoAnimations, cameraDistance);
+  if (savannaZone) drawSavanna(ctx, s, savannaSprites, cameraDistance);
   for (const effect of s.hitEffects) {
     const x = effect.x - cameraDistance, y = effect.y;
     if (x < -40 || x > 840) continue;
@@ -756,16 +760,18 @@ export function JungleVineSwing({ onExit, onFinish, onRunStart, finishLabel = 'S
   const [runMode, setRunMode] = useState<'adventure' | 'stage'>('adventure');
   const [selectedLevel, setSelectedLevel] = useState(0);
   const [shareCopied, setShareCopied] = useState(false);
-  const [hud, setHud] = useState({ phase: 'ready', lives: 3, bananas: 0, seconds: 60, paused: false, level: 0, score: 0, golden: 0, cherries: 0, fruit: 0, supplies: 0, gems: 0, levelGem: false, slide: 0, attack: 0, move: 'run', combo: 0, streak: 0, bestStreak: 0, ki: 0, special: 0, speed: 1, espresso: 0, hesitating: false, bossStarted: false, bossHp: 0, bossMax: 0 });
+  const [hud, setHud] = useState({ phase: 'ready', lives: 3, bananas: 0, seconds: 60, paused: false, level: 0, score: 0, golden: 0, cherries: 0, fruit: 0, supplies: 0, gems: 0, levelGem: false, slide: 0, attack: 0, move: 'run', combo: 0, streak: 0, bestStreak: 0, ki: 0, special: 0, speed: 1, espresso: 0, hesitating: false, bossStarted: false, bossHp: 0, bossMax: 0, bossIcon: '🦖' });
   const paused = useRef(false);
   const saved = useRef(false);
   const duckSources = useRef(new Set<string>());
   const hesitateSources = useRef(new Set<string>());
   const publish = () => {
     const s = world.current;
-    const bossMax = { easy: 2, medium: 3, hard: 4 }[s.difficulty];
-    const boss = s.dinos.find(d => d.kind === 'trex');
-    setHud({ phase: s.phase, lives: s.lives, bananas: s.bananas, seconds: Math.max(0, Math.ceil((s.level + 1) * levelSeconds(s) - s.elapsed)), paused: paused.current, level: s.level, score: runnerScore(s), golden: s.golden, cherries: s.cherries, fruit: s.fruitPickups, supplies: s.supplyPickups, gems: s.gems, levelGem: s.gemCollected[s.level], slide: s.slideLeft, attack: isAirAttack(s) ? s.attackLeft : 0, move: heroMove(s), combo: s.hitCombo, streak: s.hitStreak, bestStreak: s.bestHitStreak, ki: s.ki, special: s.specialLeft, speed: travelSpeed(s) / LEVELS[0].speed, espresso: s.espressoBoost, hesitating: s.hesitating, bossStarted: s.dinoBossStarted, bossHp: boss ? Math.max(0, bossMax - boss.hits) : 0, bossMax });
+    const dinoBoss = s.dinos.find(d => d.kind === 'trex');
+    const lionBoss = s.savannaAnimals.find(animal => animal.kind === 'lion');
+    const boss = lionBoss ?? dinoBoss;
+    const bossMax = lionBoss ? { easy: 3, medium: 4, hard: 5 }[s.difficulty] : { easy: 2, medium: 3, hard: 4 }[s.difficulty];
+    setHud({ phase: s.phase, lives: s.lives, bananas: s.bananas, seconds: Math.max(0, Math.ceil((s.level + 1) * levelSeconds(s) - s.elapsed)), paused: paused.current, level: s.level, score: runnerScore(s), golden: s.golden, cherries: s.cherries, fruit: s.fruitPickups, supplies: s.supplyPickups, gems: s.gems, levelGem: s.gemCollected[s.level], slide: s.slideLeft, attack: isAirAttack(s) ? s.attackLeft : 0, move: heroMove(s), combo: s.hitCombo, streak: s.hitStreak, bestStreak: s.bestHitStreak, ki: s.ki, special: s.specialLeft, speed: travelSpeed(s) / LEVELS[0].speed, espresso: s.espressoBoost, hesitating: s.hesitating, bossStarted: s.dinoBossStarted || s.savannaBossStarted, bossHp: boss ? Math.max(0, bossMax - boss.hits) : 0, bossMax, bossIcon: lionBoss || s.level === 7 ? '🦁' : '🦖' });
   };
   function resetRunner(nextDifficulty = difficulty, nextMode = runMode, nextLevel = selectedLevel) {
     world.current = createRunner(nextDifficulty, nextMode === 'stage' ? nextLevel : 0, nextMode === 'stage' ? nextLevel : LEVELS.length - 1);
@@ -849,6 +855,9 @@ export function JungleVineSwing({ onExit, onFinish, onRunStart, finishLabel = 'S
     allySprites.eel.src = '/games/jungle-electric-eel-v2.png';
     allySprites.sloth.src = '/games/jungle-sloth-v2.png';
     allySprites.lemming.src = '/games/jungle-lemming-v2.png';
+    const savannaSprites = Object.fromEntries((['lion', 'giraffe', 'wildebeest', 'hyena', 'cliffs', 'oasis'] as const).map(kind => {
+      const image = new Image(); image.src = `/games/jungle-savanna-${kind}-v1.png`; return [kind, image];
+    })) as SavannaSprites;
     const ctx = canvas.current?.getContext('2d');
     if (!ctx) return;
     let frame = 0, previous = 0, accumulator = 0, lastHud = 0;
@@ -862,7 +871,7 @@ export function JungleVineSwing({ onExit, onFinish, onRunStart, finishLabel = 'S
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       if (canvas.current && canvas.current.width !== 800 * dpr) { canvas.current.width = 800 * dpr; canvas.current.height = 400 * dpr; }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      paint(ctx, world.current, sprite, fightSprite, predators, wildlife, insects, dinos, dinoAnimations, coffeeBear, allySprites);
+      paint(ctx, world.current, sprite, fightSprite, predators, wildlife, insects, dinos, dinoAnimations, coffeeBear, allySprites, savannaSprites);
       if (now - lastHud > 100) { publish(); lastHud = now; }
       frame = requestAnimationFrame(tick);
     };
@@ -893,7 +902,7 @@ export function JungleVineSwing({ onExit, onFinish, onRunStart, finishLabel = 'S
             <button type="button" onClick={() => selectMode('adventure')} className={`rounded-lg px-3 py-2 text-sm font-black ${runMode === 'adventure' ? 'bg-yellow-300 text-emerald-950' : 'bg-emerald-900 text-white'}`}>Adventure Mode <small className="block font-bold">All {LEVELS.length} stages</small></button>
             <button type="button" onClick={() => selectMode('stage')} className={`rounded-lg px-3 py-2 text-sm font-black ${runMode === 'stage' ? 'bg-yellow-300 text-emerald-950' : 'bg-emerald-900 text-white'}`}>Select a Stage <small className="block font-bold">Play one level</small></button>
           </div>
-          {runMode === 'stage' && <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">{LEVELS.map((level, index) => <button key={level.name} type="button" onClick={() => selectLevel(index)} className={`rounded-lg px-2 py-2 text-xs font-black ${selectedLevel === index ? 'bg-cyan-300 text-emerald-950' : 'bg-emerald-900 text-white'}`}><span className="block">{index + 1}. {level.name}</span>{index === LEVELS.length - 1 && <small className="font-bold">Boss stage</small>}</button>)}</div>}
+          {runMode === 'stage' && <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">{LEVELS.map((level, index) => <button key={level.name} type="button" onClick={() => selectLevel(index)} className={`rounded-lg px-2 py-2 text-xs font-black ${selectedLevel === index ? 'bg-cyan-300 text-emerald-950' : 'bg-emerald-900 text-white'}`}><span className="block">{index + 1}. {level.name}</span>{index >= 6 && <small className="font-bold">Boss stage</small>}</button>)}</div>}
           <span className="px-1 text-sm font-black">Difficulty</span>
           <div className="grid grid-cols-3 gap-2">
             {(Object.keys(RUNNER_DIFFICULTIES) as RunnerDifficulty[]).map((value) => (
@@ -907,7 +916,7 @@ export function JungleVineSwing({ onExit, onFinish, onRunStart, finishLabel = 'S
           <button type="button" onClick={start} className="mt-3 w-full rounded-xl bg-yellow-300 px-5 py-3 text-base font-black text-emerald-950 shadow-lg">{runMode === 'stage' ? `Play ${LEVELS[selectedLevel].name}` : 'Start adventure'}</button>
         </fieldset>
       )}
-      <div className={`${styles.stats} mb-2 flex justify-between gap-2 text-sm font-black`}><span>🍌 {hud.bananas} <small className="block text-yellow-200">{hud.bananas % 100}/100 → +1 life</small></span><span>❤️ {hud.lives} lives</span><span>{hud.bossStarted ? `🦖 ${hud.bossHp}/${hud.bossMax} HP` : `${hud.seconds}s`} · {hud.score} pts</span></div>
+      <div className={`${styles.stats} mb-2 flex justify-between gap-2 text-sm font-black`}><span>🍌 {hud.bananas} <small className="block text-yellow-200">{hud.bananas % 100}/100 → +1 life</small></span><span>❤️ {hud.lives} lives</span><span>{hud.bossStarted ? `${hud.bossIcon} ${hud.bossHp}/${hud.bossMax} HP` : `${hud.seconds}s`} · {hud.score} pts</span></div>
       <p className={`${styles.status} mb-2 text-xs font-bold text-yellow-200`}>{RUNNER_DIFFICULTIES[difficulty].label} · Level {hud.level + 1}/{LEVELS.length} · {LEVELS[hud.level].name} · {hud.move.toUpperCase()} · {hud.speed.toFixed(1)}× pace{hud.espresso > 0 ? ` · ☕ espresso ${hud.espresso.toFixed(1)}s` : ''} · ⭐ {hud.golden} gold · 🍒 {hud.cherries} · 💎 {hud.gems}/{LEVELS.length} · {GEMS[hud.level].name}: {hud.levelGem ? "collected" : "find it!"}</p>
       {(hud.streak > 0 || hud.bestStreak > 1) && <p className={`${styles.streak} mb-2 rounded-lg bg-orange-500/20 px-3 py-1 text-sm font-black text-orange-100`} aria-live="polite">{hud.streak > 0 ? `💥 ${hud.combo > 0 ? `${hud.combo} HIT COMBO · ` : ''}${hud.streak} HIT STREAK` : '💥 STREAK ENDED'} · Best {hud.bestStreak}</p>}
       <div className={`${styles.ki} mb-3 flex items-center gap-3 rounded-xl border border-cyan-300/50 bg-cyan-950/50 px-3 py-2`}>
@@ -918,22 +927,22 @@ export function JungleVineSwing({ onExit, onFinish, onRunStart, finishLabel = 'S
         <span className="text-xs font-black text-cyan-100">{hud.special > 0 ? 'BURST!' : hud.ki >= KI_MAX ? 'E: READY' : 'COUNTER TO CHARGE'}</span>
       </div>
       <div className={`${styles.stage} relative overflow-hidden rounded-2xl border-2 border-emerald-700`}>
-        <canvas ref={canvas} width={800} height={400} aria-label="Jungle runner with seven levels, ending in DinoLand with a T. rex boss." className="block aspect-[2/1] w-full" />
+        <canvas ref={canvas} width={800} height={400} aria-label="Jungle Runner with eight levels, ending in Savanna Stampede with a roaring lion and victory oasis." className="block aspect-[2/1] w-full" />
         <div className={styles.landscapeHud} aria-label="Game status">
           <span>Stage {hud.level + 1} · {LEVELS[hud.level].name}</span>
           <span>🍌 {hud.bananas}</span>
           <span>❤️ {hud.lives}</span>
-          <span>{hud.bossStarted ? `🦖 ${hud.bossHp}/${hud.bossMax}` : `⏱ ${hud.seconds}s`}</span>
+          <span>{hud.bossStarted ? `${hud.bossIcon} ${hud.bossHp}/${hud.bossMax}` : `⏱ ${hud.seconds}s`}</span>
           <span>🏆 {hud.score}</span>
           <span>⚡ {Math.round(hud.ki)}%</span>
           <button type="button" onClick={pause} aria-label="Pause game">Ⅱ</button>
         </div>
         {(hud.phase === 'ready' || ended || hud.paused) && <div className="absolute inset-0 flex items-start justify-center overflow-y-auto bg-emerald-950/75 p-3">
           <div className="my-auto max-w-md text-center">
-            <h3 className="text-lg font-black sm:text-2xl">{hud.paused ? 'Taking a breather' : ended ? hud.phase === 'victory' ? runMode === 'stage' ? `${LEVELS[selectedLevel].name} complete!` : hud.gems === LEVELS.length ? 'Jungle Crown Victory!' : 'DinoLand victory!' : 'Run complete!' : runMode === 'stage' ? `Stage ${selectedLevel + 1}: ${LEVELS[selectedLevel].name}` : 'Adventure Mode'}</h3>
+            <h3 className="text-lg font-black sm:text-2xl">{hud.paused ? 'Taking a breather' : ended ? hud.phase === 'victory' ? runMode === 'stage' ? `${LEVELS[selectedLevel].name} complete!` : hud.gems === LEVELS.length ? 'Jungle Crown Victory!' : 'Oasis victory!' : 'Run complete!' : runMode === 'stage' ? `Stage ${selectedLevel + 1}: ${LEVELS[selectedLevel].name}` : 'Adventure Mode'}</h3>
             {ended && hud.phase === 'victory' && runMode === 'stage'
               ? <StageVictoryPayout bananas={hud.bananas} golden={hud.golden} cherries={hud.cherries} fruit={hud.fruit} supplies={hud.supplies} stones={hud.gems} score={hud.score} />
-              : <p className="my-2 text-xs sm:text-sm">{ended ? `${hud.gems === LEVELS.length && hud.phase === 'victory' ? '✦ All seven gems captured — the Jungle Crown is yours! ✦ ' : ''}${hud.bananas} banana coins · ${hud.golden} gold · ${hud.cherries} cherries · ${hud.gems}/${LEVELS.length} gems · ${hud.score} points` : runMode === 'stage' ? `Complete ${LEVELS[selectedLevel].name} as a single-stage run.${selectedLevel === LEVELS.length - 1 ? ' Defeat the T. rex to win DinoLand.' : ''}` : 'Complete every jungle stage in one continuous run. Meet the friendly Coffee Bear for rotating specials, use jungle allies to survive, and defeat the T. rex in DinoLand.'}</p>}
+              : <p className="my-2 text-xs sm:text-sm">{ended ? `${hud.gems === LEVELS.length && hud.phase === 'victory' ? `✦ All ${LEVELS.length} gems captured — the Jungle Crown is yours! ✦ ` : ''}${hud.bananas} banana coins · ${hud.golden} gold · ${hud.cherries} cherries · ${hud.gems}/${LEVELS.length} gems · ${hud.score} points` : runMode === 'stage' ? `Complete ${LEVELS[selectedLevel].name} as a single-stage run.${selectedLevel === 6 ? ' Defeat the T. rex to win DinoLand.' : selectedLevel === 7 ? ' Defeat the lion and reach the Oasis of Victory.' : ''}` : 'Complete all eight stages in one continuous run. Survive DinoLand, defeat the savanna lion, and reach the Oasis of Victory.'}</p>}
             {hud.paused ? <div className="flex justify-center gap-2"><button onClick={pause} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Resume</button><button onClick={onExit} className="rounded-xl bg-white/15 px-5 py-2 font-black text-white">Exit</button></div> : ended ? <div className="flex flex-wrap justify-center gap-2"><button onClick={start} className="rounded-xl bg-cyan-300 px-5 py-2 font-black text-emerald-950">Replay</button><button onClick={saveRun} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">{finishLabel}</button></div> : <button onClick={start} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">{runMode === 'stage' ? 'Play stage' : 'Start adventure'}</button>}
           </div>
         </div>}
