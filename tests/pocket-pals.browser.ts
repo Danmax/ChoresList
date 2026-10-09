@@ -110,6 +110,7 @@ async function main() {
     await expect(page.getByRole("img", { name: "Pudding sleeping", exact: true })).toBeVisible();
     await page.clock.fastForward(31_000);
     await expect(page.getByText("Today's care badge collected!")).toBeVisible();
+    await expect(page.getByRole("img", { name: "Pudding stretching", exact: true })).toBeVisible();
     assert.equal(completions, 1);
     await page.getByRole("button", { name: "Open pet shop" }).click();
     const shop = page.getByRole("dialog");
@@ -230,6 +231,7 @@ async function main() {
     const wrongObject = TREASURE_OBJECTS.find((item) => saved!.challenge!.treasure!.objectIds.includes(item.id) && item.id !== saved!.challenge!.treasure!.targets[0])!;
     await page.getByRole("button", { name: `Explore ${wrongObject.name}`, exact: true }).click();
     await expect(page.getByRole("status")).toContainText("Keep exploring!");
+    await expect(page.locator('[data-pose="moving"]')).toHaveCount(0);
     assert.equal(saved!.challenge!.treasure!.step, 0);
     await page.clock.fastForward(2500);
     const firstObject = TREASURE_OBJECTS.find((item) => item.id === saved!.challenge!.treasure!.targets[0])!;
@@ -237,9 +239,12 @@ async function main() {
     await page.getByRole("button", { name: `Explore ${firstObject.name}`, exact: true }).focus();
     await page.keyboard.press("Enter");
     await expect(page.getByRole("status")).toContainText("A key!");
+    await expect(page.getByRole("img", { name: "Pudding moving", exact: true })).toBeVisible();
     await page.clock.runFor(600);
     const palAfter = await page.getByRole("button", { name: "Cuddle Pudding" }).boundingBox();
     assert.ok(palBefore && palAfter && (palBefore.x !== palAfter.x || palBefore.y !== palAfter.y), "The Pal moves to the discovery");
+    await page.clock.runFor(100);
+    await expect(page.getByRole("img", { name: "Pudding playing", exact: true })).toBeVisible();
     await page.reload();
     await page.getByRole("button", { name: /Pocket Pals/ }).click();
     await expect(page.getByLabel("1 of 3 keys found")).toBeVisible();
@@ -303,6 +308,10 @@ async function main() {
     for (const asset of ["props", "chest", "key"]) {
       const response = await page.request.get(`${process.env.POCKET_PALS_TEST_URL ?? "http://localhost:3017"}/games/pocket-pals/treasure-${asset}-v1.png`);
       assert.equal(response.status(), 200, `${asset} artwork is served`);
+    }
+    for (const species of ["dog", "cat", "monkey", "guinea-pig"]) {
+      const response = await page.request.get(`${process.env.POCKET_PALS_TEST_URL ?? "http://localhost:3017"}/games/pocket-pals/${species}-motion-v1.png`);
+      assert.equal(response.status(), 200, `${species} motion artwork is served`);
     }
     // The longest older-student pattern still fits a small phone. Audio failure
     // must not block the same visual game or its server-validated result.

@@ -24,8 +24,9 @@ const STAT_META = [
 ] as const;
 const ROOM_NAMES: Record<string, string> = { home: "Our cozy home", garden: "Garden nook", library: "Storybook room", stargazer: "Stargazer room", sunroom: "Sunny sunroom" };
 const ROOM_CLASSES: Record<string, string | undefined> = { garden: styles.garden, library: styles.library, stargazer: styles.stargazer, sunroom: styles.sunroom };
-function PetArt({ species, name, className = "", pose }: { species: PetSpecies; name: string; className?: string; pose?: "sleeping" | "eating" | "playing" }) {
-  if (pose) return <span role="img" aria-label={`${name} ${pose}`} data-pose={pose} className={styles.poseSprite} style={{ backgroundImage: `url(/games/pocket-pals/${species}-actions-v1.png)`, backgroundPosition: `${pose === "sleeping" ? 0 : pose === "eating" ? 50 : 100}% 50%` }} />;
+function PetArt({ species, name, className = "", pose }: { species: PetSpecies; name: string; className?: string; pose?: "sleeping" | "eating" | "playing" | "moving" | "stretching" }) {
+  const motion = pose === "moving" || pose === "stretching";
+  if (pose) return <span role="img" aria-label={`${name} ${pose}`} data-pose={pose} className={`${styles.poseSprite} ${pose === "moving" ? styles.walkingSprite : ""}`} style={{ backgroundImage: `url(/games/pocket-pals/${species}-${motion ? "motion" : "actions"}-v1.png)`, backgroundPosition: `${pose === "sleeping" || pose === "moving" ? 0 : pose === "eating" ? 50 : 100}% 50%` }} />;
   return <img src={`/games/pocket-pals/${species}.webp`} alt={`${name}, your anime ${PET_SPECIES.find((s) => s.id === species)?.label.toLowerCase()}`} className={className} draggable={false} />;
 }
 
@@ -42,6 +43,8 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
   const [showShop, setShowShop] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [activity, setActivity] = useState("");
+  const [moving, setMoving] = useState(false);
+  const previousTrail = useRef<{ palId: string | null; id: string; found: number } | null>(null);
   const [clock, setClock] = useState(Date.now());
   const [selectedTreats, setSelectedTreats] = useState<number[]>([]);
   const [showPlayGames, setShowPlayGames] = useState(false);
@@ -106,6 +109,18 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
   }, [memberId, data?.palId, data?.version, load]);
 
   const pet = data?.pet;
+  const trailId = data?.challenge?.kind === "treasure" ? data.challenge.id : undefined;
+  const trailFound = data?.challenge?.treasure?.found.length ?? 0;
+  const trailChestReady = data?.challenge?.treasure?.chestReady;
+  useEffect(() => {
+    const previous = previousTrail.current;
+    previousTrail.current = trailId ? { palId: data?.palId ?? null, id: trailId, found: trailFound } : null;
+    const walking = !!trailId && previous?.id === trailId && previous.palId === (data?.palId ?? null) && trailFound > previous.found && !trailChestReady;
+    setMoving(walking);
+    if (!walking) return;
+    const timer = window.setTimeout(() => setMoving(false), 650);
+    return () => window.clearTimeout(timer);
+  }, [data?.palId, trailId, trailFound, trailChestReady]);
   useEffect(() => { setCaughtBubbles([]); setShowPlayGames(false); setArrangingRoom(false); }, [data?.palId, data?.challenge?.id]);
   // Use the server clock offset so a device with an incorrect clock cannot
   // wake a pet early or leave it sleeping indefinitely.
@@ -163,7 +178,7 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
   const lastDiscoveryPosition = lastDiscovery ? roomItemPosition(pet.roomPositions, pet.room, lastDiscovery.id) : undefined;
   const exploring = !!treasure || treasureOpened;
   const explorerPosition = exploring ? { left: `${treasure?.chestReady || treasureOpened ? 39 : lastDiscoveryPosition?.x ?? 50}%`, top: `${treasure?.chestReady || treasureOpened ? 54 : (lastDiscoveryPosition?.y ?? 64) - 18}%` } : undefined;
-  const pose = sleeping ? "sleeping" : activity === "feed" ? "eating" : playing || ["finish-play", "finish-bubble", "finish-rhythm", "open-treasure"].includes(activity) ? "playing" : undefined;
+  const pose = sleeping ? "sleeping" : activity === "feed" ? "eating" : moving ? "moving" : activity === "wake" ? "stretching" : playing || ["finish-play", "finish-bubble", "finish-rhythm", "open-treasure"].includes(activity) ? "playing" : undefined;
   const accessory = PET_SHOP.find((i) => i.id === pet.accessory);
   const accessoryClass = ({
     bow: styles.bow,
@@ -198,7 +213,7 @@ export function PocketPals({ memberId, playerName, onExit }: { memberId: string;
             <div className={styles.window}><span>{sleeping ? "🌙" : "☀️"}</span><i /><i /></div>
             <PocketPalRoomObjects owned={pet.owned} room={pet.room} positions={pet.roomPositions} trail={treasure} arranging={arrangingRoom} busy={busy} onFind={(objectId) => treasure && void act("find-treasure", { challengeId: challenge!.id, step: treasure.step, objectId })} onMove={(itemId: TreasureObjectId, position: RoomItemPosition) => act("move-room-item", { itemId, ...position })} />
             <div className={styles.rug} />
-            <div style={explorerPosition} className={`${styles.petFigure} ${exploring ? styles.exploringPal : ""} ${treasure?.chestReady || treasureOpened ? styles.atTreasureChest : ""} ${sleeping ? styles.sleeping : ""} ${activity === "feed" ? styles.munching : activity === "clean" ? styles.wiggling : ["affection", "finish-play", "finish-bubble", "finish-rhythm", "find-treasure", "open-treasure", "answer"].includes(activity) ? styles.bouncing : ""}`}>
+            <div style={explorerPosition} className={`${styles.petFigure} ${exploring ? styles.exploringPal : ""} ${treasure?.chestReady || treasureOpened ? styles.atTreasureChest : ""} ${sleeping ? styles.sleeping : ""} ${activity === "feed" ? styles.munching : activity === "clean" ? styles.wiggling : ["affection", "finish-play", "finish-bubble", "finish-rhythm", "open-treasure", "answer"].includes(activity) ? styles.bouncing : ""}`}>
               {accessory && <span className={`${styles.accessory} ${accessoryClass}`}>{accessory.emoji}</span>}
               <button disabled={!ready || !!playing} onClick={() => void act("affection")} aria-label={`Cuddle ${pet.name}`} className={styles.petButton}><PetArt species={pet.species} name={pet.name} pose={pose} /></button>
               {sleeping && <span className={styles.sleepMarks}>z z Z</span>}
