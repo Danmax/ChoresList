@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { chromium, expect } from "@playwright/test";
 import { DEFAULT_GAME_SETTINGS, GAME_DEFINITIONS } from "../lib/games";
 import { advancePet, applyPetAction, completeDailyCare, createPet, currentLesson, petDay, publicChallenge, type PetState, type PetAction } from "../lib/pocket-pals";
+import { TREASURE_OBJECTS } from "../lib/pocket-pals-treasure";
 
 // Browser coverage uses an isolated in-memory API fixture. It exercises real
 // React rendering and controls without writing test families to the live DB.
@@ -145,6 +146,86 @@ async function main() {
     }
     await page.getByRole("button", { name: "Check rhythm" }).click();
     await expect(page.getByRole("status")).toContainText("Pawsome rhythm");
+    await page.clock.fastForward(2500);
+    await page.getByRole("button", { name: /Play Choose/ }).click();
+    await page.getByRole("button", { name: /Treasure Trail Follow/ }).click();
+    await expect(page.getByRole("heading", { name: "Treasure Trail", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Show hint", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Hide hint", exact: true })).toHaveAttribute("aria-expanded", "true");
+    await page.clock.fastForward(2500);
+    const wrongObject = TREASURE_OBJECTS.find((item) => saved!.challenge!.treasure!.objectIds.includes(item.id) && item.id !== saved!.challenge!.treasure!.targets[0])!;
+    await page.getByRole("button", { name: `Explore ${wrongObject.name}`, exact: true }).click();
+    await expect(page.getByRole("status")).toContainText("Keep exploring!");
+    assert.equal(saved!.challenge!.treasure!.step, 0);
+    await page.clock.fastForward(2500);
+    const firstObject = TREASURE_OBJECTS.find((item) => item.id === saved!.challenge!.treasure!.targets[0])!;
+    const palBefore = await page.getByRole("button", { name: "Cuddle Pudding" }).boundingBox();
+    await page.getByRole("button", { name: `Explore ${firstObject.name}`, exact: true }).focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("status")).toContainText("A key!");
+    await page.clock.runFor(600);
+    const palAfter = await page.getByRole("button", { name: "Cuddle Pudding" }).boundingBox();
+    assert.ok(palBefore && palAfter && (palBefore.x !== palAfter.x || palBefore.y !== palAfter.y), "The Pal moves to the discovery");
+    await page.reload();
+    await page.getByRole("button", { name: /Pocket Pals/ }).click();
+    await expect(page.getByLabel("1 of 3 keys found")).toBeVisible();
+    for (const width of [390, 320]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.screenshot({ path: `${screenshotDir}/treasure-${width}.png`, fullPage: true });
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false, `Treasure Trail fits ${width}px`);
+      const room = await page.getByLabel("Pocket Pal room").boundingBox();
+      const panel = await page.getByRole("region", { name: "Treasure Trail clues" }).boundingBox();
+      assert.ok(room && panel && panel.y >= room.y + room.height, "Clues stay below the room");
+    }
+    for (let step = 1; step < 3; step++) {
+      await page.clock.fastForward(2500);
+      const object = TREASURE_OBJECTS.find((item) => item.id === saved!.challenge!.treasure!.targets[step])!;
+      await page.getByRole("button", { name: `Explore ${object.name}`, exact: true }).click();
+      await expect(page.getByLabel(`${step + 1} of 3 keys found`)).toBeVisible();
+    }
+    await page.clock.fastForward(2500);
+    const coinsBeforeChest = saved!.coins;
+    await page.getByRole("button", { name: "Open treasure chest", exact: true }).click();
+    await expect(page.getByRole("status")).toContainText("Treasure found!");
+    await expect(page.getByRole("button", { name: "Treasure chest opened", exact: true })).toBeVisible();
+    assert.equal(saved!.coins, coinsBeforeChest, "Treasure Trail respects the shared daily three-win coin cap");
+    await page.screenshot({ path: `${screenshotDir}/treasure-open.png`, fullPage: true });
+
+    // All five rooms work with free starter props and with every purchased item.
+    for (const owned of [[], ["flower-wall", "potted-palm", "cozy-sofa", "reading-lamp", "tea-table", "wall-shelves"]]) {
+      for (const room of ["home", "garden", "library", "stargazer", "sunroom"]) {
+        saved!.room = room;
+        saved!.owned = owned;
+        saved!.lastActionAt = 0;
+        await page.reload();
+        await page.getByRole("button", { name: /Pocket Pals/ }).click();
+        await page.getByRole("button", { name: /Play Choose/ }).click();
+        await page.getByRole("button", { name: /Treasure Trail Follow/ }).click();
+        await page.clock.fastForward(2500);
+        const objectButtons = page.getByRole("button", { name: /^Explore / });
+        await expect(objectButtons).toHaveCount(owned.length + 3);
+        const boxes = await objectButtons.evaluateAll((buttons) => buttons.map((button) => {
+          const { x, y, width, height } = button.getBoundingClientRect();
+          return { x, y, width, height };
+        }));
+        for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+          const a = boxes[i], b = boxes[j];
+          assert.ok(a.x + a.width <= b.x || b.x + b.width <= a.x || a.y + a.height <= b.y || b.y + b.height <= a.y, `Room object targets do not overlap in ${room}`);
+        }
+        for (let step = 0; step < 3; step++) {
+          const object = TREASURE_OBJECTS.find((item) => item.id === saved!.challenge!.treasure!.targets[step])!;
+          await page.getByRole("button", { name: `Explore ${object.name}`, exact: true }).click();
+          await expect(page.getByLabel(`${step + 1} of 3 keys found`)).toBeVisible();
+          await page.clock.fastForward(2500);
+        }
+        await page.getByRole("button", { name: "Open treasure chest", exact: true }).click();
+        await expect(page.getByRole("status")).toContainText("Treasure found!");
+      }
+    }
+    for (const asset of ["props", "chest", "key"]) {
+      const response = await page.request.get(`${process.env.POCKET_PALS_TEST_URL ?? "http://localhost:3017"}/games/pocket-pals/treasure-${asset}-v1.png`);
+      assert.equal(response.status(), 200, `${asset} artwork is served`);
+    }
     for (const width of [390, 320]) {
       await page.setViewportSize({ width, height: 900 });
       await expect(page.getByRole("button", { name: /Learn Grow/ })).toBeVisible();
@@ -153,9 +234,9 @@ async function main() {
       await page.screenshot({ path: `${screenshotDir}/care-${width}.png`, fullPage: true });
     }
     assert.deepEqual(errors, []);
-    console.log(`Browser flow passed: four species, adoption, five care activities, rewards, shop, reload, and phone widths. Screenshots: ${screenshotDir}`);
+    console.log(`Browser flow passed: adoption, care, Bubble Catch, Rhythm Paws, Treasure Trail in all five rooms with/without décor, reload, keyboard, rewards and phone widths. Screenshots: ${screenshotDir}`);
   } finally { await browser.close(); }
 }
 // Keep pending browser operations alive and fail explicitly on a hung flow.
-const watchdog = setTimeout(() => { console.error("Pocket Pals browser flow timed out"); process.exit(1); }, 120_000);
+const watchdog = setTimeout(() => { console.error("Pocket Pals browser flow timed out"); process.exit(1); }, 180_000);
 main().catch((error) => { console.error(error); process.exitCode = 1; }).finally(() => clearTimeout(watchdog));

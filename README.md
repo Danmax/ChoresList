@@ -68,7 +68,7 @@ enter the admin review queue at `/parent/community-verification`. Configure
 emails, and apply `20261008180000_community_public_verification` with
 `npm run db:deploy`. Private community groups never require verification.
 
-Feed dumplings, bathe, win Treat Memory, Bubble Catch, or Rhythm Paws, finish a lesson, and take a full
+Feed dumplings, bathe, win Treat Memory, Bubble Catch, Rhythm Paws, or Treasure Trail, finish a lesson, and take a full
 30-second nap to earn a daily care badge. Needs decay gradually with a gentle
 floor while away; the server calculates sleep and daily resets in the household's
 time zone. Four dumplings arrive daily. Coins unlock accessories, four rooms,
@@ -77,8 +77,11 @@ room is unlocked, a Pal can move between it and the cozy home from the shop.
 Bubble Catch plays in the room with bubbles that burst and disappear. Rhythm
 Paws uses audible and visual beats to repeat, with age-adjusted timing and quiet
 play. All play games share three rewarded wins per day at 8 coins each. Character
-action sheets show sleeping, eating, and playing poses. Treasure Trail is planned
-in `docs/pocket-pals-treasure-trail.md` but is not yet a playable game.
+action sheets show sleeping, eating, and playing poses. Treasure Trail uses actual
+room objects, age-adjusted clues, saved discoveries, and a chest to open after
+collecting every key. Every room includes a free plant, storybook, and teddy;
+owned décor can add targets. There is no timer or wrong-guess penalty. Moving
+rooms clears the old trail. See `docs/pocket-pals-treasure-trail.md` for details.
 Care coins are separate from household points. Parents can enable optional
 points or ticket rewards under Parent → Games; those rewards are issued once
 per completed daily badge. Care remains available afterward. Like other games,

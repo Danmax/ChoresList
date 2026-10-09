@@ -124,3 +124,41 @@ test("a write race tells the client to reload without replacing newer care", asy
   assert.equal(f.getSaved()?.version, 0);
   assert.equal(f.getSaved()?.state.dumplings, 6);
 });
+
+test("Treasure Trail persists each clue through the real API without leaking answers or replaying coins", async (t) => {
+  const f = fixture(t);
+  const saved = f.seed();
+  const started = await POST(f.request("POST", { action: "start-treasure", version: 0 }));
+  assert.equal(started.status, 200);
+  const startView = await started.json();
+  assert.equal(startView.pet.challenge, null);
+  assert.equal(startView.challenge.kind, "treasure");
+  assert.ok(!("targets" in startView.challenge.treasure));
+  const challengeId = saved.state.challenge!.id;
+  const targets = [...saved.state.challenge!.treasure!.targets];
+  const wrong = saved.state.challenge!.treasure!.objectIds.find((object) => object !== targets[0]);
+  saved.state.lastActionAt = 0;
+  const retry = await POST(f.request("POST", { action: "find-treasure", version: saved.version, challengeId, step: 0, objectId: wrong }));
+  assert.equal(retry.status, 200);
+  assert.equal((await retry.json()).challenge.treasure.step, 0);
+  assert.equal(saved.state.coins, 20);
+  for (let step = 0; step < targets.length; step++) {
+    saved.state.lastActionAt = 0;
+    const find = await POST(f.request("POST", { action: "find-treasure", version: saved.version, challengeId, step, objectId: targets[step] }));
+    assert.equal(find.status, 200);
+    assert.equal((await find.json()).challenge.treasure.step, step + 1);
+    const reload = await GET(f.request("GET"));
+    const view = await reload.json();
+    assert.equal(view.challenge.treasure.step, step + 1);
+    assert.equal(view.pet.challenge, null);
+  }
+  saved.state.lastActionAt = 0;
+  const opened = await POST(f.request("POST", { action: "open-treasure", version: saved.version, challengeId, step: targets.length }));
+  assert.equal(opened.status, 200);
+  const won = await opened.json();
+  assert.equal(won.pet.coins, 28);
+  assert.equal(won.challenge, null);
+  saved.state.lastActionAt = 0;
+  assert.equal((await POST(f.request("POST", { action: "open-treasure", version: saved.version, challengeId, step: targets.length }))).status, 400);
+  assert.equal(saved.state.coins, 28);
+});
