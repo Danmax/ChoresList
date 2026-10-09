@@ -92,7 +92,7 @@ export function PocketPalsRhythm({ offsets, patternName, preferences, onPreferen
     <button className={styles.rhythmNewPattern} type="button" disabled={busy || phase === "listen"} onClick={() => void onNewPattern()}>New pattern</button>
     <label className={styles.rhythmMute}><input type="checkbox" checked={muted} disabled={phase === "listen"} onChange={(event) => { onPreferencesChange({ ...preferences, muted: event.target.checked }); if (!event.target.checked) void prepareAudio(); }} /> Quiet play (visual beats)</label>
     {audioUnavailable && !muted && <p role="status">Sound isn&apos;t available here. Follow the flashing paws instead.</p>}
-    <small>8 coins for your first three play wins each day. Listen again repeats this beat; New pattern picks a different one.</small>
+    <small>Win this round to earn 8 silver store coins. Listen again repeats this beat; New pattern picks a different one.</small>
   </div>;
 }
 

@@ -128,6 +128,7 @@ test("a write race tells the client to reload without replacing newer care", asy
 test("Treasure Trail persists each clue through the real API without leaking answers or replaying coins", async (t) => {
   const f = fixture(t);
   const saved = f.seed();
+  saved.state.daily.playRewards = 3;
   const started = await POST(f.request("POST", { action: "start-treasure", version: 0 }));
   assert.equal(started.status, 200);
   const startView = await started.json();

@@ -265,7 +265,7 @@ async function main() {
     await page.getByRole("button", { name: "Open treasure chest", exact: true }).click();
     await expect(page.getByRole("status")).toContainText("Treasure found!");
     await expect(page.getByRole("button", { name: "Treasure chest opened", exact: true })).toBeVisible();
-    assert.equal(saved!.coins, coinsBeforeChest, "Treasure Trail respects the shared daily three-win coin cap");
+    assert.equal(saved!.coins, coinsBeforeChest + 8, "Treasure Trail always earns 8 silver store coins");
     await page.screenshot({ path: `${screenshotDir}/treasure-open.png`, fullPage: true });
 
     // All five rooms work with free starter props and with every purchased item.
@@ -325,7 +325,7 @@ async function main() {
       await page.getByRole("button", { name: "Tap rhythm", exact: true }).click({ force: true });
     }
     await page.getByRole("button", { name: "Check rhythm", exact: true }).click();
-    await expect(page.getByText("Pawsome rhythm! You and your pal make a great band.", { exact: true })).toBeVisible();
+    await expect(page.getByRole("status")).toContainText("Pawsome rhythm! You and your pal make a great band. +8 silver coins!");
     for (const width of [390, 320]) {
       await page.setViewportSize({ width, height: 900 });
       await expect(page.getByRole("button", { name: /Learn Grow/ })).toBeVisible();

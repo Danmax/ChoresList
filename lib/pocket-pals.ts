@@ -210,9 +210,11 @@ function challengeNumber(challengeId: string, index: number) {
 }
 function finishPlayRound(pet: PetState, message: string) {
   pet.gamesPlayed++; pet.happiness = clamp(pet.happiness + 20); pet.energy = clamp(pet.energy - 6);
-  if (pet.daily.playRewards < 3) { pet.coins += 8; pet.daily.playRewards++; }
+  // Each verified game win funds the Pocket Pal store. playRewards remains a
+  // daily activity counter for backward-compatible saved state, not a cap.
+  pet.coins += 8; pet.daily.playRewards++;
   pet.challenge = null; markTask(pet, "play");
-  return message;
+  return `${message} +8 silver coins!`;
 }
 export function applyPetAction(pet: PetState, action: PetAction, input: Record<string, unknown>, now: number, age: number, challengeId: string) {
   let message = "";
@@ -329,14 +331,14 @@ export function applyPetAction(pet: PetState, action: PetAction, input: Record<s
       pet.challenge = null; markTask(pet, "learn"); message = lesson.explanation; break;
     }
     case "refill":
-      if (pet.coins < 5) throw new PetActionError("Earn 5 coins by playing or learning for a refill.");
+      if (pet.coins < 5) throw new PetActionError("Earn 5 silver coins by playing or learning for a refill.");
       if (pet.dumplings > 14) throw new PetActionError("Your basket has plenty of dumplings already.");
       pet.coins -= 5; pet.dumplings += 6; message = "Six warm dumplings added to your basket."; break;
     case "buy": {
       const item = PET_SHOP.find((i) => i.id === input.itemId);
       if (!item) throw new PetActionError("Choose an item from the shop.");
       if (pet.owned.includes(item.id)) throw new PetActionError("You already own this item.");
-      if (pet.coins < item.cost) throw new PetActionError("Keep caring for your pal to earn more coins.");
+      if (pet.coins < item.cost) throw new PetActionError("Keep caring for your pal to earn more silver coins.");
       pet.coins -= item.cost; pet.owned.push(item.id);
       if (item.kind === "accessory") pet.accessory = item.id;
       if (item.kind === "room") pet.room = item.id;

@@ -80,13 +80,14 @@ Bubble Catch plays in the room with bubbles that burst and disappear. Rhythm
 Paws has 18 age-adjusted patterns with pauses and varied tempos, plus selectable
 soft drums, woodblocks, bells, and space notes. Preview sounds, adjust volume,
 repeat the current beat, or request a different pattern. Quiet visual-only play
-is always available. All play games share three rewarded wins per day at 8 coins each. Character
+is always available. Every completed play game earns 8 silver coins for the
+Pocket Pal store, with replay protection on each issued round. Character
 action sheets show sleeping, eating, and playing poses. Treasure Trail uses actual
 room objects, age-adjusted clues, saved discoveries, and a chest to open after
 collecting every key. Every room includes a free plant, storybook, and teddy;
 owned décor can add targets. There is no timer or wrong-guess penalty. Moving
 rooms clears the old trail. See `docs/pocket-pals-treasure-trail.md` for details.
-Care coins are separate from household points. Parents can enable optional
+Silver Pocket Pal coins are separate from household points. Parents can enable optional
 points or ticket rewards under Parent → Games; those rewards are issued once
 per completed daily badge. Care remains available afterward. Like other games,
 zero daily plays means no additional cap; Pocket Pals always limits badges to

@@ -140,9 +140,9 @@ test("trails freeze their room objects but buying or equipping a different room 
   assert.equal(advancePet(pet, now + 9000, day).challenge, null);
 });
 
-test("treasure rewards require opening the chest once and share the three-win daily cap", () => {
+test("every treasure completion earns silver coins and a chest cannot replay its reward", () => {
   const pet = start();
-  pet.daily.playRewards = 2; // Two wins from other games today.
+  pet.daily.playRewards = 3; // Earlier wins do not cap Treasure Trail.
   for (let round = 0; round < 2; round++) {
     const time = now + round * 20_000;
     if (round) applyPetAction(pet, "start-treasure", {}, time, 7, id);
@@ -150,8 +150,8 @@ test("treasure rewards require opening the chest once and share the three-win da
     assert.equal(pet.gamesPlayed, round);
     assert.equal(publicChallenge(pet, 7)!.treasure!.chestReady, true);
     applyPetAction(pet, "open-treasure", { challengeId: id, step: 3 }, time + 12_000, 7, id);
-    assert.equal(pet.coins, 28);
-    assert.equal(pet.daily.playRewards, 3);
+    assert.equal(pet.coins, 28 + round * 8);
+    assert.equal(pet.daily.playRewards, 4 + round);
     assert.equal(pet.gamesPlayed, round + 1);
     assert.ok(pet.daily.tasks.includes("play"));
     assert.throws(() => applyPetAction(pet, "open-treasure", { challengeId: id, step: 3 }, time + 15_000, 7, id));

@@ -101,7 +101,7 @@ test("memory rounds require the issued challenge, minimum time, and correct sequ
   assert.throws(() => applyPetAction(pet, "finish-play", { challengeId: id, sequence: [0, 0, 0] }, now + 10_000, 5, id));
 });
 
-test("Bubble Catch validates issued bubbles and shares the play reward limit", () => {
+test("Bubble Catch validates issued bubbles and awards silver store coins", () => {
   const pet = createPet("dog", "Mochi", now, day);
   applyPetAction(pet, "start-bubble", {}, now, 7, id);
   const challenge = publicChallenge(pet, 7)!;
@@ -116,7 +116,7 @@ test("Bubble Catch validates issued bubbles and shares the play reward limit", (
   assert.equal(pet.daily.playRewards, 1);
 });
 
-test("Rhythm Paws checks tap timing, retries, replay protection and shared play rewards", () => {
+test("Rhythm Paws checks tap timing, retries, replay protection and silver coin rewards", () => {
   const pet = createPet("cat", "Miso", now, day);
   applyPetAction(pet, "start-rhythm", {}, now, 10, id);
   const rhythm = publicChallenge(pet, 10)!;
@@ -130,17 +130,17 @@ test("Rhythm Paws checks tap timing, retries, replay protection and shared play 
     applyPetAction(pet, "finish-rhythm", { challengeId: id, taps }, now + 15_000 + index * 3000, 10, id);
     assert.equal(pet.gamesPlayed, 0);
   }
-  pet.daily.playRewards = 2;
+  pet.daily.playRewards = 3; // Prior games do not cap this win's store coins.
   applyPetAction(pet, "finish-rhythm", { challengeId: id, taps: offsets.map((offset, i) => i ? offset + 100 : 0) }, now + 30_000, 10, id);
   assert.equal(pet.gamesPlayed, 1);
   assert.equal(pet.coins, 28);
-  assert.equal(pet.daily.playRewards, 3);
+  assert.equal(pet.daily.playRewards, 4);
   assert.ok(pet.daily.tasks.includes("play"));
   assert.throws(() => applyPetAction(pet, "finish-rhythm", { challengeId: id, taps: offsets }, now + 33_000, 10, id));
   applyPetAction(pet, "start-rhythm", {}, now + 36_000, 5, id);
   assert.equal(pet.challenge?.rhythmOffsets?.length, 3);
   applyPetAction(pet, "finish-rhythm", { challengeId: id, taps: pet.challenge?.rhythmOffsets }, now + 48_000, 5, id);
-  assert.equal(pet.coins, 28);
+  assert.equal(pet.coins, 36);
   assert.equal(pet.gamesPlayed, 2);
 });
 
@@ -191,7 +191,7 @@ test("learning questions stay in an age-appropriate set for every student", () =
   }
 });
 
-test("repeat play and learning coins have a daily ceiling", () => {
+test("learning silver coins retain their daily ceiling", () => {
   const pet = createPet("dog", "Mochi", now, day);
   for (let i = 0; i < 5; i++) {
     const start = now + i * 10_000;
@@ -203,6 +203,24 @@ test("repeat play and learning coins have a daily ceiling", () => {
   assert.equal(pet.daily.learnRewards, 3);
   assert.equal(pet.lessonsLearned, 5);
   assert.equal(pet.xp, 10);
+});
+
+test("every completed play game earns silver store coins after earlier daily wins", () => {
+  const pet = createPet("dog", "Mochi", now, day);
+  pet.daily.playRewards = 9;
+  pet.energy = 100;
+  const wins = [
+    () => { applyPetAction(pet, "start-play", {}, now, 7, id); applyPetAction(pet, "finish-play", { challengeId: id, sequence: pet.challenge!.sequence }, now + 5000, 7, id); },
+    () => { applyPetAction(pet, "start-bubble", {}, now + 8000, 7, id); applyPetAction(pet, "finish-bubble", { challengeId: id, caught: pet.challenge!.bubbleIds }, now + 13_000, 7, id); },
+    () => { applyPetAction(pet, "start-rhythm", {}, now + 16_000, 7, id); const offsets = pet.challenge!.rhythmOffsets!; applyPetAction(pet, "finish-rhythm", { challengeId: id, taps: offsets }, now + 16_000 + offsets.at(-1)! * 2 + 2000, 7, id); },
+  ];
+  for (const [index, win] of wins.entries()) {
+    const before = pet.coins;
+    win();
+    assert.equal(pet.coins, before + 8, `game ${index + 1} pays 8 silver coins`);
+  }
+  assert.equal(pet.daily.playRewards, 12);
+  assert.equal(pet.gamesPlayed, 3);
 });
 
 test("shop prevents negative balances, duplicate purchases, and equipping unowned items", () => {
