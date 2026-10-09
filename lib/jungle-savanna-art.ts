@@ -1,4 +1,5 @@
 import { FLOOR, type Runner } from './jungle-runner';
+import { savannaVinePosition } from './jungle-savanna';
 
 export type SavannaSprites = {
   lion: HTMLImageElement;
@@ -43,6 +44,20 @@ export function drawSavannaBackdrop(ctx: CanvasRenderingContext2D, s: Runner, oa
 }
 
 export function drawSavanna(ctx: CanvasRenderingContext2D, s: Runner, sprites: SavannaSprites, camera: number) {
+  for (const vine of s.savannaVines) {
+    const rideProgress = s.swing && 'savannaVine' in s.swing && s.swing.savannaVine === vine ? s.swing.progress : undefined;
+    const tip = savannaVinePosition(vine, s.elapsed, rideProgress);
+    const anchorX = vine.pitX + vine.width / 2 - camera;
+    const tipX = tip.x - camera;
+    ctx.strokeStyle = '#5c873d'; ctx.lineWidth = 8; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(anchorX, 18); ctx.quadraticCurveTo((anchorX + tipX) / 2 + 15, 85, tipX, tip.y); ctx.stroke();
+    ctx.strokeStyle = '#a9d56b'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = '#4c762e'; ctx.beginPath(); ctx.ellipse(tipX, tip.y, 16, 9, 0.25, 0, Math.PI * 2); ctx.fill();
+    if (!vine.used) {
+      ctx.fillStyle = '#fff0a5'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('JUMP TO GRAB VINE', tipX, tip.y - 18);
+    }
+  }
   for (const pit of s.savannaPits) {
     const x = pit.x - camera;
     if (x > 900 || x + pit.width < -100) continue;
@@ -72,8 +87,8 @@ export function drawSavanna(ctx: CanvasRenderingContext2D, s: Runner, sprites: S
     if (animal.state === 'warn') { ctx.shadowColor = '#ffe37b'; ctx.shadowBlur = 18; }
     ctx.drawImage(sprite, sx, sy, sw, sh, x - targetWidth / 2, bottom - targetHeight, targetWidth, targetHeight);
     ctx.restore();
-    const label = kind === 'giraffe' ? 'FRIENDLY GIRAFFE · LAND ON BACK'
-      : kind === 'wildebeest' ? animal.state === 'warn' ? 'DUST! STAMPEDE!' : 'WILDEBEEST'
+    const label = kind === 'giraffe' ? 'LAND ON NECK · SLIDE TO TAIL'
+      : kind === 'wildebeest' ? animal.state === 'warn' ? 'DUST! STAMPEDE!' : 'BOUNCE ON ITS BACK'
       : kind === 'hyena' ? animal.state === 'warn' ? 'HA-HA! POUNCE COMING!' : animal.state === 'recover' ? 'COUNTER!' : 'LAUGHING HYENA'
       : animal.state === 'warn' ? 'ROAR! GET READY!' : animal.state === 'recover' ? 'COUNTER THE LION!' : 'LION POUNCE!';
     ctx.textAlign = 'center'; ctx.font = 'bold 12px sans-serif'; ctx.fillStyle = '#3c251dcc';

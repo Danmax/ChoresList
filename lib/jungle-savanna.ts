@@ -16,6 +16,16 @@ export type SavannaAnimal = {
   phase: number;
 };
 export type SavannaPit = { x: number; width: number; checkpoint: number };
+export type SavannaVine = { pitX: number; width: number; used?: boolean };
+
+export function savannaVinePosition(vine: SavannaVine, elapsed: number, progress?: number) {
+  const t = progress ?? 0.5 + Math.sin(elapsed * 1.8 + vine.pitX * 0.002) * 0.44;
+  return {
+    x: vine.pitX - 45 + (vine.width + 90) * t,
+    y: 145 + Math.sin(t * Math.PI) * 62,
+    progress: t,
+  };
+}
 
 export function createSavannaAnimal(kind: SavannaAnimalKind, x: number, difficulty: Runner['difficulty'] = 'medium', phase = 0): SavannaAnimal {
   const hitPoints = kind === 'lion' ? { easy: 3, medium: 4, hard: 5 }[difficulty] : kind === 'hyena' ? 2 : 1;
@@ -42,9 +52,10 @@ export function addSavannaSection(s: Runner) {
     for (let i = 0; i < count; i++) s.savannaAnimals.push(createSavannaAnimal('wildebeest', x + i * 135, s.difficulty, i * 0.17));
     s.message = 'DUST CLOUD! WILDEBEEST STAMPEDE AHEAD!'; s.messageTime = 2;
   } else {
-    const width = { easy: 155, medium: 185, hard: 215 }[s.difficulty];
+    const width = { easy: 360, medium: 430, hard: 500 }[s.difficulty];
     s.savannaAnimals.push(createSavannaAnimal('giraffe', x - 105, s.difficulty));
     s.savannaPits.push({ x: x + 100, width, checkpoint: x - 150 });
+    s.savannaVines.push({ pitX: x + 100, width });
     for (let i = 0; i < 6; i++) s.items.push({ x: x + 30 + i * (width + 150) / 5, y: FLOOR - 120 - Math.sin(i / 5 * Math.PI) * 85, kind: 'banana' });
   }
   if (!s.gemSpawned[7]) {
@@ -64,6 +75,8 @@ export function stepSavanna(s: Runner, dt: number, previousY: number, hurt: (mes
     s.savannaBossStarted = true;
     s.savannaAnimals = [];
     s.savannaPits = [];
+    s.savannaVines = [];
+    if (s.swing && ('savannaVine' in s.swing || 'giraffe' in s.swing)) s.swing = null;
     s.nextSection = Infinity;
     s.savannaAnimals.push(createSavannaAnimal('lion', worldX + 290, s.difficulty));
     s.items.push({ x: worldX + 55, y: FLOOR - 28, kind: 'heart' });
@@ -80,6 +93,16 @@ export function stepSavanna(s: Runner, dt: number, previousY: number, hurt: (mes
     }
   }
 
+  for (const vine of s.savannaVines) {
+    if (vine.used || s.swing || s.jumps === 0 || s.duck) continue;
+    const tip = savannaVinePosition(vine, s.elapsed);
+    if (Math.abs(tip.x - worldX) < 52 && Math.abs(tip.y - (s.y - 55)) < 58) {
+      vine.used = true;
+      s.swing = { savannaVine: vine, progress: tip.progress };
+      s.flipLeft = 0; s.message = 'SAVANNA VINE! SWING ACROSS!'; s.messageTime = 1.4;
+    }
+  }
+
   for (const animal of s.savannaAnimals) {
     if (animal.state === 'defeated') continue;
     animal.age += dt;
@@ -87,11 +110,12 @@ export function stepSavanna(s: Runner, dt: number, previousY: number, hurt: (mes
     const ahead = animal.x - worldX;
 
     if (animal.kind === 'giraffe') {
-      const back = FLOOR - 126;
-      if (Math.abs(ahead) < 58 && s.vy > 0 && previousY <= back && s.y >= back) {
-        s.y = back; s.vy = -610; s.jumps = 1; s.duck = false; s.slideLeft = 0; s.flipLeft = 0;
+      const neckTop = FLOOR - 185;
+      if (!s.swing && Math.abs(ahead) < 72 && s.vy > 0 && previousY <= neckTop + 20 && s.y >= neckTop) {
+        s.swing = { giraffe: animal, progress: 0 };
+        s.y = neckTop; s.vy = 0; s.jumps = 1; s.duck = false; s.slideLeft = 0; s.flipLeft = 0;
         animal.state = 'attack'; animal.age = 0;
-        s.message = 'GIRAFFE LAUNCH!'; s.messageTime = 0.9;
+        s.message = 'GIRAFFE NECK SLIDE — TAIL LAUNCH!'; s.messageTime = 1.2;
       } else if (animal.state === 'attack' && animal.age > 0.55) animal.state = 'idle';
       continue;
     }
@@ -101,7 +125,11 @@ export function stepSavanna(s: Runner, dt: number, previousY: number, hurt: (mes
       else if (animal.state === 'warn' && animal.age >= 0.72 + animal.phase) { animal.state = 'attack'; animal.age = 0; }
       if (animal.state === 'attack') animal.x -= (170 + animal.phase * 35) * dt;
       if (Math.abs(animal.x - worldX) < 52 && s.y > FLOOR - 92) {
-        if (s.starPower > 0) { animal.state = 'defeated'; starKnockout(s, animal.x, FLOOR - 60, 'WILDEBEEST'); }
+        const back = FLOOR - 78;
+        if (s.vy > 0 && previousY <= back && s.y >= back) {
+          s.y = back; s.vy = -520; s.jumps = 1; s.duck = false; s.slideLeft = 0; s.flipLeft = 0;
+          s.savannaBounces++; s.message = 'WILDEBEEST BOUNCE!'; s.messageTime = 0.75;
+        } else if (s.starPower > 0) { animal.state = 'defeated'; starKnockout(s, animal.x, FLOOR - 60, 'WILDEBEEST'); }
         else if (s.invincible <= 0) hurt('WILDEBEEST STAMPEDE! DOUBLE JUMP!', 'flatten');
       }
       continue;
@@ -153,4 +181,5 @@ export function stepSavanna(s: Runner, dt: number, previousY: number, hurt: (mes
   }
   s.savannaAnimals = s.savannaAnimals.filter(animal => animal.state !== 'defeated' && (animal.kind === 'lion' || animal.x > s.distance - 180));
   s.savannaPits = s.savannaPits.filter(value => value.x + value.width > s.distance - 100);
+  s.savannaVines = s.savannaVines.filter(vine => vine.pitX + vine.width > s.distance - 100);
 }

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRunner, FLOOR, jumpRunner, levelSeconds, PLAYER_X, punchRunner, stepRunner } from '../lib/jungle-runner';
-import { createSavannaAnimal } from '../lib/jungle-savanna';
+import { createSavannaAnimal, savannaVinePosition } from '../lib/jungle-savanna';
 
 function savanna(difficulty: 'easy' | 'medium' | 'hard' = 'medium') {
   const s = createRunner(difficulty, 7, 7);
@@ -19,14 +19,52 @@ test('Savanna Stampede is the eighth selectable level with a Citrine gem', () =>
   assert.equal(s.endLevel, 7);
 });
 
-test('friendly giraffes launch a descending runner without damage', () => {
+test('friendly giraffes catch the runner on the neck, slide to the tail, and launch', () => {
   const s = savanna();
   s.savannaAnimals = [createSavannaAnimal('giraffe', PLAYER_X + 1)];
-  s.y = FLOOR - 127; s.vy = 250; s.jumps = 1;
+  s.y = FLOOR - 186; s.vy = 250; s.jumps = 1;
   stepRunner(s, 1 / 120);
-  assert.ok(s.vy < -500);
+  assert.ok(s.swing && 'giraffe' in s.swing);
   assert.equal(s.hits, 0);
+  advance(s, 0.7);
+  assert.equal(s.swing, null);
+  assert.ok(s.vy < 0);
   assert.equal(s.jumps, 1);
+});
+
+test('a descending runner bounces safely on a charging wildebeest', () => {
+  const s = savanna();
+  const beast = createSavannaAnimal('wildebeest', PLAYER_X + 1);
+  beast.state = 'attack'; s.savannaAnimals = [beast];
+  s.y = FLOOR - 79; s.vy = 260; s.jumps = 1;
+  stepRunner(s, 1 / 120);
+  assert.ok(s.vy < -450);
+  assert.equal(s.savannaBounces, 1);
+  assert.equal(s.hits, 0);
+});
+
+test('authored death pits are large and include a swingable vine', () => {
+  const s = savanna('easy');
+  s.savannaEncounterIndex = 3; s.nextSection = 1;
+  stepRunner(s, 1 / 120);
+  assert.ok(s.savannaPits[0].width >= 360);
+  assert.equal(s.savannaVines.length, 1);
+});
+
+test('an airborne runner can grab a savanna vine and swing across a wide pit', () => {
+  const s = savanna();
+  const vine = { pitX: PLAYER_X + 100, width: 430 };
+  s.savannaVines = [vine];
+  s.savannaPits = [{ x: vine.pitX, width: vine.width, checkpoint: PLAYER_X - 40 }];
+  const tip = savannaVinePosition(vine, s.elapsed);
+  s.distance = tip.x - PLAYER_X; s.y = tip.y + 54; s.vy = 0; s.jumps = 1;
+  stepRunner(s, 1 / 120);
+  assert.ok(s.swing && 'savannaVine' in s.swing);
+  const start = s.distance;
+  advance(s, 1.2);
+  assert.equal(s.swing, null);
+  assert.ok(s.distance > start + 100);
+  assert.equal(s.hits, 0);
 });
 
 test('falling into a death cliff costs one life and returns to its checkpoint', () => {

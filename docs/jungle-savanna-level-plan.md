@@ -10,10 +10,10 @@ Use the existing difficulty durations: Easy 42 seconds, Medium 51 seconds, Hard 
 
 | Progress | Medium target | Encounter | Player action |
 | --- | --- | --- | --- |
-| 0–15% | 0–8s | Golden Grasslands: a friendly giraffe demonstrates a safe launch, with bananas tracing the route. | Jump onto its back; it gently launches the monkey forward. |
+| 0–15% | 0–8s | Golden Grasslands: a friendly giraffe demonstrates a safe launch, with bananas tracing the route. | Land high on its neck, slide toward the tail and launch forward. |
 | 15–30% | 8–15s | Laughing Hyena Pack: enemies appear in staggered pairs or trios. | Slide under a high leap, jump a low rush, or counter during recovery. |
-| 30–50% | 15–26s | Wildebeest Stampede: rising dust and visible herd silhouettes announce two waves. | Jump separated waves or use a giraffe to reach a safe upper route. |
-| 50–70% | 26–36s | Cliffs of Death: bone-strewn sandstone ledges, narrow pillars and a crumbling platform. | Follow banana arcs with double jumps and giraffe launches. |
+| 30–50% | 15–26s | Wildebeest Stampede: rising dust and visible herd silhouettes announce two waves. | Clear the waves or land on a wildebeest back for a safe spring bounce. |
+| 50–70% | 26–36s | Cliffs of Death: bone-strewn sandstone ledges and wide ravines. | Follow the banana arc, launch from a giraffe, or jump to catch the moving vine. |
 | 70–92% | 36–47s | Roaring Lion: a flat, clearly bounded showdown arena. | Read the roar and crouch, dodge alternating pounces and charges, counter in recovery. |
 | 92–100% | 47–51s | Oasis of Victory: a final giraffe-assisted crossing opens onto lush turquoise water and a leafy finish arch. | Land safely and cross the arch to complete the stage. |
 
@@ -21,13 +21,13 @@ Use the existing difficulty durations: Easy 42 seconds, Medium 51 seconds, Hard 
 
 **Lion.** Use an explicit `stalk → roar → windup → pounce/charge → recover` state machine. The roar is a warning, with a visible mane/head animation and a short action cue; it does not deal unavoidable damage. Pounces rise high enough to slide beneath; ground charges allow a double jump. Give the player a clear counter window after either attack. Proposed hit points: Easy 3, Medium 4, Hard 5, using the existing attack damage and hit cooldown rules. The lion retreats when defeated. Never combine the arena with a live cliff or stampede.
 
-**Friendly giraffes.** Never damage or block the monkey. Descending onto the back gives an automatic forward/upward launch using the existing bounce interaction. Draw the safe landing surface at the back, rather than making the head a hidden target. A banana arc shows the destination. Giraffe launches reset the air-jump allowance so the player can correct a landing. Put a giraffe before every gap requiring more range than the normal double jump. Provide a heart before the lion arena.
+**Friendly giraffes.** Never damage or block the monkey. Descending onto the upper neck begins a guided slide down the neck and back; reaching the tail launches the monkey forward and upward. A banana arc shows the destination. The launch restores one air jump so the player can correct the landing. Put a giraffe before every wide gap and provide a heart before the lion arena.
 
-**Wildebeest.** Repeat the gallop sheet with phase offsets for a herd. Dust and silhouettes begin before collision becomes possible. The stampede advances in bounded waves with real safe gaps, rather than a continuous wall of bodies. A normal hit costs one life under existing protection rules. Invulnerability prevents repeated hits from the same wave. Giraffe routes remain clear of the herd. No herd spawns onto a cliff landing.
+**Wildebeest.** Repeat the gallop sheet with phase offsets for a herd. Dust and silhouettes begin before collision becomes possible. The stampede advances in bounded waves with real safe gaps. A descending landing on a wildebeest back creates a spring bounce, restores one air jump and causes no damage. Side contact costs one life under existing protection rules. Invulnerability prevents repeated hits from the same wave. No herd spawns onto a cliff landing.
 
 **Laughing hyenas.** Reuse one animated character to form staggered packs. A laugh pose and visible cue announce the next attack. Alternate high bounds and low rushes; only one hyena starts an attack at a time on Easy and Medium. Hard may use two offset attacks, but must preserve a valid dodge route. Knockback and counter attacks use the existing combat controls. Laughter audio is an implementation task; no sound files are included in this asset pack.
 
-**Cliffs of Death.** Deep ravines show old animal skulls, ribs and scattered bones. Bones are scenery; the pit is the hazard. Ordinary double-jump gaps must be reachable at the selected difficulty and current speed. Wider gaps always have a giraffe or stable intermediate pillar. Preview the far ledge before takeoff. A crumbling platform visibly cracks before it falls, with at least 0.8 seconds after first landing. Falling costs one life and respawns the monkey at the last safe ledge, with temporary protection and cleared nearby hazards. Zero lives ends the run. Star power can protect against creatures but does not create invisible ground over pits.
+**Cliffs of Death.** Deep ravines span 360 pixels on Easy, 430 on Medium and 500 on Hard, with old animal skulls, ribs and scattered bones below. Each authored ravine includes a moving vine spanning both ledges, plus a giraffe approach route. Jumping near the vine tip grabs it and carries the monkey across; jumping again releases early. Falling costs one life and respawns the monkey at the last safe ledge with temporary protection. Zero lives ends the run. Star power protects against creatures but does not create ground over pits.
 
 **Oasis of Victory.** Water stays behind the solid playable path. Stop hostile spawning before the finish stretch and despawn trailing attackers. Victory requires the lion to be defeated and the monkey to cross the oasis finish trigger while grounded; the timer alone must never award victory before the arena is resolved. In Adventure, enter the usual final celebration and score submission. In selected-stage mode, complete only this stage.
 
@@ -64,7 +64,7 @@ The generated sprite spacing varies, including some poses extending beyond their
 ## Implemented integration
 
 1. Savanna Stampede and its Citrine gem are registered in `lib/jungle-runner.ts`.
-2. `lib/jungle-savanna.ts` owns creature states, encounter scheduling, giraffe launches, cliff recovery and the lion/oasis completion gate.
+2. `lib/jungle-savanna.ts` owns creature states, wildebeest bounces, giraffe neck rides, vine swings, cliff recovery and the lion/oasis completion gate.
 3. `lib/jungle-savanna-art.ts` uses measured sprite bounds and draws the savanna, terrain, animals and oasis finish.
 4. The stage picker exposes both DinoLand and Savanna Stampede as boss stages. Adventure Mode requires the T. rex before advancing into the savanna.
 5. Final victory requires defeating the lion and crossing the grounded oasis trigger.

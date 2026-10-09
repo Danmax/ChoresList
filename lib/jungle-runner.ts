@@ -1,6 +1,6 @@
 import { createInsect, INSECT_KINDS, stepInsects, type Insect, type InsectKind, type AntRock, type HitReaction } from './jungle-insects';
 import { addDinoSection, stepDinoLand, type Dino, type DinoProjectile, type Eruption, type TarPit } from './jungle-dinoland';
-import { addSavannaSection, isSavannaPit, stepSavanna, type SavannaAnimal, type SavannaPit } from './jungle-savanna';
+import { addSavannaSection, isSavannaPit, savannaVinePosition, stepSavanna, type SavannaAnimal, type SavannaPit, type SavannaVine } from './jungle-savanna';
 export const FLOOR = 310;
 export const PLAYER_X = 150;
 export const RUNNER_DIFFICULTIES = {
@@ -195,13 +195,13 @@ export function createRunner(difficulty: RunnerDifficulty = 'medium', startLevel
     insects: [] as Insect[], antRocks: [] as AntRock[], caterpillarBounces: 0,
     dinos: [] as Dino[], tarPits: [] as TarPit[], eruptions: [] as Eruption[], dinoProjectiles: [] as DinoProjectile[],
     dinoEncounterIndex: 0, dinoBossStarted: false, dinoBossDefeated: false, groundShake: 0, tarTime: 0,
-    savannaAnimals: [] as SavannaAnimal[], savannaPits: [] as SavannaPit[], savannaEncounterIndex: 0,
+    savannaAnimals: [] as SavannaAnimal[], savannaPits: [] as SavannaPit[], savannaVines: [] as SavannaVine[], savannaEncounterIndex: 0, savannaBounces: 0,
     savannaBossStarted: false, savannaLionDefeated: false, savannaOasisOpen: false,
     savannaOasisReached: false, savannaFinishX: null as number | null,
     reaction: 'bonk' as HitReaction, reactionLeft: 0,
     phase: 'ready' as 'ready' | 'playing' | 'over' | 'victory',
     distance: 0, elapsed: initialLevel * RUNNER_DIFFICULTIES[difficulty].seconds, level: initialLevel, endLevel: finalLevel, y: FLOOR, vy: 0, jumps: 0, duck: false, duckHeld: false, hesitating: false, slideLeft: 0, slideCooldown: 0, strongDiveLeft: 0, attackLeft: 0, forwardDashLeft: 0, forwardDashCooldown: 0, combatMove: 'run' as 'run' | 'punch' | 'kick' | 'dash', combatLeft: 0, comboStep: 0, comboWindow: 0, hitCombo: 0, hitComboWindow: 0, hitStreak: 0, hitStreakWindow: 0, bestHitStreak: 0, attackLanded: false, counterLeft: 0, ki: 0, specialLeft: 0, cameraLead: 0, impactShake: 0,
-    flipLeft: 0, swing: null as ({ river: River; progress: number } | { lemming: Lemming; progress: number }) | null,
+    flipLeft: 0, swing: null as ({ river: River; progress: number } | { lemming: Lemming; progress: number } | { savannaVine: SavannaVine; progress: number } | { giraffe: SavannaAnimal; progress: number }) | null,
     cracks: [] as { x: number; y: number; age: number; kind?: 'coconut' | 'barrel' }[],
     golden: 0, cherries: 0, fruitPickups: 0, supplyPickups: 0, bonusScore: 0, gems: 0,
     gemSpawned: LEVELS.map(() => false), gemCollected: LEVELS.map(() => false), celebrationTime: 0,
@@ -522,6 +522,7 @@ export function stepRunner(s: Runner, dt: number) {
     }
     if (level === 7) {
       s.items = []; s.dinos = []; s.tarPits = []; s.eruptions = []; s.dinoProjectiles = [];
+      s.savannaAnimals = []; s.savannaPits = []; s.savannaVines = []; s.swing = null;
       s.nextSection = s.distance + 950;
     }
     s.level = level; s.section = 0; s.encounterDeck = []; s.insectDeck = []; s.items = s.items.filter(i => i.kind !== 'gem'); s.message = `LEVEL ${level + 1}: ${LEVELS[level].name}`; s.messageTime = 3;
@@ -621,6 +622,22 @@ export function stepRunner(s: Runner, dt: number) {
       s.swing.progress = Math.min(1, s.swing.progress + dt * speed * 1.25 / (s.swing.river.width + 90));
       const tip = vinePosition(s.swing.river, s.elapsed, s.swing.progress);
       s.distance = tip.x - PLAYER_X; s.y = tip.y + 55;
+    } else if ('savannaVine' in s.swing) {
+      s.swing.progress = Math.min(1, s.swing.progress + dt * speed * 1.35 / (s.swing.savannaVine.width + 90));
+      const tip = savannaVinePosition(s.swing.savannaVine, s.elapsed, s.swing.progress);
+      s.distance = tip.x - PLAYER_X; s.y = tip.y + 55;
+    } else if ('giraffe' in s.swing) {
+      s.swing.progress = Math.min(1, s.swing.progress + dt * 1.65);
+      const t = s.swing.progress;
+      s.distance = s.swing.giraffe.x - 65 + t * 145 - PLAYER_X;
+      s.y = FLOOR - 185 + t * 90 + Math.sin(t * Math.PI) * 12;
+      s.swing.giraffe.state = 'attack';
+      if (t >= 1) {
+        const giraffe = s.swing.giraffe;
+        s.swing = null; s.distance = giraffe.x + 85 - PLAYER_X; s.y = FLOOR - 100;
+        s.vy = -650; s.jumps = 1; s.flipLeft = FLIP_SECONDS;
+        s.message = 'TAIL LAUNCH!'; s.messageTime = 0.9;
+      }
     } else {
       s.swing.progress = Math.min(1, s.swing.progress + dt * 1.25);
       const { lemming } = s.swing;
@@ -628,8 +645,10 @@ export function stepRunner(s: Runner, dt: number) {
       s.distance = lemming.x + (lemming.endX - lemming.x) * s.swing.progress - PLAYER_X;
       s.y = FLOOR - 92 - arc;
     }
-    s.vy = 0;
-    if (s.swing.progress >= 1) { s.swing = null; s.jumps = 0; jumpRunner(s); }
+    if (s.swing) {
+      s.vy = 0;
+      if (s.swing.progress >= 1) { s.swing = null; s.jumps = 0; jumpRunner(s); }
+    }
   } else { s.vy += 1500 * dt; s.y += s.vy * dt; }
   for (const r of s.rivers) {
     if (!r.vine || r.used || s.swing || s.jumps === 0 || s.duck) continue;
