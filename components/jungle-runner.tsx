@@ -266,6 +266,22 @@ function emeraldCelebration(ctx: CanvasRenderingContext2D, s: Runner) {
   ctx.shadowBlur = 0; ctx.fillStyle = '#f4ffe5'; ctx.font = 'bold 15px sans-serif'; ctx.fillText('JUNGLE CROWN CELEBRATION', 400, 101); ctx.restore();
 }
 
+function toucanArt(ctx: CanvasRenderingContext2D, x: number, y: number, elapsed: number, dropping: boolean) {
+  const flap = Math.sin(elapsed * 12) * 12;
+  ctx.save(); ctx.translate(x, y);
+  ctx.strokeStyle = '#17231f'; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+  ctx.fillStyle = '#161f23'; ctx.beginPath(); ctx.ellipse(0, 0, 27, 22, -0.12, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#fff2c8'; ctx.beginPath(); ctx.ellipse(-9, 6, 14, 13, -0.25, 0, Math.PI * 2); ctx.fill();
+  ctx.save(); ctx.rotate(-0.2 + flap * 0.008); ctx.fillStyle = '#243b45'; ctx.beginPath(); ctx.ellipse(8, 2, 22, 8, 0.35, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+  ctx.fillStyle = '#f29a2e'; ctx.beginPath(); ctx.moveTo(-19, -9); ctx.quadraticCurveTo(-64, -22, -67, -4); ctx.quadraticCurveTo(-48, 8, -18, 2); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#f6d547'; ctx.beginPath(); ctx.moveTo(-63, -5); ctx.quadraticCurveTo(-45, -2, -19, 0); ctx.lineTo(-21, 6); ctx.quadraticCurveTo(-48, 8, -63, -5); ctx.fill();
+  ctx.fillStyle = '#53b8c8'; ctx.beginPath(); ctx.moveTo(18, 10); ctx.lineTo(46, 24); ctx.lineTo(25, 3); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#f4f1dc'; ctx.beginPath(); ctx.arc(-13, -10, 8, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#17231f'; ctx.beginPath(); ctx.arc(-15, -11, 3, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#f3bc45'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-1, 18); ctx.lineTo(-4, dropping ? 28 : 23); ctx.moveTo(8, 18); ctx.lineTo(10, dropping ? 29 : 23); ctx.stroke();
+  ctx.restore();
+}
+
 function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElement, fightSprite: HTMLImageElement, predators: HTMLImageElement, wildlife: HTMLImageElement, insects: HTMLImageElement, dinos: HTMLImageElement, dinoAnimations: DinoAnimations, coffeeBear: HTMLImageElement, allySprites: { orangutan: HTMLImageElement; eel: HTMLImageElement; sloth: HTMLImageElement; lemming: HTMLImageElement; scorpion: HTMLImageElement }, savannaSprites: SavannaSprites) {
   const W = 800, H = 400;
   const night = s.level === 4;
@@ -411,7 +427,12 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
     const x = bird.x - cameraDistance;
     const y = birdHeight(bird, s.elapsed);
     const wingFrame = (bird.releaseLeft ?? 0) > 0 ? 3 : [0, 1, 2, 1][Math.floor(s.elapsed * 10) % 4];
-    animal(2, wingFrame, x, y - 40, 78, 70);
+    if (savannaZone) toucanArt(ctx, x, y, s.elapsed, (bird.releaseLeft ?? 0) > 0);
+    else animal(2, wingFrame, x, y - 40, 78, 70);
+    if (savannaZone) {
+      ctx.fillStyle = '#3c251dcc'; ctx.fillRect(x - 62, y - 47, 124, 19);
+      ctx.fillStyle = '#fff0b5'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('TOUCAN GOODIE!', x, y - 34);
+    }
     if (!bird.dropped) { if (bird.gift === 'drop') coconut(ctx, x, y + 25); else { ctx.font = '22px sans-serif'; ctx.fillText(bird.gift === 'heart' ? '❤️' : bird.gift === 'star' ? '⭐' : bird.gift === 'fruit' ? '🍍' : '🍒', x, y + 25); } }
   }
   for (const sloth of s.sloths) {

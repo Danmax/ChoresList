@@ -634,9 +634,9 @@ export function stepRunner(s: Runner, dt: number) {
       s.swing.giraffe.state = 'attack';
       if (t >= 1) {
         const giraffe = s.swing.giraffe;
-        s.swing = null; s.distance = giraffe.x + 85 - PLAYER_X; s.y = FLOOR - 100;
-        s.vy = -650; s.jumps = 1; s.flipLeft = FLIP_SECONDS;
-        s.message = 'TAIL LAUNCH!'; s.messageTime = 0.9;
+        s.swing = null; s.distance = giraffe.x + 150 - PLAYER_X; s.y = FLOOR - 125;
+        s.vy = -720; s.jumps = 0; s.flipLeft = FLIP_SECONDS;
+        s.message = 'TAIL LAUNCH! DOUBLE JUMP READY!'; s.messageTime = 1.2;
       }
     } else {
       s.swing.progress = Math.min(1, s.swing.progress + dt * 1.25);

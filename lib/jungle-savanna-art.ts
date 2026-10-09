@@ -87,7 +87,7 @@ export function drawSavanna(ctx: CanvasRenderingContext2D, s: Runner, sprites: S
     if (animal.state === 'warn') { ctx.shadowColor = '#ffe37b'; ctx.shadowBlur = 18; }
     ctx.drawImage(sprite, sx, sy, sw, sh, x - targetWidth / 2, bottom - targetHeight, targetWidth, targetHeight);
     ctx.restore();
-    const label = kind === 'giraffe' ? 'LAND ON NECK · SLIDE TO TAIL'
+    const label = kind === 'giraffe' ? 'LAND ON BACK · SLIDE · LAUNCH · DOUBLE JUMP'
       : kind === 'wildebeest' ? animal.state === 'warn' ? 'DUST! STAMPEDE!' : 'BOUNCE ON ITS BACK'
       : kind === 'hyena' ? animal.state === 'warn' ? 'HA-HA! POUNCE COMING!' : animal.state === 'recover' ? 'COUNTER!' : 'LAUGHING HYENA'
       : animal.state === 'warn' ? 'ROAR! GET READY!' : animal.state === 'recover' ? 'COUNTER THE LION!' : 'LION POUNCE!';

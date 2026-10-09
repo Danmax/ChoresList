@@ -19,7 +19,7 @@ test('Savanna Stampede is the eighth selectable level with a Citrine gem', () =>
   assert.equal(s.endLevel, 7);
 });
 
-test('friendly giraffes catch the runner on the neck, slide to the tail, and launch', () => {
+test('friendly giraffes catch the runner on the neck, slide to the tail, and launch with a fresh double jump', () => {
   const s = savanna();
   s.savannaAnimals = [createSavannaAnimal('giraffe', PLAYER_X + 1)];
   s.y = FLOOR - 186; s.vy = 250; s.jumps = 1;
@@ -29,16 +29,20 @@ test('friendly giraffes catch the runner on the neck, slide to the tail, and lau
   advance(s, 0.7);
   assert.equal(s.swing, null);
   assert.ok(s.vy < 0);
-  assert.equal(s.jumps, 1);
+  assert.equal(s.jumps, 0);
+  jumpRunner(s);
+  jumpRunner(s);
+  assert.equal(s.jumps, 2);
 });
 
 test('a descending runner bounces safely on a charging wildebeest', () => {
   const s = savanna();
-  const beast = createSavannaAnimal('wildebeest', PLAYER_X + 1);
+  const beast = createSavannaAnimal('wildebeest', PLAYER_X + 70);
   beast.state = 'attack'; s.savannaAnimals = [beast];
   s.y = FLOOR - 79; s.vy = 260; s.jumps = 1;
   stepRunner(s, 1 / 120);
-  assert.ok(s.vy < -450);
+  assert.ok(s.vy < -550);
+  assert.equal(s.jumps, 0);
   assert.equal(s.savannaBounces, 1);
   assert.equal(s.hits, 0);
 });
@@ -49,6 +53,8 @@ test('authored death pits are large and include a swingable vine', () => {
   stepRunner(s, 1 / 120);
   assert.ok(s.savannaPits[0].width >= 360);
   assert.equal(s.savannaVines.length, 1);
+  assert.equal(s.birds.length, 1);
+  assert.ok(['cherry', 'fruit', 'heart', 'star'].includes(s.birds[0].gift));
 });
 
 test('an airborne runner can grab a savanna vine and swing across a wide pit', () => {
