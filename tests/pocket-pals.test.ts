@@ -101,6 +101,43 @@ test("memory rounds require the issued challenge, minimum time, and correct sequ
   assert.throws(() => applyPetAction(pet, "finish-play", { challengeId: id, sequence: [0, 0, 0] }, now + 10_000, 5, id));
 });
 
+test("Bubble Catch validates issued bubbles and shares the play reward limit", () => {
+  const pet = createPet("dog", "Mochi", now, day);
+  applyPetAction(pet, "start-bubble", {}, now, 7, id);
+  const challenge = publicChallenge(pet, 7)!;
+  assert.equal(challenge.kind, "bubble");
+  assert.ok(!("answer" in challenge));
+  assert.throws(() => applyPetAction(pet, "finish-bubble", { challengeId: id, caught: challenge.bubbles }, now + 2_000, 7, id));
+  applyPetAction(pet, "finish-bubble", { challengeId: id, caught: ["not-a-bubble"] }, now + 5_000, 7, id);
+  assert.equal(pet.gamesPlayed, 0);
+  applyPetAction(pet, "finish-bubble", { challengeId: id, caught: challenge.bubbles }, now + 7_000, 7, id);
+  assert.equal(pet.gamesPlayed, 1);
+  assert.equal(pet.coins, 28);
+  assert.equal(pet.daily.playRewards, 1);
+});
+
+test("Hide-and-Seek and Balance Builder keep their answers private until the round is complete", () => {
+  const pet = createPet("cat", "Miso", now, day);
+  applyPetAction(pet, "start-hide", {}, now, 10, id);
+  const hide = publicChallenge(pet, 10)!;
+  assert.equal(hide.kind, "hide");
+  assert.ok(!("hideSpot" in hide));
+  applyPetAction(pet, "guess-hide", { challengeId: id, choice: 99 }, now + 3_000, 10, id);
+  assert.equal(pet.gamesPlayed, 0);
+  const privateHideSpot = pet.challenge?.hideSpot;
+  applyPetAction(pet, "guess-hide", { challengeId: id, choice: privateHideSpot }, now + 5_000, 10, id);
+  assert.equal(pet.gamesPlayed, 1);
+
+  applyPetAction(pet, "start-balance", {}, now + 8_000, 10, id);
+  const balance = publicChallenge(pet, 10)!;
+  assert.equal(balance.kind, "balance");
+  assert.ok(!("balanceSequence" in balance));
+  assert.throws(() => applyPetAction(pet, "finish-balance", { challengeId: id, placements: pet.challenge?.balanceSequence }, now + 10_000, 10, id));
+  applyPetAction(pet, "finish-balance", { challengeId: id, placements: pet.challenge?.balanceSequence }, now + 13_000, 10, id);
+  assert.equal(pet.gamesPlayed, 2);
+  assert.equal(pet.daily.playRewards, 2);
+});
+
 test("lessons hide answers, teach after mistakes, and cannot replay rewards", () => {
   const pet = createPet("monkey", "Kiki", now, day);
   const lesson = currentLesson(pet, 7);

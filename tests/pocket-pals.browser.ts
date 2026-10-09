@@ -74,6 +74,7 @@ async function main() {
     await expect(page.getByRole("status")).toContainText("Fresh and fluffy");
     await page.clock.fastForward(2500);
     await page.getByRole("button", { name: /Play Treat/ }).click();
+    await page.getByRole("button", { name: /Treat memory Remember/ }).click();
     await expect(page.getByRole("heading", { name: "Treat memory" })).toBeVisible();
     await page.clock.fastForward(4500);
     const sequence = saved!.challenge!.sequence!;
