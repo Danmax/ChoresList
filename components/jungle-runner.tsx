@@ -7,6 +7,7 @@ import { pantherPaw } from '@/lib/jungle-motion';
 import { drawWaterLife, drawOrangutan, drawPineapple } from '@/lib/jungle-water-art';
 import { useEffect, useRef, useState } from 'react';
 import { RUNNER_DIFFICULTIES, type RunnerDifficulty, type CoffeeSpecial, GEMS, spiderPosition, slothPosition, airBoost, FLIP_SECONDS, vinePosition, birdHeight, crocodileFrame, hippoFrame, createRunner, dashBoost, duckRunner, FLOOR, forwardDashRunner, hesitateRunner, heroMove, isAirAttack, jumpRunner, kickRunner, KI_MAX, LEVELS, levelSeconds, PLAYER_X, punchRunner, runnerScore, specialRunner, STRONG_DIVE_SECONDS, travelSpeed, stepRunner, type Runner } from '@/lib/jungle-runner';
+import { JungleLeaderboard } from '@/components/jungle-leaderboard';
 import styles from './jungle-runner.module.css';
 
 // Canvas artwork keeps shells and moving limbs crisp at every display density.
@@ -768,11 +769,12 @@ function StageVictoryPayout({ bananas, golden, cherries, fruit, supplies, stones
   </div>;
 }
 
-export function JungleVineSwing({ onExit, onFinish, onRunStart, finishLabel = 'Save & exit' }: {
+export function JungleVineSwing({ onExit, onFinish, onRunStart, finishLabel = 'Save & exit', playerId }: {
   onExit: () => void;
   onFinish: (score: number, duration: number, metadata: Record<string, unknown>) => void;
   onRunStart?: () => boolean;
   finishLabel?: string;
+  playerId?: string;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const world = useRef(createRunner());
@@ -781,6 +783,7 @@ export function JungleVineSwing({ onExit, onFinish, onRunStart, finishLabel = 'S
   const [runMode, setRunMode] = useState<'adventure' | 'stage'>('adventure');
   const [selectedLevel, setSelectedLevel] = useState(0);
   const [shareCopied, setShareCopied] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [hud, setHud] = useState({ phase: 'ready', lives: 3, bananas: 0, seconds: 60, paused: false, level: 0, score: 0, golden: 0, cherries: 0, fruit: 0, supplies: 0, gems: 0, levelGem: false, slide: 0, attack: 0, move: 'run', combo: 0, streak: 0, bestStreak: 0, ki: 0, special: 0, speed: 1, espresso: 0, hesitating: false, bossStarted: false, bossHp: 0, bossMax: 0, bossIcon: '🦖' });
   const paused = useRef(false);
   const saved = useRef(false);
@@ -915,7 +918,8 @@ export function JungleVineSwing({ onExit, onFinish, onRunStart, finishLabel = 'S
   const ended = hud.phase === 'over' || hud.phase === 'victory';
   return <section data-game-screen={hud.phase !== 'ready'} data-playing={hud.phase === 'playing'} data-paused={hud.paused} className={`${styles.root} fixed inset-0 z-50 flex flex-col justify-center overflow-auto bg-emerald-950 text-white`}>
     <div className={`${styles.shell} mx-auto w-full max-w-4xl`}>
-      <header className={`${styles.header} mb-2 flex items-center justify-between gap-2`}><h2 className="font-black">Jungle Runner</h2><div className="flex gap-2"><button type="button" onClick={() => void shareGame()} className="rounded-xl bg-cyan-300 px-3 py-2 font-black text-emerald-950">{shareCopied ? '✓ Copied' : '↗ Share'}</button><button onClick={pause} disabled={hud.phase !== 'playing'} className="rounded-xl bg-white/10 px-3 py-2 disabled:opacity-40">{hud.paused ? 'Resume' : 'Pause'}</button><button onClick={onExit} className="rounded-xl bg-white/10 px-3 py-2">Exit</button></div></header>
+      <header className={`${styles.header} mb-2 flex items-center justify-between gap-2`}><h2 className="font-black">Jungle Runner</h2><div className="flex gap-2">{playerId && <button type="button" onClick={() => setShowLeaderboard(true)} className="rounded-xl bg-yellow-300 px-3 py-2 font-black text-emerald-950">🏆 Top 100</button>}<button type="button" onClick={() => void shareGame()} className="rounded-xl bg-cyan-300 px-3 py-2 font-black text-emerald-950">{shareCopied ? '✓ Copied' : '↗ Share'}</button><button onClick={pause} disabled={hud.phase !== 'playing'} className="rounded-xl bg-white/10 px-3 py-2 disabled:opacity-40">{hud.paused ? 'Resume' : 'Pause'}</button><button onClick={onExit} className="rounded-xl bg-white/10 px-3 py-2">Exit</button></div></header>
+      {showLeaderboard && playerId && <JungleLeaderboard memberId={playerId} onClose={() => setShowLeaderboard(false)} />}
       {hud.phase === 'ready' && (
         <fieldset className={`${styles.setup} mb-3 rounded-xl bg-white/10 p-3`}>
           <legend className="px-1 text-sm font-black">Choose your run</legend>

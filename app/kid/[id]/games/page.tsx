@@ -224,7 +224,7 @@ export default function KidGamesPage() {
       ) : activeGame === "burger-rush" ? (
         <BurgerRush onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("burger-rush", score, duration, metadata)} />
       ) : activeGame === "jungle-vine-swing" ? (
-        <JungleVineSwing onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("jungle-vine-swing", score, duration, metadata)} />
+        <JungleVineSwing playerId={member.id} onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("jungle-vine-swing", score, duration, metadata)} />
       ) : activeGame === "chess-quest" ? (
         <ChessQuest
           playerId={member.id}
