@@ -3,13 +3,14 @@
 import { type DragEvent, type MouseEvent as ReactMouseEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
-import { ArrowLeft, BookOpen, CheckCircle2, ChefHat, Circle, Crown, FileText, Gamepad2, Grid3X3, KeyRound, PawPrint, Puzzle, RefreshCw, Scissors, Shapes, Swords, TreePine, Trophy } from "lucide-react";
+import { ArrowLeft, Blocks, BookOpen, CheckCircle2, ChefHat, Circle, Crown, FileText, Gamepad2, Grid3X3, KeyRound, PawPrint, Puzzle, RefreshCw, Scissors, Shapes, Swords, TreePine, Trophy } from "lucide-react";
 import { toast } from "sonner";
 import { MemberAvatar } from "@/components/member-avatar";
 import { JungleVineSwing } from "@/components/jungle-runner";
 import { ChessQuest, type ChessStats } from "@/components/chess-quest";
 import { FamilyMultiplayerGame } from "@/components/family-multiplayer-games";
 import { createTriviaRound, type TriviaLevel } from "@/lib/bible-trivia";
+import { BlockDrop } from "@/components/block-drop";
 import { PocketPals } from "@/components/pocket-pals";
 import { PET_SPECIES } from "@/lib/pocket-pals";
 import type { GameKey } from "@/lib/games";
@@ -78,6 +79,7 @@ function shuffle<T>(items: T[]) {
 }
 
 function iconForGame(key: string) {
+  if (key === "block-drop") return Blocks;
   if (key === "pocket-pals") return PawPrint;
   if (key === "rock-paper-scissors-shoot") return Swords;
   if (key === "bible-trivia") return BookOpen;
@@ -209,6 +211,8 @@ export default function KidGamesPage() {
         />
       ) : activeGame === "pocket-pals" ? (
         <PocketPals memberId={member.id} playerName={member.name} onExit={() => { setActiveGame(null); void load(); }} />
+      ) : activeGame === "block-drop" ? (
+        <BlockDrop onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("block-drop", score, duration, metadata)} />
       ) : activeGame === "memory-match" ? (
         <MemoryMatch onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("memory-match", score, duration, metadata)} />
       ) : activeGame === "bible-trivia" ? (

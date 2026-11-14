@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, ChefHat, Copy, Crown, Gamepad2, Grid3X3, KeyRound, PawPrint, Puzzle, QrCode, RefreshCw, Save, Shapes, Swords, TreePine, Users } from "lucide-react";
+import { Blocks, BookOpen, ChefHat, Copy, Crown, Gamepad2, Grid3X3, KeyRound, PawPrint, Puzzle, QrCode, RefreshCw, Save, Shapes, Swords, TreePine, Users } from "lucide-react";
 import { toast } from "sonner";
 import { LocalQrCode } from "@/components/local-qr-code";
 import { ParentPageHeader } from "@/components/parent-management-shell";
@@ -49,6 +49,7 @@ type GameShareGroup = { id: string; name: string; events: Array<{ id: string; ti
 type GameConnection = { id: string; householdName: string; createdAt: string };
 
 function iconForGame(key: string) {
+  if (key === "block-drop") return Blocks;
   if (key === "pocket-pals") return PawPrint;
   if (key === "rock-paper-scissors-shoot") return Swords;
   if (key === "bible-trivia") return BookOpen;
@@ -63,6 +64,7 @@ function iconForGame(key: string) {
 }
 
 function gameLabel(key: string) {
+  if (key === "block-drop") return "Block Drop";
   if (key === "pocket-pals") return "Pocket Pals";
   if (key === "rock-paper-scissors-shoot") return "Rock Paper Scissors Shoot";
   if (key === "bible-trivia") return "Bible Trivia";

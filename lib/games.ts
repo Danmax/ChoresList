@@ -1,4 +1,4 @@
-export type GameKey = "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot" | "shape-safari" | "codebreaker-quest" | "tic-tac-toe" | "burger-rush" | "jungle-vine-swing" | "chess-quest" | "pocket-pals";
+export type GameKey = "block-drop" | "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot" | "shape-safari" | "codebreaker-quest" | "tic-tac-toe" | "burger-rush" | "jungle-vine-swing" | "chess-quest" | "pocket-pals";
 export type GameRewardType = "none" | "points" | "tickets";
 
 export type GameDefinition = {
@@ -14,6 +14,17 @@ export type GameDefinition = {
 };
 
 export const GAME_DEFINITIONS: GameDefinition[] = [
+  {
+    key: "block-drop",
+    title: "Block Drop",
+    description: "Rotate falling blocks, fill rows, and clear space as the pace picks up. How high can you score?",
+    icon: "Blocks",
+    ageMin: 6,
+    ageMax: 18,
+    playTime: "3-8 min",
+    color: "#0891b2",
+    bg: "#cffafe",
+  },
   {
     key: "pocket-pals",
     title: "Pocket Pals",
@@ -134,6 +145,14 @@ export const DEFAULT_GAME_SETTINGS: Record<GameKey, {
   requiresChoresComplete: boolean;
   dailyPlayLimit: number;
 }> = {
+  "block-drop": {
+    enabled: true,
+    rewardType: "points",
+    rewardPoints: 8,
+    rewardTickets: 0,
+    requiresChoresComplete: false,
+    dailyPlayLimit: 3,
+  },
   "pocket-pals": {
     enabled: true,
     rewardType: "none",

@@ -16,6 +16,8 @@
     "db:studio": "prisma studio",
     "notifications:run": "tsx scripts/process-notifications.ts",
     "price-alerts:run": "tsx scripts/process-price-alerts.ts",
+    "test:block-drop": "node --import tsx --test tests/block-drop.test.ts",
+    "test:block-drop:browser": "node --import tsx tests/block-drop.browser.ts",
     "test:plugins": "node --import tsx --test tests/plugins-registry.test.ts",
     "test:surveys": "node --import tsx --test tests/community-surveys.test.ts",
     "test:secret-santa": "node --import tsx --test tests/secret-santa.test.ts",
