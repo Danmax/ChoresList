@@ -17,7 +17,7 @@ export const GAME_DEFINITIONS: GameDefinition[] = [
   {
     key: "block-drop",
     title: "Block Drop",
-    description: "Rotate falling blocks, fill rows, and clear space as the pace picks up. How high can you score?",
+    description: "Choose classic falling blocks or Gem & Fruit Columns. Clear rows, match symbols, and build chain reactions!",
     icon: "Blocks",
     ageMin: 6,
     ageMax: 18,

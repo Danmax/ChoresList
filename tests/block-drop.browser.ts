@@ -58,8 +58,43 @@ async function main() {
     assert.ok(Number(sessions[0].score) > 0);
     assert.ok(Number(sessions[0].durationSeconds) < 5, "pause must not count toward active play time");
     assert.equal((sessions[0].metadata as { pieces: number }).pieces, 2);
+    await page.clock.pauseAt(await page.evaluate(() => Date.now()));
+    for (const theme of ["Gems", "Fruits"]) {
+      await page.getByRole("button", { name: /Block Drop/ }).click();
+      await page.getByRole("button", { name: "Gem & Fruit Columns", exact: true }).click();
+      await page.getByRole("button", { name: theme, exact: false }).last().click();
+      await expect(page.getByRole("button", { name: theme, exact: false }).last()).toHaveAttribute("aria-pressed", "true");
+      await page.getByRole("button", { name: "Start game", exact: true }).click();
+      const cells = board.locator('div[aria-hidden="true"] > div');
+      await expect(cells).toHaveCount(78);
+      const symbols = () => cells.evaluateAll((nodes) => nodes.map((node) => node.querySelector("polygon")?.getAttribute("points") ?? node.textContent ?? "").filter(Boolean));
+      const before = await symbols();
+      assert.equal(before.length, 3);
+      await board.press("ArrowUp");
+      assert.deepEqual(await symbols(), [...before.slice(1), before[0]]);
+      await page.getByRole("button", { name: "Cycle symbols", exact: true }).click();
+      await page.getByRole("button", { name: "Move left", exact: true }).click();
+      await page.getByRole("button", { name: "Drop", exact: true }).click();
+      await page.clock.runFor(500);
+      await page.getByRole("button", { name: "Pause", exact: true }).click();
+      const pausedColumns = await board.innerHTML();
+      await page.clock.runFor(3000);
+      assert.equal(await board.innerHTML(), pausedColumns);
+      await page.getByRole("button", { name: "Resume", exact: true }).first().click();
+      await page.screenshot({ path: `/tmp/columns-${theme.toLowerCase()}-mobile.png`, fullPage: true });
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
+      await page.getByRole("button", { name: "Finish & save" }).click();
+      await page.getByRole("button", { name: "Save game", exact: true }).click();
+      await expect(page.getByText("You earned 8 points.", { exact: true })).toBeVisible();
+      const metadata = sessions.at(-1)!.metadata as { mode: string; theme: string; pieces: number; bestChain: number };
+      assert.equal(metadata.mode, "columns");
+      assert.equal(metadata.theme, theme.toLowerCase());
+      assert.equal(metadata.pieces, 1);
+      assert.equal(typeof metadata.bestChain, "number");
+    }
+    assert.equal(sessions.length, 3);
     assert.deepEqual(errors, []);
-    console.log("Block Drop browser checks passed: keyboard, touch, pause, mobile layout, and session saving.");
+    console.log("Block Drop browser checks passed: classic blocks, gem and fruit columns, cycling, touch, pause, mobile layout, and session saving.");
   } finally { await browser.close(); }
 }
 
