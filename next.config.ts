@@ -8,6 +8,10 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  experimental: {
+    // Keep builds within the shared hosting container's process/thread limit.
+    cpus: 2,
+  },
   images: {
     unoptimized: true,
   },
