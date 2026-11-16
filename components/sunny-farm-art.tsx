@@ -24,7 +24,7 @@ export function FarmSprite({ item, animal, pose = 0, className, style, label }: 
   const rows = [[0, 230], [230, 200], [425, 185], [608, 220], [828, 196]];
   // The idle horse starts lower than its happy pose; exclude the sheep row above it.
   const rect = item ? items[item] : animal === "horse" && pose === 0 ? [left, 620, width, 208] : [left, rows[row][0], width, rows[row][1]];
-  return <svg className={className} style={style} viewBox={item === "tractor" ? "0 0 610 185" : rect.join(" ")} role={label ? "img" : undefined} aria-label={label} aria-hidden={label ? undefined : true} focusable="false">
+  return <svg className={className} style={style} data-pose={animal ? pose : undefined} viewBox={item === "tractor" ? "0 0 610 185" : rect.join(" ")} role={label ? "img" : undefined} aria-label={label} aria-hidden={label ? undefined : true} focusable="false">
     <defs><clipPath id={clipId}><rect x={rect[0]} y={rect[1]} width={rect[2]} height={rect[3]} /></clipPath></defs>
     {item === "tractor" ? <>
       <defs><clipPath id={`${clipId}-trailer`}><rect x={items.trailer[0]} y={items.trailer[1]} width={items.trailer[2]} height={items.trailer[3]} /></clipPath></defs>

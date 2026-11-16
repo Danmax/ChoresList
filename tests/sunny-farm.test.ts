@@ -77,3 +77,14 @@ test("breakfast goal links animal care and produce while preserving free explora
   assert.equal(farmBreakfast(farm).every(g => g.ready), true);
   assert.equal(nextFarmStop(farm), "hay");
 });
+
+test("feedback varies across repeated actions and distinguishes care types", async () => {
+  const { responseAt, feedbackKind, FARM_RESPONSES } = await import("../lib/sunny-farm-feedback");
+  for (const kind of Object.keys(FARM_RESPONSES) as Array<keyof typeof FARM_RESPONSES>) {
+    assert.notEqual(responseAt(kind, 0), responseAt(kind, 1));
+    assert.equal(responseAt(kind, FARM_RESPONSES[kind].length), responseAt(kind, 0));
+  }
+  assert.equal(feedbackKind("horse", "feed"), "feed");
+  assert.equal(feedbackKind("chickens", "egg-0"), "egg");
+  assert.equal(feedbackKind("garden", "water-0"), "grow");
+});

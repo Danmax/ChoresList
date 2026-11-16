@@ -7,6 +7,13 @@ import { activeTargets, applyFarmAction, celebrateFarm, createFarm, FARM_TASKS, 
 async function main() {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1280, height: 1100 } });
+  await page.addInitScript(() => {
+    const log = window as unknown as { farmAudioStarts: number[]; farmSpeech: string[] };
+    log.farmAudioStarts = []; log.farmSpeech = [];
+    const start = AudioBufferSourceNode.prototype.start;
+    AudioBufferSourceNode.prototype.start = function (...args: Parameters<typeof start>) { log.farmAudioStarts.push(this.buffer?.duration ?? 0); return start.apply(this, args); };
+    window.speechSynthesis.speak = utterance => { log.farmSpeech.push(utterance.text); };
+  });
   const errors: string[] = [];
   page.on("pageerror", err => errors.push(err.message));
   let farm = createFarm(), version = 0, rewards = 0, failNext = false, conflictNext = false;
@@ -59,10 +66,30 @@ async function main() {
   }
   try {
     await open();
+    const toy = page.getByRole("button", { name: "Ring the farm bell", exact: true });
+    await toy.click();
+    const firstToyReply = await page.getByRole("region", { name: "Sunny Farm Helpers" }).getByRole("status").textContent();
+    await toy.click();
+    await expect(page.getByRole("region", { name: "Sunny Farm Helpers" }).getByRole("status")).not.toHaveText(firstToyReply!);
+    if (version !== 0) throw new Error("Exploring changed saved farm progress");
+    if (await page.evaluate(() => (window as unknown as { farmAudioStarts: number[] }).farmAudioStarts.length)) throw new Error("Audio played while muted");
+    await page.getByRole("button", { name: "Turn farm sounds on", exact: true }).click();
+    await toy.click();
+    await expect.poll(() => page.evaluate(() => (window as unknown as { farmAudioStarts: number[] }).farmAudioStarts.length)).toBeGreaterThan(0);
+    if (await page.evaluate(() => (window as unknown as { farmSpeech: string[] }).farmSpeech.length)) throw new Error("Effects toggle enabled the reader");
+    await page.getByText("Audio settings", { exact: true }).click();
+    await page.getByLabel("Spoken guidance", { exact: true }).check();
+    await page.getByRole("button", { name: "Preview voice", exact: true }).click();
+    await expect.poll(() => page.evaluate(() => (window as unknown as { farmSpeech: string[] }).farmSpeech.length)).toBe(1);
+    await page.getByText("Audio settings", { exact: true }).click();
     await page.screenshot({ path: "/tmp/sunny-farm-preview/map-desktop.png", fullPage: true });
     await page.getByRole("button", { name: "Horse stable: Feed & brush" }).click();
     await page.getByRole("button", { name: "Feed horse", exact: true }).click();
     await expect(page.getByRole("button", { name: "Brush spot 1", exact: true })).toBeVisible();
+    const horseArt = page.getByRole("img", { name: "Your farm horse", exact: true });
+    await expect(horseArt).toHaveAttribute("data-pose", "4");
+    await expect(horseArt).toHaveAttribute("data-pose", "0", { timeout: 3000 });
+    await expect.poll(() => page.evaluate(() => (window as unknown as { farmAudioStarts: number[] }).farmAudioStarts.some(duration => duration > 1))).toBe(true);
     if (farm.inventory.hay !== 0) throw new Error("Starter feeding created negative hay");
     await page.getByRole("button", { name: "Farm map", exact: true }).click();
     await page.getByRole("button", { name: "Hayfield: Gather hay", exact: true }).click();
@@ -82,6 +109,11 @@ async function main() {
     const labels: Record<string, string> = { feed: "Feed hay", "milk-left": "Squeeze left", "milk-right": "Squeeze right", "milk-finish": "Finish milking" };
     for (const task of FARM_TASKS.slice(1)) {
       await page.getByRole("button", { name: `${task.title}: ${task.verb}`, exact: true }).click();
+      const sceneToys = page.locator('[aria-label="Explore this scene"] button');
+      await expect(sceneToys).toHaveCount(2);
+      const beforeExploring: number = version;
+      await sceneToys.nth(0).click(); await sceneToys.nth(1).click();
+      if (version !== beforeExploring) throw new Error(`${task.id} exploration changed care progress`);
       for (const stage of task.stages) for (const target of stage) {
         if (farm.done[task.id].includes(target)) continue;
         const i = Number(target.split("-").at(-1)) + 1;
@@ -164,6 +196,11 @@ async function main() {
       }
       await expect(page.getByText("Happy & cared for!")).toBeVisible();
       if (task.id === "garden") await page.screenshot({ path: "/tmp/sunny-farm-preview/garden-desktop.png", fullPage: true });
+      if (task.id === "horse") {
+        const horseArt = page.getByRole("img", { name: "Your farm horse", exact: true });
+        await expect(horseArt).toHaveAttribute("data-pose", "5");
+        await expect(horseArt).toHaveAttribute("data-pose", "0", { timeout: 3000 });
+      }
       if (task.id === "horse") await page.screenshot({ path: "/tmp/sunny-farm-preview/horse-desktop.png", fullPage: true });
       if (task.id === "chickens") {
         await page.getByRole("button", { name: "Next: Apple orchard →", exact: true }).click();
@@ -177,6 +214,8 @@ async function main() {
     await page.getByRole("button", { name: "Celebrate our happy farm! ★", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Everyone is happy!" })).toBeVisible();
     await page.screenshot({ path: "/tmp/sunny-farm-preview/celebration-desktop.png", fullPage: true });
+    await expect(page.locator('[data-pose="5"]')).toHaveCount(4);
+    await expect(page.locator('[data-pose="5"]')).toHaveCount(0, { timeout: 3000 });
     if (rewards !== 1) throw new Error(`Expected one completion, got ${rewards}`);
     await page.getByRole("button", { name: "Start another farm day →" }).click();
     await expect(page.getByLabel("0 of 8 farm stops complete")).toBeVisible();
