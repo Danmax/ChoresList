@@ -37,3 +37,9 @@ Image preparation prompts:
 - Start a local server on port 3017, then `npm run test:sunny-farm:browser`. Override the origin with `SUNNY_FARM_TEST_URL` if needed. Browser checks use an in-memory API fixture and do not modify real households. Coverage includes all activities, save/reload, retry after failure, stale-tab recovery, celebration, next round, and mobile interaction. Screenshots are written to `/tmp/sunny-farm-preview`.
 
 Live database migration and persistence require the target database; the isolated browser fixture verifies UI behavior and the same shared action rules without touching it.
+
+## Interaction polish
+
+Horse and cow activity art renders at 85% of its original width. Feeding, brushing, and milking spots share each animal’s local coordinates, keeping them aligned across screen sizes. On small screens, horse grooming reveals one spot at a time to avoid overlapping touch targets.
+
+Tools can be selected or dragged straight from the tray. The carried tool appears on touch-down, hides when leaving the work area, and stops working on Escape, window blur, or pointer cancellation. Brush strokes can move between patches; unfinished work on other patches survives a completed step. Failed submissions clear only the submitted spot so it can be retried. Partial gestures remain local to the open activity; completed actions save to the server.

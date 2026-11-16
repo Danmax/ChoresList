@@ -17,7 +17,8 @@ export function FarmSprite({ item, animal, pose = 0, className, style, label }: 
   const columns = [[0, 250], [255, 230], [487, 211], [699, 219], [944, 292], [1250, 282]];
   const [left, width] = columns[Math.min(5, Math.max(0, pose))];
   const rows = [[0, 230], [230, 200], [425, 185], [608, 220], [828, 196]];
-  const rect = item ? items[item] : [left, rows[row][0], width, rows[row][1]];
+  // The idle horse starts lower than its happy pose; exclude the sheep row above it.
+  const rect = item ? items[item] : animal === "horse" && pose === 0 ? [left, 620, width, 208] : [left, rows[row][0], width, rows[row][1]];
   return <svg className={className} style={style} viewBox={rect.join(" ")} role={label ? "img" : undefined} aria-label={label} aria-hidden={label ? undefined : true} focusable="false">
     <defs><clipPath id={clipId}><rect x={rect[0]} y={rect[1]} width={rect[2]} height={rect[3]} /></clipPath></defs>
     <image clipPath={`url(#${clipId})`} href={`/games/sunny-farm/${item ? "items" : "animals"}.webp`} width="1536" height="1024" />

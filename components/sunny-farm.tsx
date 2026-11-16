@@ -118,19 +118,22 @@ function ActivityArtwork({ taskId: id, farm, targets, busy }: { taskId: FarmTask
     {[0, 1, 2].map(i => targetButton(`bale-${i}`, 20 + i * 29, 72 - i * 8, `Collect hay ${i + 1}`, <span className={styles.hayBale} aria-hidden="true">🌾</span>))}
   </>;
   if (id === "horse") return <>
-    <FarmSprite animal="horse" pose={taskComplete(farm, id) ? 5 : 0} className={styles.prop} style={place(25, 21, 50)} label="Your farm horse" />
-    {targetButton("feed", 50, 79, "Feed hay", <span className={styles.feedTrough} aria-hidden="true">🌾</span>)}
-    {[0, 1, 2].map(i => targetButton(`brush-${i}`, 42 + i * 9, 48 + (i % 2) * 12, `Brush spot ${i + 1}`, <span className={styles.dust}>✦</span>, styles.patch))}
-    {seen("feed") && art("brush", 7, 70, 15)}
+    <div className={`${styles.animalBody} ${styles.horseBody}`}>
+      <FarmSprite animal="horse" pose={taskComplete(farm, id) ? 5 : 0} className={styles.animalSprite} label="Your farm horse" />
+      {targetButton("feed", 89, 61, "Feed hay", <span className={styles.feedTrough} aria-hidden="true">🌾</span>, styles.animalFeeder)}
+      {[0, 1, 2].map(i => targetButton(`brush-${i}`, 31 + i * 15, 60 - i * 3, `Brush spot ${i + 1}`, <span className={styles.dust}>✦</span>, styles.patch))}
+    </div>
   </>;
   if (id === "cow") return <>
-    <FarmSprite animal="cow" pose={taskComplete(farm, id) ? 5 : 0} className={styles.prop} style={place(22, 18, 49)} label="Your farm cow" />
-    {art(seen("milk-finish") ? "milk" : "pail", 71, 61, 16)}
-    {targetButton("feed", 51, 80, "Feed hay", <span className={styles.feedTrough} aria-hidden="true">🌾</span>)}
-    {targetButton("milk-left", 39, 81, "Squeeze left", <span className={styles.handle}>↓</span>)}
-    {targetButton("milk-right", 62, 81, "Squeeze right", <span className={styles.handle}>↓</span>)}
-    {targetButton("milk-finish", 50, 81, "Finish milking", <span className={styles.handle}>↓</span>)}
-    {seen("milk-left") && !seen("milk-finish") && <span className={styles.milkProgress} style={place(78, 53)}>{seen("milk-right") ? "⅔" : "⅓"} full</span>}
+    <div className={`${styles.animalBody} ${styles.cowBody}`}>
+      <FarmSprite animal="cow" pose={taskComplete(farm, id) ? 5 : 0} className={styles.animalSprite} label="Your farm cow" />
+      {targetButton("feed", 89, 64, "Feed hay", <span className={styles.feedTrough} aria-hidden="true">🌾</span>, styles.animalFeeder)}
+      {targetButton("milk-left", 32, 82, "Squeeze left", <span className={styles.handle}>↓</span>)}
+      {targetButton("milk-right", 45, 82, "Squeeze right", <span className={styles.handle}>↓</span>)}
+      {targetButton("milk-finish", 38, 82, "Finish milking", <span className={styles.handle}>↓</span>)}
+      {art(seen("milk-finish") ? "milk" : "pail", 59, 75, 24)}
+      {seen("milk-left") && !seen("milk-finish") && <span className={styles.milkProgress} style={place(68, 69)}>{seen("milk-right") ? "⅔" : "⅓"} full</span>}
+    </div>
   </>;
   if (id === "chickens") return <>
     {[0, 1, 2].map(i => <FarmSprite key={i} animal="chicken" pose={seen("feed") ? 4 : 0} className={styles.prop} style={place(9 + i * 27, 57, 22)} />)}

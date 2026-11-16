@@ -45,7 +45,9 @@ async function main() {
     const target = page.getByRole("button", { name: label, exact: true });
     await expect(target).toHaveAttribute("aria-disabled", "false");
     await target.focus();
-    for (let i = 0; i < 4; i++) await target.press("ArrowUp");
+    const meter = page.getByRole("progressbar", { name: `${label} progress` });
+    const done = await meter.count() ? Number(await meter.getAttribute("aria-valuenow")) / 25 : 0;
+    for (let i = done; i < 4; i++) await target.press("ArrowUp");
     await page.waitForTimeout(80);
     await expect(page.getByRole("region", { name: "Sunny Farm Helpers" }).getByRole("status")).not.toContainText("Saving your helping hands");
   }
@@ -75,21 +77,53 @@ async function main() {
       for (const stage of task.stages) for (const target of stage) {
         const i = Number(target.split("-").at(-1)) + 1;
         const label = task.id === "chickens" && target === "feed" ? "Scatter grain" : labels[target] ?? (target.startsWith("brush") ? `Brush spot ${i}` : target.startsWith("egg") ? `Collect egg ${i}` : target.startsWith("herd") ? `Guide sheep ${i}` : target.startsWith("wool") ? `Clip wool ${i}` : target.startsWith("duck") ? `Feed duck ${i}` : target.startsWith("apple") ? `Pick apple ${i}` : target.startsWith("plant") ? `Plant bed ${i}` : target.startsWith("water") ? `Water bed ${i}` : `Harvest bed ${i}`);
-        if (target === "brush-0") {
+        if (target === "feed" && (task.id === "horse" || task.id === "cow")) {
+          const pickup = page.getByRole("button", { name: /Pick up.*Fresh hay/ });
+          const feeder = page.getByRole("button", { name: "Feed hay", exact: true });
+          await page.setViewportSize({ width: 390, height: 844 });
+          await feeder.scrollIntoViewIfNeeded();
+          await page.screenshot({ path: `/tmp/sunny-farm-preview/${task.id}-feed-mobile.png`, fullPage: true });
+          if (await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)) throw new Error("Animal activity overflows on mobile");
+          await page.setViewportSize({ width: 1280, height: 1100 });
+          await pickup.scrollIntoViewIfNeeded();
+          const start = (await pickup.boundingBox())!, end = (await feeder.boundingBox())!;
+          await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
+          await page.mouse.down();
+          await page.mouse.move(end.x + end.width / 2, end.y + 16, { steps: 12 });
+          await page.mouse.up();
+          await expect(feeder).toHaveCount(0);
+          await page.screenshot({ path: `/tmp/sunny-farm-preview/${task.id}-work-desktop.png`, fullPage: true });
+          const animal = page.getByRole("img", { name: task.id === "horse" ? "Your farm horse" : "Your farm cow" });
+          const size = (await animal.boundingBox())!;
+          const scene = (await page.getByLabel(`${task.title} activity`, { exact: true }).boundingBox())!;
+          const ratio = task.id === "horse" ? .425 : .4165;
+          if (Math.abs(size.width / scene.width - ratio) > .005) throw new Error("Animal scale differs from the requested 15% reduction");
+        } else if (target === "brush-0") {
           const spot = page.getByRole("button", { name: label, exact: true });
           await spot.click({ force: true });
           if (farm.done.horse.includes(target)) throw new Error("Click completed brushing without a tool");
           await page.getByRole("button", { name: /Pick up.*Grooming brush/ }).click();
+          // Partial work on a second patch must survive completing the first.
+          const second = page.getByRole("button", { name: "Brush spot 2", exact: true });
+          await second.focus(); await second.press("ArrowUp");
           const box = (await spot.boundingBox())!;
           const x = box.x + box.width / 2, y = box.y + 15;
           await page.mouse.move(x, y); await page.mouse.down();
           for (let n = 0; n < 16; n++) await page.mouse.move(x + (n % 2 ? -12 : 12), y, { steps: 3 });
           await page.mouse.up();
           await expect(spot).toHaveCount(0);
+          await expect(page.getByRole("progressbar", { name: "Brush spot 2 progress" })).toHaveAttribute("aria-valuenow", "25");
         } else if (target === "water-0") {
           await page.getByRole("button", { name: /Pick up.*Watering can/ }).click();
           const bed = page.getByRole("button", { name: label, exact: true });
           const box = (await bed.boundingBox())!;
+          await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+          await page.mouse.down();
+          await expect(page.locator('[class*="carriedTool"]')).toBeVisible();
+          await page.keyboard.press("Escape");
+          await page.waitForTimeout(1150); await page.mouse.up();
+          if (farm.done.garden.includes(target)) throw new Error("Escape did not stop watering");
+          await page.getByRole("button", { name: /Pick up.*Watering can/ }).click();
           await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
           await page.mouse.down(); await page.waitForTimeout(1250); await page.mouse.up();
           await expect(bed).toHaveCount(0);

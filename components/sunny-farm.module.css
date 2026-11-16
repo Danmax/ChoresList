@@ -15,3 +15,14 @@
 .workTarget[data-farm-target^="herd"] .workObject{transform:translateX(calc(var(--work) * 45px))}
 .workTarget[data-farm-target^="milk"] .workObject{transform:scaleY(calc(1 - var(--work) * .25));transform-origin:bottom}
 .feedTrough{display:flex;align-items:center;justify-content:center;width:78px;height:50px;border:5px solid #83552c;border-top:2px solid #ab7a43;border-radius:5px 5px 20px 20px;background:#bb8c54;box-shadow:0 9px 0 -4px #694721;font-size:30px}
+
+/* Animal work spots share the sprite's coordinate system at every screen size. */
+.animalBody{position:absolute;bottom:12%;pointer-events:none}
+.horseBody{left:28.75%;width:42.5%;aspect-ratio:250/220}
+.cowBody{left:25.675%;width:41.65%;aspect-ratio:250/230}
+.animalSprite{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;filter:drop-shadow(0 5px 3px #2a361b22)}
+.animalBody .target{pointer-events:auto}.animalBody .patch{width:12%;min-width:44px}
+.animalFeeder{border:0;background:transparent}.animalFeeder .feedTrough{width:68px;height:43px;font-size:25px}
+.animalBody .targetLabel{font-size:10px;pointer-events:none}.animalBody .milkProgress{font-size:12px;white-space:nowrap}
+.pickupTool{touch-action:none}
+@media(max-width:640px){.animalBody .patch~.patch{display:none}.animalBody .targetLabel{font-size:8px}.animalFeeder .feedTrough{width:53px;height:38px;font-size:22px}.animalBody .milkProgress{font-size:9px}.animalBody .target{min-width:44px}}
