@@ -43,3 +43,9 @@ Live database migration and persistence require the target database; the isolate
 Horse and cow activity art renders at 85% of its original width. Feeding, brushing, and milking spots share each animal’s local coordinates, keeping them aligned across screen sizes. On small screens, horse grooming reveals one spot at a time to avoid overlapping touch targets.
 
 Tools can be selected or dragged straight from the tray. The carried tool appears on touch-down, hides when leaving the work area, and stops working on Escape, window blur, or pointer cancellation. Brush strokes can move between patches; unfinished work on other patches survives a completed step. Failed submissions clear only the submitted spot so it can be retried. Partial gestures remain local to the open activity; completed actions save to the server.
+
+## Spaced item atlas
+
+`items-spaced.webp` integrates the supplied “Colorful Farm Game Sticker Sheet.png” with updated viewports for every used item, including a whole apple for picking and an individual carrot plant for field growth. The tractor and trailer remain separate in the source atlas and are assembled together at render time. The older `items.webp` is retained as a source version.
+
+The supplied checkerboard was opaque RGB. The built-in imagegen tool prepared true transparency with this prompt: “Remove ALL white/light gray checkerboard background to actual transparent alpha=0 everywhere outside the illustrated objects. Preserve the exact original canvas dimensions, object pixel positions, spacing, colors, outlines, scale and layout. Do not redraw, rearrange, add objects, or move anything.” The prepared alpha atlas is saved in `public/games/sunny-farm/items-spaced.webp`.
