@@ -1,13 +1,13 @@
 /** Shared farm rules. Only the server persists actions and awards completion rewards. */
 export const FARM_TASKS = [
-  { id: "hay", title: "Hayfield", verb: "Gather hay", icon: "🚜", scene: "field", hint: "Drive to each hay bale to fill your trailer.", stages: [["bale-0", "bale-1", "bale-2"]] },
-  { id: "horse", title: "Horse stable", verb: "Feed & brush", icon: "🐴", scene: "stable", hint: "Give your horse hay, then brush the three dusty spots.", stages: [["feed"], ["brush-0", "brush-1", "brush-2"]] },
-  { id: "cow", title: "Cow barn", verb: "Feed & milk", icon: "🐮", scene: "barn", hint: "Feed your cow hay, then alternate the left and right handles.", stages: [["feed"], ["milk-left"], ["milk-right"], ["milk-finish"]] },
-  { id: "chickens", title: "Chicken coop", verb: "Feed & collect eggs", icon: "🐔", scene: "coop", hint: "Fill the feeder, then collect three eggs from the nests.", stages: [["feed"], ["egg-0", "egg-1", "egg-2"]] },
-  { id: "sheep", title: "Sheep meadow", verb: "Guide & shear", icon: "🐑", scene: "pasture", hint: "Guide each sheep through the gate, then gently clip three wool patches.", stages: [["herd-0", "herd-1", "herd-2"], ["wool-0", "wool-1", "wool-2"]] },
-  { id: "ducks", title: "Duck pond", verb: "Feed the ducks", icon: "🦆", scene: "pond", hint: "Tap each hungry duck to toss it a little duck feed.", stages: [["duck-0", "duck-1", "duck-2"]] },
-  { id: "orchard", title: "Apple orchard", verb: "Pick apples", icon: "🍎", scene: "hub", hint: "Pick three ripe apples from your little orchard tree.", stages: [["apple-0", "apple-1", "apple-2"]] },
-  { id: "garden", title: "Vegetable garden", verb: "Plant, water & harvest", icon: "🥕", scene: "hub", hint: "Plant each bed, water the sprouts, then harvest your carrots.", stages: [["plant-0", "plant-1", "plant-2"], ["water-0", "water-1", "water-2"], ["harvest-0", "harvest-1", "harvest-2"]] },
+  { id: "hay", title: "Hayfield", verb: "Gather hay", icon: "🚜", scene: "field", hint: "Pick up the tractor keys and drive to each hay bale to fill your trailer.", stages: [["bale-0", "bale-1", "bale-2"]] },
+  { id: "horse", title: "Horse stable", verb: "Feed & brush", icon: "🐴", scene: "stable", hint: "Carry hay to the feeder, then pick up the brush and sweep away the dust.", stages: [["feed"], ["brush-0", "brush-1", "brush-2"]] },
+  { id: "cow", title: "Cow barn", verb: "Feed & milk", icon: "🐮", scene: "barn", hint: "Carry hay to the feeder, then pick up the pail and pull the milking handles.", stages: [["feed"], ["milk-left"], ["milk-right"], ["milk-finish"]] },
+  { id: "chickens", title: "Chicken coop", verb: "Feed & collect eggs", icon: "🐔", scene: "coop", hint: "Pick up grain to fill the feeder, then use your basket to collect the eggs.", stages: [["feed"], ["egg-0", "egg-1", "egg-2"]] },
+  { id: "sheep", title: "Sheep meadow", verb: "Guide & shear", icon: "🐑", scene: "pasture", hint: "Use the shepherd’s crook to guide the sheep, then sweep the clippers over their wool.", stages: [["herd-0", "herd-1", "herd-2"], ["wool-0", "wool-1", "wool-2"]] },
+  { id: "ducks", title: "Duck pond", verb: "Feed the ducks", icon: "🦆", scene: "pond", hint: "Pick up duck pellets and sprinkle a little feed over each duck.", stages: [["duck-0", "duck-1", "duck-2"]] },
+  { id: "orchard", title: "Apple orchard", verb: "Pick apples", icon: "🍎", scene: "hub", hint: "Pick up a basket and gently pull ripe apples from your orchard tree.", stages: [["apple-0", "apple-1", "apple-2"]] },
+  { id: "garden", title: "Vegetable garden", verb: "Plant, water & harvest", icon: "🥕", scene: "garden", hint: "Pick up seeds, water the nine beds with your watering can, then pull up the carrots.", stages: [Array.from({ length: 9 }, (_, i) => `plant-${i}`), Array.from({ length: 9 }, (_, i) => `water-${i}`), Array.from({ length: 9 }, (_, i) => `harvest-${i}`)] },
 ] as const;
 export type FarmTaskId = typeof FARM_TASKS[number]["id"];
 export type FarmState = {

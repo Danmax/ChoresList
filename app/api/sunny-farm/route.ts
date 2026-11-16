@@ -8,6 +8,9 @@ import { rateLimit } from "@/lib/rate-limit";
 import { getLevelFromPoints } from "@/lib/points";
 import { applyFarmAction, celebrateFarm, createFarm, FarmRuleError, nextFarmDay, type FarmState } from "@/lib/sunny-farm";
 
+import { farmTool } from "@/lib/sunny-farm-tools";
+import { taskDefinition } from "@/lib/sunny-farm";
+
 export const runtime = "nodejs";
 class FarmConflict extends Error {}
 class FarmLimit extends Error {}
@@ -47,7 +50,11 @@ export const POST = withErrors(async (req) => {
       if (!saved || saved.householdId !== actor.householdId || saved.version !== body.version) throw new FarmConflict();
       const state = saved.state as unknown as FarmState;
       let next: FarmState;
-      if (body.action === "help") next = applyFarmAction(state, body.task, body.target);
+      if (body.action === "help") {
+        const task = taskDefinition(body.task);
+        if (!task || typeof body.target !== "string" || body.tool !== farmTool(task.id, body.target).id) throw new FarmRuleError("Pick up the right tool for this job first.");
+        next = applyFarmAction(state, body.task, body.target);
+      }
       else if (body.action === "celebrate") next = celebrateFarm(state);
       else if (body.action === "next-day") next = nextFarmDay(state);
       else throw new FarmRuleError("Choose a farm activity.");

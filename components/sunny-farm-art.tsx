@@ -6,6 +6,7 @@ const items = {
   brush: [30, 240, 238, 175], clippers: [265, 250, 247, 155], sheep: [526, 224, 306, 203], shorn: [838, 222, 267, 207], wool: [1125, 260, 310, 151],
   egg: [15, 448, 97, 126], basket: [220, 420, 199, 164], eggs: [425, 418, 190, 165], chickenFeed: [650, 424, 240, 164], duckFeed: [1090, 420, 235, 168],
   pail: [12, 588, 142, 153], milk: [162, 585, 140, 156], apple: [324, 598, 105, 127], carrot: [1200, 588, 145, 147],
+  sprout: [142, 745, 88, 100], carrotPlant: [846, 740, 105, 109],
   seeds: [46, 779, 80, 55], soil: [30, 872, 254, 141], sprouts: [286, 871, 244, 143], carrots: [533, 870, 242, 145], tree: [1005, 835, 254, 187],
 } satisfies Record<string, number[]>;
 export type FarmItem = keyof typeof items;

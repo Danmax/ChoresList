@@ -1,6 +1,7 @@
 import { chromium, expect } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import { DEFAULT_GAME_SETTINGS, GAME_DEFINITIONS } from "../lib/games";
+import { farmTool } from "../lib/sunny-farm-tools";
 import { activeTargets, applyFarmAction, celebrateFarm, createFarm, FARM_TASKS, nextFarmDay } from "../lib/sunny-farm";
 
 async function main() {
@@ -22,7 +23,7 @@ async function main() {
         if (conflictNext) { conflictNext = false; version++; await route.fulfill({ status: 409, json: { error: "Farm updated in another tab." } }); return; }
         try {
           if (body.version !== version) throw new Error("Stale version");
-          if (body.action === "help") farm = applyFarmAction(farm, body.task, body.target);
+          if (body.action === "help") { if (body.tool !== farmTool(body.task, body.target).id) throw new Error("Wrong tool"); farm = applyFarmAction(farm, body.task, body.target); }
           else if (body.action === "celebrate") { farm = celebrateFarm(farm); rewards++; }
           else if (body.action === "next-day") farm = nextFarmDay(farm);
           version++;
@@ -37,6 +38,17 @@ async function main() {
     await page.getByRole("button", { name: /Sunny Farm Helpers/ }).click();
     await expect(page.getByRole("heading", { name: "Who shall we help today?" })).toBeVisible();
   };
+  async function work(label: string) {
+    await page.waitForTimeout(80);
+    const pickup = page.getByRole("button", { name: /Pick up|Put down/ });
+    if (await pickup.getAttribute("aria-pressed") !== "true") await pickup.click();
+    const target = page.getByRole("button", { name: label, exact: true });
+    await expect(target).toHaveAttribute("aria-disabled", "false");
+    await target.focus();
+    for (let i = 0; i < 4; i++) await target.press("ArrowUp");
+    await page.waitForTimeout(80);
+    await expect(page.getByRole("region", { name: "Sunny Farm Helpers" }).getByRole("status")).not.toContainText("Saving your helping hands");
+  }
   try {
     await open();
     await page.screenshot({ path: "/tmp/sunny-farm-preview/map-desktop.png", fullPage: true });
@@ -45,13 +57,13 @@ async function main() {
     await expect(page.getByRole("button", { name: "Feed hay", exact: true })).toBeDisabled();
     await page.getByRole("button", { name: "Go to hayfield" }).click();
     failNext = true;
-    await page.getByRole("button", { name: "Collect hay 1", exact: true }).click();
+    await work("Collect hay 1");
     await expect(page.getByRole("region", { name: "Sunny Farm Helpers" }).getByRole("alert")).toContainText("Connection lost");
     await expect(page.getByRole("button", { name: "Collect hay 1", exact: true })).toBeEnabled();
     conflictNext = true;
-    await page.getByRole("button", { name: "Collect hay 1", exact: true }).click();
+    await work("Collect hay 1");
     await expect(page.getByRole("region", { name: "Sunny Farm Helpers" }).getByRole("alert")).toContainText("another tab");
-    for (const i of [3, 1, 2]) await page.getByRole("button", { name: `Collect hay ${i}`, exact: true }).click();
+    for (const i of [3, 1, 2]) await work(`Collect hay ${i}`);
     await expect(page.getByText("Happy & cared for!")).toBeVisible();
     await page.getByRole("button", { name: "Back to the farm →", exact: true }).click();
     await page.reload();
@@ -63,9 +75,28 @@ async function main() {
       for (const stage of task.stages) for (const target of stage) {
         const i = Number(target.split("-").at(-1)) + 1;
         const label = task.id === "chickens" && target === "feed" ? "Scatter grain" : labels[target] ?? (target.startsWith("brush") ? `Brush spot ${i}` : target.startsWith("egg") ? `Collect egg ${i}` : target.startsWith("herd") ? `Guide sheep ${i}` : target.startsWith("wool") ? `Clip wool ${i}` : target.startsWith("duck") ? `Feed duck ${i}` : target.startsWith("apple") ? `Pick apple ${i}` : target.startsWith("plant") ? `Plant bed ${i}` : target.startsWith("water") ? `Water bed ${i}` : `Harvest bed ${i}`);
-        await page.getByRole("button", { name: label, exact: true }).click();
+        if (target === "brush-0") {
+          const spot = page.getByRole("button", { name: label, exact: true });
+          await spot.click({ force: true });
+          if (farm.done.horse.includes(target)) throw new Error("Click completed brushing without a tool");
+          await page.getByRole("button", { name: /Pick up.*Grooming brush/ }).click();
+          const box = (await spot.boundingBox())!;
+          const x = box.x + box.width / 2, y = box.y + 15;
+          await page.mouse.move(x, y); await page.mouse.down();
+          for (let n = 0; n < 16; n++) await page.mouse.move(x + (n % 2 ? -12 : 12), y, { steps: 3 });
+          await page.mouse.up();
+          await expect(spot).toHaveCount(0);
+        } else if (target === "water-0") {
+          await page.getByRole("button", { name: /Pick up.*Watering can/ }).click();
+          const bed = page.getByRole("button", { name: label, exact: true });
+          const box = (await bed.boundingBox())!;
+          await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+          await page.mouse.down(); await page.waitForTimeout(1250); await page.mouse.up();
+          await expect(bed).toHaveCount(0);
+        } else await work(label);
       }
       await expect(page.getByText("Happy & cared for!")).toBeVisible();
+      if (task.id === "garden") await page.screenshot({ path: "/tmp/sunny-farm-preview/garden-desktop.png", fullPage: true });
       if (task.id === "horse") await page.screenshot({ path: "/tmp/sunny-farm-preview/horse-desktop.png", fullPage: true });
       await page.getByRole("button", { name: "Back to the farm →", exact: true }).click();
     }
@@ -80,7 +111,15 @@ async function main() {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.screenshot({ path: "/tmp/sunny-farm-preview/map-mobile.png", fullPage: true });
     await page.getByRole("button", { name: "Duck pond: Feed the ducks", exact: true }).click();
-    await page.getByRole("button", { name: "Feed duck 2", exact: true }).click();
+    await page.getByRole("button", { name: /Pick up.*Duck pellets/ }).click();
+    const duck = page.getByRole("button", { name: "Feed duck 2", exact: true });
+    await duck.scrollIntoViewIfNeeded();
+    const touchBox = (await duck.boundingBox())!;
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: touchBox.x + touchBox.width / 2, y: touchBox.y + touchBox.height / 2 }] });
+    await page.waitForTimeout(1250);
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await expect(duck).toHaveCount(0);
     await page.screenshot({ path: "/tmp/sunny-farm-preview/ducks-mobile.png", fullPage: true });
     const overflows = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
     if (overflows) throw new Error("Mobile page overflows horizontally");

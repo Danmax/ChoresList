@@ -11,7 +11,7 @@ test("connected farm loop supplies hay, saves goods, and celebrates once", () =>
   for (const task of FARM_TASKS) farm = helpAll(farm, task);
   assert.equal(completedTasks(farm), 8);
   assert.equal(farmReady(farm), true);
-  assert.deepEqual(farm.inventory, { hay: 1, milk: 1, eggs: 3, wool: 3, apples: 3, carrots: 3 });
+  assert.deepEqual(farm.inventory, { hay: 1, milk: 1, eggs: 3, wool: 3, apples: 3, carrots: 9 });
   farm = celebrateFarm(farm);
   assert.equal(farm.completedDays, 1);
   assert.throws(() => celebrateFarm(farm), /already/);
@@ -44,4 +44,14 @@ test("targets can be collected in any order within a stage and survive JSON save
   farm = applyFarmAction(farm, "chickens", "egg-1");
   assert.equal(farm.inventory.eggs, 3);
   assert.equal(completedTasks(farm), 1);
+});
+
+test("all nine field beds must be planted and watered before harvest", () => {
+  let farm = createFarm();
+  for (let i = 0; i < 9; i++) farm = applyFarmAction(farm, "garden", `plant-${i}`);
+  assert.equal(activeTargets(farm, "garden").length, 9);
+  assert.throws(() => applyFarmAction(farm, "garden", "harvest-8"), /another step/);
+  for (let i = 0; i < 9; i++) farm = applyFarmAction(farm, "garden", `water-${i}`);
+  farm = applyFarmAction(farm, "garden", "harvest-8");
+  assert.equal(farm.inventory.carrots, 1);
 });

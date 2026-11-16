@@ -8,7 +8,11 @@ Eight farm stops form one player-paced farm day. Gather three hay bales before f
 
 Once all eight stops are complete, celebrate on the map. This records one game session and awards the parent's configured points or tickets once. Starting another farm day resets task inventory while retaining completed-day count. Farm days are play rounds, not calendar dates. Existing daily play limits count completed rounds using the app's shared game-day convention.
 
-Controls in this MVP use taps/clicks and keyboard buttons. Tractor driving, brushing, herding, and shearing are guided target interactions, rather than free movement or drag simulations.
+Pick up the pictured tool from the tray before each job. Brush and clip by holding and sweeping back and forth; dust and wool fade as the work progresses. Seeds, water, and feed pour while held over a work spot. Pull carrots upward, guide sheep right toward the gate, and pull eggs, apples, and milking handles downward. Carry hay to the feeder and release, or drag the tractor to a bale. A click alone does not finish work.
+
+Keyboard controls: select the tool, Tab to a work spot, and press arrow keys four times to perform the work. Escape puts the tool away. Touch, mouse, and pen share the same pointer controls. Partial strokes are temporary until the step finishes; completed steps save as before.
+
+The garden uses the supplied 3×3 field background (`garden.webp`). All nine beds must be planted, watered, and harvested; crops are drawn on the actual beds. Existing saves retain completed steps and can continue across the remaining beds. No database migration is needed for this interaction update.
 
 ## Database
 
