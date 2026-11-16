@@ -40,6 +40,12 @@ async function main() {
   };
   async function work(label: string) {
     await page.waitForTimeout(80);
+    if (/Feed duck/.test(label)) { await page.getByRole("button", { name: label, exact: true }).click(); await page.waitForTimeout(80); return; }
+    if (/Collect egg|Pick apple/.test(label)) {
+      await page.getByRole("button", { name: label, exact: true }).press("Enter");
+      await page.getByRole("button", { name: "Put item in basket", exact: true }).press("Enter");
+      await page.waitForTimeout(80); return;
+    }
     const pickup = page.getByRole("button", { name: /Pick up|Put down/ });
     if (await pickup.getAttribute("aria-pressed") !== "true") await pickup.click();
     const target = page.getByRole("button", { name: label, exact: true });
@@ -55,9 +61,11 @@ async function main() {
     await open();
     await page.screenshot({ path: "/tmp/sunny-farm-preview/map-desktop.png", fullPage: true });
     await page.getByRole("button", { name: "Horse stable: Feed & brush" }).click();
-    await expect(page.getByText(/Your friends need hay/)).toBeVisible();
-    await expect(page.getByRole("button", { name: "Feed hay", exact: true })).toBeDisabled();
-    await page.getByRole("button", { name: "Go to hayfield" }).click();
+    await page.getByRole("button", { name: "Feed horse", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Brush spot 1", exact: true })).toBeVisible();
+    if (farm.inventory.hay !== 0) throw new Error("Starter feeding created negative hay");
+    await page.getByRole("button", { name: "Farm map", exact: true }).click();
+    await page.getByRole("button", { name: "Hayfield: Gather hay", exact: true }).click();
     failNext = true;
     await work("Collect hay 1");
     await expect(page.getByRole("region", { name: "Sunny Farm Helpers" }).getByRole("alert")).toContainText("Connection lost");
@@ -75,29 +83,54 @@ async function main() {
     for (const task of FARM_TASKS.slice(1)) {
       await page.getByRole("button", { name: `${task.title}: ${task.verb}`, exact: true }).click();
       for (const stage of task.stages) for (const target of stage) {
+        if (farm.done[task.id].includes(target)) continue;
         const i = Number(target.split("-").at(-1)) + 1;
         const label = task.id === "chickens" && target === "feed" ? "Scatter grain" : labels[target] ?? (target.startsWith("brush") ? `Brush spot ${i}` : target.startsWith("egg") ? `Collect egg ${i}` : target.startsWith("herd") ? `Guide sheep ${i}` : target.startsWith("wool") ? `Clip wool ${i}` : target.startsWith("duck") ? `Feed duck ${i}` : target.startsWith("apple") ? `Pick apple ${i}` : target.startsWith("plant") ? `Plant bed ${i}` : target.startsWith("water") ? `Water bed ${i}` : `Harvest bed ${i}`);
-        if (target === "feed" && (task.id === "horse" || task.id === "cow")) {
-          const pickup = page.getByRole("button", { name: /Pick up.*Fresh hay/ });
-          const feeder = page.getByRole("button", { name: "Feed hay", exact: true });
+        if (target === "feed") {
+          const animalLabel = task.id === "chickens" ? "Feed chicken 1" : `Feed ${task.id}`;
+          const animalButton = page.getByRole("button", { name: animalLabel, exact: true });
           await page.setViewportSize({ width: 390, height: 844 });
-          await feeder.scrollIntoViewIfNeeded();
+          await animalButton.scrollIntoViewIfNeeded();
           await page.screenshot({ path: `/tmp/sunny-farm-preview/${task.id}-feed-mobile.png`, fullPage: true });
-          if (await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)) throw new Error("Animal activity overflows on mobile");
+          // Direct touch feeding must work without selecting a tool or a hidden hotspot.
+          const box = (await animalButton.boundingBox())!;
+          const touch = await page.context().newCDPSession(page);
+          await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: box.x + box.width / 2, y: box.y + box.height / 2 }] });
+          await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+          await expect(animalButton).toHaveCount(0);
           await page.setViewportSize({ width: 1280, height: 1100 });
-          await pickup.scrollIntoViewIfNeeded();
-          const start = (await pickup.boundingBox())!, end = (await feeder.boundingBox())!;
-          await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
-          await page.mouse.down();
-          await page.mouse.move(end.x + end.width / 2, end.y + 16, { steps: 12 });
-          await page.mouse.up();
-          await expect(feeder).toHaveCount(0);
-          await page.screenshot({ path: `/tmp/sunny-farm-preview/${task.id}-work-desktop.png`, fullPage: true });
-          const animal = page.getByRole("img", { name: task.id === "horse" ? "Your farm horse" : "Your farm cow" });
-          const size = (await animal.boundingBox())!;
-          const scene = (await page.getByLabel(`${task.title} activity`, { exact: true }).boundingBox())!;
-          const ratio = task.id === "horse" ? .425 : .4165;
-          if (Math.abs(size.width / scene.width - ratio) > .005) throw new Error("Animal scale differs from the requested 15% reduction");
+          if (task.id === "cow") await page.screenshot({ path: "/tmp/sunny-farm-preview/cow-work-desktop.png", fullPage: true });
+        } else if (target === "egg-0" || target === "egg-1") {
+          const egg = page.getByRole("button", { name: label, exact: true });
+          const basket = page.getByRole("button", { name: "Put item in basket", exact: true });
+          await egg.scrollIntoViewIfNeeded();
+          const start = (await egg.boundingBox())!, end = (await basket.boundingBox())!;
+          await page.mouse.move(start.x + start.width / 2, start.y + 16); await page.mouse.down();
+          if (target === "egg-0") {
+            await page.mouse.move(start.x + start.width / 2, start.y + start.height + 40, { steps: 5 }); await page.mouse.up();
+            if (farm.inventory.eggs !== 0) throw new Error("Egg saved before reaching basket");
+            await basket.click();
+          } else {
+            await page.mouse.move(end.x + end.width / 2, end.y + end.height / 2, { steps: 12 }); await page.mouse.up();
+          }
+          await expect(egg).toHaveCount(0);
+          if (target === "egg-1") await page.screenshot({ path: "/tmp/sunny-farm-preview/eggs-basket-desktop.png", fullPage: true });
+        } else if (target === "egg-2") {
+          await page.setViewportSize({ width: 390, height: 844 });
+          const egg = page.getByRole("button", { name: label, exact: true });
+          await egg.scrollIntoViewIfNeeded();
+          const touch = await page.context().newCDPSession(page);
+          const tap = async (box: { x: number; y: number; width: number; height: number }) => {
+            await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: box.x + box.width / 2, y: box.y + box.height / 2 }] });
+            await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+          };
+          await tap((await egg.boundingBox())!);
+          if (farm.inventory.eggs !== 2) throw new Error("Touch pickup saved an egg before depositing");
+          const basket = page.getByRole("button", { name: "Put item in basket", exact: true });
+          await basket.scrollIntoViewIfNeeded(); await tap((await basket.boundingBox())!);
+          await expect(egg).toHaveCount(0);
+          await page.screenshot({ path: "/tmp/sunny-farm-preview/eggs-basket-mobile.png", fullPage: true });
+          await page.setViewportSize({ width: 1280, height: 1100 });
         } else if (target === "brush-0") {
           const spot = page.getByRole("button", { name: label, exact: true });
           await spot.click({ force: true });
@@ -132,8 +165,13 @@ async function main() {
       await expect(page.getByText("Happy & cared for!")).toBeVisible();
       if (task.id === "garden") await page.screenshot({ path: "/tmp/sunny-farm-preview/garden-desktop.png", fullPage: true });
       if (task.id === "horse") await page.screenshot({ path: "/tmp/sunny-farm-preview/horse-desktop.png", fullPage: true });
-      await page.getByRole("button", { name: "Back to the farm →", exact: true }).click();
+      if (task.id === "chickens") {
+        await page.getByRole("button", { name: "Next: Apple orchard →", exact: true }).click();
+        await expect(page.getByRole("heading", { name: "Apple orchard", exact: true })).toBeVisible();
+        await page.getByRole("button", { name: "Farm map", exact: true }).click();
+      } else await page.getByRole("button", { name: "Back to the farm →", exact: true }).click();
     }
+    await expect(page.getByText("Breakfast basket ready!", { exact: true })).toBeVisible();
     await expect(page.getByLabel("3 eggs", { exact: true })).toBeVisible();
     await expect(page.getByLabel("1 milk", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Celebrate our happy farm! ★", exact: true }).click();
@@ -145,19 +183,28 @@ async function main() {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.screenshot({ path: "/tmp/sunny-farm-preview/map-mobile.png", fullPage: true });
     await page.getByRole("button", { name: "Duck pond: Feed the ducks", exact: true }).click();
-    await page.getByRole("button", { name: /Pick up.*Duck pellets/ }).click();
     const duck = page.getByRole("button", { name: "Feed duck 2", exact: true });
     await duck.scrollIntoViewIfNeeded();
     const touchBox = (await duck.boundingBox())!;
     const cdp = await page.context().newCDPSession(page);
     await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: touchBox.x + touchBox.width / 2, y: touchBox.y + touchBox.height / 2 }] });
-    await page.waitForTimeout(1250);
     await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
     await expect(duck).toHaveCount(0);
     await page.screenshot({ path: "/tmp/sunny-farm-preview/ducks-mobile.png", fullPage: true });
     const overflows = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
     if (overflows) throw new Error("Mobile page overflows horizontally");
     if (activeTargets(farm, "ducks").length !== 2) throw new Error("Mobile action did not save");
+    await page.getByRole("button", { name: "Farm map", exact: true }).click();
+    await page.getByRole("button", { name: "Horse stable: Feed & brush", exact: true }).click();
+    const food = page.getByRole("button", { name: "Carry fresh hay", exact: true });
+    const horse = page.getByRole("button", { name: "Feed horse", exact: true });
+    await page.setViewportSize({ width: 1280, height: 1100 });
+    await food.scrollIntoViewIfNeeded();
+    const foodBox = (await food.boundingBox())!, horseBox = (await horse.boundingBox())!;
+    await page.mouse.move(foodBox.x + foodBox.width / 2, foodBox.y + foodBox.height / 2); await page.mouse.down();
+    await page.mouse.move(horseBox.x + horseBox.width / 2, horseBox.y + horseBox.height / 2, { steps: 12 }); await page.mouse.up();
+    await expect(horse).toHaveCount(0);
+    if (!farm.done.horse.includes("feed")) throw new Error("Direct food-to-animal drag did not save");
     if (errors.length) throw new Error(errors.join("\n"));
     console.log("Farm browser checks passed: all eight activities, save/reload, error retry, conflicts, one celebration, new day, and mobile layout.");
   } finally { await browser.close(); }

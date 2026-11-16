@@ -4,7 +4,7 @@ import { farmTool, type FarmTool } from "@/lib/sunny-farm-tools";
 import type { FarmTaskId } from "@/lib/sunny-farm";
 import { FarmSprite, type FarmItem } from "./sunny-farm-art";
 import styles from "./sunny-farm.module.css";
-const WorkContext = createContext<{ selected: boolean; busy: boolean; progress: Record<string, number>; keyboard: (target: string) => void }>({ selected: false, busy: false, progress: {}, keyboard: () => {} });
+const WorkContext = createContext<{ selected: boolean; busy: boolean; progress: Record<string, number>; keyboard: (target: string) => void; activate: (target: string) => void; deposit: () => void; held: string | null }>({ selected: false, busy: false, progress: {}, keyboard: () => {}, activate: () => {}, deposit: () => {}, held: null });
 function ToolArt({ tool }: { tool: FarmTool }) {
   if (tool.id === "water") return <svg viewBox="0 0 100 80" aria-hidden="true"><path d="M62 27C88 5 101 52 69 53" fill="none" stroke="#ba3b2c" strokeWidth="9"/><path d="M20 25h46l6 45H19z" fill="#e74c35" stroke="#983c2e" strokeWidth="3"/><path d="M21 43 5 20l-5 5 20 36" fill="#ed6744"/><path d="M28 26C25 1 59 1 58 26" fill="none" stroke="#d74432" strokeWidth="7"/><path d="M2 32v8m7-4v9m-8-1v9" stroke="#62c6ed" strokeWidth="3" strokeLinecap="round"/></svg>;
   return tool.item ? <FarmSprite item={tool.item as FarmItem} /> : <span aria-hidden="true">{tool.symbol}</span>;
@@ -12,6 +12,10 @@ function ToolArt({ tool }: { tool: FarmTool }) {
 export function FarmWorkbench({ task, targets, busy, onComplete, children }: { task: FarmTaskId; targets: string[]; busy: boolean; onComplete: (target: string, tool: string) => void; children: ReactNode }) {
   const tool = farmTool(task, targets[0] ?? "");
   const [selected, setSelected] = useState(false);
+  const [held, setHeld] = useState<string | null>(null);
+  const heldRef = useRef<string | null>(null);
+  function carry(target: string | null) { heldRef.current = target; setHeld(target); }
+  const simple = tool.motion === "feed" || tool.motion === "collect";
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
   const [progress, setProgress] = useState<Record<string, number>>({});
   const root = useRef<HTMLDivElement>(null);
@@ -21,7 +25,7 @@ export function FarmWorkbench({ task, targets, busy, onComplete, children }: { t
   const pending = useRef<string | null>(null);
   const busyRef = useRef(busy); busyRef.current = busy;
   const current = useRef({ targets, tool, onComplete }); current.current = { targets, tool, onComplete };
-  useEffect(() => { setSelected(false); setCursor(null); setProgress({}); work.current = {}; gesture.current = null; }, [task, tool.id]);
+  useEffect(() => { setSelected(tool.motion === "feed" || tool.motion === "collect"); carry(null); setCursor(null); setProgress({}); work.current = {}; gesture.current = null; }, [task, tool.id]);
   useEffect(() => {
     if (!busy) {
       completed.current = false;
@@ -30,7 +34,7 @@ export function FarmWorkbench({ task, targets, busy, onComplete, children }: { t
       pending.current = null; work.current = retained; setProgress(retained);
     }
   }, [busy, targets.join(",")]);
-  function putDown() { gesture.current = null; setSelected(false); setCursor(null); }
+  function putDown() { carry(null); gesture.current = null; setSelected(false); setCursor(null); }
   useEffect(() => {
     const cancel = () => { gesture.current = null; setCursor(null); };
     window.addEventListener("blur", cancel);
@@ -40,6 +44,7 @@ export function FarmWorkbench({ task, targets, busy, onComplete, children }: { t
   const finish = (target: string) => {
     if (busyRef.current || completed.current || !current.current.targets.includes(target)) return;
     completed.current = true; pending.current = target; gesture.current = null;
+    carry(null);
     current.current.onComplete(target, current.current.tool.id);
   };
   // Pouring measures time, not event count; mouse, touch and pen behave the same.
@@ -60,7 +65,7 @@ export function FarmWorkbench({ task, targets, busy, onComplete, children }: { t
   }
   function move(e: PointerEvent<HTMLDivElement>) {
     const rect = root.current!.getBoundingClientRect();
-    if (selected) setCursor({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+    if (selected || simple || heldRef.current) setCursor({ x: e.clientX - rect.left, y: e.clientY - rect.top });
     const g = gesture.current;
     if (!g || g.pointer !== e.pointerId || busy || completed.current) return;
     if (task === "hay") {
@@ -87,42 +92,66 @@ export function FarmWorkbench({ task, targets, busy, onComplete, children }: { t
     g.x = e.clientX; g.y = e.clientY;
   }
   function down(e: PointerEvent<HTMLDivElement>) {
-    if (!selected || busy || e.button !== 0 || (e.target as HTMLElement).closest("[data-tool-tray]")) return;
+    if ((!selected && !simple) || busy || e.button !== 0 || (e.target as HTMLElement).closest("[data-tool-tray]")) return;
     e.preventDefault();
     const rect = e.currentTarget.getBoundingClientRect();
     setCursor({ x: e.clientX - rect.left, y: e.clientY - rect.top });
     e.currentTarget.setPointerCapture(e.pointerId);
-    gesture.current = { pointer: e.pointerId, x: e.clientX, y: e.clientY, target: hit(e.clientX, e.clientY), startX: e.clientX, startY: e.clientY };
+    const target = hit(e.clientX, e.clientY);
+    if (tool.motion === "collect" && target) carry(target);
+    gesture.current = { pointer: e.pointerId, x: e.clientX, y: e.clientY, target, startX: e.clientX, startY: e.clientY };
   }
-  return <WorkContext.Provider value={{ selected, busy, progress, keyboard: target => {
+  function activate(target: string) {
+    if (busy || completed.current || !targets.includes(target)) return;
+    if (tool.motion === "feed") finish(target);
+    if (tool.motion === "collect") { carry(target); root.current?.querySelector<HTMLButtonElement>("[data-farm-basket]")?.focus({ preventScroll: true }); }
+  }
+  function overBasket(x: number, y: number) {
+    const rect = root.current?.querySelector("[data-farm-basket]")?.getBoundingClientRect();
+    return rect && x >= rect.left - 12 && x <= rect.right + 12 && y >= rect.top - 12 && y <= rect.bottom + 12;
+  }
+  function pickUp(e: PointerEvent<HTMLButtonElement>) {
+    if (busy || e.button !== 0) return;
+    e.stopPropagation();
+    if (selected && !simple) { putDown(); return; }
+    setSelected(true);
+    const rect = root.current!.getBoundingClientRect();
+    setCursor({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+    root.current!.setPointerCapture(e.pointerId);
+    gesture.current = { pointer: e.pointerId, x: e.clientX, y: e.clientY, target: null, startX: e.clientX, startY: e.clientY };
+
+  }
+  return <WorkContext.Provider value={{ selected: selected || simple, busy, progress, held, activate, deposit: () => { if (heldRef.current) finish(heldRef.current); }, keyboard: target => {
+    if (simple) { activate(target); return; }
     if (!selected || busy || completed.current) return;
     work.current[target] = Math.min(1, (work.current[target] ?? 0) + .25);
     setProgress({ ...work.current }); if (work.current[target] >= 1) finish(target);
   } }}><div ref={root} className={`${styles.workbench} ${selected ? styles.toolEquipped : ""}`} onPointerDown={down} onPointerMove={move} onPointerUp={e => {
+    if (tool.motion === "collect" && heldRef.current && overBasket(e.clientX, e.clientY)) finish(heldRef.current);
+    if (gesture.current && tool.motion === "feed") { const target = hit(e.clientX, e.clientY); if (target) finish(target); }
     if (gesture.current && tool.motion === "drag") { const target = hit(e.clientX, e.clientY); if (target && Math.hypot(e.clientX - gesture.current.startX, e.clientY - gesture.current.startY) > 20) finish(target); }
     gesture.current = null; setCursor(null);
   }} onPointerCancel={() => { gesture.current = null; setCursor(null); }} onLostPointerCapture={() => { gesture.current = null; }} onPointerLeave={() => { if (!gesture.current) setCursor(null); }} onKeyDown={e => { if (e.key === "Escape") putDown(); }}>
     <div className={styles.toolTray} data-tool-tray>
-      {targets.length > 0 ? <><button type="button" disabled={busy} className={styles.pickupTool} aria-pressed={selected} onPointerDown={e => {
-        if (busy || e.button !== 0) return;
-        e.stopPropagation();
-        if (selected) { putDown(); return; }
-        setSelected(true);
-        const rect = root.current!.getBoundingClientRect();
-        setCursor({ x: e.clientX - rect.left, y: e.clientY - rect.top });
-        root.current!.setPointerCapture(e.pointerId);
-        gesture.current = { pointer: e.pointerId, x: e.clientX, y: e.clientY, target: null, startX: e.clientX, startY: e.clientY };
-      }} onClick={e => { if (e.detail === 0) { if (selected) putDown(); else setSelected(true); } }}><ToolArt tool={tool} /><span>{selected ? "Put down" : "Pick up"}<strong>{tool.label}</strong></span></button><div><strong>{selected ? `${tool.label} in hand` : "Choose your tool first"}</strong><p>{tool.instruction}</p><small>Keyboard: pick up the tool, Tab to a work spot, then use the arrow keys four times. Escape puts the tool down.</small></div></> : <p>Tools away. A job well done!</p>}
+      {targets.length > 0 && simple ? <div className={styles.simpleHint}>{tool.motion === "feed" ? <button type="button" className={styles.foodSource} aria-label={`Carry ${tool.label.toLowerCase()}`} onPointerDown={pickUp}><ToolArt tool={tool} /></button> : <span aria-hidden="true">🧺</span>}<div><strong>{tool.motion === "feed" ? "A little meal, a happy friend" : held ? "Now put it in the basket" : "From the farm to your basket"}</strong><p>{tool.instruction}</p><small>{tool.motion === "collect" ? "Keyboard: Enter to pick up, then Enter on the basket. Escape returns the item." : "Tap an animal to feed it. Keyboard: Enter on the animal."}</small></div></div> : targets.length > 0 ? <><button type="button" disabled={busy} className={styles.pickupTool} aria-pressed={selected} onPointerDown={pickUp} onClick={e => { if (e.detail === 0) { if (selected) putDown(); else setSelected(true); } }}><ToolArt tool={tool} /><span>{selected ? "Put down" : "Pick up"}<strong>{tool.label}</strong></span></button><div><strong>{selected ? `${tool.label} in hand` : "Choose your tool first"}</strong><p>{tool.instruction}</p><small>Keyboard: pick up the tool, Tab to a work spot, then use the arrow keys four times. Escape puts the tool down.</small></div></> : <p>Tools away. A job well done!</p>}
     </div>
     <div>{children}</div>
-    {selected && cursor && <div className={styles.carriedTool} style={{ left: cursor.x, top: cursor.y }}><ToolArt tool={tool} /></div>}
+    {(selected || simple) && cursor && (tool.motion !== "collect" || held) && <div className={styles.carriedTool} style={{ left: cursor.x, top: cursor.y }}>{held ? <FarmSprite item={held.startsWith("egg") ? "egg" : "apple"} /> : <ToolArt tool={tool} />}</div>}
   </div></WorkContext.Provider>;
 }
 export function FarmWorkTarget({ target, label, children, className, style, disabled }: { target: string; label: string; children: ReactNode; className: string; style: CSSProperties; disabled: boolean }) {
   const ctx = useContext(WorkContext);
   const amount = ctx.progress[target] ?? 0;
-  return <button type="button" data-farm-target={target} className={`${className} ${styles.workTarget}`} style={{ ...style, "--work": amount } as CSSProperties} aria-label={label} aria-disabled={!ctx.selected || disabled || ctx.busy} disabled={disabled || ctx.busy} onClick={e => e.preventDefault()} onKeyDown={e => { if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) { e.preventDefault(); ctx.keyboard(target); } }}>
+  return <button type="button" data-farm-target={target} data-held={ctx.held === target} className={`${className} ${styles.workTarget}`} style={{ ...style, "--work": amount } as CSSProperties} aria-label={label} aria-disabled={!ctx.selected || disabled || ctx.busy} disabled={disabled || ctx.busy} onClick={e => { e.preventDefault(); ctx.activate(target); }} onKeyDown={e => { if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) { e.preventDefault(); ctx.keyboard(target); } }}>
     <span className={styles.workObject} style={{ opacity: target.startsWith("brush") || target.startsWith("wool") ? 1 - amount * .85 : 1 }}>{children}</span>
     {amount > 0 && <span className={styles.workMeter} role="progressbar" aria-label={`${label} progress`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(amount * 100)}><span style={{ width: `${amount * 100}%` }} /></span>}
+  </button>;
+}
+
+export function FarmCollectionBasket({ count, style, kind = "egg" }: { count: number; style: CSSProperties; kind?: "egg" | "apple" }) {
+  const ctx = useContext(WorkContext);
+  return <button type="button" data-farm-basket className={`${styles.collectionBasket} ${ctx.held ? styles.basketReady : ""}`} style={style} onClick={ctx.deposit} disabled={ctx.busy} aria-label="Put item in basket">
+    <FarmSprite item="basket" /><span className={styles.basketContents}>{Array.from({ length: Math.min(3, count) }, (_, i) => <FarmSprite key={i} item={kind} />)}</span>
+    <span>{ctx.held ? "Drop it here!" : `${count} collected`}</span>
   </button>;
 }

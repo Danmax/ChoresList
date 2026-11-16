@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { activeTargets, applyFarmAction, celebrateFarm, completedTasks, createFarm, FARM_TASKS, farmReady, nextFarmDay, type FarmState } from "../lib/sunny-farm";
+import { activeTargets, applyFarmAction, farmBreakfast, nextFarmStop, celebrateFarm, completedTasks, createFarm, FARM_TASKS, farmReady, nextFarmDay, type FarmState } from "../lib/sunny-farm";
 
 function helpAll(farm: FarmState, task: typeof FARM_TASKS[number]) {
   for (const stage of task.stages) for (const target of stage) farm = applyFarmAction(farm, task.id, target);
@@ -24,7 +24,7 @@ test("connected farm loop supplies hay, saves goods, and celebrates once", () =>
 });
 test("rejects out-of-order steps, duplicates, invented tasks, and premature rewards", () => {
   const farm = createFarm();
-  assert.throws(() => applyFarmAction(farm, "horse", "feed"), /hayfield/);
+  assert.equal(applyFarmAction(farm, "horse", "feed").inventory.hay, 0, "barn hay allows direct feeding even with an empty field basket");
   assert.throws(() => applyFarmAction(farm, "cow", "milk-finish"), /another step/);
   assert.throws(() => applyFarmAction(farm, "garden", "harvest-0"), /another step/);
   assert.throws(() => applyFarmAction(farm, "bogus", "feed"), /Choose/);
@@ -54,4 +54,26 @@ test("all nine field beds must be planted and watered before harvest", () => {
   for (let i = 0; i < 9; i++) farm = applyFarmAction(farm, "garden", `water-${i}`);
   farm = applyFarmAction(farm, "garden", "harvest-8");
   assert.equal(farm.inventory.carrots, 1);
+});
+
+test("direct animal feeding uses barn hay without negative inventory or duplicate meals", () => {
+  let farm = createFarm();
+  farm = applyFarmAction(farm, "horse", "feed");
+  farm = applyFarmAction(farm, "cow", "feed");
+  assert.equal(farm.inventory.hay, 0);
+  assert.throws(() => applyFarmAction(farm, "cow", "feed"), /already/);
+  assert.deepEqual(activeTargets(farm, "cow"), ["milk-left"]);
+});
+
+test("breakfast goal links animal care and produce while preserving free exploration", () => {
+  let farm = createFarm();
+  assert.equal(nextFarmStop(farm), "chickens");
+  farm = helpAll(farm, FARM_TASKS.find(t => t.id === "orchard")!);
+  assert.equal(farmBreakfast(farm).find(g => g.item === "apples")!.ready, true);
+  assert.equal(farmBreakfast(farm).every(g => g.ready), false);
+  farm = helpAll(farm, FARM_TASKS.find(t => t.id === "chickens")!);
+  assert.equal(nextFarmStop(farm), "cow");
+  farm = helpAll(farm, FARM_TASKS.find(t => t.id === "cow")!);
+  assert.equal(farmBreakfast(farm).every(g => g.ready), true);
+  assert.equal(nextFarmStop(farm), "hay");
 });
