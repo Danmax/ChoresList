@@ -58,3 +58,11 @@
 .rhythmAudioControls{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;font-size:11px;color:var(--muted)}.rhythmAudioControls label{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0}.rhythmAudioControls input{width:95px;padding:0;accent-color:#ca7696}.rhythmAudioControls button,.rhythmNewPattern{background:#f0e4da;border-radius:12px;padding:8px 11px;font-size:11px;font-weight:700}.rhythmNewPattern{margin-top:12px}
 .rhythmBeats{flex-wrap:wrap;gap:8px}.rhythmBeats span{width:32px;height:32px;flex-shrink:0}
 @media(max-width:650px){.rhythmSounds>div{grid-template-columns:repeat(2,minmax(0,1fr))}.rhythmPattern{flex-wrap:wrap}.rhythmPanel{padding:15px}}
+
+/* Accessory positions use percentages so outfits also follow the exploring pal. */
+.wornAccessory{position:absolute;z-index:5;transform:translate(-50%,-50%);font-size:clamp(28px,3vw,38px);line-height:1;pointer-events:none;filter:drop-shadow(0 2px 2px #64473325)}
+.game .editAccessory{pointer-events:auto;cursor:grab;touch-action:none;border:2px dashed #bd7398;border-radius:12px;background:#fff8f0bb;min-width:44px;min-height:44px;padding:3px}
+.game .editAccessory:hover:not(:disabled),.game .editAccessory:focus-visible{transform:translate(-50%,-50%);outline:3px solid #c7789c;outline-offset:2px}.game .editAccessory:active{cursor:grabbing}
+.petFigure.dressingPal{animation:none;z-index:5}.exploringPal .wornAccessory{font-size:20px}
+.wardrobe{margin-top:12px;padding:16px;border:1px solid #e1b6c7;border-radius:18px;background:#fff8fb}.wardrobe h3{font-size:16px;font-weight:800}.wardrobe p{font-size:12px;line-height:1.6;color:var(--muted);margin:8px 0 12px}
+.wardrobeItems{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px}.wardrobeItems button{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 6px;border:2px solid #ead9df;border-radius:13px;background:#fff;font-size:11px}.wardrobeItems button[aria-pressed="true"]{border-color:#ca7696;background:#f9e4ed}.wardrobeItems button>span{font-size:28px}.wardrobeItems small{color:#9b5b76}

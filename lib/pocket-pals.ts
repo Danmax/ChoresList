@@ -72,6 +72,24 @@ export const PET_SHOP = [
   { id: "tea-table", name: "Tea table", cost: 60, kind: "decor", emoji: "🪑" },
   { id: "wall-shelves", name: "Wall shelves", cost: 80, kind: "decor", emoji: "🗄️" },
 ] as const;
+// Keep older saves with a single accessory usable without a database migration.
+export function wornAccessories(pet: PetState): string[] {
+  return [...new Set(pet.accessories ?? (pet.accessory ? [pet.accessory] : []))]
+    .filter((id) => pet.owned.includes(id) && PET_SHOP.some((item) => item.id === id && item.kind === "accessory"));
+}
+export function accessoryPosition(pet: PetState, id: string) {
+  const defaults: Record<string, { x: number; y: number }> = {
+    bow: { x: 77, y: 17 }, "sunny-cap": { x: 50, y: 7 },
+    "bookish-glasses": { x: 50, y: 39 }, crown: { x: 50, y: 5 },
+    "cozy-scarf": { x: 50, y: 65 }, "tiny-backpack": { x: 82, y: 50 },
+    sparkles: { x: 50, y: 6 }, "rainbow-cape": { x: 78, y: 50 },
+  };
+  return pet.accessoryPositions?.[id] ?? defaults[id] ?? { x: 50, y: 20 };
+}
+function wearAccessory(pet: PetState, id: string) {
+  pet.accessories = [...new Set([...wornAccessories(pet), id])];
+  pet.accessory = id;
+}
 export const PLAY_SYMBOLS = ["🍓", "🌸", "🍡", "⭐"];
 
 type Lesson = { id: string; topic: string; question: string; choices: string[]; answer: number; explanation: string; minAge: number; maxAge: number };
@@ -122,7 +140,7 @@ export type PetState = {
   serialNumber?: string; appearance?: PetAppearance;
   hunger: number; happiness: number; cleanliness: number; energy: number; smarts: number; bond: number;
   xp: number; coins: number; dumplings: number; lessonsLearned: number; gamesPlayed: number; lastRhythmPattern?: string;
-  owned: string[]; accessory: string | null; room: string; roomPositions?: RoomPositions; sleepingUntil: number | null;
+  owned: string[]; accessory: string | null; accessories?: string[]; accessoryPositions?: Record<string, { x: number; y: number }>; room: string; roomPositions?: RoomPositions; sleepingUntil: number | null;
   lastActionAt: number; lastCareDay: string | null; streak: number;
   daily: { day: string; startedAt: number; tasks: CareTask[]; rewarded: boolean; playRewards: number; learnRewards: number };
   challenge: { kind: "play" | "bubble" | "rhythm" | "treasure" | "hide" | "balance" | "learn"; id: string; startedAt: number; sequence?: number[]; lessonId?: string; bubbleIds?: string[]; hideSpot?: number; hideSpotCount?: number; balanceSequence?: number[]; rhythmOffsets?: number[]; rhythmTolerance?: number; rhythmName?: string; treasure?: { room: string; objectIds: TreasureObjectId[]; targets: TreasureObjectId[]; step: number; age: number } } | null;
@@ -204,7 +222,7 @@ export function publicChallenge(pet: PetState, age: number) {
   const lesson = LESSONS.find((l) => l.id === challenge.lessonId) ?? currentLesson(pet, age);
   return { id: challenge.id, kind: challenge.kind, startedAt: challenge.startedAt, topic: lesson.topic, question: lesson.question, choices: lesson.choices };
 }
-export type PetAction = "feed" | "clean" | "sleep" | "wake" | "affection" | "start-play" | "finish-play" | "start-bubble" | "finish-bubble" | "start-rhythm" | "finish-rhythm" | "start-treasure" | "find-treasure" | "open-treasure" | "start-learn" | "answer" | "buy" | "equip" | "move-room-item" | "refill" | "rename";
+export type PetAction = "feed" | "clean" | "sleep" | "wake" | "affection" | "start-play" | "finish-play" | "start-bubble" | "finish-bubble" | "start-rhythm" | "finish-rhythm" | "start-treasure" | "find-treasure" | "open-treasure" | "start-learn" | "answer" | "buy" | "equip" | "move-room-item" | "move-accessory" | "remove-accessory" | "refill" | "rename";
 function challengeNumber(challengeId: string, index: number) {
   return parseInt(challengeId.replaceAll("-", "").slice(index * 2, index * 2 + 2), 16) || 0;
 }
@@ -218,7 +236,7 @@ function finishPlayRound(pet: PetState, message: string) {
 }
 export function applyPetAction(pet: PetState, action: PetAction, input: Record<string, unknown>, now: number, age: number, challengeId: string) {
   let message = "";
-  const administrative = ["buy", "equip", "move-room-item", "refill", "rename", "wake"].includes(action);
+  const administrative = ["buy", "equip", "move-room-item", "move-accessory", "remove-accessory", "refill", "rename", "wake"].includes(action);
   if (pet.sleepingUntil && !administrative) throw new PetActionError(`${pet.name} is napping. Let them rest or wake them up.`);
   if (!administrative && now - pet.lastActionAt < 2_000) throw new PetActionError("Give your pal a moment before the next activity.");
   if (pet.challenge && !administrative && !["answer", "finish-play", "start-play", "start-bubble", "finish-bubble", "start-rhythm", "finish-rhythm", "start-treasure", "find-treasure", "open-treasure", "start-learn"].includes(action)) pet.challenge = null;
@@ -340,18 +358,34 @@ export function applyPetAction(pet: PetState, action: PetAction, input: Record<s
       if (pet.owned.includes(item.id)) throw new PetActionError("You already own this item.");
       if (pet.coins < item.cost) throw new PetActionError("Keep caring for your pal to earn more silver coins.");
       pet.coins -= item.cost; pet.owned.push(item.id);
-      if (item.kind === "accessory") pet.accessory = item.id;
+      if (item.kind === "accessory") wearAccessory(pet, item.id);
       if (item.kind === "room") pet.room = item.id;
       message = `${item.name} unlocked!`; break;
     }
     case "equip": {
       if (input.itemId === "home") { pet.room = "home"; break; }
-      if (input.itemId === "none") { pet.accessory = null; break; }
+      if (input.itemId === "none") { pet.accessories = []; pet.accessory = null; message = "All accessories removed. They are safe in your wardrobe."; break; }
       const item = PET_SHOP.find((i) => i.id === input.itemId);
       if (!item || !pet.owned.includes(item.id)) throw new PetActionError("Unlock this item first.");
-      if (item.kind === "accessory") { pet.accessory = item.id; message = `${item.name} equipped.`; break; }
+      if (item.kind === "accessory") { wearAccessory(pet, item.id); message = `${item.name} equipped.`; break; }
       if (item.kind === "room") { pet.room = item.id; message = `${pet.name} moved to the ${item.name}.`; break; }
       throw new PetActionError("Decorations are placed automatically in every room.");
+    }
+    case "remove-accessory": {
+      const item = PET_SHOP.find((item) => item.id === input.itemId && item.kind === "accessory");
+      if (!item || !wornAccessories(pet).includes(item.id)) throw new PetActionError("Choose an accessory your pal is wearing.");
+      pet.accessories = wornAccessories(pet).filter((id) => id !== item.id);
+      pet.accessory = pet.accessories.at(-1) ?? null;
+      message = `${item.name} removed. You can wear it again anytime.`; break;
+    }
+    case "move-accessory": {
+      const item = PET_SHOP.find((item) => item.id === input.itemId && item.kind === "accessory");
+      if (!item || !wornAccessories(pet).includes(item.id)) throw new PetActionError("Put this accessory on your pal first.");
+      const { x, y } = input;
+      if (typeof x !== "number" || !Number.isFinite(x) || typeof y !== "number" || !Number.isFinite(y) || x < 5 || x > 95 || y < 5 || y > 95) throw new PetActionError("Keep the accessory on your pal.");
+      pet.accessoryPositions ??= {};
+      pet.accessoryPositions[item.id] = { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 };
+      message = `${item.name} placed.`; break;
     }
     case "move-room-item": {
       if (pet.challenge?.kind === "treasure") throw new PetActionError("Finish or switch from Treasure Trail before arranging the room.");

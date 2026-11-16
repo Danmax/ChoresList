@@ -264,3 +264,52 @@ test("daily care uses the household time zone across a daylight saving boundary"
   assert.equal(petDay(Date.parse("2026-11-01T05:30:00Z"), "America/New_York"), "2026-11-01");
   assert.equal(petDay(Date.parse("2026-11-01T06:30:00Z"), "America/New_York"), "2026-11-01");
 });
+
+test("wardrobe supports multiple accessories and keeps removed items and placements", () => {
+  const pet = createPet("cat", "Miso", now, day);
+  pet.coins = 500;
+  for (const itemId of ["bow", "bookish-glasses"]) applyPetAction(pet, "buy", { itemId }, now, 8, id);
+  assert.deepEqual(pet.accessories, ["bow", "bookish-glasses"]);
+  applyPetAction(pet, "move-accessory", { itemId: "bow", x: 72.345, y: 21 }, now, 8, id);
+  assert.deepEqual(pet.accessoryPositions?.bow, { x: 72.3, y: 21 });
+  const coins = pet.coins;
+  applyPetAction(pet, "remove-accessory", { itemId: "bow" }, now, 8, id);
+  assert.deepEqual(pet.accessories, ["bookish-glasses"]);
+  assert.ok(pet.owned.includes("bow"));
+  applyPetAction(pet, "equip", { itemId: "bow" }, now, 8, id);
+  applyPetAction(pet, "equip", { itemId: "bow" }, now, 8, id);
+  assert.deepEqual(pet.accessories, ["bookish-glasses", "bow"]);
+  assert.equal(pet.coins, coins);
+  const restored = advancePet(JSON.parse(JSON.stringify(pet)), now + 1000, day);
+  assert.deepEqual(restored.accessoryPositions?.bow, { x: 72.3, y: 21 });
+  assert.deepEqual(restored.accessories, pet.accessories);
+  applyPetAction(pet, "equip", { itemId: "none" }, now, 8, id);
+  assert.deepEqual(pet.accessories, []);
+  assert.equal(pet.accessory, null);
+});
+
+test("legacy outfits migrate when another accessory is added", () => {
+  const pet = createPet("dog", "Mochi", now, day);
+  pet.owned = ["bow", "crown"];
+  pet.accessory = "bow";
+  applyPetAction(pet, "equip", { itemId: "crown" }, now, 8, id);
+  assert.deepEqual(pet.accessories, ["bow", "crown"]);
+  assert.equal(pet.accessory, "crown");
+});
+
+test("accessory placements reject invalid coordinates and unworn items", () => {
+  const pet = createPet("dog", "Mochi", now, day);
+  pet.owned = ["bow"];
+  for (const itemId of ["bow", "crown", "garden", "__proto__"]) {
+    assert.throws(() => applyPetAction(pet, "move-accessory", { itemId, x: 50, y: 50 }, now, 8, id), /first/);
+  }
+  applyPetAction(pet, "equip", { itemId: "bow" }, now, 8, id);
+  for (const x of [NaN, Infinity, -1, 96, "50", null]) {
+    assert.throws(() => applyPetAction(pet, "move-accessory", { itemId: "bow", x, y: 50 }, now, 8, id), /on your pal/);
+  }
+  assert.deepEqual(pet.accessoryPositions, undefined);
+  pet.sleepingUntil = now + 30000;
+  applyPetAction(pet, "move-accessory", { itemId: "bow", x: 5, y: 95 }, now, 8, id);
+  assert.deepEqual(advancePet(pet, now, day).accessoryPositions?.bow, { x: 5, y: 95 });
+  assert.equal(pet.lastActionAt, 0);
+});
