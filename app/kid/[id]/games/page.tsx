@@ -11,6 +11,7 @@ import { ChessQuest, type ChessStats } from "@/components/chess-quest";
 import { FamilyMultiplayerGame } from "@/components/family-multiplayer-games";
 import { createTriviaRound, type TriviaLevel } from "@/lib/bible-trivia";
 import { BlockDrop } from "@/components/block-drop";
+import { SunnyFarm } from "@/components/sunny-farm";
 import { PocketPals } from "@/components/pocket-pals";
 import { PET_SPECIES } from "@/lib/pocket-pals";
 import type { GameKey } from "@/lib/games";
@@ -209,6 +210,8 @@ export default function KidGamesPage() {
           onBack={() => setShowJohnnyMenu(false)}
           onStart={() => { setShowJohnnyMenu(false); setReward(null); setActiveGame("jungle-vine-swing"); }}
         />
+      ) : activeGame === "sunny-farm" ? (
+        <SunnyFarm memberId={member.id} playerName={member.name} onExit={() => { setActiveGame(null); void load(); }} />
       ) : activeGame === "pocket-pals" ? (
         <PocketPals memberId={member.id} playerName={member.name} onExit={() => { setActiveGame(null); void load(); }} />
       ) : activeGame === "block-drop" ? (
@@ -245,6 +248,13 @@ export default function KidGamesPage() {
             const status = availability[game.key];
             const Icon = iconForGame(game.key);
             const locked = !status?.available;
+            if (game.key === "sunny-farm") {
+              return <button key={game.key} type="button" disabled={locked} onClick={() => { setReward(null); setActiveGame("sunny-farm"); }} className="group relative min-h-64 overflow-hidden rounded-3xl border-2 border-lime-200 text-left shadow-sm disabled:opacity-65">
+                <span className="absolute inset-0 bg-cover bg-center transition-transform group-hover:scale-105" style={{ backgroundImage: "url('/games/sunny-farm/hub.webp')" }} />
+                <span className="absolute inset-0 bg-gradient-to-t from-green-950 via-green-950/30 to-transparent" />
+                <span className="relative flex min-h-64 flex-col items-start justify-end p-5 text-white"><span className="mb-2 rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-green-900">🚜 A little care. A lot of happy.</span><span className="text-2xl font-black">Sunny Farm Helpers</span><span className="mt-1 text-sm font-bold text-lime-50">Care for animals, gather eggs, and grow your little farm.</span><span className="mt-3 rounded-xl bg-lime-100 px-4 py-2 text-xs font-black text-green-950">{locked ? status?.reason ?? "Locked" : "Visit your farm →"}</span></span>
+              </button>;
+            }
             if (game.key === "pocket-pals") {
               return <button key={game.key} type="button" disabled={locked} onClick={() => { setReward(null); setActiveGame("pocket-pals"); }} className="group overflow-hidden rounded-3xl border-2 border-rose-200 bg-[#fff8f0] p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md disabled:opacity-65">
                 <span className="inline-flex items-center gap-2 rounded-full bg-rose-100 px-3 py-1 text-xs font-black text-rose-700"><PawPrint size={14} /> A little love, every day</span>

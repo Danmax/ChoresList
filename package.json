@@ -22,7 +22,9 @@
     "test:surveys": "node --import tsx --test tests/community-surveys.test.ts",
     "test:secret-santa": "node --import tsx --test tests/secret-santa.test.ts",
     "test:pocket-pals": "node --import tsx --test tests/pocket-pals*.test.ts",
-    "test:pocket-pals:browser": "node --import tsx tests/pocket-pals.browser.ts"
+    "test:pocket-pals:browser": "node --import tsx tests/pocket-pals.browser.ts",
+    "test:sunny-farm": "node --import tsx --test tests/sunny-farm.test.ts",
+    "test:sunny-farm:browser": "node --import tsx tests/sunny-farm.browser.ts"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"

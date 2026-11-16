@@ -1,4 +1,4 @@
-export type GameKey = "block-drop" | "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot" | "shape-safari" | "codebreaker-quest" | "tic-tac-toe" | "burger-rush" | "jungle-vine-swing" | "chess-quest" | "pocket-pals";
+export type GameKey = "sunny-farm" | "block-drop" | "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot" | "shape-safari" | "codebreaker-quest" | "tic-tac-toe" | "burger-rush" | "jungle-vine-swing" | "chess-quest" | "pocket-pals";
 export type GameRewardType = "none" | "points" | "tickets";
 
 export type GameDefinition = {
@@ -14,6 +14,11 @@ export type GameDefinition = {
 };
 
 export const GAME_DEFINITIONS: GameDefinition[] = [
+  {
+    key: "sunny-farm", title: "Sunny Farm Helpers",
+    description: "Drive the tractor, care for your animals, collect eggs, and grow a happy little farm.",
+    icon: "Tractor", ageMin: 4, ageMax: 12, playTime: "5–10 min", color: "#52802c", bg: "#ecfccb",
+  },
   {
     key: "block-drop",
     title: "Block Drop",
@@ -145,6 +150,7 @@ export const DEFAULT_GAME_SETTINGS: Record<GameKey, {
   requiresChoresComplete: boolean;
   dailyPlayLimit: number;
 }> = {
+  "sunny-farm": { enabled: true, rewardType: "none", rewardPoints: 5, rewardTickets: 0, requiresChoresComplete: false, dailyPlayLimit: 0 },
   "block-drop": {
     enabled: true,
     rewardType: "points",

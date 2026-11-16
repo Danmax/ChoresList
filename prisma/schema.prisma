@@ -109,6 +109,7 @@ model Household {
   meritBadges              MeritBadge[]
   memberBadges             MemberBadge[]
   wellbeingCheckIns        WellbeingCheckIn[]
+  farmProgress             FarmProgress[]
   gameSettings             GameSetting[]
   gameSessions             GameSession[]
   familyChessMatches       FamilyChessMatch[]
@@ -253,6 +254,7 @@ model FamilyMember {
   educationAssignments  EducationAssignment[]
   educationAttempts     EducationAttempt[]
   educationProjects     EducationProject[]
+  farmProgress          FarmProgress?
   gameSessions          GameSession[]
   primaryVirtualPets    VirtualPet[]             @relation("PrimaryPal")
   palCaregiving         PetCaregiver[]
@@ -1755,4 +1757,19 @@ model DevicePairingCode {
   household Household        @relation(fields: [householdId], references: [id], onDelete: Cascade)
   member    FamilyMember?    @relation(fields: [memberId], references: [id], onDelete: SetNull)
   device    HouseholdDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+}
+
+model FarmProgress {
+  id          String   @id @default(uuid()) @db.Char(36)
+  householdId String   @db.Char(36)
+  memberId    String   @unique @db.Char(36)
+  state       Json
+  version     Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  household Household    @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  member    FamilyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([householdId])
 }

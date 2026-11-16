@@ -195,6 +195,9 @@ export const POST = withErrors(async (req: NextRequest) => {
   const game = gameByKey(body.gameKey);
   const memberId = typeof body.memberId === "string" ? body.memberId : "";
   if (!game || !memberId) return NextResponse.json({ error: "Game and member are required" }, { status: 400 });
+  if (game.key === "sunny-farm") {
+    return NextResponse.json({ error: "Farm rewards come from completing a farm day in the game." }, { status: 400 });
+  }
   if (game.key === "pocket-pals") {
     return NextResponse.json({ error: "Pocket Pals rewards come from completing daily care in the game." }, { status: 400 });
   }

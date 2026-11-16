@@ -42,6 +42,15 @@ npm run db:deploy
 
 `GIPHY_API_KEY` is optional and enables GIF search on event message boards. Members can still paste an HTTPS GIF URL when it is not configured.
 
+## Sunny Farm Helpers
+
+A farm game in each child’s Games screen: collect hay, feed and brush the horse,
+milk the cow, gather eggs, guide and shear sheep, feed ducks, pick apples, and
+plant/water/harvest carrots. Progress saves per child, and parents configure access
+and optional completion rewards under Parent → Games. Apply
+`20261115000000_add_sunny_farm` with `npm run db:deploy` before playing.
+See [the farm guide](docs/sunny-farm.md) for controls, assets, and verification.
+
 ## Pocket Pals
 
 Pocket Pals lives in each player's Games screen. Each Pal has a permanent
