@@ -703,7 +703,7 @@ function ShapeSafari({
   }
 
   return (
-    <section className="rounded-3xl bg-white p-4 shadow-sm sm:p-6">
+    <section className="rounded-3xl bg-white p-4 shadow-sm sm:mx-auto sm:w-full sm:max-w-xl sm:p-6">
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="flex items-center gap-2 text-2xl font-black text-slate-800"><Shapes className="text-orange-600" /> Shape Safari</h2>
@@ -724,7 +724,7 @@ function ShapeSafari({
               key={choice}
               type="button"
               onClick={() => choose(choice)}
-              className={`aspect-square rounded-3xl border-2 text-5xl shadow-sm transition-all ${selected ? isCorrect ? "border-emerald-300 bg-emerald-50" : isSelected ? "border-red-200 bg-red-50" : "border-slate-100 opacity-50" : "border-orange-100 bg-white hover:-translate-y-0.5 hover:border-orange-300"}`}
+              className={`aspect-square sm:aspect-auto sm:h-32 rounded-3xl border-2 text-5xl shadow-sm transition-all ${selected ? isCorrect ? "border-emerald-300 bg-emerald-50" : isSelected ? "border-red-200 bg-red-50" : "border-slate-100 opacity-50" : "border-orange-100 bg-white hover:-translate-y-0.5 hover:border-orange-300"}`}
               aria-label={`Choose ${choice}`}
             >
               {choice}

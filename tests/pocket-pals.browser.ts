@@ -161,6 +161,11 @@ async function main() {
     await expect(page.getByRole("img", { name: "Little crown", exact: true })).toBeVisible();
     assert.deepEqual(saved!.accessoryPositions!.bow, bowPlacement);
     await page.setViewportSize({ width: 1280, height: 1100 });
+    if (process.argv.includes("--wardrobe-only")) {
+      assert.deepEqual(errors, []);
+      console.log(`Wardrobe browser flow passed: multiple accessories, keyboard and drag placement, removal, re-wearing, reload and 320px layout. Screenshots: ${screenshotDir}`);
+      return;
+    }
     await page.getByRole("button", { name: "Arrange room", exact: true }).click();
     await expect(page.getByRole("button", { name: "Done arranging", exact: true })).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByRole("button", { name: /Play Choose/ })).toBeDisabled();
