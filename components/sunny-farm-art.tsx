@@ -11,6 +11,7 @@ const items = {
   pail: [15, 550, 130, 145], milk: [160, 550, 135, 145],
   apple: [1265, 820, 85, 90], carrot: [1170, 545, 155, 140],
   sprout: [750, 725, 85, 80], carrotPlant: [845, 700, 95, 105],
+  tomatoPlant: [505, 690, 115, 115], cornPlant: [1390, 685, 115, 120],
   seeds: [30, 735, 90, 60], soil: [15, 840, 250, 150], sprouts: [270, 840, 240, 150],
   carrots: [510, 840, 250, 150], tree: [1020, 810, 220, 190],
 } satisfies Record<string, number[]>;

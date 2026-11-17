@@ -2,7 +2,7 @@ import { chromium, expect } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import { DEFAULT_GAME_SETTINGS, GAME_DEFINITIONS } from "../lib/games";
 import { farmTool } from "../lib/sunny-farm-tools";
-import { activeTargets, applyFarmAction, celebrateFarm, createFarm, FARM_TASKS, nextFarmDay } from "../lib/sunny-farm";
+import { activeTargets, applyFarmAction, celebrateFarm, createFarm, FARM_CROPS, FARM_TASKS, nextFarmDay } from "../lib/sunny-farm";
 
 async function main() {
   const browser = await chromium.launch({ headless: true });
@@ -30,7 +30,7 @@ async function main() {
         if (conflictNext) { conflictNext = false; version++; await route.fulfill({ status: 409, json: { error: "Farm updated in another tab." } }); return; }
         try {
           if (body.version !== version) throw new Error("Stale version");
-          if (body.action === "help") { if (body.tool !== farmTool(body.task, body.target).id) throw new Error("Wrong tool"); farm = applyFarmAction(farm, body.task, body.target); }
+          if (body.action === "help") { if (body.tool !== farmTool(body.task, body.target).id) throw new Error("Wrong tool"); farm = applyFarmAction(farm, body.task, body.target, body.crop); }
           else if (body.action === "celebrate") { farm = celebrateFarm(farm); rewards++; }
           else if (body.action === "next-day") farm = nextFarmDay(farm);
           version++;
@@ -118,7 +118,20 @@ async function main() {
         if (farm.done[task.id].includes(target)) continue;
         const i = Number(target.split("-").at(-1)) + 1;
         const label = task.id === "chickens" && target === "feed" ? "Scatter grain" : labels[target] ?? (target.startsWith("brush") ? `Brush spot ${i}` : target.startsWith("egg") ? `Collect egg ${i}` : target.startsWith("herd") ? `Guide sheep ${i}` : target.startsWith("wool") ? `Clip wool ${i}` : target.startsWith("duck") ? `Feed duck ${i}` : target.startsWith("apple") ? `Pick apple ${i}` : target.startsWith("plant") ? `Plant bed ${i}` : target.startsWith("water") ? `Water bed ${i}` : `Harvest bed ${i}`);
-        if (target === "feed") {
+        if (task.id === "garden" && target.startsWith("plant-")) {
+          const crop = FARM_CROPS[(i - 1) % 3];
+          await page.getByRole("button", { name: crop.label, exact: true }).click();
+          await work(label);
+          await expect(page.locator(`[data-crop="${crop.id}"]`)).toHaveCount(Math.ceil(i / 3));
+          if (target === "plant-8") {
+            await open();
+            await page.getByRole("button", { name: `${task.title}: ${task.verb}`, exact: true }).click();
+            for (const savedCrop of FARM_CROPS) await expect(page.locator(`[data-crop="${savedCrop.id}"]`)).toHaveCount(3);
+            await page.setViewportSize({ width: 390, height: 844 });
+            await page.screenshot({ path: "/tmp/sunny-farm-preview/mixed-garden-mobile.png", fullPage: true });
+            await page.setViewportSize({ width: 1280, height: 1100 });
+          }
+        } else if (target === "feed") {
           const animalLabel = task.id === "chickens" ? "Feed chicken 1" : `Feed ${task.id}`;
           const animalButton = page.getByRole("button", { name: animalLabel, exact: true });
           await page.setViewportSize({ width: 390, height: 844 });
@@ -193,8 +206,19 @@ async function main() {
           await page.mouse.down(); await page.waitForTimeout(1250); await page.mouse.up();
           await expect(bed).toHaveCount(0);
         } else await work(label);
+        if (task.id === "garden" && target === "water-8") {
+          await page.screenshot({ path: "/tmp/sunny-farm-preview/mixed-garden-grown-desktop.png", fullPage: true });
+          await page.setViewportSize({ width: 390, height: 844 });
+          await page.screenshot({ path: "/tmp/sunny-farm-preview/mixed-garden-grown-mobile.png", fullPage: true });
+          const gardenScene = await page.getByLabel("Vegetable garden activity", { exact: true }).boundingBox();
+          if (!gardenScene || gardenScene.x + gardenScene.width > 390) throw new Error("Mobile garden extends past the screen");
+          await page.setViewportSize({ width: 1280, height: 1100 });
+        }
       }
       await expect(page.getByText("Happy & cared for!")).toBeVisible();
+      if (task.id === "garden") {
+        for (const crop of FARM_CROPS) await expect(page.getByLabel(`3 ${crop.inventory}`, { exact: true })).toBeVisible();
+      }
       if (task.id === "garden") await page.screenshot({ path: "/tmp/sunny-farm-preview/garden-desktop.png", fullPage: true });
       if (task.id === "horse") {
         const horseArt = page.getByRole("img", { name: "Your farm horse", exact: true });

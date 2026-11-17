@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { activeTargets, applyFarmAction, farmBreakfast, nextFarmStop, celebrateFarm, completedTasks, createFarm, FARM_TASKS, farmReady, nextFarmDay, type FarmState } from "../lib/sunny-farm";
+import { FARM_CROPS, bedCrop, activeTargets, applyFarmAction, farmBreakfast, nextFarmStop, celebrateFarm, completedTasks, createFarm, FARM_TASKS, farmReady, nextFarmDay, type FarmState } from "../lib/sunny-farm";
 
 function helpAll(farm: FarmState, task: typeof FARM_TASKS[number]) {
   for (const stage of task.stages) for (const target of stage) farm = applyFarmAction(farm, task.id, target);
@@ -11,7 +11,7 @@ test("connected farm loop supplies hay, saves goods, and celebrates once", () =>
   for (const task of FARM_TASKS) farm = helpAll(farm, task);
   assert.equal(completedTasks(farm), 8);
   assert.equal(farmReady(farm), true);
-  assert.deepEqual(farm.inventory, { hay: 1, milk: 1, eggs: 3, wool: 3, apples: 3, carrots: 9 });
+  assert.deepEqual(farm.inventory, { hay: 1, milk: 1, eggs: 3, wool: 3, apples: 3, carrots: 9, tomatoes: 0, corn: 0 });
   farm = celebrateFarm(farm);
   assert.equal(farm.completedDays, 1);
   assert.throws(() => celebrateFarm(farm), /already/);
@@ -87,4 +87,50 @@ test("feedback varies across repeated actions and distinguishes care types", asy
   assert.equal(feedbackKind("horse", "feed"), "feed");
   assert.equal(feedbackKind("chickens", "egg-0"), "egg");
   assert.equal(feedbackKind("garden", "water-0"), "grow");
+});
+
+
+test("mixed crops persist per bed and harvest into the matching basket counts", () => {
+  let farm = createFarm();
+  for (let i = 0; i < 9; i++) farm = applyFarmAction(farm, "garden", `plant-${i}`, FARM_CROPS[i % 3].id);
+  farm = JSON.parse(JSON.stringify(farm));
+  for (let i = 0; i < 9; i++) {
+    assert.equal(bedCrop(farm, i).id, FARM_CROPS[i % 3].id);
+    farm = applyFarmAction(farm, "garden", `water-${i}`);
+  }
+  for (let i = 8; i >= 0; i--) farm = applyFarmAction(farm, "garden", `harvest-${i}`);
+  assert.equal(farm.inventory.carrots, 3);
+  assert.equal(farm.inventory.tomatoes, 3);
+  assert.equal(farm.inventory.corn, 3);
+  assert.throws(() => applyFarmAction(farm, "garden", "harvest-0"), /already/);
+});
+
+test("invalid crops and changes after planting are rejected without changing a save", () => {
+  const farm = createFarm();
+  for (const crop of ["potato", "", null, {}, ["corn"]]) assert.throws(() => applyFarmAction(farm, "garden", "plant-0", crop), /Choose/);
+  const planted = applyFarmAction(farm, "garden", "plant-0", "tomato");
+  assert.throws(() => applyFarmAction(planted, "garden", "plant-0", "corn"), /already/);
+  assert.throws(() => applyFarmAction(planted, "hay", "bale-0", "corn"), /Choose/);
+  assert.deepEqual(farm.gardenCrops, {});
+});
+
+test("old carrot saves continue alongside new crops without a migration", () => {
+  let farm = createFarm();
+  delete farm.gardenCrops;
+  delete farm.inventory.tomatoes;
+  delete farm.inventory.corn;
+  farm.done.garden = ["plant-0", "plant-1"];
+  farm = applyFarmAction(farm, "garden", "plant-2", "tomato");
+  farm = applyFarmAction(farm, "garden", "plant-3", "corn");
+  for (let i = 4; i < 9; i++) farm = applyFarmAction(farm, "garden", `plant-${i}`);
+  for (let i = 0; i < 9; i++) farm = applyFarmAction(farm, "garden", `water-${i}`);
+  for (let i = 0; i < 9; i++) farm = applyFarmAction(farm, "garden", `harvest-${i}`);
+  assert.equal(farm.inventory.carrots, 7);
+  assert.equal(farm.inventory.tomatoes, 1);
+  assert.equal(farm.inventory.corn, 1);
+  for (const task of FARM_TASKS.filter(t => t.id !== "garden")) farm = helpAll(farm, task);
+  const next = nextFarmDay(celebrateFarm(farm));
+  assert.deepEqual(next.gardenCrops, {});
+  assert.equal(next.inventory.tomatoes, 0);
+  assert.equal(next.inventory.corn, 0);
 });

@@ -53,7 +53,7 @@ export const POST = withErrors(async (req) => {
       if (body.action === "help") {
         const task = taskDefinition(body.task);
         if (!task || typeof body.target !== "string" || body.tool !== farmTool(task.id, body.target).id) throw new FarmRuleError("Pick up the right tool for this job first.");
-        next = applyFarmAction(state, body.task, body.target);
+        next = applyFarmAction(state, body.task, body.target, body.crop);
       }
       else if (body.action === "celebrate") next = celebrateFarm(state);
       else if (body.action === "next-day") next = nextFarmDay(state);

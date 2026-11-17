@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { ArrowLeft, Check, Heart, LoaderCircle, Volume2, VolumeX } from "lucide-react";
-import { activeTargets, completedTasks, farmBreakfast, nextFarmStop, FARM_TASKS, farmReady, taskComplete, taskDefinition, type FarmState, type FarmTaskId } from "@/lib/sunny-farm";
+import { FARM_CROPS, bedCrop, type FarmCropId, activeTargets, completedTasks, farmBreakfast, nextFarmStop, FARM_TASKS, farmReady, taskComplete, taskDefinition, type FarmState, type FarmTaskId } from "@/lib/sunny-farm";
 import { FarmCollectionBasket, FarmWorkbench, FarmWorkTarget } from "./sunny-farm-tools";
 import { useFarmAudio } from "./sunny-farm-audio";
 import { FarmExplore } from "./sunny-farm-explore";
@@ -13,12 +13,13 @@ import styles from "./sunny-farm.module.css";
 
 type SavedFarm = { farm: FarmState; version: number; reward?: { points: number; tickets: number } | null };
 const positions = [[15, 37], [38, 39], [61, 38], [84, 36], [16, 74], [39, 76], [62, 74], [85, 73]];
-const inventoryIcons = { hay: "🌾", eggs: "🥚", milk: "🥛", wool: "🧶", apples: "🍎", carrots: "🥕" };
+const inventoryIcons = { hay: "🌾", eggs: "🥚", milk: "🥛", wool: "🧶", apples: "🍎", carrots: "🥕", tomatoes: "🍅", corn: "🌽" };
 const place = (x: number, y: number, width?: number): CSSProperties => ({ left: `${x}%`, top: `${y}%`, ...(width ? { width: `${width}%` } : {}) });
 
 export function SunnyFarm({ memberId, playerName, onExit }: { memberId: string; playerName: string; onExit: () => void }) {
   const [saved, setSaved] = useState<SavedFarm | null>(null);
   const [taskId, setTaskId] = useState<FarmTaskId | null>(null);
+  const [selectedCrop, setSelectedCrop] = useState<FarmCropId>("carrot");
   const audio = useFarmAudio();
   const responses = useRef<Partial<Record<FarmFeedbackKind, number>>>({});
   function respond(kind: FarmFeedbackKind) { const count = responses.current[kind] ?? 0; responses.current[kind] = count + 1; return responseAt(kind, count); }
@@ -52,7 +53,7 @@ export function SunnyFarm({ memberId, playerName, onExit }: { memberId: string; 
     if (!saved || inFlight.current) return;
     inFlight.current = true; setBusy(true); setError("");
     try {
-      const res = await fetch("/api/sunny-farm", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ memberId, version: saved.version, action, task: taskId, target, tool }) });
+      const res = await fetch("/api/sunny-farm", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ memberId, version: saved.version, action, task: taskId, target, tool, ...(taskId === "garden" && target?.startsWith("plant-") ? { crop: selectedCrop } : {}) }) });
       const data = await res.json();
       if (!res.ok) {
         if (res.status === 409) await load();
@@ -107,6 +108,11 @@ export function SunnyFarm({ memberId, playerName, onExit }: { memberId: string; 
       </div> : task ? <>
         <div className={styles.activityHeader}><button className={styles.smallButton} onClick={() => { setTaskId(null); setError(""); setMessage("Choose another spot to help."); }}><ArrowLeft size={17} /> Farm map</button><div><span className={styles.eyebrow}>{task.verb}</span><h3 ref={titleRef} tabIndex={-1}>{task.title}</h3></div><span className={styles.activityIcon} aria-hidden="true">{task.icon}</span></div>
         {done && <div className={styles.instructions}><span aria-hidden="true">{done ? "💛" : "👉"}</span><p>{done ? "All done! Thank you for taking care of the farm." : farmTool(task.id, targets[0] ?? "").instruction}</p></div>}
+        {task.id === "garden" && targets[0]?.startsWith("plant-") && <div className={styles.cropPicker} role="group" aria-label="Choose seeds">
+          <strong>Choose seeds for your next bed</strong>
+          {FARM_CROPS.map(crop => <button type="button" key={crop.id} aria-pressed={selectedCrop === crop.id} disabled={busy} onClick={() => setSelectedCrop(crop.id)}><span aria-hidden="true">{crop.icon}</span> {crop.label}</button>)}
+          <span>Pick seeds, then plant an empty bed. Mix crops in your garden!</span>
+        </div>}
         <FarmWorkbench key={task.id} task={task.id} targets={targets} busy={busy} onComplete={(target, tool) => void act("help", target, tool)}>
         <div className={`${styles.scene} ${styles.activityScene} ${task.id === "garden" ? styles.gardenScene : ""}`} style={{ backgroundImage: `url('/games/sunny-farm/${task.scene}.webp')` }} aria-label={`${task.title} activity`}>
           <ActivityArtwork taskId={task.id} farm={farm} targets={targets} busy={busy} eating={reaction?.task === task.id && reaction.kind === "eat"} happy={reaction?.task === task.id && reaction.kind === "happy"} />
@@ -128,7 +134,7 @@ export function SunnyFarm({ memberId, playerName, onExit }: { memberId: string; 
         </div>
         <div className={styles.mapFooter}><span>Explore freely, or follow the farm trail.</span>{nextStop && <button className={styles.primary} onClick={() => openTask(nextStop)}>Let’s visit the {taskDefinition(nextStop)!.title.toLowerCase()} →</button>}{farmReady(farm) && <button className={styles.primary} disabled={busy} onClick={() => void act("celebrate")}>Celebrate our happy farm! ★</button>}</div>
       </>}
-      <div className={styles.basketBar}><span className={styles.basketTitle}>Your farm basket</span>{Object.entries(farm.inventory).map(([name, amount]) => <span key={name} className={styles.inventory} aria-label={`${amount} ${name}`}><span aria-hidden="true">{inventoryIcons[name as keyof typeof inventoryIcons]}</span><strong>{amount}</strong><span>{name}</span></span>)}</div>
+      <div className={styles.basketBar}><span className={styles.basketTitle}>Your farm basket</span>{Object.entries({ ...farm.inventory, tomatoes: farm.inventory.tomatoes ?? 0, corn: farm.inventory.corn ?? 0 }).map(([name, amount]) => <span key={name} className={styles.inventory} aria-label={`${amount} ${name}`}><span aria-hidden="true">{inventoryIcons[name as keyof typeof inventoryIcons]}</span><strong>{amount}</strong><span>{name}</span></span>)}</div>
       <div className={styles.status} role="status" aria-live="polite">{busy ? "Saving your helping hands…" : message}</div>
       {error && <p className={styles.error} role="alert">{error}</p>}
     </>}
@@ -185,8 +191,9 @@ function ActivityArtwork({ taskId: id, farm, targets, busy, eating, happy }: { t
     const planted = seen(`plant-${i}`), watered = seen(`water-${i}`), harvested = seen(`harvest-${i}`);
     const current = targets.find(t => t.endsWith(`-${i}`));
     const label = current?.startsWith("plant") ? `Plant bed ${i + 1}` : current?.startsWith("water") ? `Water bed ${i + 1}` : `Harvest bed ${i + 1}`;
-    const plants = <span className={styles.bedPlants}>{!harvested && planted && [0, 1, 2].map(n => <FarmSprite key={n} item={watered ? "carrotPlant" : "sprout"} />)}</span>;
-    return <div key={i} className={`${styles.fieldBed} ${watered && !harvested ? styles.wetBed : ""}`} style={{ ...place(x, y), width: `${22 + row * 3}%` }}>
+    const crop = bedCrop(farm, i);
+    const plants = <span className={styles.bedPlants}>{!harvested && planted && [0, 1, 2].map(n => <FarmSprite key={n} item={watered ? crop.plant : "sprout"} />)}</span>;
+    return <div key={i} data-crop={planted ? crop.id : undefined} title={planted ? `Bed ${i + 1}: ${crop.label}` : undefined} className={`${styles.fieldBed} ${watered && !harvested ? styles.wetBed : ""}`} style={{ ...place(x, y), width: `${22 + row * 3}%` }}>
       {current ? <FarmWorkTarget target={current} label={label} disabled={busy} className={styles.bedTarget} style={{}}>{plants}<span className={styles.bedNumber}>{i + 1}</span></FarmWorkTarget> : plants}
     </div>;
   })}</>;
