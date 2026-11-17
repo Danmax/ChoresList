@@ -172,7 +172,7 @@ export function BlockDrop({ onExit, onFinish }: {
               <div className={styles.tetrisBanner}><strong>TETRIS!</strong><span>4 lines · +{800 * level}</span></div>
             </div>}
             {(!game || paused || finished) && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 p-3 text-center backdrop-blur-sm">
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-950/90 p-3 text-center backdrop-blur-sm">
                 <p className="text-xl font-black sm:text-2xl">{finished ? "Nice stacking!" : game ? "Paused" : (isColumns ? "Three of a kind!" : "Make room for more.")}</p>
                 <p role="status" className="mt-2 text-sm text-slate-300">{finished ? `${game?.score.toLocaleString()} score · ${columns ? columns.cleared : blocks?.lines} ${isColumns ? "symbols" : "lines"}` : game ? "Your blocks can wait." : (isColumns ? "Cycle a stack of three. Match 3+ across, down, or diagonally!" : "Fill a row to clear it. Keep the stack below the top!")}</p>
                 {!finished && <button type="button" onClick={() => { if (!game) start(); else { setPaused(false); boardRef.current?.focus(); } }} className="mt-5 flex min-h-12 items-center gap-2 rounded-xl bg-cyan-300 px-5 py-3 text-sm font-black text-slate-950"><Play size={18} />{game ? "Resume" : "Start game"}</button>}

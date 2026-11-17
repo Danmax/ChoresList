@@ -1,6 +1,91 @@
 import assert from "node:assert/strict";
-import { chromium, expect } from "@playwright/test";
+import { chromium, expect, type Page } from "@playwright/test";
 import { DEFAULT_GAME_SETTINGS, GAME_DEFINITIONS } from "../lib/games";
+
+async function checkClearEffects(page: Page, tetris: boolean) {
+  await page.setViewportSize({ width: 1200, height: 1000 });
+  await page.getByRole("button", { name: /Block Drop/ }).click();
+  // These two seven-piece bags build a four-row stack with a well on the right.
+  const randomValues = [["I", "O", "J", "L", "S", "T", "Z"], ["T", "J", "I", "O", "S", "Z", "L"]].flatMap((target) => {
+    const bag = ["I", "O", "T", "S", "Z", "J", "L"];
+    const values: number[] = [];
+    for (let i = bag.length - 1; i > 0; i--) {
+      const j = bag.indexOf(target[i]);
+      values.push((j + 0.5) / (i + 1));
+      [bag[i], bag[j]] = [bag[j], bag[i]];
+    }
+    return values;
+  });
+  await page.getByRole("button", { name: "Start game", exact: true }).evaluate((button, values) => {
+    const original = Math.random;
+    Math.random = () => {
+      const value = values.shift();
+      if (!values.length) Math.random = original;
+      return value ?? original();
+    };
+    (button as HTMLButtonElement).click();
+  }, randomValues);
+  const board = page.getByRole("group", { name: "Block Drop board", exact: true });
+  const moves = tetris ? [
+    ["ArrowLeft", "ArrowLeft", "ArrowLeft"],
+    ["ArrowLeft", "ArrowLeft", "ArrowLeft", "ArrowLeft"],
+    ["ArrowUp", "ArrowUp", "ArrowUp", "ArrowLeft"],
+    ["ArrowRight", "ArrowRight", "ArrowRight"],
+    ["ArrowRight"], ["ArrowUp"],
+    ["ArrowUp", "ArrowRight", "ArrowRight", "ArrowRight"],
+    ["ArrowUp", "ArrowUp", "ArrowRight", "ArrowRight"],
+    ["ArrowUp", "ArrowUp", "ArrowLeft", "ArrowLeft", "ArrowLeft"],
+    ["ArrowUp", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight"],
+  ] : [
+    ["ArrowLeft", "ArrowLeft", "ArrowLeft"],
+    ["ArrowLeft", "ArrowLeft", "ArrowLeft", "ArrowLeft"],
+    ["ArrowRight"],
+    ["ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight"],
+  ];
+  for (const keys of moves) {
+    for (const key of keys) await board.press(key);
+    await board.press("Space");
+  }
+  await expect(board).toHaveAttribute("data-clear", tetris ? "tetris" : "line");
+  await expect(board.locator('[data-clearing="true"]')).toHaveCount(tetris ? 40 : 10);
+  await expect(page.getByRole("button", { name: "Drop", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Finish & save" })).toBeDisabled();
+  const flashing = await board.innerHTML();
+  await board.press("ArrowLeft");
+  await board.press("Space");
+  assert.equal(await board.innerHTML(), flashing, "keyboard input must wait for the clear effect");
+  await page.clock.runFor(tetris ? 400 : 200);
+  await board.press("p");
+  const paused = await board.innerHTML();
+  await page.clock.runFor(3000);
+  assert.equal(await board.innerHTML(), paused, "pause must preserve an in-progress clear");
+  await page.getByRole("button", { name: "Resume", exact: true }).first().click();
+  if (tetris) {
+    await expect(board.getByText("TETRIS!", { exact: true })).toHaveCount(1);
+    await expect(board.getByText("4 lines · +800", { exact: true })).toHaveCount(1);
+    await board.evaluate((node) => node.getAnimations({ subtree: true }).forEach((animation) => { animation.pause(); animation.currentTime = 300; }));
+    await page.screenshot({ path: "/tmp/block-drop-tetris-desktop.png", fullPage: true });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({ path: "/tmp/block-drop-tetris-mobile.png", fullPage: true });
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    assert.equal(await board.locator('[data-clearing="true"]').first().evaluate((node) => getComputedStyle(node, "::after").animationName), "none");
+    await expect(board.getByText("TETRIS!", { exact: true })).toBeVisible();
+  } else {
+    assert.notEqual(await board.locator('[data-clearing="true"]').first().evaluate((node) => getComputedStyle(node, "::after").animationName), "none");
+  }
+  await page.clock.runFor(tetris ? 899 : 419);
+  await expect(board.locator('[data-clearing="true"]')).toHaveCount(tetris ? 40 : 10);
+  await page.clock.runFor(1);
+  await expect(board).not.toHaveAttribute("data-clear");
+  await expect(board.locator('[data-clearing="true"]')).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Drop", exact: true })).toBeEnabled();
+  await expect(board.getByText("TETRIS!", { exact: true })).toHaveCount(0);
+  const cells = board.locator('div[aria-hidden="true"] > div');
+  if (tetris) assert.equal(await cells.evaluateAll((nodes) => nodes.slice(20).filter((node) => (node as HTMLElement).style.backgroundColor !== "rgb(21, 34, 57)").length), 0, "all four completed rows must disappear");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.getByRole("button", { name: "Exit", exact: true }).click();
+}
 
 async function main() {
   const browser = await chromium.launch({ headless: true });
@@ -93,8 +178,10 @@ async function main() {
       assert.equal(typeof metadata.bestChain, "number");
     }
     assert.equal(sessions.length, 3);
+    await checkClearEffects(page, false);
+    await checkClearEffects(page, true);
     assert.deepEqual(errors, []);
-    console.log("Block Drop browser checks passed: classic blocks, gem and fruit columns, cycling, touch, pause, mobile layout, and session saving.");
+    console.log("Block Drop browser checks passed: classic blocks, line flashes, Tetris effects, reduced motion, columns, touch, pause, mobile layout, and session saving.");
   } finally { await browser.close(); }
 }
 
