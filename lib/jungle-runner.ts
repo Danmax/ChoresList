@@ -1,6 +1,7 @@
 import { createInsect, INSECT_KINDS, stepInsects, type Insect, type InsectKind, type AntRock, type HitReaction } from './jungle-insects';
 import { addDinoSection, stepDinoLand, type Dino, type DinoProjectile, type Eruption, type TarPit } from './jungle-dinoland';
 import { addSavannaSection, isSavannaPit, savannaVinePosition, stepSavanna, type SavannaAnimal, type SavannaPit, type SavannaVine } from './jungle-savanna';
+import { addMonsterSection, MONSTER_LEVEL, stepMonsters, type Monster, type MonsterSpell, type MonsterEffect, type MoonShield } from './jungle-monsters';
 export const FLOOR = 310;
 export const PLAYER_X = 150;
 export const RUNNER_DIFFICULTIES = {
@@ -18,6 +19,7 @@ export const LEVELS = [
   { name: 'Giant Insect Grove', sky: '#542b79', mist: '#b4efd0', speed: 505 },
   { name: 'DinoLand', sky: '#dc7b58', mist: '#f9ce7c', speed: 565 },
   { name: 'Savanna Stampede', sky: '#ef9d55', mist: '#ffe4a0', speed: 625 },
+  { name: 'Moonlit Monster Hollow', sky: '#100e32', mist: '#564789', speed: 685 },
 ] as const;
 export const LEVEL_SECONDS = 60;
 export const SLIDE_SECONDS = 1.5;
@@ -35,6 +37,7 @@ export const GEMS = [
   { name: 'Moonstone', color: '#d2b7ff' }, { name: 'Peridot', color: '#c4ff57' },
   { name: 'Sunstone', color: '#ff9d52' },
   { name: 'Citrine', color: '#ffe064' },
+  { name: 'Amethyst', color: '#c58aff' },
 ] as const;
 export function hasAllGems(s: Pick<Runner, 'gemCollected'>) { return s.gemCollected.every(Boolean); }
 export type Hog = { herdX: number; x: number; y: number; vy: number; age: number; jumper: boolean; jumpIn: number; active: boolean; knocked?: boolean };
@@ -198,6 +201,9 @@ export function createRunner(difficulty: RunnerDifficulty = 'medium', startLevel
     savannaAnimals: [] as SavannaAnimal[], savannaPits: [] as SavannaPit[], savannaVines: [] as SavannaVine[], savannaEncounterIndex: 0, savannaBounces: 0,
     savannaBossStarted: false, savannaLionDefeated: false, savannaOasisOpen: false,
     savannaOasisReached: false, savannaFinishX: null as number | null,
+    monsters: [] as Monster[], monsterSpells: [] as MonsterSpell[], monsterEffects: [] as MonsterEffect[], moonShields: [] as MoonShield[],
+    monsterEncounterIndex: 0, monsterShieldLeft: 0, monsterBossStarted: false, monsterBossDefeated: false,
+    monsterPortalOpen: false, monsterPortalReached: false, monsterFinishX: null as number | null,
     reaction: 'bonk' as HitReaction, reactionLeft: 0,
     phase: 'ready' as 'ready' | 'playing' | 'over' | 'victory',
     distance: 0, elapsed: initialLevel * RUNNER_DIFFICULTIES[difficulty].seconds, level: initialLevel, endLevel: finalLevel, y: FLOOR, vy: 0, jumps: 0, duck: false, duckHeld: false, hesitating: false, slideLeft: 0, slideCooldown: 0, strongDiveLeft: 0, attackLeft: 0, forwardDashLeft: 0, forwardDashCooldown: 0, combatMove: 'run' as 'run' | 'punch' | 'kick' | 'dash', combatLeft: 0, comboStep: 0, comboWindow: 0, hitCombo: 0, hitComboWindow: 0, hitStreak: 0, hitStreakWindow: 0, bestHitStreak: 0, attackLanded: false, counterLeft: 0, ki: 0, specialLeft: 0, cameraLead: 0, impactShake: 0,
@@ -308,6 +314,12 @@ export function starKnockout(s: Runner, x: number, y: number, label: string) {
 
 function hurt(s: Runner, message: string, reaction: HitReaction = 'bonk') {
   if (s.invincible > 0) return;
+  if (s.monsterShieldLeft > 0) {
+    s.monsterShieldLeft = 0; s.invincible = 0.85;
+    s.monsterEffects.push({ kind: 'impact', x: s.distance + PLAYER_X, y: s.y - 50, age: 0 });
+    s.message = 'MOON SHIELD BLOCKED THE HIT!'; s.messageTime = 1.5;
+    return;
+  }
   s.swing = null;
   s.flipLeft = 0;
   s.lives--;
@@ -335,6 +347,7 @@ function hurt(s: Runner, message: string, reaction: HitReaction = 'bonk') {
 // of screen size. Every challenge is followed by a long, safe coin trail.
 function addSection(s: Runner) {
   const x = s.nextSection;
+  if (s.level === MONSTER_LEVEL) { addMonsterSection(s); return; }
   if (s.level === 7) { addSavannaSection(s); return; }
   if (s.level === 6) { addDinoSection(s); return; }
   if (s.level === 5) {
@@ -490,6 +503,7 @@ export function stepRunner(s: Runner, dt: number) {
     // short counter window without advancing hazards or the world beneath a
     // knocked-back hero.
     stepInsects(s, 0, runnerSpeed(s), s.y, () => {});
+    stepMonsters(s, 0, () => {});
     return;
   }
   if (s.duck) {
@@ -500,17 +514,17 @@ export function stepRunner(s: Runner, dt: number) {
   s.elapsed += dt;
   if (s.elapsed >= levelSeconds(s) * (s.endLevel + 1)) {
     const selectedDino = s.endLevel === 6;
-    const selectedSavanna = s.endLevel === 7;
     if (selectedDino && s.dinoBossDefeated) { s.phase = 'victory'; return; }
-    if (selectedSavanna) s.elapsed = levelSeconds(s) * 8 - 0.001;
-    else if (!selectedDino) { s.phase = 'victory'; return; }
-    else s.elapsed = levelSeconds(s) * 7 - 0.001;
+    if (s.endLevel >= 6) s.elapsed = levelSeconds(s) * (s.endLevel + 1) - 0.001;
+    else { s.phase = 'victory'; return; }
   }
   const level = Math.floor(s.elapsed / levelSeconds(s));
   if (level !== s.level) {
     // Adventure Mode cannot leave DinoLand until the T. rex is defeated.
     if (s.level === 6 && level === 7 && !s.dinoBossDefeated) {
       s.elapsed = levelSeconds(s) * 7 - 0.001;
+    } else if (s.level === 7 && level === MONSTER_LEVEL && !s.savannaOasisReached) {
+      s.elapsed = levelSeconds(s) * 8 - 0.001;
     } else {
     if (level === 5) {
       s.items = []; s.rivers = []; s.predators = []; s.hogs = []; s.bats = []; s.herds = []; s.spiders = []; s.orangutans = []; s.pineapples = []; s.guardians = []; s.birds = []; s.sloths = []; s.lemmings = [];
@@ -523,6 +537,11 @@ export function stepRunner(s: Runner, dt: number) {
     if (level === 7) {
       s.items = []; s.dinos = []; s.tarPits = []; s.eruptions = []; s.dinoProjectiles = [];
       s.savannaAnimals = []; s.savannaPits = []; s.savannaVines = []; s.swing = null;
+      s.nextSection = s.distance + 950;
+    }
+    if (level === MONSTER_LEVEL) {
+      s.items = []; s.savannaAnimals = []; s.savannaPits = []; s.savannaVines = []; s.birds = [];
+      s.monsters = []; s.monsterSpells = []; s.monsterEffects = []; s.moonShields = []; s.swing = null;
       s.nextSection = s.distance + 950;
     }
     s.level = level; s.section = 0; s.encounterDeck = []; s.insectDeck = []; s.items = s.items.filter(i => i.kind !== 'gem'); s.message = `LEVEL ${level + 1}: ${LEVELS[level].name}`; s.messageTime = 3;
@@ -718,6 +737,7 @@ export function stepRunner(s: Runner, dt: number) {
   const height = s.duck && s.y >= FLOOR - 1 ? 30 : 76;
   stepDinoLand(s, dt, previousY, (message, reaction) => hurt(s, message, reaction));
   stepSavanna(s, dt, previousY, (message, reaction) => hurt(s, message, reaction));
+  stepMonsters(s, dt, (message, reaction) => hurt(s, message, reaction));
   for (const r of s.rivers) {
     if (r.resident === 'piranha') for (let i = 0; i < 2; i++) {
       if (r.piranhasKnocked?.[i]) continue;

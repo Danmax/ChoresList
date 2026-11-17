@@ -5,7 +5,7 @@ const socialImage = new URL("/games/johnny-hero-journey.png", process.env.PUBLIC
 
 export const metadata: Metadata = {
   title: "Play Johnny: The People's Champ | ChoresList",
-  description: "Try the Jungle Runner adventure free. Run, flip, fight, and collect supplies across seven jungle stages.",
+  description: "Try the Jungle Runner adventure free. Explore nine stages, including Moonlit Monster Hollow with magical monsters and the Headless Horseman.",
   openGraph: {
     title: "Johnny: The People's Champ",
     description: "Play the Jungle Runner guest demo—no account needed for your first three runs.",

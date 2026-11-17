@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createRunner, FLOOR, jumpRunner, levelSeconds, PLAYER_X, punchRunner, stepRunner } from '../lib/jungle-runner';
+import { createRunner, FLOOR, jumpRunner, LEVELS, levelSeconds, PLAYER_X, punchRunner, stepRunner } from '../lib/jungle-runner';
 import { createSavannaAnimal, savannaVinePosition } from '../lib/jungle-savanna';
 
 function savanna(difficulty: 'easy' | 'medium' | 'hard' = 'medium') {
@@ -15,7 +15,7 @@ function advance(s: ReturnType<typeof savanna>, seconds: number) {
 test('Savanna Stampede is the eighth selectable level with a Citrine gem', () => {
   const s = savanna();
   assert.equal(s.level, 7);
-  assert.equal(s.gemCollected.length, 8);
+  assert.equal(s.gemCollected.length, LEVELS.length);
   assert.equal(s.endLevel, 7);
 });
 

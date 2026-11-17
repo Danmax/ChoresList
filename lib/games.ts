@@ -121,7 +121,7 @@ export const GAME_DEFINITIONS: GameDefinition[] = [
   {
     key: "jungle-vine-swing",
     title: "Johnny's Jungle Journey",
-    description: "Race through eight worlds with jumps, flips, slides, dashes, vine swings, and Ki counters. Survive DinoLand and its T. rex, then cross the Savanna Stampede with giraffe launches, wildebeest herds, laughing hyenas, death cliffs, a roaring lion, and the Oasis of Victory.",
+    description: "Race through nine worlds with jumps, flips, slides, dashes, vine swings, and Ki counters. Survive DinoLand, cross the Savanna Stampede, and explore Moonlit Monster Hollow with werewolves, vampires, spell returns, moon shields, and the Headless Horseman.",
     icon: "TreePine",
     ageMin: 5,
     ageMax: 14,

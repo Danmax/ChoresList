@@ -1,0 +1,253 @@
+{
+  "cell": 256,
+  "padding": 40,
+  "baseline": 216,
+  "sources": {
+    "Blue-Gray Wolf Running Sprite Sheet": {
+      "width": 1774,
+      "height": 887,
+      "exteriorMatteRemoved": false
+    },
+    "Blue-Gray Wolf Encounter Sprite Sheet": {
+      "width": 1774,
+      "height": 887,
+      "exteriorMatteRemoved": false
+    },
+    "Goblin Rogue Pumpkin Bomb Sprite Sheet": {
+      "width": 1774,
+      "height": 887,
+      "exteriorMatteRemoved": false
+    },
+    "Cartoon Goblin Running Sprite Sheet": {
+      "width": 1774,
+      "height": 887,
+      "exteriorMatteRemoved": false
+    },
+    "Chibi Zombie Caretaker Walk Cycle Grid": {
+      "width": 1774,
+      "height": 887,
+      "exteriorMatteRemoved": false
+    },
+    "Zombie Caretaker Encounter Sprite Sheet": {
+      "width": 1774,
+      "height": 887,
+      "exteriorMatteRemoved": true
+    },
+    "Werewolf Running Animation Sprite Sheet": {
+      "width": 1774,
+      "height": 887,
+      "exteriorMatteRemoved": false
+    },
+    "Werewolf Encounter Attack Sprite Sheet": {
+      "width": 1774,
+      "height": 887,
+      "exteriorMatteRemoved": true
+    },
+    "Horned Forest Beast Encounter Sprite Sheet": {
+      "width": 1774,
+      "height": 887,
+      "exteriorMatteRemoved": false
+    },
+    "Horned Forest Beast Walk Cycle": {
+      "width": 1774,
+      "height": 887,
+      "exteriorMatteRemoved": false
+    },
+    "Troll Club-Swinging Sprite Sheet": {
+      "width": 1774,
+      "height": 887,
+      "exteriorMatteRemoved": false
+    },
+    "Rocky Troll Walking Sprite Sheet": {
+      "width": 1774,
+      "height": 887,
+      "exteriorMatteRemoved": false
+    },
+    "Vampire Encounter Attack Sprite Sheet": {
+      "width": 1774,
+      "height": 887,
+      "exteriorMatteRemoved": false
+    },
+    "Vampire Run Cycle Sprite Sheet": {
+      "width": 1774,
+      "height": 887,
+      "exteriorMatteRemoved": true
+    },
+    "Headless Horseman Action Sprite Sheet": {
+      "width": 1774,
+      "height": 887,
+      "exteriorMatteRemoved": false
+    },
+    "Glowing Cyan Shield Bubble Sprite Sheet": {
+      "width": 1774,
+      "height": 887,
+      "exteriorMatteRemoved": false
+    },
+    "Glowing Green Ground Eruption Sprite Sheet": {
+      "width": 1774,
+      "height": 887,
+      "exteriorMatteRemoved": false
+    },
+    "Glowing Purple Magic Projectile Sprite Sheet": {
+      "width": 1774,
+      "height": 887,
+      "exteriorMatteRemoved": false
+    },
+    "Golden Impact Burst Sprite Sheet": {
+      "width": 1774,
+      "height": 887,
+      "exteriorMatteRemoved": false
+    },
+    "Magical Purple Teleport Smoke Sprite Sheet": {
+      "width": 1774,
+      "height": 887,
+      "exteriorMatteRemoved": false
+    },
+    "Moonlit Magic Rune Animation Spritesheet": {
+      "width": 1774,
+      "height": 887,
+      "exteriorMatteRemoved": true
+    },
+    "Pumpkin Explosion VFX Sprite Sheet": {
+      "width": 1774,
+      "height": 887,
+      "exteriorMatteRemoved": false
+    },
+    "Purple-Gold Curse Break VFX Sprite Sheet": {
+      "width": 1774,
+      "height": 887,
+      "exteriorMatteRemoved": false
+    },
+    "Haunted Graveyard Fantasy Tileset": {
+      "width": 1774,
+      "height": 887,
+      "exteriorMatteRemoved": false
+    }
+  },
+  "atlases": {
+    "wolf-run": {
+      "frames": 8,
+      "rows": 2,
+      "scale": 0.4160756501182033
+    },
+    "wolf-encounter": {
+      "frames": 8,
+      "rows": 2,
+      "scale": 0.4160756501182033
+    },
+    "goblin-run": {
+      "frames": 8,
+      "rows": 2,
+      "scale": 0.3752665245202559
+    },
+    "goblin-encounter": {
+      "frames": 8,
+      "rows": 2,
+      "scale": 0.3752665245202559
+    },
+    "zombie-run": {
+      "frames": 8,
+      "rows": 2,
+      "scale": 0.4230769230769231
+    },
+    "zombie-encounter": {
+      "frames": 8,
+      "rows": 2,
+      "scale": 0.4230769230769231
+    },
+    "werewolf-run": {
+      "frames": 8,
+      "rows": 2,
+      "scale": 0.4631578947368421
+    },
+    "werewolf-encounter": {
+      "frames": 8,
+      "rows": 2,
+      "scale": 0.4631578947368421
+    },
+    "beast-run": {
+      "frames": 8,
+      "rows": 2,
+      "scale": 0.44221105527638194
+    },
+    "beast-encounter": {
+      "frames": 8,
+      "rows": 2,
+      "scale": 0.44221105527638194
+    },
+    "troll-run": {
+      "frames": 8,
+      "rows": 2,
+      "scale": 0.3972911963882618
+    },
+    "troll-encounter": {
+      "frames": 8,
+      "rows": 2,
+      "scale": 0.3972911963882618
+    },
+    "vampire-run": {
+      "frames": 8,
+      "rows": 2,
+      "scale": 0.3972911963882618
+    },
+    "vampire-encounter": {
+      "frames": 8,
+      "rows": 2,
+      "scale": 0.3972911963882618
+    },
+    "horseman-encounter": {
+      "frames": 8,
+      "rows": 2,
+      "scale": 0.3876651982378855
+    },
+    "shield": {
+      "frames": 8,
+      "rows": 2,
+      "scale": 0.4282238442822384
+    },
+    "eruption": {
+      "frames": 8,
+      "rows": 2,
+      "scale": 0.4160756501182033
+    },
+    "bolt": {
+      "frames": 8,
+      "rows": 2,
+      "scale": 0.46437994722955145
+    },
+    "impact": {
+      "frames": 8,
+      "rows": 2,
+      "scale": 0.38427947598253276
+    },
+    "teleport": {
+      "frames": 8,
+      "rows": 2,
+      "scale": 0.3955056179775281
+    },
+    "rune": {
+      "frames": 8,
+      "rows": 2,
+      "scale": 0.411214953271028
+    },
+    "explosion": {
+      "frames": 8,
+      "rows": 2,
+      "scale": 0.3902439024390244
+    },
+    "curse": {
+      "frames": 8,
+      "rows": 2,
+      "scale": 0.4292682926829268
+    },
+    "pumpkin": {
+      "frames": 1,
+      "rows": 1,
+      "scale": 2.4444444444444446
+    },
+    "props": {
+      "frames": 9,
+      "rows": 3
+    }
+  }
+}

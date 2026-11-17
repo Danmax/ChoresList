@@ -581,7 +581,7 @@ test('full run spawns exactly one gem per level and bats only at night', () => {
     for (const item of s.items) if (item.kind === 'gem' && !seen.has(item)) { seen.add(item); counts[item.level!]++; }
     if (s.bats.length) { assert.equal(s.level, 4); nightBats = true; }
   }
-  assert.deepEqual(counts, [1, 1, 1, 1, 1, 1, 1, 0]); assert.ok(nightBats); assert.equal(s.phase, 'playing'); assert.equal(s.level, 6);
+  assert.deepEqual(counts, LEVELS.map((_, index) => index <= 6 ? 1 : 0)); assert.ok(nightBats); assert.equal(s.phase, 'playing'); assert.equal(s.level, 6);
 });
 
 test('gem collection awards 250 points once per level, and restart clears progress', () => {

@@ -3,6 +3,8 @@
 import { drawInsectGrove, drawInsects, drawReaction } from '@/lib/jungle-insect-art';
 import { drawDinoBackdrop, drawDinoLand, type DinoAnimations } from '@/lib/jungle-dino-art';
 import { drawSavanna, drawSavannaBackdrop, type SavannaSprites } from '@/lib/jungle-savanna-art';
+import { createMonsterSprites, loadMonsterSprites, drawMonsterBackdrop, drawMonsterGround, drawMonsters, drawMonsterForeground, type MonsterSprites } from '@/lib/jungle-monster-art';
+import { MONSTER_LEVEL } from '@/lib/jungle-monsters';
 import { pantherPaw } from '@/lib/jungle-motion';
 import { drawWaterLife, drawOrangutan, drawPineapple } from '@/lib/jungle-water-art';
 import { useEffect, useRef, useState } from 'react';
@@ -283,11 +285,12 @@ function toucanArt(ctx: CanvasRenderingContext2D, x: number, y: number, elapsed:
   ctx.restore();
 }
 
-function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElement, fightSprite: HTMLImageElement, predators: HTMLImageElement, wildlife: HTMLImageElement, insects: HTMLImageElement, dinos: HTMLImageElement, dinoAnimations: DinoAnimations, coffeeBear: HTMLImageElement, allySprites: { orangutan: HTMLImageElement; eel: HTMLImageElement; sloth: HTMLImageElement; lemming: HTMLImageElement; scorpion: HTMLImageElement }, savannaSprites: SavannaSprites) {
+function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElement, fightSprite: HTMLImageElement, predators: HTMLImageElement, wildlife: HTMLImageElement, insects: HTMLImageElement, dinos: HTMLImageElement, dinoAnimations: DinoAnimations, coffeeBear: HTMLImageElement, allySprites: { orangutan: HTMLImageElement; eel: HTMLImageElement; sloth: HTMLImageElement; lemming: HTMLImageElement; scorpion: HTMLImageElement }, savannaSprites: SavannaSprites, monsterSprites: MonsterSprites) {
   const W = 800, H = 400;
   const night = s.level === 4;
   const dinoZone = s.level === 6;
   const savannaZone = s.level === 7;
+  const monsterLevel = s.level === MONSTER_LEVEL;
   const cameraDistance = s.distance - s.cameraLead;
   const playerX = PLAYER_X + s.cameraLead;
   const animal = (row: number, frame: number, x: number, y: number, width: number, height: number, flip = false) => {
@@ -305,16 +308,17 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
   sky.addColorStop(0, LEVELS[s.level].sky); sky.addColorStop(1, LEVELS[s.level].mist);
   ctx.fillStyle = sky; ctx.fillRect(-8, -8, W + 16, H + 16);
   if (savannaZone) drawSavannaBackdrop(ctx, s, savannaSprites.oasis, cameraDistance);
+  if (monsterLevel) drawMonsterBackdrop(ctx, s, monsterSprites, cameraDistance);
   if (night) {
     ctx.fillStyle = '#d4e6ff';
     for (let i = 0; i < 45; i++) { ctx.globalAlpha = 0.45 + Math.sin(s.elapsed * 1.5 + i) * 0.3; ctx.beginPath(); ctx.arc((i * 137) % W, 12 + (i * 43) % 170, i % 3 === 0 ? 1.7 : 1, 0, Math.PI * 2); ctx.fill(); }
     ctx.globalAlpha = 1;
     const glow = ctx.createRadialGradient(650, 65, 15, 650, 65, 100); glow.addColorStop(0, '#d8e9ff88'); glow.addColorStop(1, '#9bbdff00'); ctx.fillStyle = glow; ctx.fillRect(550, 0, 200, 165);
   }
-  ctx.fillStyle = night ? '#e0eaff' : '#fff5b6'; ctx.beginPath(); ctx.arc(650, 65, 38, 0, Math.PI * 2); ctx.fill();
+  if (!monsterLevel) { ctx.fillStyle = night ? '#e0eaff' : '#fff5b6'; ctx.beginPath(); ctx.arc(650, 65, 38, 0, Math.PI * 2); ctx.fill(); }
   if (night) { ctx.fillStyle = '#a6b8d477'; for (const [x, y, r] of [[637, 50, 8], [665, 76, 11], [635, 80, 5]]) { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); } }
   // Three independent speeds create depth without moving the collision plane.
-  if (!dinoZone && !savannaZone) for (let layer = 0; layer < 3; layer++) {
+  if (!dinoZone && !savannaZone && !monsterLevel) for (let layer = 0; layer < 3; layer++) {
     const spacing = [240, 190, 330][layer];
     const offset = (cameraDistance * [0.12, 0.35, 0.65][layer]) % spacing;
     for (let i = -1; i < 6; i++) {
@@ -341,6 +345,7 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
   ctx.fillStyle = dinoZone ? '#e6a05e' : savannaZone ? '#e7b64d' : night ? '#7b9fae' : '#8bc34b'; ctx.fillRect(0, FLOOR, W, 9);
   ctx.fillStyle = dinoZone ? '#9c705c' : savannaZone ? '#c98642' : night ? '#53667d' : '#bc884b';
   for (let i = -1; i < 24; i++) ctx.fillRect(i * 45 - cameraDistance % 45, FLOOR + 30 + i % 3 * 10, 18, 5);
+  if (monsterLevel) drawMonsterGround(ctx, s, monsterSprites, cameraDistance);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   for (const r of s.rivers) {
     const x = r.x - cameraDistance;
@@ -593,6 +598,7 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
   drawInsects(ctx, s, insects, cameraDistance, allySprites.scorpion);
   if (dinoZone) drawDinoLand(ctx, s, dinos, dinoAnimations, cameraDistance);
   if (savannaZone) drawSavanna(ctx, s, savannaSprites, cameraDistance);
+  if (monsterLevel) drawMonsters(ctx, s, monsterSprites, cameraDistance);
   for (const effect of s.hitEffects) {
     const x = effect.x - cameraDistance, y = effect.y;
     if (x < -40 || x > 840) continue;
@@ -705,15 +711,17 @@ function paint(ctx: CanvasRenderingContext2D, s: Runner, sprite: HTMLImageElemen
   }
   // Foreground grasses scroll fastest and stay below the playable area.
   ctx.fillStyle = dinoZone ? '#6b4b3d' : night ? '#102c3b' : '#225939';
-  for (let i = -1; i < 14; i++) {
+  if (!monsterLevel) for (let i = -1; i < 14; i++) {
     const x = i * 80 - (cameraDistance * 1.2) % 80;
     ctx.beginPath(); ctx.moveTo(x, 400); ctx.lineTo(x + 12, 371); ctx.lineTo(x + 19, 389); ctx.lineTo(x + 34, 365); ctx.lineTo(x + 43, 400); ctx.fill();
   }
+  if (monsterLevel) drawMonsterForeground(ctx, s, monsterSprites, cameraDistance);
   ctx.restore();
   const activeAbilities = [
     s.starPower > 0 ? `⭐ STAR POWER ${s.starPower.toFixed(1)}s` : '',
     s.espressoBoost > 0 ? `☕ ESPRESSO ${s.espressoBoost.toFixed(1)}s` : '',
     s.specialLeft > 0 ? `⚡ KI BURST ${s.specialLeft.toFixed(1)}s` : '',
+    s.monsterShieldLeft > 0 ? `☾ MOON SHIELD ${s.monsterShieldLeft.toFixed(1)}s` : '',
   ].filter(Boolean);
   if (s.messageTime > 0 || activeAbilities.length > 0) {
     const mainMessage = s.messageTime > 0 ? s.message : 'ABILITY ACTIVE';
@@ -793,9 +801,11 @@ export function JungleVineSwing({ onExit, onFinish, onRunStart, finishLabel = 'S
     const s = world.current;
     const dinoBoss = s.dinos.find(d => d.kind === 'trex');
     const lionBoss = s.savannaAnimals.find(animal => animal.kind === 'lion');
-    const boss = lionBoss ?? dinoBoss;
-    const bossMax = lionBoss ? { easy: 3, medium: 4, hard: 5 }[s.difficulty] : { easy: 2, medium: 3, hard: 4 }[s.difficulty];
-    setHud({ phase: s.phase, lives: s.lives, bananas: s.bananas, seconds: Math.max(0, Math.ceil((s.level + 1) * levelSeconds(s) - s.elapsed)), paused: paused.current, level: s.level, score: runnerScore(s), golden: s.golden, cherries: s.cherries, fruit: s.fruitPickups, supplies: s.supplyPickups, gems: s.gems, levelGem: s.gemCollected[s.level], slide: s.slideLeft, attack: isAirAttack(s) ? s.attackLeft : 0, move: heroMove(s), combo: s.hitCombo, streak: s.hitStreak, bestStreak: s.bestHitStreak, ki: s.ki, special: s.specialLeft, speed: travelSpeed(s) / LEVELS[0].speed, espresso: s.espressoBoost, hesitating: s.hesitating, bossStarted: s.dinoBossStarted || s.savannaBossStarted, bossHp: boss ? Math.max(0, bossMax - boss.hits) : 0, bossMax, bossIcon: lionBoss || s.level === 7 ? '🦁' : '🦖' });
+    const horseman = s.monsters.find(monster => monster.kind === 'horseman');
+    const boss = s.level === MONSTER_LEVEL ? horseman : s.level === 7 ? lionBoss : dinoBoss;
+    const bossMax = boss?.hitPoints ?? 0;
+    const bossStarted = s.level === MONSTER_LEVEL ? s.monsterBossStarted : s.level === 7 ? s.savannaBossStarted : s.level === 6 && s.dinoBossStarted;
+    setHud({ phase: s.phase, lives: s.lives, bananas: s.bananas, seconds: Math.max(0, Math.ceil((s.level + 1) * levelSeconds(s) - s.elapsed)), paused: paused.current, level: s.level, score: runnerScore(s), golden: s.golden, cherries: s.cherries, fruit: s.fruitPickups, supplies: s.supplyPickups, gems: s.gems, levelGem: s.gemCollected[s.level], slide: s.slideLeft, attack: isAirAttack(s) ? s.attackLeft : 0, move: heroMove(s), combo: s.hitCombo, streak: s.hitStreak, bestStreak: s.bestHitStreak, ki: s.ki, special: s.specialLeft, speed: travelSpeed(s) / LEVELS[0].speed, espresso: s.espressoBoost, hesitating: s.hesitating, bossStarted, bossHp: boss ? Math.max(0, bossMax - boss.hits) : 0, bossMax, bossIcon: s.level === MONSTER_LEVEL ? '🎃' : s.level === 7 ? '🦁' : '🦖' });
   };
   function resetRunner(nextDifficulty = difficulty, nextMode = runMode, nextLevel = selectedLevel) {
     world.current = createRunner(nextDifficulty, nextMode === 'stage' ? nextLevel : 0, nextMode === 'stage' ? nextLevel : LEVELS.length - 1);
@@ -882,6 +892,7 @@ export function JungleVineSwing({ onExit, onFinish, onRunStart, finishLabel = 'S
     const savannaSprites = Object.fromEntries((['lion', 'giraffe', 'wildebeest', 'hyena', 'cliffs', 'oasis'] as const).map(kind => {
       const image = new Image(); image.src = `/games/jungle-savanna-${kind}-v1.png`; return [kind, image];
     })) as SavannaSprites;
+    const monsterSprites = createMonsterSprites();
     const ctx = canvas.current?.getContext('2d');
     if (!ctx) return;
     let frame = 0, previous = 0, accumulator = 0, lastHud = 0;
@@ -895,7 +906,8 @@ export function JungleVineSwing({ onExit, onFinish, onRunStart, finishLabel = 'S
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       if (canvas.current && canvas.current.width !== 800 * dpr) { canvas.current.width = 800 * dpr; canvas.current.height = 400 * dpr; }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      paint(ctx, world.current, sprite, fightSprite, predators, wildlife, insects, dinos, dinoAnimations, coffeeBear, allySprites, savannaSprites);
+      if (world.current.level >= 7) loadMonsterSprites(monsterSprites);
+      paint(ctx, world.current, sprite, fightSprite, predators, wildlife, insects, dinos, dinoAnimations, coffeeBear, allySprites, savannaSprites, monsterSprites);
       if (now - lastHud > 100) { publish(); lastHud = now; }
       frame = requestAnimationFrame(tick);
     };
@@ -952,7 +964,7 @@ export function JungleVineSwing({ onExit, onFinish, onRunStart, finishLabel = 'S
         <span className="text-xs font-black text-cyan-100">{hud.special > 0 ? 'BURST!' : hud.ki >= KI_MAX ? 'E: READY' : 'COUNTER TO CHARGE'}</span>
       </div>
       <div className={`${styles.stage} relative overflow-hidden rounded-2xl border-2 border-emerald-700`}>
-        <canvas ref={canvas} width={800} height={400} aria-label="Jungle Runner with eight levels, ending in Savanna Stampede with a roaring lion and victory oasis." className="block aspect-[2/1] w-full" />
+        <canvas ref={canvas} width={800} height={400} aria-label="Jungle Runner with nine levels, ending in Moonlit Monster Hollow with magical monsters and the Headless Horseman." className="block aspect-[2/1] w-full" />
         <div className={styles.landscapeHud} aria-label="Game status">
           <span>Stage {hud.level + 1} · {LEVELS[hud.level].name}</span>
           <span>🍌 {hud.bananas}</span>
@@ -964,10 +976,10 @@ export function JungleVineSwing({ onExit, onFinish, onRunStart, finishLabel = 'S
         </div>
         {(hud.phase === 'ready' || ended || hud.paused) && <div className="absolute inset-0 flex items-start justify-center overflow-y-auto bg-emerald-950/75 p-3">
           <div className="my-auto max-w-md text-center">
-            <h3 className="text-lg font-black sm:text-2xl">{hud.paused ? 'Taking a breather' : ended ? hud.phase === 'victory' ? runMode === 'stage' ? `${LEVELS[selectedLevel].name} complete!` : hud.gems === LEVELS.length ? 'Jungle Crown Victory!' : 'Oasis victory!' : 'Run complete!' : runMode === 'stage' ? `Stage ${selectedLevel + 1}: ${LEVELS[selectedLevel].name}` : 'Adventure Mode'}</h3>
+            <h3 className="text-lg font-black sm:text-2xl">{hud.paused ? 'Taking a breather' : ended ? hud.phase === 'victory' ? runMode === 'stage' ? `${LEVELS[selectedLevel].name} complete!` : hud.gems === LEVELS.length ? 'Jungle Crown Victory!' : 'Monster Hollow victory!' : 'Run complete!' : runMode === 'stage' ? `Stage ${selectedLevel + 1}: ${LEVELS[selectedLevel].name}` : 'Adventure Mode'}</h3>
             {ended && hud.phase === 'victory' && runMode === 'stage'
               ? <StageVictoryPayout bananas={hud.bananas} golden={hud.golden} cherries={hud.cherries} fruit={hud.fruit} supplies={hud.supplies} stones={hud.gems} score={hud.score} />
-              : <p className="my-2 text-xs sm:text-sm">{ended ? `${hud.gems === LEVELS.length && hud.phase === 'victory' ? `✦ All ${LEVELS.length} gems captured — the Jungle Crown is yours! ✦ ` : ''}${hud.bananas} banana coins · ${hud.golden} gold · ${hud.cherries} cherries · ${hud.gems}/${LEVELS.length} gems · ${hud.score} points` : runMode === 'stage' ? `Complete ${LEVELS[selectedLevel].name} as a single-stage run.${selectedLevel === 6 ? ' Defeat the T. rex to win DinoLand.' : selectedLevel === 7 ? ' Defeat the lion and reach the Oasis of Victory.' : ''}` : 'Complete all eight stages in one continuous run. Survive DinoLand, defeat the savanna lion, and reach the Oasis of Victory.'}</p>}
+              : <p className="my-2 text-xs sm:text-sm">{ended ? `${hud.gems === LEVELS.length && hud.phase === 'victory' ? `✦ All ${LEVELS.length} gems captured — the Jungle Crown is yours! ✦ ` : ''}${hud.bananas} banana coins · ${hud.golden} gold · ${hud.cherries} cherries · ${hud.gems}/${LEVELS.length} gems · ${hud.score} points` : runMode === 'stage' ? `Complete ${LEVELS[selectedLevel].name} as a single-stage run.${selectedLevel === 6 ? ' Defeat the T. rex to win DinoLand.' : selectedLevel === 7 ? ' Defeat the lion and reach the Oasis of Victory.' : selectedLevel === MONSTER_LEVEL ? ' Collect moon shields, return spells, and counter the Headless Horseman to open the castle portal.' : ''}` : `Complete all ${LEVELS.length} stages in one continuous run. Cross the savanna, break the Horseman’s curse, and reach the castle portal.`}</p>}
             {hud.paused ? <div className="flex justify-center gap-2"><button onClick={pause} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">Resume</button><button onClick={onExit} className="rounded-xl bg-white/15 px-5 py-2 font-black text-white">Exit</button></div> : ended ? <div className="flex flex-wrap justify-center gap-2"><button onClick={start} className="rounded-xl bg-cyan-300 px-5 py-2 font-black text-emerald-950">Replay</button><button onClick={saveRun} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">{finishLabel}</button></div> : <button onClick={start} className="rounded-xl bg-yellow-300 px-5 py-2 font-black text-emerald-950">{runMode === 'stage' ? 'Play stage' : 'Start adventure'}</button>}
           </div>
         </div>}

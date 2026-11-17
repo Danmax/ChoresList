@@ -18,6 +18,8 @@
     "price-alerts:run": "tsx scripts/process-price-alerts.ts",
     "test:block-drop": "node --import tsx --test tests/block-drop.test.ts tests/gem-columns.test.ts",
     "test:block-drop:browser": "node --import tsx tests/block-drop.browser.ts",
+    "test:jungle": "node --import tsx --test tests/jungle-*.test.ts",
+    "test:jungle:browser": "node --import tsx tests/jungle-monsters.browser.ts",
     "test:plugins": "node --import tsx --test tests/plugins-registry.test.ts",
     "test:surveys": "node --import tsx --test tests/community-surveys.test.ts",
     "test:secret-santa": "node --import tsx --test tests/secret-santa.test.ts",

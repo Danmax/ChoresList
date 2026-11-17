@@ -1,5 +1,5 @@
 import {
-  FLOOR, FLIP_SECONDS, PLAYER_X, gainKi, heroDamage, heroStrikeConnects, recordHeroHit,
+  FLOOR, FLIP_SECONDS, PLAYER_X, gainKi, heroDamage, heroStrikeConnects, levelSeconds, recordHeroHit,
   runnerSpeed, starKnockout, type Runner,
 } from './jungle-runner';
 
@@ -188,7 +188,8 @@ export function stepSavanna(s: Runner, dt: number, previousY: number, hurt: (mes
 
   if (s.savannaOasisOpen && s.savannaFinishX !== null && worldX >= s.savannaFinishX && s.y >= FLOOR - 2) {
     s.savannaOasisReached = true;
-    s.phase = 'victory';
+    if (s.endLevel === 7) s.phase = 'victory';
+    else s.elapsed = levelSeconds(s) * 8 - 0.001;
     s.message = 'OASIS OF VICTORY!'; s.messageTime = 3;
   }
   s.savannaAnimals = s.savannaAnimals.filter(animal => animal.state !== 'defeated' && (animal.kind === 'lion' || animal.x > s.distance - 180));

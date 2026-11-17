@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Check, Copy, Gamepad2, Share2, Sparkles, UserPlus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { JungleVineSwing } from "@/components/jungle-runner";
+import { LEVELS } from "@/lib/jungle-runner";
 
 const DEMO_LIMIT = 3;
 const DEMO_STORAGE_KEY = "choreslist:jungle-demo-runs";
@@ -89,7 +90,7 @@ export function GuestJungleDemo() {
           <div className="max-w-2xl">
             <p className="inline-flex items-center gap-2 rounded-full border border-yellow-200/50 bg-yellow-300/15 px-3 py-1.5 text-xs font-black uppercase tracking-[0.16em] text-yellow-100"><Sparkles size={15} /> Shareable guest demo</p>
             <h1 className="mt-5 text-4xl font-black leading-none drop-shadow-lg sm:text-6xl">Johnny: The People&apos;s Champ</h1>
-            <p className="mt-5 max-w-xl text-base font-bold leading-7 text-emerald-50 sm:text-lg">Run, flip, fight, and gather supplies across eight jungle stages, including the new Savanna Stampede. No account is needed for your first three runs.</p>
+            <p className="mt-5 max-w-xl text-base font-bold leading-7 text-emerald-50 sm:text-lg">Run, flip, fight, and gather supplies across {LEVELS.length} adventure stages, including Moonlit Monster Hollow and the Headless Horseman. No account is needed for your first three runs.</p>
             {!showSignup ? (
               <div className="mt-7 flex flex-wrap items-center gap-3">
                 <button type="button" disabled={runsUsed === null} onClick={() => setPlaying(true)} className="inline-flex items-center gap-2 rounded-2xl bg-yellow-300 px-6 py-3.5 text-lg font-black text-emerald-950 shadow-xl transition-transform hover:scale-[1.02] disabled:opacity-50"><Gamepad2 size={21} /> Play free demo</button>
@@ -112,7 +113,7 @@ export function GuestJungleDemo() {
 
       <section className="mx-auto grid max-w-6xl gap-4 px-5 py-8 sm:grid-cols-3 sm:px-8 lg:px-12">
         {[
-          ["🌿", "Seven stages", "Choose one stage or attempt the complete Adventure Mode."],
+          ["🌿", `${LEVELS.length} stages`, "Choose one stage or attempt the complete Adventure Mode."],
           ["⚡", "Hero combat", "Jump, slide, dash, fight, and unleash a charged Ki attack."],
           ["🏆", "Family rewards", "Accounts unlock saved scores, player profiles, and parent-controlled rewards."],
         ].map(([icon, title, text]) => <article key={title} className="rounded-3xl bg-white/10 p-5"><span className="text-3xl">{icon}</span><h2 className="mt-3 text-lg font-black">{title}</h2><p className="mt-1 text-sm font-semibold leading-6 text-emerald-100">{text}</p></article>)}
