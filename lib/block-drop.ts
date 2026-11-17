@@ -19,6 +19,8 @@ export type BlockDropState = {
   lines: number;
   pieces: number;
   over: boolean;
+  phase: "falling" | "clearing";
+  clearingRows: number[];
 };
 export type BlockDropAction = "left" | "right" | "rotate" | "down" | "tick" | "drop";
 
@@ -38,7 +40,7 @@ export function spawnPiece(kind: PieceKind): Piece {
 
 export function createBlockDrop(random = Math.random): BlockDropState {
   const bag = shuffledBag(random);
-  return { board: Array.from({ length: BOARD_HEIGHT }, () => Array(BOARD_WIDTH).fill(0)), active: spawnPiece(bag[0]), queue: bag.slice(1), score: 0, lines: 0, pieces: 0, over: false };
+  return { board: Array.from({ length: BOARD_HEIGHT }, () => Array(BOARD_WIDTH).fill(0)), active: spawnPiece(bag[0]), queue: bag.slice(1), score: 0, lines: 0, pieces: 0, over: false, phase: "falling", clearingRows: [] };
 }
 
 export function fits(board: number[][], piece: Piece): boolean {
@@ -56,19 +58,29 @@ export function landingPiece(board: number[][], piece: Piece): Piece {
 export function blockDropLevel(lines: number) { return 1 + Math.floor(lines / 10); }
 export function fallDelay(lines: number) { return Math.max(100, 850 - (blockDropLevel(lines) - 1) * 70); }
 
+function spawnNext(state: BlockDropState, random: () => number): BlockDropState {
+  const queue = state.queue.length < 7 ? [...state.queue, ...shuffledBag(random)] : [...state.queue];
+  const next = spawnPiece(queue.shift()!);
+  return { ...state, active: next, queue, over: !fits(state.board, next) };
+}
+
 function lockPiece(state: BlockDropState, active: Piece, bonus: number, random: () => number): BlockDropState {
   const board = state.board.map((row) => [...row]);
   active.cells.forEach((row, dy) => row.forEach((cell, dx) => { if (cell) board[active.y + dy][active.x + dx] = cell; }));
-  const remaining = board.filter((row) => row.some((cell) => !cell));
-  const cleared = BOARD_HEIGHT - remaining.length;
-  const nextBoard = [...Array.from({ length: cleared }, () => Array(BOARD_WIDTH).fill(0)), ...remaining];
-  const queue = state.queue.length < 7 ? [...state.queue, ...shuffledBag(random)] : [...state.queue];
-  const next = spawnPiece(queue.shift()!);
-  return { board: nextBoard, active: next, queue, score: state.score + bonus + [0, 100, 300, 500, 800][cleared] * blockDropLevel(state.lines), lines: state.lines + cleared, pieces: state.pieces + 1, over: !fits(nextBoard, next) };
+  const clearingRows = board.flatMap((row, y) => row.every(Boolean) ? [y] : []);
+  const locked = { ...state, board, score: state.score + bonus, pieces: state.pieces + 1, clearingRows };
+  return clearingRows.length ? { ...locked, phase: "clearing" } : spawnNext(locked, random);
 }
 
 export function advanceBlockDrop(state: BlockDropState, action: BlockDropAction, random = Math.random): BlockDropState {
   if (state.over) return state;
+  if (state.phase === "clearing") {
+    if (action !== "tick") return state;
+    const cleared = state.clearingRows.length;
+    const remaining = state.board.filter((_, y) => !state.clearingRows.includes(y));
+    const board = [...Array.from({ length: cleared }, () => Array(BOARD_WIDTH).fill(0)), ...remaining];
+    return spawnNext({ ...state, board, score: state.score + [0, 100, 300, 500, 800][cleared] * blockDropLevel(state.lines), lines: state.lines + cleared, phase: "falling", clearingRows: [] }, random);
+  }
   const active = state.active;
   if (action === "left" || action === "right") {
     const moved = { ...active, x: active.x + (action === "left" ? -1 : 1) };

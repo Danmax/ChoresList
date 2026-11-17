@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowLeft, ArrowRight, Blocks, ChevronsDown, Pause, Play, RotateCw } from "lucide-react";
 import { advanceBlockDrop, blockDropLevel, createBlockDrop, fallDelay, landingPiece, PIECES, type BlockDropAction, type BlockDropState } from "@/lib/block-drop";
 import { advanceColumns, columnsDelay, columnsLanding, columnsLevel, createColumns, type ColumnsState } from "@/lib/gem-columns";
+import styles from "./block-drop.module.css";
 
 type DropState = BlockDropState | ColumnsState;
 const FRUITS = ["", "🍒", "🍋", "🍇", "🍏", "🍊", "🫐"];
@@ -30,7 +31,10 @@ export function BlockDrop({ onExit, onFinish }: {
   const columns = game && "cleared" in game ? game : null;
   const blocks = game && "lines" in game ? game : null;
   const level = columns ? columnsLevel(columns.cleared) : blockDropLevel(blocks?.lines ?? 0);
-  const clearing = columns?.phase === "clearing";
+  const clearing = game?.phase === "clearing";
+  const clearingRows = new Set(blocks?.clearingRows ?? []);
+  const tetris = clearingRows.size === 4;
+  const clearDelay = columns ? 450 : tetris ? 900 : 420;
   const current = useRef<DropState | null>(null);
   const [paused, setPaused] = useState(false);
   const [ended, setEnded] = useState(false);
@@ -38,7 +42,7 @@ export function BlockDrop({ onExit, onFinish }: {
   const [seconds, setSeconds] = useState(0);
   const boardRef = useRef<HTMLDivElement>(null);
   const running = !!game && !game.over && !paused && !ended;
-  const delay = clearing ? 450 : columns ? columnsDelay(columns.cleared) : fallDelay(blocks?.lines ?? 0);
+  const delay = clearing ? clearDelay : columns ? columnsDelay(columns.cleared) : fallDelay(blocks?.lines ?? 0);
 
   const act = useCallback((action: BlockDropAction) => {
     if (!current.current) return;
@@ -59,9 +63,13 @@ export function BlockDrop({ onExit, onFinish }: {
 
   useEffect(() => {
     if (!running) return;
+    if (clearing) {
+      const clear = window.setTimeout(() => act("tick"), delay);
+      return () => window.clearTimeout(clear);
+    }
     const gravity = window.setInterval(() => act("tick"), delay);
     return () => window.clearInterval(gravity);
-  }, [running, delay, act]);
+  }, [running, clearing, delay, act]);
 
   useEffect(() => {
     if (!running) return;
@@ -135,6 +143,8 @@ export function BlockDrop({ onExit, onFinish }: {
             role="group"
             aria-label="Block Drop board"
             aria-describedby="block-drop-instructions"
+            data-clear={clearing && blocks ? (tetris ? "tetris" : "line") : undefined}
+            style={{ "--clear-duration": `${clearDelay}ms` } as CSSProperties}
             onKeyDown={(event) => {
               if (event.target !== event.currentTarget) return;
               if ((event.key.toLowerCase() === "p" || event.key === "Escape") && game && !finished) {
@@ -149,13 +159,18 @@ export function BlockDrop({ onExit, onFinish }: {
               if (event.repeat && (action === "drop" || action === "rotate")) return;
               act(action);
             }}
-            className="relative mx-auto w-full max-w-[300px] overflow-hidden rounded-xl border-2 border-slate-600 bg-slate-900 p-1 outline-none focus-visible:border-cyan-300"
+            className={`relative mx-auto w-full max-w-[300px] overflow-hidden rounded-xl border-2 border-slate-600 bg-slate-900 p-1 outline-none focus-visible:border-cyan-300 ${tetris ? styles.tetrisBoard : ""} ${paused ? styles.paused : ""}`}
           >
             <div aria-hidden="true" className={`grid gap-px ${isColumns ? "grid-cols-6" : "grid-cols-10"}`}>
               {display.flatMap((row, y) => row.map((cell, x) => (
-                <div key={`${y}-${x}`} className={`flex aspect-square items-center justify-center rounded-[2px] text-[clamp(1rem,5vw,2rem)] leading-none ${matching.has(`${y}-${x}`) ? "animate-pulse bg-white/40 ring-2 ring-inset ring-white" : ""}`} style={{ backgroundColor: isColumns ? (matching.has(`${y}-${x}`) ? "#486080" : "#152239") : COLORS[cell], border: cell ? "2px solid #ffffff40" : ghostCells.has(`${y}-${x}`) ? "2px solid #67e8f980" : "1px solid #ffffff04", boxShadow: cell ? "inset 0 -3px 0 #00000025" : undefined }}>{symbol(cell)}</div>
+                <div key={`${y}-${x}`} data-clearing={clearingRows.has(y) || undefined} className={`flex aspect-square items-center justify-center rounded-[2px] text-[clamp(1rem,5vw,2rem)] leading-none ${clearingRows.has(y) ? styles.lineFlash : ""} ${matching.has(`${y}-${x}`) ? "animate-pulse bg-white/40 ring-2 ring-inset ring-white" : ""}`} style={{ backgroundColor: isColumns ? (matching.has(`${y}-${x}`) ? "#486080" : "#152239") : COLORS[cell], border: cell ? "2px solid #ffffff40" : ghostCells.has(`${y}-${x}`) ? "2px solid #67e8f980" : "1px solid #ffffff04", boxShadow: cell ? "inset 0 -3px 0 #00000025" : undefined }}>{symbol(cell)}</div>
               )))}
             </div>
+            {tetris && <div aria-hidden="true" className={styles.tetrisEffect}>
+              <div className={styles.burstRing} />
+              {Array.from({ length: 12 }, (_, i) => <span key={i} className={styles.spark} style={{ "--angle": `${i * 30}deg`, "--spark-color": ["#fef08a", "#67e8f9", "#c084fc"][i % 3] } as CSSProperties} />)}
+              <div className={styles.tetrisBanner}><strong>TETRIS!</strong><span>4 lines · +{800 * level}</span></div>
+            </div>}
             {(!game || paused || finished) && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 p-3 text-center backdrop-blur-sm">
                 <p className="text-xl font-black sm:text-2xl">{finished ? "Nice stacking!" : game ? "Paused" : (isColumns ? "Three of a kind!" : "Make room for more.")}</p>
@@ -177,6 +192,7 @@ export function BlockDrop({ onExit, onFinish }: {
           <p className="text-center text-xs text-slate-400">{Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}</p>
         </aside>
       </div>
+      {!isColumns && <p role="status" aria-atomic="true" className="sr-only">{clearingRows.size ? (tetris ? "Tetris! Four lines cleared!" : `${clearingRows.size} ${clearingRows.size === 1 ? "line" : "lines"} cleared!`) : ""}</p>}
       {isColumns && <p role="status" className="mt-3 text-center text-sm font-black text-amber-200">{columns?.chain ? `${columns.chain}× chain · Best ${columns.bestChain}×` : "Match 3 or more. Set up a chain!"}</p>}
       <div className="mx-auto mt-4 grid max-w-md grid-cols-4 gap-2">
         <button type="button" aria-label="Move left" disabled={!running || clearing} onClick={() => act("left")} className={CONTROL}><ArrowLeft size={22} /></button>
