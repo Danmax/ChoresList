@@ -13,12 +13,12 @@
       "height": 887,
       "exteriorMatteRemoved": false
     },
-    "Goblin Rogue Pumpkin Bomb Sprite Sheet": {
+    "Cartoon Goblin Running Sprite Sheet": {
       "width": 1774,
       "height": 887,
       "exteriorMatteRemoved": false
     },
-    "Cartoon Goblin Running Sprite Sheet": {
+    "Goblin Rogue Pumpkin Bomb Sprite Sheet": {
       "width": 1774,
       "height": 887,
       "exteriorMatteRemoved": false
@@ -28,27 +28,27 @@
       "height": 887,
       "exteriorMatteRemoved": false
     },
-    "Zombie Caretaker Encounter Sprite Sheet": {
+    "Eight Poses of a Cartoon Zombie Worker": {
       "width": 1774,
       "height": 887,
-      "exteriorMatteRemoved": true
+      "exteriorMatteRemoved": false
     },
     "Werewolf Running Animation Sprite Sheet": {
       "width": 1774,
       "height": 887,
       "exteriorMatteRemoved": false
     },
-    "Werewolf Encounter Attack Sprite Sheet": {
-      "width": 1774,
-      "height": 887,
-      "exteriorMatteRemoved": true
-    },
-    "Horned Forest Beast Encounter Sprite Sheet": {
+    "Werewolf Action Pose Sprite Sheet": {
       "width": 1774,
       "height": 887,
       "exteriorMatteRemoved": false
     },
     "Horned Forest Beast Walk Cycle": {
+      "width": 1774,
+      "height": 887,
+      "exteriorMatteRemoved": false
+    },
+    "Horned Forest Beast Encounter Sprite Sheet": {
       "width": 1774,
       "height": 887,
       "exteriorMatteRemoved": false
@@ -63,15 +63,15 @@
       "height": 887,
       "exteriorMatteRemoved": false
     },
-    "Vampire Encounter Attack Sprite Sheet": {
+    "Chibi Vampire Running Sprite Sheet": {
       "width": 1774,
       "height": 887,
       "exteriorMatteRemoved": false
     },
-    "Vampire Run Cycle Sprite Sheet": {
+    "Vampire Encounter Attack Sprite Sheet": {
       "width": 1774,
       "height": 887,
-      "exteriorMatteRemoved": true
+      "exteriorMatteRemoved": false
     },
     "Headless Horseman Action Sprite Sheet": {
       "width": 1774,
@@ -103,10 +103,10 @@
       "height": 887,
       "exteriorMatteRemoved": false
     },
-    "Moonlit Magic Rune Animation Spritesheet": {
+    "Eight Purple Moon Magic Circles Sprite Sheet": {
       "width": 1774,
       "height": 887,
-      "exteriorMatteRemoved": true
+      "exteriorMatteRemoved": false
     },
     "Pumpkin Explosion VFX Sprite Sheet": {
       "width": 1774,
@@ -148,22 +148,22 @@
     "zombie-run": {
       "frames": 8,
       "rows": 2,
-      "scale": 0.4230769230769231
+      "scale": 0.41904761904761906
     },
     "zombie-encounter": {
       "frames": 8,
       "rows": 2,
-      "scale": 0.4230769230769231
+      "scale": 0.41904761904761906
     },
     "werewolf-run": {
       "frames": 8,
       "rows": 2,
-      "scale": 0.4631578947368421
+      "scale": 0.4536082474226804
     },
     "werewolf-encounter": {
       "frames": 8,
       "rows": 2,
-      "scale": 0.4631578947368421
+      "scale": 0.4536082474226804
     },
     "beast-run": {
       "frames": 8,
@@ -228,7 +228,7 @@
     "rune": {
       "frames": 8,
       "rows": 2,
-      "scale": 0.411214953271028
+      "scale": 0.41411764705882353
     },
     "explosion": {
       "frames": 8,

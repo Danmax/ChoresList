@@ -28,7 +28,7 @@ async function main() {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
   await page.screenshot({ path: '/tmp/monster-hollow-mobile.png', fullPage: true });
   await page.setViewportSize({ width: 844, height: 390 });
-  await expect(page.getByRole('group', { name: 'Landscape gamepad controls' }).or(page.locator('[aria-label="Landscape gamepad controls"]'))).toBeVisible();
+  await expect(page.locator('[aria-label="Landscape gamepad controls"]')).toBeVisible();
   await page.screenshot({ path: '/tmp/monster-hollow-landscape.png', fullPage: true });
   assert.deepEqual(failedAssets, []);
   assert.deepEqual(errors, []);

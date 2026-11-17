@@ -265,7 +265,7 @@ function emeraldCelebration(ctx: CanvasRenderingContext2D, s: Runner) {
     ctx.save(); ctx.translate(x, y); ctx.rotate(angle + t * 2); ctx.fillStyle = i % 2 ? '#bffff0' : '#4cf7ae'; ctx.shadowColor = '#4cf7ae'; ctx.shadowBlur = 14;
     ctx.beginPath(); ctx.moveTo(0, -8); ctx.lineTo(6, 0); ctx.lineTo(0, 8); ctx.lineTo(-6, 0); ctx.closePath(); ctx.fill(); ctx.restore();
   }
-  ctx.fillStyle = '#4cf7ae'; ctx.shadowColor = '#c8ffef'; ctx.shadowBlur = 20; ctx.font = 'bold 26px sans-serif'; ctx.fillText('✦ ALL EMERALDS FOUND! ✦', 400, 76);
+  ctx.fillStyle = '#4cf7ae'; ctx.shadowColor = '#c8ffef'; ctx.shadowBlur = 20; ctx.font = 'bold 26px sans-serif'; ctx.fillText('✦ ALL GEMS FOUND! ✦', 400, 76);
   ctx.shadowBlur = 0; ctx.fillStyle = '#f4ffe5'; ctx.font = 'bold 15px sans-serif'; ctx.fillText('JUNGLE CROWN CELEBRATION', 400, 101); ctx.restore();
 }
 

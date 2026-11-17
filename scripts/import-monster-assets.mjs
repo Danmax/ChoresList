@@ -13,11 +13,11 @@ const CELL = 256, PAD = 40, BASELINE = CELL - PAD;
 const characters = {
   wolf: ['Blue-Gray Wolf Running Sprite Sheet', 'Blue-Gray Wolf Encounter Sprite Sheet'],
   goblin: ['Cartoon Goblin Running Sprite Sheet', 'Goblin Rogue Pumpkin Bomb Sprite Sheet'],
-  zombie: ['Chibi Zombie Caretaker Walk Cycle Grid', 'Zombie Caretaker Encounter Sprite Sheet'],
-  werewolf: ['Werewolf Running Animation Sprite Sheet', 'Werewolf Encounter Attack Sprite Sheet'],
+  zombie: ['Chibi Zombie Caretaker Walk Cycle Grid', 'Eight Poses of a Cartoon Zombie Worker'],
+  werewolf: ['Werewolf Running Animation Sprite Sheet', 'Werewolf Action Pose Sprite Sheet'],
   beast: ['Horned Forest Beast Walk Cycle', 'Horned Forest Beast Encounter Sprite Sheet'],
   troll: ['Rocky Troll Walking Sprite Sheet', 'Troll Club-Swinging Sprite Sheet'],
-  vampire: ['Vampire Run Cycle Sprite Sheet', 'Vampire Encounter Attack Sprite Sheet'],
+  vampire: ['Chibi Vampire Running Sprite Sheet', 'Vampire Encounter Attack Sprite Sheet'],
   horseman: [null, 'Headless Horseman Action Sprite Sheet'],
 };
 const effects = {
@@ -26,7 +26,7 @@ const effects = {
   bolt: 'Glowing Purple Magic Projectile Sprite Sheet',
   impact: 'Golden Impact Burst Sprite Sheet',
   teleport: 'Magical Purple Teleport Smoke Sprite Sheet',
-  rune: 'Moonlit Magic Rune Animation Spritesheet',
+  rune: 'Eight Purple Moon Magic Circles Sprite Sheet',
   explosion: 'Pumpkin Explosion VFX Sprite Sheet',
   curse: 'Purple-Gold Curse Break VFX Sprite Sheet',
 };

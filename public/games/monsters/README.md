@@ -11,9 +11,10 @@ This is 15.625% per side, equivalent to 80px on a 512px cell. Grounded art uses
 source baseline y=216. Character scale is shared across both animation sheets.
 
 The source tileset contains nine objects in unequal columns, so its frames are
-extracted individually. The importer removes exterior pale mattes from the
-werewolf encounter, zombie encounter, vampire movement, and rune sheets. Effect
-crop perimeters taper to transparent before being packed into the safe area.
+extracted individually. The werewolf encounter, zombie encounter, vampire
+movement, and rune sheets now use the updated transparent PNGs supplied by the
+user. All sprite sources have native alpha; no exterior matte removal is needed.
+Effect crop perimeters taper to transparent before being packed into the safe area.
 
 To reproduce the import from a folder containing the original filenames:
 
