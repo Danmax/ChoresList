@@ -928,18 +928,18 @@ export function JungleVineSwing({ onExit, onFinish, onRunStart, finishLabel = 'S
   }, []);
 
   const ended = hud.phase === 'over' || hud.phase === 'victory';
-  return <section data-game-screen={hud.phase !== 'ready'} data-playing={hud.phase === 'playing'} data-paused={hud.paused} className={`${styles.root} fixed inset-0 z-50 flex flex-col justify-center overflow-auto bg-emerald-950 text-white`}>
-    <div className={`${styles.shell} mx-auto w-full max-w-4xl`}>
+  return <section data-game-screen={hud.phase !== 'ready'} data-playing={hud.phase === 'playing'} data-paused={hud.paused} className={`${styles.root} fixed inset-0 z-50 flex flex-col justify-start overflow-auto bg-emerald-950 text-white`}>
+    <div className={`${styles.shell} mx-auto my-auto w-full max-w-4xl shrink-0`}>
       <header className={`${styles.header} mb-2 flex items-center justify-between gap-2`}><h2 className="font-black">Jungle Runner</h2><div className="flex gap-2">{playerId && <button type="button" onClick={() => setShowLeaderboard(true)} className="rounded-xl bg-yellow-300 px-3 py-2 font-black text-emerald-950">🏆 Top 100</button>}<button type="button" onClick={() => void shareGame()} className="rounded-xl bg-cyan-300 px-3 py-2 font-black text-emerald-950">{shareCopied ? '✓ Copied' : '↗ Share'}</button><button onClick={pause} disabled={hud.phase !== 'playing'} className="rounded-xl bg-white/10 px-3 py-2 disabled:opacity-40">{hud.paused ? 'Resume' : 'Pause'}</button><button onClick={onExit} className="rounded-xl bg-white/10 px-3 py-2">Exit</button></div></header>
       {showLeaderboard && playerId && <JungleLeaderboard memberId={playerId} onClose={() => setShowLeaderboard(false)} />}
       {hud.phase === 'ready' && (
         <fieldset className={`${styles.setup} mb-3 rounded-xl bg-white/10 p-3`}>
           <legend className="px-1 text-sm font-black">Choose your run</legend>
           <div className="mb-3 grid grid-cols-2 gap-2">
-            <button type="button" onClick={() => selectMode('adventure')} className={`rounded-lg px-3 py-2 text-sm font-black ${runMode === 'adventure' ? 'bg-yellow-300 text-emerald-950' : 'bg-emerald-900 text-white'}`}>Adventure Mode <small className="block font-bold">All {LEVELS.length} stages</small></button>
-            <button type="button" onClick={() => selectMode('stage')} className={`rounded-lg px-3 py-2 text-sm font-black ${runMode === 'stage' ? 'bg-yellow-300 text-emerald-950' : 'bg-emerald-900 text-white'}`}>Select a Stage <small className="block font-bold">Play one level</small></button>
+            <button type="button" aria-pressed={runMode === 'adventure'} onClick={() => selectMode('adventure')} className={`rounded-lg px-3 py-2 text-sm font-black ${runMode === 'adventure' ? 'bg-yellow-300 text-emerald-950' : 'bg-emerald-900 text-white'}`}>Adventure Mode <small className="block font-bold">All {LEVELS.length} stages</small></button>
+            <button type="button" aria-pressed={runMode === 'stage'} onClick={() => selectMode('stage')} className={`rounded-lg px-3 py-2 text-sm font-black ${runMode === 'stage' ? 'bg-yellow-300 text-emerald-950' : 'bg-emerald-900 text-white'}`}>Select a Stage <small className="block font-bold">Play one level</small></button>
           </div>
-          {runMode === 'stage' && <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">{LEVELS.map((level, index) => <button key={level.name} type="button" onClick={() => selectLevel(index)} className={`rounded-lg px-2 py-2 text-xs font-black ${selectedLevel === index ? 'bg-cyan-300 text-emerald-950' : 'bg-emerald-900 text-white'}`}><span className="block">{index + 1}. {level.name}</span>{index >= 6 && <small className="font-bold">Boss stage</small>}</button>)}</div>}
+          {runMode === 'stage' && <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">{LEVELS.map((level, index) => <button key={level.name} type="button" aria-pressed={selectedLevel === index} onClick={() => selectLevel(index)} className={`rounded-lg px-2 py-2 text-xs font-black ${selectedLevel === index ? 'bg-cyan-300 text-emerald-950' : 'bg-emerald-900 text-white'}`}><span className="block">{index + 1}. {level.name}</span>{index >= 6 && <small className="font-bold">Boss stage</small>}</button>)}</div>}
           <span className="px-1 text-sm font-black">Difficulty</span>
           <div className="grid grid-cols-3 gap-2">
             {(Object.keys(RUNNER_DIFFICULTIES) as RunnerDifficulty[]).map((value) => (
