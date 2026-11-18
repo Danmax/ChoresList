@@ -177,7 +177,7 @@ async function main() {
     const viewport = page.getByTestId("coloring-viewport");
     await viewport.scrollIntoViewIfNeeded();
     await viewport.evaluate((node) => { node.scrollLeft = 0; node.scrollTop = 0; });
-    await page.getByRole("button", { name: "Move", exact: true }).click();
+    await page.getByRole("button", { name: "Pan picture", exact: true }).click();
     await viewport.scrollIntoViewIfNeeded();
     const beforePan = await snapshot(), panBox = (await viewport.boundingBox())!;
     await page.mouse.move(panBox.x + panBox.width * .7, panBox.y + panBox.height / 2); await page.mouse.down();
@@ -268,10 +268,26 @@ async function main() {
     await page.getByRole("button", { name: "Place text on picture", exact: true }).click();
     await canvas().focus(); await canvas().press("Enter");
     const withText = await snapshot(); assert.notEqual(withText, beforeText);
+    await expect(page.getByRole("img", { name: "Live text preview", exact: true })).toBeVisible();
+    const storedTexts = () => page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).texts, coloringStorageKey("coloring-preview", "jungle-friends"));
+    const originalLabel = (await storedTexts())[0];
+    await canvas().press("ArrowRight");
+    assert.equal((await storedTexts())[0].x, originalLabel.x + 5);
+    await page.getByRole("button", { name: "Undo", exact: true }).click();
+    assert.equal(await snapshot(), withText);
+
     await page.getByRole("button", { name: "Undo", exact: true }).click(); assert.equal(await snapshot(), beforeText);
     await page.getByRole("button", { name: "Redo", exact: true }).click(); assert.equal(await snapshot(), withText);
     await open(); assert.equal(await snapshot(), withText);
     await expect(page.getByLabel("Picture title", { exact: true })).toHaveValue("Rainbow Jungle");
+    await page.getByRole("button", { name: "Move text", exact: true }).click();
+    await canvas().scrollIntoViewIfNeeded();
+    const savedLabel = (await storedTexts())[0];
+    const from = await at({ x: savedLabel.x, y: savedLabel.y }, "position");
+    await page.mouse.move(from.x, from.y); await page.mouse.down(); await page.mouse.move(from.x + 18, from.y + 12, { steps: 5 }); await page.mouse.up();
+    assert.ok((await storedTexts())[0].x > savedLabel.x + 10, "saved text can be dragged after reload");
+    await page.getByRole("button", { name: "Undo", exact: true }).click(); assert.equal(await snapshot(), withText);
+
     const titledDownload = page.waitForEvent("download"); await page.getByRole("button", { name: "Download picture", exact: true }).click();
     assert.equal((await titledDownload).suggestedFilename(), "rainbow-jungle.png");
 

@@ -4,6 +4,7 @@ import { type CSSProperties, type KeyboardEvent, type PointerEvent, useEffect, u
 import { ArrowLeft, Check, CheckCircle2, ChevronRight, Download, Eraser, Eye, Maximize, Minimize, SlidersHorizontal, Hand, Leaf, LoaderCircle, PaintBucket, Paintbrush, Palette, Pipette, Redo2, RotateCcw, Scan, Sparkles, Star, Undo2, X, ZoomIn } from "lucide-react";
 import { COLORING_COLORS, COLORING_SCENES, COLORING_THEMES, type ColoringBrush, coloringPreferences, coloringStorageKey, type ColoringPattern, type ColoringSceneId, type ColoringTool } from "@/lib/coloring";
 import { useColoringCanvas } from "./use-coloring-canvas";
+import { drawColoringText } from "@/lib/coloring-text";
 import styles from "./coloring-adventures.module.css";
 
 const TOOLS = [
@@ -12,9 +13,19 @@ const TOOLS = [
   { id: "pattern", label: "Patterns", icon: Sparkles, shortcut: "P", hint: "Pick a pattern, then tap a shape." },
   { id: "eraser", label: "Eraser", icon: Eraser, shortcut: "E", hint: "Rub out color. Your outlines stay safe." },
   { id: "picker", label: "Pick color", icon: Pipette, shortcut: "I", hint: "Tap a painted area to pick its color." },
-  { id: "pan", label: "Move", icon: Hand, shortcut: "H", hint: "Zoom in, then drag to explore your picture. Your colors stay put." },
+  { id: "pan", label: "Pan picture", icon: Hand, shortcut: "H", hint: "Zoom in, then drag to explore your picture. Your colors stay put." },
 ] as const;
 const PATTERNS: { id: ColoringPattern; label: string }[] = [{ id: "dots", label: "Dots" }, { id: "stripes", label: "Stripes" }, { id: "stars", label: "Stars" }, { id: "checks", label: "Checks" }, { id: "waves", label: "Waves" }, { id: "hearts", label: "Hearts" }, { id: "crosshatch", label: "Weave" }];
+
+function TextPreview({ words, color, size, font, effect, outlineColor, outlineWidth }: { words: string; color: string; size: number; font: string; effect: string; outlineColor: string; outlineWidth: number }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const ctx = ref.current?.getContext("2d"); if (!ctx) return;
+    ctx.clearRect(0, 0, 320, 130); ctx.fillStyle = "#fffef8"; ctx.fillRect(0, 0, 320, 130);
+    drawColoringText(ctx, { id: "preview", text: words.trim() || "Jungle magic!", x: 160, y: 65, color, size: size * .65, font, style: effect, outlineColor, outlineWidth: outlineWidth * .65 }, 320);
+  }, [words, color, size, font, effect, outlineColor, outlineWidth]);
+  return <canvas ref={ref} width={320} height={130} className={styles.textPreview} role="img" aria-label="Live text preview" />;
+}
 
 function PatternPreview({ pattern, color }: { pattern: ColoringPattern; color: string }) {
   return <span className={`${styles.patternPreview} ${styles[pattern]}`} style={{ "--paint": color } as CSSProperties} aria-hidden="true">
@@ -60,6 +71,10 @@ export function ColoringAdventures({ memberId, playerName, onExit, onFinish }: {
   const [text, setText] = useState("");
   const [textFont, setTextFont] = useState("sans-serif");
   const [textStyle, setTextStyle] = useState("outline");
+  const [textColor, setTextColor] = useState("#ed6464");
+  const [outlineColor, setOutlineColor] = useState("#202d3a");
+  const [outlineWidth, setOutlineWidth] = useState(8);
+  const [movingText, setMovingText] = useState(false);
   const [textSize, setTextSize] = useState(56);
   const [placingText, setPlacingText] = useState(false);
   const [size, setSize] = useState(28);
@@ -89,7 +104,7 @@ export function ColoringAdventures({ memberId, playerName, onExit, onFinish }: {
   useEffect(() => {
     let title = "";
     try { title = localStorage.getItem(titleKey) ?? ""; } catch { /* Optional title. */ }
-    setPictureTitle(title.slice(0, 80)); setTitleLoaded(titleKey); setPlacingText(false);
+    setPictureTitle(title.slice(0, 80)); setTitleLoaded(titleKey); setPlacingText(false); setMovingText(false);
   }, [titleKey]);
   useEffect(() => {
     if (titleLoaded !== titleKey) return;
@@ -193,7 +208,7 @@ export function ColoringAdventures({ memberId, playerName, onExit, onFinish }: {
   }, [drawing.ready, finishing, reviewImage]);
 
   function chooseTool(next: ColoringTool) {
-    setPlacingText(false); drawing.endStroke(); pan.current = null;
+    setPlacingText(false); setMovingText(false); drawing.endStroke(); pan.current = null;
     if (drawing.canvasRef.current) delete drawing.canvasRef.current.dataset.dragging;
     if (next === "bucket" || next === "brush" || next === "pattern") lastPaintTool.current = next;
     setTool(next);
@@ -237,8 +252,8 @@ export function ColoringAdventures({ memberId, playerName, onExit, onFinish }: {
 
   function apply(at: { x: number; y: number }, pointerId: number) {
     if (placingText) {
-      drawing.addText(at, text, color, textSize, textFont, textStyle);
-      setPlacingText(false); return;
+      drawing.addText(at, text, textColor, textSize, textFont, textStyle, outlineColor, outlineWidth);
+      setPlacingText(false); setMovingText(true); return;
     }
     const picked = drawing.dab(at, { tool, color, size, pattern, stayInLines, brush }, pointerId);
     if (picked) chooseColor(picked);
@@ -251,6 +266,7 @@ export function ColoringAdventures({ memberId, playerName, onExit, onFinish }: {
     event.currentTarget.focus({ preventScroll: true });
     event.currentTarget.setPointerCapture(event.pointerId);
     setKeyboardPoint(null);
+    if (movingText && !placingText) { drawing.beginTextDrag(point(event)); return; }
     if (!placingText && tool === "pan" && viewportRef.current) {
       pan.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, left: viewportRef.current.scrollLeft, top: viewportRef.current.scrollTop };
       event.currentTarget.dataset.dragging = "true";
@@ -258,6 +274,7 @@ export function ColoringAdventures({ memberId, playerName, onExit, onFinish }: {
   }
 
   function pointerMove(event: PointerEvent<HTMLCanvasElement>) {
+    if (movingText && !placingText) { drawing.moveTextDrag(point(event)); return; }
     const active = pan.current, viewport = viewportRef.current;
     if (active && active.pointerId === event.pointerId && viewport) {
       viewport.scrollLeft = active.left + active.x - event.clientX;
@@ -299,6 +316,9 @@ export function ColoringAdventures({ memberId, playerName, onExit, onFinish }: {
     if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Enter", " "].includes(event.key)) return;
     event.preventDefault();
     const canvas = event.currentTarget;
+    if (movingText && !placingText) {
+      drawing.nudgeText(event.key === "ArrowLeft" ? -5 : event.key === "ArrowRight" ? 5 : 0, event.key === "ArrowUp" ? -5 : event.key === "ArrowDown" ? 5 : 0); return;
+    }
     if (tool === "pan" && !placingText) {
       viewportRef.current?.scrollBy({ left: event.key === "ArrowLeft" ? -60 : event.key === "ArrowRight" ? 60 : 0, top: event.key === "ArrowUp" ? -60 : event.key === "ArrowDown" ? 60 : 0 });
       return;
@@ -370,7 +390,7 @@ export function ColoringAdventures({ memberId, playerName, onExit, onFinish }: {
         </div>
         <div ref={viewportRef} className={styles.viewport} data-testid="coloring-viewport">
           <div className={styles.paper} style={{ width: `${zoom}%` }}>
-            <canvas ref={drawing.canvasRef} className={styles.canvas} data-ready={drawing.ready} data-tool={tool} aria-label={`${scene.title} coloring canvas`} aria-describedby={hintId} tabIndex={drawing.ready && !finishing && !confirmClear ? 0 : -1}
+            <canvas ref={drawing.canvasRef} className={styles.canvas} data-ready={drawing.ready} data-tool={movingText && !placingText ? "text-move" : tool} aria-label={`${scene.title} coloring canvas`} aria-describedby={hintId} tabIndex={drawing.ready && !finishing && !confirmClear ? 0 : -1}
               onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerLeave={() => { if (cursorRef.current) cursorRef.current.hidden = true; }}
               onPointerUp={pointerEnd} onPointerCancel={pointerEnd} onLostPointerCapture={pointerEnd} onKeyDown={keyboard}
             >Use the bucket, brush, or patterns to color {scene.title}.</canvas>
@@ -380,7 +400,7 @@ export function ColoringAdventures({ memberId, playerName, onExit, onFinish }: {
           {!drawing.ready && <div className={styles.loading}>{drawing.error ? <><Palette size={28} /><p role="alert">{drawing.error}</p><button type="button" className={styles.finishButton} onClick={drawing.retry}>Try again</button></> : <><LoaderCircle size={28} className={styles.spinning} /><p>Getting your picture ready…</p></>}</div>}
         </div>
         <div className={styles.canvasFooter}><span><span className={styles.liveDot} />{displayTitle}</span><span className={styles.saveStatus} role="status">{drawing.status}</span></div>
-        <div className={styles.toolHint} id={hintId}><toolInfo.icon size={17} /><span>{placingText ? "Tap your picture to place the text. Press Escape to cancel. Undo removes it." : toolInfo.hint} <span className={styles.keyboardHint}>{tool === "pan" ? "Arrow keys move around the picture. Fit picture brings it all back." : "Arrows to move, Enter to color. Shift + arrows to brush; Alt for small steps. B brush · F fill · H move."}</span></span></div>
+        <div className={styles.toolHint} id={hintId}><toolInfo.icon size={17} /><span>{placingText ? "Tap your picture to place the text. Press Escape to cancel. Undo removes it." : movingText ? "Drag a text label to reposition it. Arrow keys adjust it. Pan picture moves the zoomed view." : toolInfo.hint} <span className={styles.keyboardHint}>{tool === "pan" ? "Arrow keys move around the picture. Fit picture brings it all back." : "Arrows to move, Enter to color. Shift + arrows to brush; Alt for small steps. B brush · F fill · H move."}</span></span></div>
         {confirmClear && <div className={styles.clearPrompt} role="group" aria-label="Start over confirmation"><span>Start this picture again? You can undo this.</span><div><button type="button" className={styles.quietButton} onClick={() => setConfirmClear(false)}>Keep coloring</button><button type="button" className={styles.finishButton} onClick={() => { drawing.clear(); setConfirmClear(false); }}>Start fresh</button></div></div>}
         {drawing.saveWarning && <p className={styles.warning} role="alert">{drawing.saveWarning}</p>}
       </div>
@@ -399,7 +419,7 @@ export function ColoringAdventures({ memberId, playerName, onExit, onFinish }: {
         <label className={styles.supplyField}>Brush style<select aria-label="Brush style" value={brush} onChange={(event) => { setBrush(event.target.value as ColoringBrush); chooseTool("brush"); }}><option value="round">Round brush</option><option value="marker">Soft marker</option><option value="pencil">Sketch pencil</option><option value="ribbon">Ribbon brush</option></select></label>
         <div className={styles.brushSection}><label className={styles.supplyLabel} htmlFor={`${hintId}-size`}><span>Brush size</span><span className={styles.sizeValue} aria-hidden="true">{size}px</span></label><div className={styles.sizeControl}><span className={styles.smallBrush} /><input id={`${hintId}-size`} type="range" aria-label="Brush size" aria-valuetext={`${size} pixels`} min={6} max={80} step={2} value={size} onChange={(event) => setSize(Number(event.target.value))} /><span className={styles.largeBrush} /></div><label className={styles.stayInLines}><input type="checkbox" checked={stayInLines} onChange={(event) => setStayInLines(event.target.checked)} /><span>Stay inside the lines</span></label></div>
 
-        <div className={styles.creativeSection}><h3 className={styles.supplyLabel}>Style Text</h3><label className={styles.supplyField}>Your words<input aria-label="Style Text words" value={text} maxLength={80} placeholder="My jungle adventure!" onChange={(event) => setText(event.target.value)} /></label><label className={styles.supplyField}>Lettering<select aria-label="Text font" value={textFont} onChange={(event) => setTextFont(event.target.value)}><option value="sans-serif">Playful bold</option><option value="serif">Storybook</option><option value="cursive">Handwritten</option><option value="monospace">Typewriter</option></select></label><label className={styles.supplyField}>Text effect<select aria-label="Text effect" value={textStyle} onChange={(event) => setTextStyle(event.target.value)}><option value="outline">White outline</option><option value="shadow">Drop shadow</option><option value="plain">Plain color</option></select></label><label className={styles.supplyField}>Text size<input aria-label="Text size" type="range" min={20} max={120} step={4} value={textSize} onChange={(event) => setTextSize(Number(event.target.value))} /></label><button type="button" className={styles.downloadButton} disabled={!text.trim() || !drawing.ready} aria-pressed={placingText} onClick={() => { drawing.endStroke(); setPlacingText(!placingText); if (fullScreen) setDockOpen(false); }}>{placingText ? "Cancel text placement" : "Place text on picture"}</button><p className={styles.localNote}>Uses your selected color. Tap to place; Undo to remove.</p></div>
+        <div className={styles.creativeSection}><h3 className={styles.supplyLabel}>Style Text</h3><label className={styles.supplyField}>Your words<input aria-label="Style Text words" value={text} maxLength={80} placeholder="My jungle adventure!" onChange={(event) => setText(event.target.value)} /></label><label className={styles.supplyField}>Lettering<select aria-label="Text font" value={textFont} onChange={(event) => setTextFont(event.target.value)}><option value="sans-serif">Playful bold</option><option value="serif">Storybook</option><option value="cursive">Handwritten</option><option value="monospace">Typewriter</option></select></label><label className={styles.supplyField}>Text effect<select aria-label="Text effect" value={textStyle} onChange={(event) => setTextStyle(event.target.value)}><option value="outline">Bold outline</option><option value="shadow">Drop shadow</option><option value="plain">Solid lettering</option><option value="glow">Neon glow</option><option value="sparkle">Bedazzled sparkles</option></select></label><label className={styles.supplyField}>Text color<input type="color" aria-label="Text color" value={textColor} onChange={(event) => setTextColor(event.target.value)} /></label><label className={styles.supplyField}>Outline / glow color<input type="color" aria-label="Text outline color" value={outlineColor} onChange={(event) => setOutlineColor(event.target.value)} /></label><label className={styles.supplyField}>Outline thickness: {outlineWidth}px<input type="range" aria-label="Text outline thickness" min={0} max={24} step={1} value={outlineWidth} onChange={(event) => setOutlineWidth(Number(event.target.value))} /></label><TextPreview words={text} color={textColor} size={textSize} font={textFont} effect={textStyle} outlineColor={outlineColor} outlineWidth={outlineWidth} /><label className={styles.supplyField}>Text size<input aria-label="Text size" type="range" min={20} max={120} step={4} value={textSize} onChange={(event) => setTextSize(Number(event.target.value))} /></label><button type="button" className={styles.downloadButton} disabled={!text.trim() || !drawing.ready} aria-pressed={placingText} onClick={() => { drawing.endStroke(); setPlacingText(!placingText); if (fullScreen) setDockOpen(false); }}>{placingText ? "Cancel text placement" : "Place text on picture"}</button><button type="button" className={styles.downloadButton} aria-pressed={movingText} onClick={() => { drawing.endStroke(); setPlacingText(false); setMovingText(!movingText); if (fullScreen) setDockOpen(false); }}>Move text</button><p className={styles.localNote}>New text stays movable after saving. Drag a label or use arrow keys. Undo removes or restores a change.</p></div>
         <div className={styles.littleNote}><Star size={18} /><p>A purple monkey?<br />A rainbow river?<br /><strong>You&apos;re the artist.</strong></p></div>
         <button type="button" className={styles.downloadButton} disabled={!drawing.ready || finishing} onClick={() => drawing.download(displayTitle)}><Download size={17} />Download picture</button>
         <p className={styles.localNote}>Progress saves on this device.</p>

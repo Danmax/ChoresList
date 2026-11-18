@@ -98,3 +98,13 @@ test("the game is available through the existing registry with relaxed creative-
   assert.equal(gameByKey("coloring-adventures")?.ageMin, 3);
   assert.deepEqual(DEFAULT_GAME_SETTINGS["coloring-adventures"], { enabled: true, rewardType: "none", rewardPoints: 5, rewardTickets: 0, requiresChoresComplete: false, dailyPlayLimit: 0 });
 });
+
+test("editable text saves validate effects and clamp restored lettering sizes", async () => {
+  const { restoreColoringTexts } = await import("../lib/coloring-text");
+  const label = { id: "label", text: "Jungle!", x: 200, y: 100, color: "#ed6464", size: 56, font: "serif", style: "glow", outlineColor: "#a855f7", outlineWidth: 12 };
+  assert.deepEqual(restoreColoringTexts([label]), [label]);
+  assert.deepEqual(restoreColoringTexts([null, { ...label, x: NaN }, { ...label, style: "invalid" }]), []);
+  assert.equal(restoreColoringTexts([{ ...label, size: 999, outlineWidth: 100 }])[0].outlineWidth, 24);
+  assert.equal(restoreColoringTexts([{ ...label, size: 999 }])[0].size, 120);
+  assert.deepEqual(restoreColoringTexts(undefined), []);
+});

@@ -6,19 +6,23 @@ import {
   type ColoringBrush, type ColoringPattern, type ColoringRegions, type ColoringSceneId, type ColoringTool,
 } from "@/lib/coloring";
 
+import { drawColoringText, restoreColoringTexts, textBounds, type ColoringText } from "@/lib/coloring-text";
+
+type Snapshot = { pixels: ImageData; texts: ColoringText[] };
 type Point = { x: number; y: number };
 type Editor = {
   paint: HTMLCanvasElement;
   ink: HTMLImageElement;
   ctx: CanvasRenderingContext2D;
   regions: ColoringRegions;
-  undo: ImageData[];
-  redo: ImageData[];
+  undo: Snapshot[];
+  redo: Snapshot[];
+  texts: ColoringText[];
   marks: number;
   thumbnail: string;
   coverage: number;
 };
-type Stroke = { pointerId: number; before: ImageData; last: Point };
+type Stroke = { pointerId: number; before: Snapshot; last: Point };
 type BrushOptions = { tool: ColoringTool; color: string; size: number; pattern: ColoringPattern; stayInLines: boolean; brush?: ColoringBrush };
 const HISTORY_LIMIT = 12;
 
@@ -45,6 +49,8 @@ function regionPath(regions: ColoringRegions, id: number) {
 export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId; image: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const editor = useRef<Editor | null>(null);
+  const textDrag = useRef<{ index: number; dx: number; dy: number; before: Snapshot } | null>(null);
+  const selectedText = useRef<number | null>(null);
   const stroke = useRef<Stroke | null>(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
@@ -65,6 +71,7 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
     ctx.globalCompositeOperation = "multiply";
     ctx.drawImage(current.ink, 0, 0);
     ctx.globalCompositeOperation = "source-over";
+    current.texts.forEach((item) => drawColoringText(ctx, item, canvas.width));
   }, []);
 
   const persist = useCallback(() => {
@@ -73,7 +80,7 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
     try {
       localStorage.setItem(coloringStorageKey(memberId, scene.id), JSON.stringify({
         version: 1, width: current.paint.width, height: current.paint.height,
-        image: current.paint.toDataURL("image/png"), marks: current.marks,
+        image: current.paint.toDataURL("image/png"), texts: current.texts, marks: current.marks,
         thumbnail: current.coverage > 0 ? current.thumbnail : null,
       }));
       setSaveWarning("");
@@ -89,6 +96,7 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
     if (!current) return;
     setHistory({ undo: current.undo.length, redo: current.redo.length });
     current.coverage = coloringCoverage(current.ctx.getImageData(0, 0, current.paint.width, current.paint.height), current.regions);
+    if (current.texts.length) current.coverage = Math.max(.01, current.coverage);
     setCoverage(current.coverage);
     render();
     const canvas = canvasRef.current;
@@ -101,11 +109,11 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
     }
   }, [render, scene.id]);
 
-  const commit = useCallback((before: ImageData) => {
+  const commit = useCallback((before: Snapshot) => {
     const current = editor.current;
     if (!current) return;
     const after = current.ctx.getImageData(0, 0, current.paint.width, current.paint.height);
-    if (!different(before, after)) return;
+    if (!different(before.pixels, after) && JSON.stringify(before.texts) === JSON.stringify(current.texts)) return;
     current.undo.push(before);
     if (current.undo.length > HISTORY_LIMIT) current.undo.shift();
     current.redo = [];
@@ -116,6 +124,9 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
 
   const endStroke = useCallback((pointerId?: number) => {
     const current = editor.current, active = stroke.current;
+    if (current && textDrag.current) {
+      const before = textDrag.current.before; textDrag.current = null; commit(before);
+    }
     if (!current || !active || (pointerId !== undefined && active.pointerId !== pointerId)) return;
     current.ctx.restore();
     stroke.current = null;
@@ -127,7 +138,7 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
     setReady(false); setError(""); setSaveWarning(""); setCoverage(0);
     setHistory({ undo: 0, redo: 0 }); setStatus("Getting your picture ready…");
     editor.current = null;
-    stroke.current = null;
+    stroke.current = null; textDrag.current = null; selectedText.current = null;
     async function load() {
       try {
         const ink = new Image();
@@ -144,7 +155,7 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
         ctx.drawImage(ink, 0, 0);
         const regions = createColoringRegions(ctx.getImageData(0, 0, paint.width, paint.height));
         ctx.clearRect(0, 0, paint.width, paint.height);
-        const current: Editor = { paint, ink, ctx, regions, undo: [], redo: [], marks: 0, thumbnail: "", coverage: 0 };
+        const current: Editor = { paint, ink, ctx, regions, undo: [], redo: [], texts: [], marks: 0, thumbnail: "", coverage: 0 };
         let restored = false;
         try {
           const raw = localStorage.getItem(coloringStorageKey(memberId, scene.id));
@@ -157,6 +168,7 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
             if (cancelled) return;
             if (image.naturalWidth !== paint.width || image.naturalHeight !== paint.height) throw new Error("Invalid saved size");
             ctx.drawImage(image, 0, 0);
+            current.texts = restoreColoringTexts(saved.texts);
             current.marks = Number.isSafeInteger(saved.marks) && saved.marks >= 0 ? saved.marks : 0;
             restored = true;
           }
@@ -200,7 +212,7 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
     if (id < 1 && (options.stayInLines || options.tool === "bucket" || options.tool === "pattern")) {
       setStatus("Tap inside a shape to color it"); return;
     }
-    const before = ctx.getImageData(0, 0, paint.width, paint.height);
+    const before = { pixels: ctx.getImageData(0, 0, paint.width, paint.height), texts: structuredClone(current.texts) };
     if (options.tool === "bucket" || options.tool === "pattern") {
       const pixels = ctx.getImageData(0, 0, paint.width, paint.height);
       if (fillColoringRegion(pixels, regions, id, hexToRgb(options.color), options.tool === "pattern" ? options.pattern : undefined)) {
@@ -232,23 +244,43 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
     render();
   }
 
-  function addText(point: Point, text: string, color: string, size: number, font: string, style: string) {
-    endStroke();
-    const current = editor.current;
-    if (!current || !text.trim()) return;
-    const { ctx, paint } = current;
-    const before = ctx.getImageData(0, 0, paint.width, paint.height);
-    ctx.save();
-    ctx.font = `bold ${size}px ${font}`;
-    ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    const width = Math.min(paint.width - 20, ctx.measureText(text.trim()).width);
-    const x = Math.max(width / 2 + 10, Math.min(paint.width - width / 2 - 10, point.x));
-    const y = Math.max(size, Math.min(paint.height - size, point.y));
-    ctx.fillStyle = color;
-    if (style === "shadow") { ctx.shadowColor = "#00000088"; ctx.shadowBlur = 4; ctx.shadowOffsetX = 3; ctx.shadowOffsetY = 3; }
-    if (style === "outline") { ctx.strokeStyle = "white"; ctx.lineWidth = Math.max(3, size / 10); ctx.lineJoin = "round"; ctx.strokeText(text.trim(), x, y, paint.width - 20); }
-    ctx.fillText(text.trim(), x, y, paint.width - 20);
-    ctx.restore(); commit(before);
+  function snapshot(current: Editor): Snapshot {
+    return { pixels: current.ctx.getImageData(0, 0, current.paint.width, current.paint.height), texts: structuredClone(current.texts) };
+  }
+  function addText(point: Point, text: string, color: string, size: number, font: string, style: string, outlineColor = "#202d3a", outlineWidth = 8) {
+    endStroke(); const current = editor.current;
+    if (!current || !text.trim() || current.texts.length >= 50) return;
+    const before = snapshot(current);
+    current.texts.push({ id: crypto.randomUUID(), text: text.trim().slice(0, 80), x: Math.max(30, Math.min(current.paint.width - 30, point.x)), y: Math.max(size, Math.min(current.paint.height - size, point.y)), color, size, font, style, outlineColor, outlineWidth });
+    selectedText.current = current.texts.length - 1; commit(before);
+  }
+  function beginTextDrag(point: Point) {
+    endStroke(); const current = editor.current;
+    if (!current) return;
+    for (let index = current.texts.length - 1; index >= 0; index--) {
+      const item = current.texts[index], bounds = textBounds(current.ctx, item, current.paint.width);
+      if (point.x >= bounds.left && point.x <= bounds.right && point.y >= bounds.top && point.y <= bounds.bottom) {
+        selectedText.current = index;
+        textDrag.current = { index, dx: item.x - point.x, dy: item.y - point.y, before: snapshot(current) };
+        setStatus("Drag your text to move it. Arrow keys make small adjustments."); return;
+      }
+    }
+    setStatus("Drag a text label to move it. Pan picture moves the zoomed view.");
+  }
+  function moveTextDrag(point: Point) {
+    const current = editor.current, drag = textDrag.current;
+    if (!current || !drag) return;
+    const item = current.texts[drag.index];
+    item.x = Math.max(30, Math.min(current.paint.width - 30, point.x + drag.dx));
+    item.y = Math.max(item.size, Math.min(current.paint.height - item.size, point.y + drag.dy)); render();
+  }
+  function nudgeText(dx: number, dy: number) {
+    endStroke(); const current = editor.current;
+    if (!current || !current.texts.length) return;
+    const before = snapshot(current), item = current.texts[selectedText.current ?? current.texts.length - 1];
+    if (!item) return;
+    item.x = Math.max(30, Math.min(current.paint.width - 30, item.x + dx));
+    item.y = Math.max(item.size, Math.min(current.paint.height - item.size, item.y + dy)); commit(before);
   }
 
   function travel(direction: "undo" | "redo") {
@@ -257,8 +289,8 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
     if (!current) return;
     const pixels = current[direction].pop();
     if (!pixels) return;
-    current[direction === "undo" ? "redo" : "undo"].push(current.ctx.getImageData(0, 0, current.paint.width, current.paint.height));
-    current.ctx.putImageData(pixels, 0, 0);
+    current[direction === "undo" ? "redo" : "undo"].push(snapshot(current));
+    current.ctx.putImageData(pixels.pixels, 0, 0); current.texts = structuredClone(pixels.texts); selectedText.current = null;
     refresh(); persist();
   }
 
@@ -266,7 +298,8 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
     endStroke();
     const current = editor.current;
     if (!current) return;
-    const before = current.ctx.getImageData(0, 0, current.paint.width, current.paint.height);
+    const before = snapshot(current);
+    current.texts = [];
     current.ctx.clearRect(0, 0, current.paint.width, current.paint.height);
     commit(before);
   }
@@ -287,7 +320,7 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
   }
 
   return { canvasRef, ready, error, saveWarning, status, history, coverage, dab, move, endStroke, travel, clear, download,
-    artwork, addText,
+    artwork, addText, beginTextDrag, moveTextDrag, nudgeText,
     retry: () => setReload((n) => n + 1),
     marks: () => editor.current?.marks ?? 0,
   };

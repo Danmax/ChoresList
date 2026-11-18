@@ -268,3 +268,5 @@
 @media (max-width: 760px) { .scenes { grid-template-columns: repeat(2, minmax(0, 1fr)); } .headerActions { flex-wrap: wrap; } }
 .fullScreen .viewport { display: flex; flex-direction: column; }
 .fullScreen .paper { flex-shrink: 0; margin: auto; }
+.textPreview { display: block; width: 100%; height: auto; margin: 12px 0; border: 1px solid #dce2cf; border-radius: 10px; }
+.canvas[data-tool="text-move"] { cursor: move; }

@@ -53,8 +53,11 @@ A quick color strip stays beside the canvas on phones. Edit Picture title above
 the canvas to name each picture; the title also names its PNG download. The
 supplies panel offers seven patterns, four brush styles, and five themed palettes.
 Style Text lets you enter words, choose lettering and an effect, then tap the
-picture to place the text. Text becomes part of the artwork: Undo removes it,
-and saved pictures and PNG downloads include it. The brush cursor shows
+picture to place the text. New text stays on a separate movable layer above the scene outlines. Move text
+allows dragging or arrow-key adjustments, including after reload. The live
+preview shows lettering, fill, outline thickness/color, neon glow, and bedazzled
+sparkles before placement. Undo/redo includes text moves; PNG downloads include
+the text. Older rasterized labels remain part of the original paint layer. The brush cursor shows
 the actual stroke size, and the color picker returns to your previous painting
 tool. Full screen expands the canvas on phones and tablets with an icon dock on the
 left. Edit supplies opens colors, brushes, patterns, styled text, titles, and scene
