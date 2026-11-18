@@ -112,6 +112,7 @@ model Household {
   farmProgress             FarmProgress[]
   gameSettings             GameSetting[]
   gameSessions             GameSession[]
+  coloringPosts            ColoringPost[]
   familyChessMatches       FamilyChessMatch[]
   familyMultiplayerMatches FamilyMultiplayerMatch[]
   virtualPets              VirtualPet[]
@@ -256,6 +257,7 @@ model FamilyMember {
   educationProjects     EducationProject[]
   farmProgress          FarmProgress?
   gameSessions          GameSession[]
+  coloringPosts         ColoringPost[]
   primaryVirtualPets    VirtualPet[]             @relation("PrimaryPal")
   palCaregiving         PetCaregiver[]
   palActivities         PetActivity[]
@@ -338,6 +340,21 @@ model GameSetting {
 
   @@unique([householdId, gameKey])
   @@index([householdId, enabled])
+}
+
+model ColoringPost {
+  id          String   @id @db.Char(36)
+  householdId String   @db.Char(36)
+  memberId    String   @db.Char(36)
+  title       String   @db.VarChar(80)
+  sceneId     String   @db.VarChar(64)
+  image       Bytes    @db.MediumBlob
+  createdAt   DateTime @default(now())
+
+  household Household    @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  member    FamilyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([householdId, createdAt, id])
 }
 
 model GameSession {

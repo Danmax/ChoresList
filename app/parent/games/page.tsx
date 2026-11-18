@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Blocks, BookOpen, ChefHat, Copy, Crown, Gamepad2, Grid3X3, KeyRound, Palette, PawPrint, Puzzle, QrCode, RefreshCw, Save, Shapes, Swords, Tractor, TreePine, Users } from "lucide-react";
 import { toast } from "sonner";
@@ -186,6 +187,7 @@ export default function ParentGamesPage() {
         title="Games"
         description="Manage simple kid games, chore gates, daily limits, and point rewards."
         actions={<div className="flex flex-wrap items-center gap-2">
+          <Link href="/parent/feed" className="rounded-lg bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700">View family feed</Link>
           {members.length > 0 && <><select value={launchMemberId} onChange={(event) => setLaunchMemberId(event.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700"><option value="">Choose a player</option>{members.map((member) => <option key={member.id} value={member.id}>{member.avatar} {member.name}</option>)}</select><button type="button" disabled={!launchMemberId} onClick={() => router.push(`/kid/${launchMemberId}/games?returnTo=parent-games`)} className="flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"><Gamepad2 size={18} /> Launch games</button></>}
           <button type="button" onClick={load} className="flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50"><RefreshCw size={18} /> Refresh</button>
         </div>}

@@ -312,3 +312,13 @@
 .starterExplanation { font-size: 12px; line-height: 1.8; color: #68765d; margin: 12px 0; }
 .fullScreen .generateTool { margin-top: 8px; }
 @media (max-width: 760px) { .generateTool { margin-top: 0; } }
+
+.reviewShare{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;padding:12px 20px;border-radius:12px;border:1px solid #3d744e;background:#477f55;color:white;font-weight:800;cursor:pointer}.reviewShare:hover{background:#376743}.reviewShare:disabled{cursor:default;opacity:.75}
+
+.quickColors, .fullScreen .quickColors { display: flex; align-items: center; gap: 10px; flex-shrink: 0; padding: 7px 14px; border-bottom: 1px solid var(--line); background: #fffef8; }
+.quickLabel { flex-shrink: 0; font-size: 9px; font-weight: 800; letter-spacing: 1px; color: #748166; }
+.quickColors > div { display: flex; min-width: 0; gap: 4px; overflow-x: auto; padding: 3px; }
+.quickColors button { display: grid; place-items: center; flex-shrink: 0; width: 44px; height: 44px; border: 6px solid #fffef8; border-radius: 100%; background: var(--paint); box-shadow: inset 0 0 0 1px #0000000c; }
+.quickColors button[aria-pressed="true"] { outline: 1.5px solid #7e986b; outline-offset: -3px; }
+.quickColors button svg { border-radius: 100%; background: white; color: #345c48; }
+.fullScreen .paper { width: calc(min(100%, (100dvh - 170px) * 1.777) * var(--canvas-zoom)) !important; }

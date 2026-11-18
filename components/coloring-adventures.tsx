@@ -1,7 +1,7 @@
 "use client";
 
 import { type CSSProperties, type KeyboardEvent, type PointerEvent, useEffect, useId, useRef, useState } from "react";
-import { ArrowLeft, Check, CheckCircle2, ChevronRight, Download, Eraser, Eye, Maximize, Minimize, Type, Images, Hand, Leaf, LoaderCircle, PaintBucket, Paintbrush, Palette, Pipette, Redo2, RotateCcw, Scan, Sparkles, Star, Undo2, X, ZoomIn } from "lucide-react";
+import { ArrowLeft, Check, CheckCircle2, ChevronRight, Download, Eraser, Eye, Maximize, Minimize, Type, Images, Hand, Leaf, LoaderCircle, PaintBucket, Paintbrush, Palette, Pipette, Redo2, RotateCcw, Scan, Share2, Sparkles, Star, Undo2, X, ZoomIn } from "lucide-react";
 import { COLORING_COLORS, COLORING_SCENES, COLORING_THEMES, type ColoringBrush, coloringPreferences, coloringStorageKey, type ColoringPattern, type ColoringSceneId, type ColoringTool } from "@/lib/coloring";
 import { useColoringCanvas } from "./use-coloring-canvas";
 import { COLORING_LETTERING, coloringTextFont, drawColoringText } from "@/lib/coloring-text";
@@ -93,6 +93,10 @@ export function ColoringAdventures({ memberId, playerName, onExit, onFinish }: {
   const [confirmClear, setConfirmClear] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [finishError, setFinishError] = useState("");
+  const [sharing, setSharing] = useState(false);
+  const [shared, setShared] = useState(false);
+  const [shareError, setShareError] = useState("");
+  const shareSnapshot = useRef<{ image: string; title: string; memberId: string; sceneId: string; id: string; shared: boolean } | null>(null);
   const [keyboardPoint, setKeyboardPoint] = useState<{ x: number; y: number } | null>(null);
   const [recentColors, setRecentColors] = useState<string[]>([]);
   const [preferencesLoadedFor, setPreferencesLoadedFor] = useState<string | null>(null);
@@ -346,6 +350,34 @@ export function ColoringAdventures({ memberId, playerName, onExit, onFinish }: {
     if (event.shiftKey && (tool === "brush" || tool === "eraser")) { apply(at, -1); drawing.move(next, -1); drawing.endStroke(-1); }
   }
 
+  function reviewPicture() {
+    drawing.endStroke();
+    const image = drawing.canvasRef.current?.toDataURL("image/png") ?? null;
+    const previous = shareSnapshot.current;
+    if (image && (!previous || previous.image !== image || previous.title !== displayTitle || previous.memberId !== memberId || previous.sceneId !== sceneId)) {
+      shareSnapshot.current = { image, title: displayTitle, memberId, sceneId, id: crypto.randomUUID(), shared: false };
+    }
+    setShared(shareSnapshot.current?.shared ?? false);
+    setShareError(""); setFinishError(""); setReviewImage(image);
+  }
+
+  async function sharePicture() {
+    const snapshot = shareSnapshot.current;
+    if (finishing || !snapshot || snapshot.shared) return;
+    setFinishing(true); setSharing(true); setShareError("");
+    try {
+      const response = await fetch("/api/coloring/feed", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: snapshot.id, memberId: snapshot.memberId, sceneId: snapshot.sceneId, title: snapshot.title, image: snapshot.image }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(data?.error ?? "Your picture couldn’t be shared. Please try again.");
+      snapshot.shared = true; setShared(true);
+    } catch (error) {
+      setShareError(error instanceof Error ? error.message : "Your picture couldn’t be shared. Please try again.");
+    } finally { setFinishing(false); setSharing(false); }
+  }
+
   async function finish() {
     drawing.endStroke();
     if (finishing || drawing.coverage <= 0) return;
@@ -368,7 +400,7 @@ export function ColoringAdventures({ memberId, playerName, onExit, onFinish }: {
       <div className={styles.headerActions}>
         <button ref={fullScreenButtonRef} type="button" className={styles.quietButton} aria-label="Enter full screen" disabled={finishing} onClick={() => void enterFullScreen()}><Maximize size={18} /><span>Full screen</span></button>
         <button type="button" className={styles.quietButton} disabled={finishing} onClick={() => { drawing.endStroke(); onExit(); }}><ArrowLeft size={16} /><span>Games</span></button>
-        <button ref={finishButtonRef} type="button" className={styles.finishButton} disabled={!drawing.ready || drawing.coverage <= 0 || finishing} onClick={() => { drawing.endStroke(); setFinishError(""); setReviewImage(drawing.canvasRef.current?.toDataURL("image/png") ?? null); }}><CheckCircle2 size={17} /><span>Finish picture</span></button>
+        <button ref={finishButtonRef} type="button" className={styles.finishButton} disabled={!drawing.ready || drawing.coverage <= 0 || finishing} onClick={reviewPicture}><CheckCircle2 size={17} /><span>Finish picture</span></button>
       </div>
     </header>
 
@@ -377,11 +409,17 @@ export function ColoringAdventures({ memberId, playerName, onExit, onFinish }: {
     <div className={styles.workspace}>
       <nav className={styles.tools} aria-label="Coloring tools">
         <p className={styles.sectionLabel}>TOOLS</p>
-        {TOOLS.map(({ id, icon: Icon, label, shortcut }) => <button key={id} type="button" className={`${styles.tool} ${tool === id ? styles.activeTool : ""}`} aria-label={label} title={`${label} (${shortcut})`} aria-keyshortcuts={shortcut} aria-pressed={tool === id} onClick={() => chooseTool(id)} disabled={finishing}>
-          <Icon size={23} strokeWidth={1.7} /><span>{label}</span>
-        </button>)}
-        {([{ id: "colors", label: "Colors", icon: Palette }, { id: "picture", label: "Picture", icon: Images }] as const).map(({ id, label, icon: Icon }) => <button key={id} type="button" className={`${styles.tool} ${panel === id ? styles.activeTool : ""}`} aria-label={label} title={label} aria-pressed={panel === id} aria-controls={`${hintId}-supplies`} onClick={() => openPanel(id)}><Icon size={23} /><span>{label}</span></button>)}
-        <button type="button" className={`${styles.tool} ${styles.textSectionTool} ${panel === "text" ? styles.activeTool : ""}`} aria-label="Text" title="Text editor" aria-pressed={panel === "text"} aria-controls={`${hintId}-text-editor`} onClick={() => openPanel("text")}><Type size={23} /><span>Text</span></button>
+        {[
+          { id: "picture", label: "Picture", icon: Images },
+          ...TOOLS.filter((item) => ["bucket", "brush", "pattern"].includes(item.id)),
+          { id: "text", label: "Text", icon: Type },
+          { id: "colors", label: "Colors", icon: Palette },
+          ...TOOLS.filter((item) => ["eraser", "pan"].includes(item.id)),
+        ].map(({ id, label, icon: Icon }) => {
+          const drawingTool = TOOLS.find((item) => item.id === id);
+          const active = drawingTool ? tool === id && !movingText : panel === id;
+          return <button key={id} type="button" className={`${styles.tool} ${id === "text" ? styles.textSectionTool : ""} ${active ? styles.activeTool : ""}`} aria-label={label} title={drawingTool ? `${label} (${drawingTool.shortcut})` : label} aria-keyshortcuts={drawingTool?.shortcut} aria-pressed={active} aria-controls={`${hintId}-supplies`} disabled={finishing} onClick={() => drawingTool ? chooseTool(drawingTool.id) : openPanel(id as SupplyPanel)}><Icon size={23} strokeWidth={1.7} /><span>{label}</span></button>;
+        })}
         {fullScreen && <>
           <button type="button" className={styles.tool} aria-label="Exit full screen" title="Exit full screen" onClick={leaveFullScreen}><Minimize size={23} /><span>Exit full screen</span></button>
         </>}
@@ -389,10 +427,9 @@ export function ColoringAdventures({ memberId, playerName, onExit, onFinish }: {
       </nav>
 
       <div className={styles.workbench}>
-        <label className={styles.pictureTitleControl}>Picture title<input aria-label="Picture title" maxLength={80} value={pictureTitle} placeholder={scene.title} onChange={(event) => setPictureTitle(event.target.value)} /></label>
 
         <div className={styles.quickColors} role="group" aria-label="Quick colors">
-          <span className={styles.quickLabel}>COLORS</span><div>{[...COLORING_COLORS.map((item) => item.hex as string), ...recentColors.filter((hex) => !COLORING_COLORS.some((item) => item.hex === hex))].map((hex) => <button key={hex} type="button" aria-label={`Quick ${COLORING_COLORS.find((item) => item.hex === hex)?.name ?? hex}`} aria-pressed={color === hex} onClick={() => chooseColor(hex)} style={{ "--paint": hex } as CSSProperties}>{color === hex && <Check size={16} />}</button>)}</div>
+          <span className={styles.quickLabel}>RECENT COLORS</span><div>{(recentColors.length ? recentColors : [color]).map((hex) => <button key={hex} type="button" aria-label={`Quick ${COLORING_COLORS.find((item) => item.hex === hex)?.name ?? hex}`} aria-pressed={color === hex} onClick={() => chooseColor(hex)} style={{ "--paint": hex } as CSSProperties}>{color === hex && <Check size={16} />}</button>)}</div>
         </div>
         <div className={styles.canvasToolbar}>
           <div className={styles.editActions}>
@@ -426,6 +463,7 @@ export function ColoringAdventures({ memberId, playerName, onExit, onFinish }: {
         <section className={styles.supplyPanel} hidden={panel !== "generate"} aria-label="Starting color controls"><p className={styles.starterExplanation}>Give your picture a colorful head start, then make it your own.</p><label className={styles.supplyField}>Color style<select aria-label="Starting color style" value={starterStyle} onChange={(event) => setStarterStyle(event.target.value as "scenery" | "complementary")}><option value="scenery">Scenery-inspired shades</option><option value="complementary">Random complementary colors</option></select></label><p className={styles.starterExplanation}>{starterStyle === "scenery" ? "Natural greens, water blues, earthy animal colors, and treasure gold. Small details stay yours to finish." : "Creates a fresh palette using opposite hues, with lighter and darker shades."}</p><label className={styles.stayInLines}><input type="checkbox" checked={keepColors} onChange={(event) => setKeepColors(event.target.checked)} />Keep my colors</label><p className={styles.localNote}>Keeps any shape you have already painted. Turn off to recolor the scene. Text stays intact.</p><button type="button" className={styles.downloadButton} disabled={!drawing.ready || finishing} onClick={() => { drawing.generateColors(starterStyle, keepColors); if (fullScreen) setDockOpen(false); }}>Generate colors</button><p className={styles.localNote}>Try another palette any time. Undo restores the previous picture.</p></section>
         <div className={styles.supplyPanel} hidden={panel !== "colors"}>
         <div className={styles.creativeSection}><label className={styles.supplyField}>Themed palette<select aria-label="Themed palette" value={theme} onChange={(event) => setTheme(event.target.value)}>{COLORING_THEMES.map((item) => <option key={item.name}>{item.name}</option>)}</select></label><div className={styles.themeColors}>{COLORING_THEMES.find((item) => item.name === theme)!.colors.map((hex) => <button key={hex} type="button" aria-label={`${theme} ${hex}`} title={hex} style={{ background: hex }} onClick={() => chooseColor(hex)} aria-pressed={color === hex} />)}</div></div>
+        <button type="button" className={styles.downloadButton} aria-label="Pick color" aria-pressed={tool === "picker"} onClick={() => { chooseTool("picker"); if (fullScreen) setDockOpen(false); }}><Pipette size={17} />Eyedropper</button>
         <div className={styles.paletteHeading}><div><p className={styles.sectionLabel}>MAKE IT YOURS</p><h3>Your colors</h3></div><Palette size={19} /></div>
         <div className={styles.palette} role="group" aria-label="Color palette">{COLORING_COLORS.map((item) => <button key={item.name} type="button" aria-label={item.name} aria-pressed={color === item.hex} title={item.name} className={styles.swatch} style={{ "--paint": item.hex } as CSSProperties} onClick={() => chooseColor(item.hex)}>{color === item.hex && <Check size={18} strokeWidth={3} style={{ color: item.hex === "#ffffff" || item.name === "Sunshine" ? "#454e43" : "white" }} />}</button>)}</div>
         <label className={styles.customColor}><input type="color" aria-label="Custom color" value={color} onChange={(event) => chooseColor(event.target.value)} /><span><strong>{colorName}</strong><small>or mix your own color</small></span><ChevronRight size={15} /></label>
@@ -441,7 +479,7 @@ export function ColoringAdventures({ memberId, playerName, onExit, onFinish }: {
         </div><section id={`${hintId}-text-editor`} className={`${styles.supplyPanel} ${styles.textEditorSection}`} aria-label="Text controls" hidden={panel !== "text"}>
         <div className={styles.creativeSection}><h3 className={styles.textGroupHeading}>Create text</h3><label className={styles.supplyField}>Your words<input aria-label="Style Text words" value={text} maxLength={80} placeholder="My jungle adventure!" onChange={(event) => setText(event.target.value)} /></label><h3 className={styles.textGroupHeading}>Font & effects</h3><label className={styles.supplyField}>Lettering<select aria-label="Text font" value={textFont} onChange={(event) => setTextFont(event.target.value)}>{COLORING_LETTERING.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label><details className={styles.letteringSamples}><summary>Browse lettering styles</summary><div>{COLORING_LETTERING.map((item) => <button key={item.id} type="button" aria-label={`Use ${item.label} lettering`} aria-pressed={textFont === item.id} onClick={() => setTextFont(item.id)}><span style={{ fontFamily: item.family, fontWeight: item.weight }}>{text.trim().slice(0, 22) || "Jungle magic!"}</span><small>{item.label}</small></button>)}</div></details><label className={styles.supplyField}>Text effect<select aria-label="Text effect" value={textStyle} onChange={(event) => setTextStyle(event.target.value)}><option value="outline">Bold outline</option><option value="shadow">Drop shadow</option><option value="plain">Solid lettering</option><option value="glow">Neon glow</option><option value="sparkle">Bedazzled sparkles</option></select></label><label className={styles.supplyField}>Text color<input type="color" aria-label="Text color" value={textColor} onChange={(event) => setTextColor(event.target.value)} /></label><label className={styles.supplyField}>Outline / glow color<input type="color" aria-label="Text outline color" value={outlineColor} onChange={(event) => setOutlineColor(event.target.value)} /></label><label className={styles.supplyField}>Outline thickness: {outlineWidth}px<input type="range" aria-label="Text outline thickness" min={0} max={24} step={1} value={outlineWidth} onChange={(event) => setOutlineWidth(Number(event.target.value))} /></label><TextPreview words={text} color={textColor} size={textSize} font={textFont} effect={textStyle} outlineColor={outlineColor} outlineWidth={outlineWidth} /><label className={styles.supplyField}>Text size<input aria-label="Text size" type="range" min={20} max={120} step={4} value={textSize} onChange={(event) => setTextSize(Number(event.target.value))} /></label><button type="button" className={styles.downloadButton} disabled={!text.trim() || !drawing.ready} aria-pressed={placingText} onClick={() => { drawing.endStroke(); setPlacingText(!placingText); if (fullScreen) setDockOpen(false); }}>{placingText ? "Cancel text placement" : "Place text on picture"}</button><h3 className={styles.textGroupHeading}>Manage text boxes</h3><button type="button" className={styles.downloadButton} aria-pressed={movingText} onClick={() => { drawing.endStroke(); setPlacingText(false); setMovingText(!movingText); if (fullScreen) setDockOpen(false); }}>Move text</button><label className={styles.supplyField}>Select a text box<select aria-label="Select text box" value={drawing.selectedTextId ?? ""} onChange={(event) => drawing.selectText(event.target.value)} disabled={!drawing.textLabels.length}><option value="">Choose a text box</option>{drawing.textLabels.map((label, index) => <option key={label.id} value={label.id}>{index + 1}. {label.text}</option>)}</select></label><button type="button" className={styles.deleteTextButton} disabled={!drawing.selectedTextId || finishing} onClick={drawing.deleteSelectedText}>Delete selected text</button><p className={styles.localNote}>New text stays movable after saving. Select a text box above, or use Move text and tap a label. Delete selected text removes only that box; Undo restores it.</p></div>
         </section><div className={styles.supplyPanel} hidden={panel !== "picture"}>
-        <label className={styles.supplyField}>Picture title<input aria-label="Dock picture title" maxLength={80} value={pictureTitle} placeholder={scene.title} onChange={(event) => setPictureTitle(event.target.value)} /></label><label className={styles.supplyField}>Scene<select aria-label="Dock scene" value={sceneId} onChange={(event) => { selectScene(event.target.value as ColoringSceneId); setDockOpen(false); }}>{COLORING_SCENES.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label>
+        <label className={styles.supplyField}>Picture title<input aria-label="Picture title" maxLength={80} value={pictureTitle} placeholder={scene.title} onChange={(event) => setPictureTitle(event.target.value)} /></label><label className={styles.supplyField}>Scene<select aria-label="Dock scene" value={sceneId} onChange={(event) => { selectScene(event.target.value as ColoringSceneId); setDockOpen(false); }}>{COLORING_SCENES.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label>
         <div className={styles.creationSummary} aria-label="Artwork description"><h3>{displayTitle}</h3><p>{scene.description}</p>{drawing.artwork?.sceneId === sceneId && <img src={drawing.artwork.thumbnail} alt="Current artwork preview" />}<p>{Math.round(drawing.coverage * 100)}% colored · {drawing.textLabels.length} text {drawing.textLabels.length === 1 ? "box" : "boxes"}</p>{drawing.paintColors.length > 0 && <div className={styles.paintSummary}><span>Main paint colors</span>{drawing.paintColors.map((hex) => <span key={hex} title={hex} aria-label={`Paint color ${hex}`} style={{ background: hex }} />)}</div>}{drawing.textLabels.length > 0 && <p>Lettering: {drawing.textLabels.map((label) => `“${label.text}”`).join(", ")}</p>}</div>
         <button type="button" className={styles.downloadButton} disabled={!drawing.ready || finishing} onClick={() => drawing.download(displayTitle)}><Download size={17} />Download picture</button>
         <p className={styles.localNote}>Progress saves on this device.</p></div>
@@ -460,9 +498,12 @@ export function ColoringAdventures({ memberId, playerName, onExit, onFinish }: {
       <p className={styles.reviewCredit}>{displayTitle} <span>by {playerName}</span></p>
       {reviewImage && <div className={styles.reviewFrame}><img src={reviewImage} alt={`Your finished ${scene.title} picture`} /></div>}
       <p className={styles.reviewNote}>{drawing.saveWarning ? "Download a copy to keep your colors safe." : "Your colors are saved on this device. Keep a copy to show someone you love."}</p>
-      <button type="button" className={styles.reviewDownload} onClick={() => drawing.download(displayTitle)}><Download size={18} />Download PNG</button>
+      <button type="button" className={styles.reviewShare} disabled={finishing || shared} onClick={() => void sharePicture()}>{sharing ? <LoaderCircle size={18} className={styles.spinning} /> : shared ? <CheckCircle2 size={18} /> : <Share2 size={18} />}{sharing ? "Sharing…" : shared ? "Shared with parents" : "Share with parents"}</button>
+      <p className={styles.reviewNote} role="status">{shared ? "Your picture is in the parent feed!" : "Share to your private parent feed so your parents can see your creation."}</p>
+      {shareError && <p className={styles.warning} role="alert">{shareError} Your picture is still here.</p>}
+      <button type="button" className={styles.reviewDownload} disabled={finishing} onClick={() => drawing.download(displayTitle)}><Download size={18} />Download PNG</button>
       {finishError && <p className={styles.warning} role="alert">{finishError}</p>}
-      <div className={styles.reviewActions}><button type="button" className={styles.quietButton} disabled={finishing} onClick={() => setReviewImage(null)}>Keep coloring</button><button type="button" className={styles.finishButton} disabled={finishing} onClick={() => void finish()}>{finishing ? <LoaderCircle size={17} className={styles.spinning} /> : <CheckCircle2 size={17} />}{finishing ? "Saving…" : "Save & return to games"}</button></div>
+      <div className={styles.reviewActions}><button type="button" className={styles.quietButton} disabled={finishing} onClick={() => setReviewImage(null)}>Keep coloring</button><button type="button" className={styles.finishButton} disabled={finishing} onClick={() => void finish()}>{finishing ? <LoaderCircle size={17} className={styles.spinning} /> : <CheckCircle2 size={17} />}{finishing && !sharing ? "Saving…" : "Save & return to games"}</button></div>
     </dialog>
   </section>;
 }

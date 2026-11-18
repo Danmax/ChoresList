@@ -153,3 +153,24 @@ test("starter colors work for all six actual scenes without painting across the 
     for (let i = 0; i < regions.labels.length; i++) if (regions.labels[i] < 1) assert.equal(pixels.data[i * 4 + 3], 0);
   }
 });
+
+test("scenery starters use appropriate animal, water, and treasure shades", async () => {
+  const { generateStarterColors } = await import("../lib/coloring-starter");
+  const probes = [
+    ["vine-swing", 604, 248, "warm"], ["elephant-splash", 371, 475, "gray"],
+    ["jungle-river", 772, 584, "water"], ["treasure-jungle", 736, 541, "warm"],
+    ["jungle-friends", 800, 430, "warm"],
+  ] as const;
+  for (const [sceneId, x, y, kind] of probes) {
+    const scene = COLORING_SCENES.find((scene) => scene.id === sceneId)!;
+    const { data, info } = await sharp(`public${scene.image}`).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    const regions = createColoringRegions({ width: info.width, height: info.height, data: new Uint8ClampedArray(data) });
+    const pixels = paint(info.width, info.height);
+    generateStarterColors(pixels, regions, sceneId, "scenery", 42);
+    const [r, g, b, alpha] = pixel(pixels, x, y);
+    assert.equal(alpha, 255);
+    if (kind === "warm") assert.ok(r > g && g > b, `${sceneId} has warm animal/wood colors`);
+    if (kind === "water") assert.ok(b > r && g > r);
+    if (kind === "gray") assert.ok(Math.max(r, g, b) - Math.min(r, g, b) < 40);
+  }
+});
