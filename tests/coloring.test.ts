@@ -122,9 +122,9 @@ test("all lettering styles survive saved-text validation and their bundled fonts
 });
 
 test("starter palettes are repeatable, varied, outline-safe, and protect painted shapes", async () => {
-  const { generateStarterColors } = await import("../lib/coloring-starter");
+  const { generateStarterColors, STARTER_THEMES } = await import("../lib/coloring-starter");
   const regions = createColoringRegions(paper(80, 60));
-  for (const style of ["scenery", "complementary"] as const) {
+  for (const { id: style } of STARTER_THEMES) {
     const first = paint(80, 60), same = paint(80, 60), next = paint(80, 60);
     assert.ok(generateStarterColors(first, regions, "vine-swing", style, 42) > 0);
     generateStarterColors(same, regions, "vine-swing", style, 42);
@@ -144,13 +144,15 @@ test("starter palettes are repeatable, varied, outline-safe, and protect painted
 });
 
 test("starter colors work for all six actual scenes without painting across the ink", async () => {
-  const { generateStarterColors } = await import("../lib/coloring-starter");
+  const { generateStarterColors, STARTER_THEMES } = await import("../lib/coloring-starter");
   for (const scene of COLORING_SCENES) {
     const { data, info } = await sharp(`public${scene.image}`).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
     const regions = createColoringRegions({ width: info.width, height: info.height, data: new Uint8ClampedArray(data) });
-    const pixels = paint(info.width, info.height);
-    assert.ok(generateStarterColors(pixels, regions, scene.id, "scenery", 42) > regions.paintable * .5, `${scene.title} gets useful starting coverage`);
-    for (let i = 0; i < regions.labels.length; i++) if (regions.labels[i] < 1) assert.equal(pixels.data[i * 4 + 3], 0);
+    for (const { id: style } of STARTER_THEMES) {
+      const pixels = paint(info.width, info.height);
+      assert.ok(generateStarterColors(pixels, regions, scene.id, style, 42) > regions.paintable * .5, `${scene.title} gets useful ${style} coverage`);
+      for (let i = 0; i < regions.labels.length; i++) if (regions.labels[i] < 1) assert.equal(pixels.data[i * 4 + 3], 0);
+    }
   }
 });
 

@@ -373,7 +373,7 @@ async function main() {
     const beforeStarter = await snapshot(), labelsBeforeStarter = await storedTexts();
     await page.getByRole("button", { name: "Generate starting colors", exact: true }).click();
     await expect(page.getByLabel("Keep my colors", { exact: true })).toBeChecked();
-    await page.getByLabel("Starting color style", { exact: true }).selectOption("complementary");
+    await page.getByLabel("Starting color style", { exact: true }).selectOption("neon");
     await page.getByRole("button", { name: "Generate colors", exact: true }).click();
     const started = await snapshot(); assert.notEqual(started, beforeStarter);
     assert.deepEqual(await storedTexts(), labelsBeforeStarter);
@@ -383,6 +383,15 @@ async function main() {
     await page.getByRole("button", { name: "Generate colors", exact: true }).click(); assert.notEqual(await snapshot(), started);
     await page.getByRole("button", { name: "Undo", exact: true }).click(); assert.equal(await snapshot(), started);
     await page.getByRole("button", { name: "Undo", exact: true }).click(); assert.equal(await snapshot(), beforeStarter);
+    for (const theme of ["sepia", "bedazzled", "party", "hearts", "sunshine", "holiday"]) {
+      await page.getByLabel("Starting color style", { exact: true }).selectOption(theme);
+      await page.getByRole("button", { name: "Generate colors", exact: true }).click();
+      assert.notEqual(await snapshot(), beforeStarter, `${theme} generates colors`);
+      assert.deepEqual(await storedTexts(), labelsBeforeStarter);
+      await page.screenshot({ path: `${screenshotDir}/starter-${theme}.png`, fullPage: true });
+      await page.getByRole("button", { name: "Undo", exact: true }).click();
+      assert.equal(await snapshot(), beforeStarter, `${theme} undoes in one step`);
+    }
     await page.getByLabel("Starting color style", { exact: true }).selectOption("scenery");
     await page.getByRole("button", { name: "Generate colors", exact: true }).click();
     await page.screenshot({ path: `${screenshotDir}/generated-starter.png`, fullPage: true });

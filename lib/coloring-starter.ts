@@ -1,6 +1,16 @@
 import { coloringRegionAt, hexToRgb, type ColoringPixels, type ColoringRegions, type ColoringSceneId, type RGB } from "./coloring";
 
-export type StarterColorStyle = "scenery" | "complementary";
+export const STARTER_THEMES = [
+  { id: "scenery", name: "Natural scenery", description: "Leafy greens, blue water, earthy animals, and treasure gold." },
+  { id: "neon", name: "Neon", description: "Electric greens, turquoise water, and hot pink accents." },
+  { id: "sepia", name: "Vintage Sepia", description: "Warm antique browns, faded gold, and creamy paper tones." },
+  { id: "bedazzled", name: "Flashy Bedazzled", description: "Jewel tones with sparkling highlights on flowers and treasure." },
+  { id: "party", name: "Fun Party", description: "Bright tropical colors with confetti on flowers and treasure." },
+  { id: "hearts", name: "Hearts & Kisses", description: "Rose pinks, soft lavender, and heart and kiss accents." },
+  { id: "sunshine", name: "Cool Sunshine", description: "Cool aqua, sunny gold, and fresh mint greens." },
+  { id: "holiday", name: "Cozy Holiday", description: "Evergreen, cranberry, warm cocoa, and golden festive sparkles." },
+] as const;
+export type StarterColorStyle = typeof STARTER_THEMES[number]["id"];
 type Shade = "leaf" | "water" | "sky" | "wood" | "fur" | "face" | "gold" | "gray" | "flower" | "jewel" | "earth" | "white" | "dark";
 const SHADES: Record<Shade, string[]> = {
   white: ["#ffffff"], dark: ["#434b54", "#56606a"],
@@ -8,6 +18,32 @@ const SHADES: Record<Shade, string[]> = {
   wood: ["#a67c52", "#ba9166"], fur: ["#ad7952", "#986947"], face: ["#f0cfaa", "#e5bb91"], gold: ["#eac25c", "#f2ce70"],
   gray: ["#9ca9b8", "#b6b6c4"], flower: ["#ea91ac", "#e7a8cc", "#f1b989"], jewel: ["#a68ac7", "#73c4be"], earth: ["#d6bd8d", "#cbb283"],
 };
+// Colors keep the same role throughout a scene, instead of choosing unrelated hues.
+const THEME_SHADES: Record<Exclude<StarterColorStyle, "scenery">, Record<Shade, string[]>> = {
+  neon: { white: ["#f3ffff"], dark: ["#38315c"], leaf: ["#79ed40", "#b5fa52"], water: ["#17d5e6", "#47ebee"], sky: ["#d2edff"], wood: ["#8a58c0", "#a16cd2"], fur: ["#f79847", "#ffb258"], face: ["#ffe1ab"], gold: ["#f6eb36", "#f6cf34"], gray: ["#9caceb", "#b9b4f2"], flower: ["#ff58ba", "#ff76d4"], jewel: ["#b469f5", "#ef6be5"], earth: ["#c5b5ed"] },
+  sepia: { white: ["#fff6e2"], dark: ["#554335"], leaf: ["#a38d5f", "#b7a373"], water: ["#c5b79b", "#d5c6aa"], sky: ["#eee2c9"], wood: ["#917052", "#ab8963"], fur: ["#a17954", "#b28a61"], face: ["#e6c99e", "#efd7b4"], gold: ["#d4af6d", "#e1bf84"], gray: ["#b6a38b", "#c5b49a"], flower: ["#c39c7b", "#d9b28d"], jewel: ["#b28b65", "#d2b48a"], earth: ["#d9c5a0"] },
+  bedazzled: { ...SHADES, leaf: ["#499b85", "#6cb4a4"], water: ["#71b8df", "#86a4df"], sky: ["#e3dcf9"], flower: ["#c47cdb", "#e68dc6"], jewel: ["#9672d6", "#57becb"], gold: ["#e8bf55", "#f4d780"] },
+  party: { ...SHADES, leaf: ["#64c183", "#91cf68"], water: ["#58c8dc", "#79d9e5"], sky: ["#d1eff9"], flower: ["#fa8b9d", "#ba8ce4", "#ffbc55"], jewel: ["#a17ee1", "#ed6eaf"], gold: ["#f9c84f", "#ffdc6b"] },
+  hearts: { ...SHADES, leaf: ["#9bb69e", "#b6c9ae"], water: ["#c0b9e3", "#d0c9ee"], sky: ["#fae6ef"], flower: ["#ec8fae", "#f3a8bc"], jewel: ["#df759d", "#c49edc"], gold: ["#eeb4ac", "#f3c7b9"], earth: ["#e4cecb"] },
+  sunshine: { ...SHADES, leaf: ["#82c49a", "#a5d6ab"], water: ["#79ccd9", "#a3dfe4"], sky: ["#def3f9"], flower: ["#f6d569", "#f5bf86"], jewel: ["#69bfc6", "#a3c7e0"], gold: ["#efc556", "#f9df85"], earth: ["#e8d8ad"] },
+  holiday: { ...SHADES, leaf: ["#477b5a", "#658c68"], water: ["#94bdc7", "#b2d2d6"], sky: ["#e4eeee"], wood: ["#906a50", "#aa8263"], flower: ["#c76a79", "#dc8b8c"], jewel: ["#b75c71", "#d09b52"], gold: ["#d5b160", "#e5c77f"], earth: ["#dfcba9"] },
+};
+
+// Accent marks are clipped by the original region labels, so linework stays intact.
+function accentAt(style: StarterColorStyle, x: number, y: number): boolean {
+  const u = ((x + (Math.floor(y / 38) % 2) * 19) % 38) - 19, v = y % 38 - 19;
+  if (style === "bedazzled" || style === "holiday") return Math.abs(u) + Math.abs(v) < 6 && (Math.abs(u) < 1.8 || Math.abs(v) < 1.8);
+  if (style === "party") return (u * u + v * v < 7) || (Math.abs(u - 10) < 2 && Math.abs(v + 9) < 3);
+  if (style === "hearts") {
+    if ((Math.floor(x / 38) + Math.floor(y / 38)) % 2 === 0) {
+      const hx = u / 6, hy = -v / 6;
+      return (hx * hx + hy * hy - 1) ** 3 - hx * hx * hy ** 3 <= 0;
+    }
+    // Two curved lips with a narrow center opening.
+    return u * u / 49 + v * v / 16 < 1 && Math.abs(v) > .9;
+  }
+  return false;
+}
 // These guide points refer to the supplied 1280×720 drawings. They select
 // connected shapes in the original linework; generation never modifies ink.
 const GUIDES: Record<ColoringSceneId, [number, number, Shade][]> = {
@@ -116,12 +152,6 @@ function randomSource(seed: number) {
   let state = seed >>> 0;
   return () => { state = (Math.imul(state, 1664525) + 1013904223) >>> 0; return state / 4294967296; };
 }
-function hsl(hue: number, saturation: number, lightness: number): RGB {
-  const chroma = (1 - Math.abs(2 * lightness - 1)) * saturation, h = ((hue % 360) + 360) % 360 / 60;
-  const x = chroma * (1 - Math.abs(h % 2 - 1));
-  const rgb = h < 1 ? [chroma,x,0] : h < 2 ? [x,chroma,0] : h < 3 ? [0,chroma,x] : h < 4 ? [0,x,chroma] : h < 5 ? [x,0,chroma] : [chroma,0,x];
-  return rgb.map((v) => Math.round((v + lightness - chroma / 2) * 255)) as unknown as RGB;
-}
 export function generateStarterColors(pixels: ColoringPixels, regions: ColoringRegions, sceneId: ColoringSceneId, style: StarterColorStyle, seed: number, keepExisting = true): number {
   const random = randomSource(seed), painted = new Uint8Array(regions.bounds.length);
   if (keepExisting) for (let i = 0; i < regions.labels.length; i++) if (regions.labels[i] > 0 && pixels.data[i * 4 + 3] > 0) painted[regions.labels[i]] = 1;
@@ -130,24 +160,26 @@ export function generateStarterColors(pixels: ColoringPixels, regions: ColoringR
     const id = coloringRegionAt(regions, gx / 1280 * regions.width, gy / 720 * regions.height);
     if (id > 0) guides.set(id, shade);
   }
-  const hue = random() * 360, colors: (RGB | undefined)[] = [];
+  const colors: (RGB | undefined)[] = [], accents = new Set<number>();
+  const shades = style === "scenery" ? SHADES : THEME_SHADES[style];
   for (let id = 1; id < regions.bounds.length; id++) {
     const bounds = regions.bounds[id];
     // Leave tiny details (eyes, teeth, spots) for the artist to finish.
     if (painted[id] || bounds.area < 600) continue;
-    if (style === "complementary") {
-      colors[id] = hsl(hue + (random() < .5 ? 0 : 180) + (random() - .5) * 22, .45 + random() * .25, .55 + random() * .25);
-    } else {
-      const y = (bounds.top + bounds.bottom) / 2 / regions.height;
-      const shade = guides.get(id) ?? (y > .85 ? "earth" : "leaf");
-      const palette = SHADES[shade];
-      const base = hexToRgb(palette[Math.floor(random() * palette.length)]), shift = shade === "white" ? 0 : Math.round((random() - .5) * 14);
-      colors[id] = base.map((channel) => Math.max(0, Math.min(255, channel + shift))) as unknown as RGB;
-    }
+    const y = (bounds.top + bounds.bottom) / 2 / regions.height;
+    const shade = guides.get(id) ?? (y > .85 ? "earth" : "leaf");
+    const palette = shades[shade];
+    const base = hexToRgb(palette[Math.floor(random() * palette.length)]), shift = shade === "white" ? 0 : Math.round((random() - .5) * 14);
+    colors[id] = base.map((channel) => Math.max(0, Math.min(255, channel + shift))) as unknown as RGB;
+    if (shade === "flower" || shade === "jewel" || shade === "gold") accents.add(id);
   }
   let changed = 0;
   for (let i = 0; i < regions.labels.length; i++) {
-    const color = colors[regions.labels[i]];
+    const id = regions.labels[i];
+    let color = colors[id];
+    if (color && accents.has(id) && accentAt(style, (i % regions.width) * 1280 / regions.width, Math.floor(i / regions.width) * 720 / regions.height)) {
+      color = style === "hearts" ? [181, 53, 98] : [255, 247, 215];
+    }
     if (!color) continue;
     const offset = i * 4;
     if (pixels.data[offset] !== color[0] || pixels.data[offset + 1] !== color[1] || pixels.data[offset + 2] !== color[2] || pixels.data[offset + 3] !== 255) changed++;
