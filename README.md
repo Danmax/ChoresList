@@ -51,7 +51,10 @@ the lines” for free drawing. Zoom to reach small details, use Move to drag the
 picture with a mouse or finger, and Fit picture to see the whole scene again.
 A quick color strip stays beside the canvas on phones. Edit Picture title above
 the canvas to name each picture; the title also names its PNG download. The
-supplies panel offers seven patterns, four brush styles, and five themed palettes.
+left toolbar opens focused Colors, Brush/Eraser, Patterns, Text, and Picture
+sections instead of one long supplies list. Picture shows the actual artwork
+preview, scene description, painted coverage, main paint colors, and text labels.
+The supplies panel offers seven patterns, four brush styles, and five themed palettes.
 Style Text lets you enter words, choose lettering and an effect, then tap the
 picture to place the text. New text stays on a separate movable layer above the scene outlines. Move text
 allows dragging or arrow-key adjustments, including after reload. Select a text

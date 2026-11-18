@@ -54,6 +54,7 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
   const stroke = useRef<Stroke | null>(null);
   const [textLabels, setTextLabels] = useState<{ id: string; text: string }[]>([]);
   const [selectedTextId, setSelectedTextId] = useState<string | null>(null);
+  const [paintColors, setPaintColors] = useState<string[]>([]);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
   const [saveWarning, setSaveWarning] = useState("");
@@ -99,7 +100,14 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
     setHistory({ undo: current.undo.length, redo: current.redo.length });
     setTextLabels(current.texts.map(({ id, text }) => ({ id, text })));
     setSelectedTextId(selectedText.current === null ? null : current.texts[selectedText.current]?.id ?? null);
-    current.coverage = coloringCoverage(current.ctx.getImageData(0, 0, current.paint.width, current.paint.height), current.regions);
+    const painted = current.ctx.getImageData(0, 0, current.paint.width, current.paint.height);
+    current.coverage = coloringCoverage(painted, current.regions);
+    const colors = new Map<string, number>();
+    for (let i = 0; i < painted.data.length; i += 16) if (painted.data[i + 3] > 128) {
+      const hex = `#${((1 << 24) + (painted.data[i] << 16) + (painted.data[i + 1] << 8) + painted.data[i + 2]).toString(16).slice(1)}`;
+      colors.set(hex, (colors.get(hex) ?? 0) + 1);
+    }
+    setPaintColors([...colors].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([hex]) => hex));
     if (current.texts.length) current.coverage = Math.max(.01, current.coverage);
     setCoverage(current.coverage);
     render();
@@ -139,7 +147,7 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
 
   useEffect(() => {
     let cancelled = false;
-    setTextLabels([]); setSelectedTextId(null);
+    setPaintColors([]); setTextLabels([]); setSelectedTextId(null);
     setReady(false); setError(""); setSaveWarning(""); setCoverage(0);
     setHistory({ undo: 0, redo: 0 }); setStatus("Getting your picture ready…");
     editor.current = null;
@@ -340,7 +348,7 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
   }
 
   return { canvasRef, ready, error, saveWarning, status, history, coverage, dab, move, endStroke, travel, clear, download,
-    artwork, addText, beginTextDrag, moveTextDrag, nudgeText, textLabels, selectedTextId, selectText, deleteSelectedText,
+    artwork, paintColors, addText, beginTextDrag, moveTextDrag, nudgeText, textLabels, selectedTextId, selectText, deleteSelectedText,
     retry: () => setReload((n) => n + 1),
     marks: () => editor.current?.marks ?? 0,
   };

@@ -1,8 +1,8 @@
 export const COLORING_SCENES = [
-  { id: "treasure-jungle", title: "Treasure Jungle", subtitle: "A little adventure. A lot of gold.", image: "/games/coloring/treasure-jungle.png" },
-  { id: "crocodile-creek", title: "Crocodile Creek", subtitle: "Make a splash with your favorite colors.", image: "/games/coloring/crocodile-creek.png" },
-  { id: "jungle-friends", title: "Jungle Friends", subtitle: "A whole jungle of happy little friends.", image: "/games/coloring/jungle-friends.png" },
-  { id: "jungle-river", title: "Jungle River Adventure", subtitle: "A wild river, a brave explorer, and a splash of color.", image: "/games/coloring/jungle-river.png" },
+  { id: "treasure-jungle", description: "A monkey and jaguar discover a treasure chest among jungle leaves and flowers.", title: "Treasure Jungle", subtitle: "A little adventure. A lot of gold.", image: "/games/coloring/treasure-jungle.png" },
+  { id: "crocodile-creek", description: "A smiling crocodile swims below a monkey beside water lilies and river plants.", title: "Crocodile Creek", subtitle: "Make a splash with your favorite colors.", image: "/games/coloring/crocodile-creek.png" },
+  { id: "jungle-friends", description: "A monkey, toucan, snake, and jaguar share a leafy jungle hideaway.", title: "Jungle Friends", subtitle: "A whole jungle of happy little friends.", image: "/games/coloring/jungle-friends.png" },
+  { id: "jungle-river", description: "A brave monkey explores a river with a waterfall, hippo, fish, snakes, gorilla, and tiger.", title: "Jungle River Adventure", subtitle: "A wild river, a brave explorer, and a splash of color.", image: "/games/coloring/jungle-river.png" },
 ] as const;
 
 export type ColoringSceneId = typeof COLORING_SCENES[number]["id"];

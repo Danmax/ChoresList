@@ -58,6 +58,12 @@ async function main() {
       }
       await route.fulfill({ json: response });
     });
+    async function supplies(section: "Colors" | "Brush" | "Patterns" | "Text" | "Picture") {
+      const aside = page.getByRole("complementary", { name: "Art supplies", includeHidden: true });
+      const key = { Colors: "colors", Brush: "brush", Patterns: "patterns", Text: "text", Picture: "picture" }[section];
+      if (await aside.getAttribute("data-panel") !== key || !(await aside.isVisible())) await page.getByRole("button", { name: section, exact: true }).click();
+      return page;
+    }
     const canvas = () => page.locator('canvas[data-ready="true"]');
     const snapshot = () => canvas().evaluate((node) => (node as HTMLCanvasElement).toDataURL());
     async function open(memberId = "coloring-preview") {
@@ -84,9 +90,17 @@ async function main() {
 
     await open();
     const empty = await snapshot();
+    await expect(page.getByLabel("Themed palette", { exact: true })).toBeVisible();
+    await expect(page.getByLabel("Style Text words", { exact: true })).toBeHidden();
+    await supplies("Text");
+    await expect(page.getByLabel("Style Text words", { exact: true })).toBeVisible();
+    await expect(page.getByLabel("Themed palette", { exact: true })).toBeHidden();
+    await supplies("Picture");
+    await expect(page.getByLabel("Artwork description", { exact: true })).toContainText("A monkey and jaguar discover");
+    await supplies("Colors");
     await expect(page.getByRole("button", { name: "Finish picture", exact: true })).toBeDisabled();
     await page.screenshot({ path: `${screenshotDir}/studio-desktop.png`, fullPage: true });
-    await page.getByRole("button", { name: "Poppy", exact: true }).click();
+    await (await supplies("Colors")).getByRole("button", { name: "Poppy", exact: true }).click();
     await at(first.seed);
     assert.deepEqual(await paintedPixel(first.seed), [237, 100, 100, 255]);
     assert.deepEqual(await paintedPixel(first.other), [0, 0, 0, 0]);
@@ -94,26 +108,30 @@ async function main() {
     await page.getByRole("button", { name: "Undo", exact: true }).click(); assert.equal(await snapshot(), empty);
     await page.getByRole("button", { name: "Redo", exact: true }).click(); assert.equal(await snapshot(), solid);
     for (const pattern of ["Dots", "Stripes", "Stars"]) {
-      await page.getByRole("button", { name: `${pattern} pattern`, exact: true }).click(); await at(first.seed);
+      await (await supplies("Patterns")).getByRole("button", { name: `${pattern} pattern`, exact: true }).click(); await at(first.seed);
       assert.notEqual(await snapshot(), solid);
       assert.deepEqual(await paintedPixel(first.other), [0, 0, 0, 0]);
     }
-    await page.getByRole("button", { name: "Dots pattern", exact: true }).click(); await at(first.seed);
+    await (await supplies("Patterns")).getByRole("button", { name: "Dots pattern", exact: true }).click(); await at(first.seed);
     assert.deepEqual(await paintedPixel(first.dot), [237, 100, 100, 255]);
     assert.deepEqual(await paintedPixel(first.light), [251, 224, 224, 255]);
     await page.getByRole("button", { name: "Bucket", exact: true }).click();
-    await page.getByRole("button", { name: "Leaf", exact: true }).click(); await at(first.seed);
+    await (await supplies("Colors")).getByRole("button", { name: "Leaf", exact: true }).click(); await at(first.seed);
     const green = await snapshot();
+    await supplies("Picture");
+    await expect(page.getByLabel("Artwork description", { exact: true })).toContainText("colored");
+    await expect(page.getByRole("img", { name: "Current artwork preview", exact: true })).toBeVisible();
+    await supplies("Colors");
     await expect(page.getByRole("img", { name: "Your colored Treasure Jungle picture", exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "Poppy", exact: true }).click();
+    await (await supplies("Colors")).getByRole("button", { name: "Poppy", exact: true }).click();
     await page.getByRole("button", { name: "Pick color", exact: true }).click(); await at(first.seed);
-    await expect(page.getByRole("button", { name: "Leaf", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect((await supplies("Colors")).getByRole("button", { name: "Leaf", exact: true })).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByRole("button", { name: "Bucket", exact: true })).toHaveAttribute("aria-pressed", "true");
     await page.reload(); await page.getByRole("button", { name: /Coloring Adventures/ }).click(); await expect(canvas()).toBeVisible();
     assert.equal(await snapshot(), green, "progress survives a reload");
     await expect(page.getByRole("img", { name: "Your colored Treasure Jungle picture", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Crocodile Creek", exact: true }).click(); await expect(canvas()).toHaveAttribute("aria-label", "Crocodile Creek coloring canvas");
-    await page.getByRole("button", { name: "Sky", exact: true }).click(); await at(second.seed);
+    await (await supplies("Colors")).getByRole("button", { name: "Sky", exact: true }).click(); await at(second.seed);
     const creek = await snapshot();
     await page.getByRole("button", { name: "Treasure Jungle", exact: true }).click(); await expect(canvas()).toHaveAttribute("aria-label", "Treasure Jungle coloring canvas"); assert.equal(await snapshot(), green);
     await page.getByRole("button", { name: "Crocodile Creek", exact: true }).click(); await expect(canvas()).toHaveAttribute("aria-label", "Crocodile Creek coloring canvas"); assert.equal(await snapshot(), creek);
@@ -132,7 +150,7 @@ async function main() {
     await page.getByRole("button", { name: "Start over", exact: true }).click(); await page.getByRole("button", { name: "Keep coloring", exact: true }).click(); assert.equal(await snapshot(), green);
     await page.getByRole("button", { name: "Start over", exact: true }).click(); await page.getByRole("button", { name: "Start fresh", exact: true }).click(); assert.equal(await snapshot(), empty);
     await page.getByRole("button", { name: "Brush", exact: true }).click();
-    await page.getByRole("button", { name: "Leaf", exact: true }).click();
+    await (await supplies("Colors")).getByRole("button", { name: "Leaf", exact: true }).click();
     const start = await at(first.seed, "position"), end = await at(first.other, "position");
     await page.mouse.move(start.x, start.y);
     const cursor = page.locator('[class*="brushCursor"]');
@@ -145,16 +163,16 @@ async function main() {
     const brushed = await snapshot();
     await canvas().focus(); await canvas().press("Control+z"); assert.equal(await snapshot(), empty);
     await canvas().press("Control+Shift+z"); assert.equal(await snapshot(), brushed);
-    await page.getByLabel("Stay inside the lines", { exact: true }).uncheck();
+    await (await supplies("Brush")).getByLabel("Stay inside the lines", { exact: true }).uncheck();
     await page.mouse.move(start.x, start.y); await page.mouse.down(); await page.mouse.move(end.x, end.y, { steps: 15 }); await page.mouse.up();
     assert.deepEqual(await paintedPixel(first.other), [88, 161, 123, 255], "free brush can cross shapes");
-    await page.getByLabel("Stay inside the lines", { exact: true }).check();
+    await (await supplies("Brush")).getByLabel("Stay inside the lines", { exact: true }).check();
     await page.getByRole("button", { name: "Pick color", exact: true }).click(); await at(first.seed);
     await expect(page.getByRole("button", { name: "Brush", exact: true })).toHaveAttribute("aria-pressed", "true");
     await page.getByRole("button", { name: "Eraser", exact: true }).click();
-    await page.getByRole("button", { name: "Leaf", exact: true }).click();
+    await (await supplies("Colors")).getByRole("button", { name: "Leaf", exact: true }).click();
     await expect(page.getByRole("button", { name: "Brush", exact: true })).toHaveAttribute("aria-pressed", "true");
-    const downloadEvent = page.waitForEvent("download"); await page.getByRole("button", { name: "Download picture", exact: true }).click();
+    const downloadEvent = page.waitForEvent("download"); await (await supplies("Picture")).getByRole("button", { name: "Download picture", exact: true }).click();
     const download = await downloadEvent; assert.equal(download.suggestedFilename(), "treasure-jungle.png");
     await download.saveAs(`${screenshotDir}/export.png`);
 
@@ -222,53 +240,53 @@ async function main() {
 
     // Custom colors and supplies survive a reload without leaking to another child.
     await page.getByRole("button", { name: /Coloring Adventures/ }).click(); await expect(canvas()).toBeVisible();
-    await page.getByLabel("Custom color", { exact: true }).evaluate((node) => {
+    await (await supplies("Colors")).getByLabel("Custom color", { exact: true }).evaluate((node) => {
       const input = node as HTMLInputElement;
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "#a138ce");
       input.dispatchEvent(new Event("input", { bubbles: true })); input.dispatchEvent(new Event("change", { bubbles: true }));
     });
-    await expect(page.getByRole("button", { name: "Recent #a138ce", exact: true })).toBeVisible();
-    const brushSize = page.getByLabel("Brush size", { exact: true });
+    await expect((await supplies("Colors")).getByRole("button", { name: "Recent #a138ce", exact: true })).toBeVisible();
+    const brushSize = (await supplies("Brush")).getByLabel("Brush size", { exact: true });
     await brushSize.press("Home");
     for (let i = 0; i < 21; i++) await brushSize.press("ArrowRight");
-    await page.getByLabel("Stay inside the lines", { exact: true }).uncheck();
-    await page.getByRole("button", { name: "Stars pattern", exact: true }).click();
+    await (await supplies("Brush")).getByLabel("Stay inside the lines", { exact: true }).uncheck();
+    await (await supplies("Patterns")).getByRole("button", { name: "Stars pattern", exact: true }).click();
     await open();
-    await expect(page.getByLabel("Custom color", { exact: true })).toHaveValue("#a138ce");
-    await expect(page.getByLabel("Brush size", { exact: true })).toHaveValue("48");
-    await expect(page.getByLabel("Stay inside the lines", { exact: true })).not.toBeChecked();
-    await expect(page.getByRole("button", { name: "Recent #a138ce", exact: true })).toBeVisible();
+    await expect((await supplies("Colors")).getByLabel("Custom color", { exact: true })).toHaveValue("#a138ce");
+    await expect((await supplies("Brush")).getByLabel("Brush size", { exact: true })).toHaveValue("48");
+    await expect((await supplies("Brush")).getByLabel("Stay inside the lines", { exact: true })).not.toBeChecked();
+    await expect((await supplies("Colors")).getByRole("button", { name: "Recent #a138ce", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Patterns", exact: true }).click();
-    await expect(page.getByRole("button", { name: "Stars pattern", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect((await supplies("Patterns")).getByRole("button", { name: "Stars pattern", exact: true })).toHaveAttribute("aria-pressed", "true");
     await open("another-child");
-    await expect(page.getByLabel("Custom color", { exact: true })).toHaveValue("#58a17b");
-    await expect(page.getByRole("button", { name: "Recent #a138ce", exact: true })).toHaveCount(0);
+    await expect((await supplies("Colors")).getByLabel("Custom color", { exact: true })).toHaveValue("#58a17b");
+    await expect((await supplies("Colors")).getByRole("button", { name: "Recent #a138ce", exact: true })).toHaveCount(0);
     await open();
 
     await page.getByLabel("Picture title", { exact: true }).fill("Rainbow Jungle");
-    await page.getByLabel("Themed palette", { exact: true }).selectOption("Ocean");
-    await page.getByRole("button", { name: "Ocean #0891b2", exact: true }).click();
-    await expect(page.getByLabel("Custom color", { exact: true })).toHaveValue("#0891b2");
+    await (await supplies("Colors")).getByLabel("Themed palette", { exact: true }).selectOption("Ocean");
+    await (await supplies("Colors")).getByRole("button", { name: "Ocean #0891b2", exact: true }).click();
+    await expect((await supplies("Colors")).getByLabel("Custom color", { exact: true })).toHaveValue("#0891b2");
     for (const label of ["Checks", "Waves", "Hearts", "Weave"]) {
-      await page.getByRole("button", { name: `${label} pattern`, exact: true }).click();
-      await expect(page.getByRole("button", { name: `${label} pattern`, exact: true })).toHaveAttribute("aria-pressed", "true");
+      await (await supplies("Patterns")).getByRole("button", { name: `${label} pattern`, exact: true }).click();
+      await expect((await supplies("Patterns")).getByRole("button", { name: `${label} pattern`, exact: true })).toHaveAttribute("aria-pressed", "true");
     }
-    await page.getByRole("button", { name: "Poppy", exact: true }).click();
+    await (await supplies("Colors")).getByRole("button", { name: "Poppy", exact: true }).click();
     for (const style of ["marker", "pencil", "ribbon", "round"]) {
       const before = await snapshot();
-      await page.getByLabel("Brush style", { exact: true }).selectOption(style);
+      await (await supplies("Brush")).getByLabel("Brush style", { exact: true }).selectOption(style);
       await canvas().focus(); await canvas().press("Enter");
       assert.notEqual(await snapshot(), before, `${style} brush adds paint`);
       await page.getByRole("button", { name: "Undo", exact: true }).click(); assert.equal(await snapshot(), before);
     }
     const beforeText = await snapshot();
-    await page.getByLabel("Style Text words", { exact: true }).fill("Jungle magic!");
-    await page.getByLabel("Text font", { exact: true }).selectOption("serif");
-    await page.getByLabel("Text effect", { exact: true }).selectOption("shadow");
-    await page.getByRole("button", { name: "Place text on picture", exact: true }).click();
+    await (await supplies("Text")).getByLabel("Style Text words", { exact: true }).fill("Jungle magic!");
+    await (await supplies("Text")).getByLabel("Text font", { exact: true }).selectOption("serif");
+    await (await supplies("Text")).getByLabel("Text effect", { exact: true }).selectOption("shadow");
+    await (await supplies("Text")).getByRole("button", { name: "Place text on picture", exact: true }).click();
     await canvas().focus(); await canvas().press("Enter");
     const withText = await snapshot(); assert.notEqual(withText, beforeText);
-    await expect(page.getByRole("img", { name: "Live text preview", exact: true })).toBeVisible();
+    await expect((await supplies("Text")).getByRole("img", { name: "Live text preview", exact: true })).toBeVisible();
     const storedTexts = () => page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).texts, coloringStorageKey("coloring-preview", "jungle-friends"));
     const originalLabel = (await storedTexts())[0];
     await canvas().press("ArrowRight");
@@ -280,7 +298,7 @@ async function main() {
     await page.getByRole("button", { name: "Redo", exact: true }).click(); assert.equal(await snapshot(), withText);
     await open(); assert.equal(await snapshot(), withText);
     await expect(page.getByLabel("Picture title", { exact: true })).toHaveValue("Rainbow Jungle");
-    await page.getByRole("button", { name: "Move text", exact: true }).click();
+    await (await supplies("Text")).getByRole("button", { name: "Move text", exact: true }).click();
     await canvas().scrollIntoViewIfNeeded();
     const savedLabel = (await storedTexts())[0];
     const from = await at({ x: savedLabel.x, y: savedLabel.y }, "position");
@@ -289,30 +307,30 @@ async function main() {
     await page.getByRole("button", { name: "Undo", exact: true }).click(); assert.equal(await snapshot(), withText);
 
     // Remove a chosen saved label after other edits, without changing paint or its neighbor.
-    await page.getByLabel("Style Text words", { exact: true }).fill("Keep this label");
-    await page.getByRole("button", { name: "Place text on picture", exact: true }).click();
+    await (await supplies("Text")).getByLabel("Style Text words", { exact: true }).fill("Keep this label");
+    await (await supplies("Text")).getByRole("button", { name: "Place text on picture", exact: true }).click();
     await canvas().focus(); await canvas().press("Enter");
     await page.getByRole("button", { name: "Brush", exact: true }).click();
-    await page.getByRole("button", { name: "Sky", exact: true }).click();
+    await (await supplies("Colors")).getByRole("button", { name: "Sky", exact: true }).click();
     await canvas().focus(); await canvas().press("Enter");
     const paintBeforeDelete = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).image, coloringStorageKey("coloring-preview", "jungle-friends"));
     const bothLabels = await storedTexts(); assert.equal(bothLabels.length, 2);
-    await page.getByLabel("Select text box", { exact: true }).selectOption(bothLabels[0].id);
-    await page.getByRole("button", { name: "Delete selected text", exact: true }).click();
+    await (await supplies("Text")).getByLabel("Select text box", { exact: true }).selectOption(bothLabels[0].id);
+    await (await supplies("Text")).getByRole("button", { name: "Delete selected text", exact: true }).click();
     assert.deepEqual((await storedTexts()).map((label: { id: string }) => label.id), [bothLabels[1].id]);
     assert.equal(await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).image, coloringStorageKey("coloring-preview", "jungle-friends")), paintBeforeDelete);
     await page.getByRole("button", { name: "Undo", exact: true }).click(); assert.equal((await storedTexts()).length, 2);
     await page.getByRole("button", { name: "Redo", exact: true }).click(); assert.equal((await storedTexts()).length, 1);
     await open();
     assert.equal((await storedTexts()).length, 1);
-    await expect(page.getByRole("button", { name: "Delete selected text", exact: true })).toBeDisabled();
-    await page.getByRole("button", { name: "Move text", exact: true }).click();
-    await page.getByLabel("Select text box", { exact: true }).selectOption(bothLabels[1].id);
+    await expect((await supplies("Text")).getByRole("button", { name: "Delete selected text", exact: true })).toBeDisabled();
+    await (await supplies("Text")).getByRole("button", { name: "Move text", exact: true }).click();
+    await (await supplies("Text")).getByLabel("Select text box", { exact: true }).selectOption(bothLabels[1].id);
     await canvas().focus(); await canvas().press("Backspace"); assert.equal((await storedTexts()).length, 0);
     await page.getByRole("button", { name: "Undo", exact: true }).click(); assert.equal((await storedTexts()).length, 1);
     assert.equal(await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).image, coloringStorageKey("coloring-preview", "jungle-friends")), paintBeforeDelete);
 
-    const titledDownload = page.waitForEvent("download"); await page.getByRole("button", { name: "Download picture", exact: true }).click();
+    const titledDownload = page.waitForEvent("download"); await (await supplies("Picture")).getByRole("button", { name: "Download picture", exact: true }).click();
     assert.equal((await titledDownload).suggestedFilename(), "rainbow-jungle.png");
 
     // The expanded workspace must work even when native fullscreen is unavailable.
@@ -326,9 +344,9 @@ async function main() {
       const bounds = (await studio.boundingBox())!;
       assert.equal(Math.round(bounds.width), dimensions.width); assert.equal(Math.round(bounds.height), dimensions.height);
       assert.equal(await snapshot(), before, "fullscreen preserves artwork");
-      await page.getByRole("button", { name: "Edit supplies", exact: true }).click();
-      await expect(page.getByLabel("Dock picture title", { exact: true })).toBeVisible();
-      await expect(page.getByLabel("Style Text words", { exact: true })).toBeVisible();
+      await page.getByRole("button", { name: "Picture", exact: true }).click();
+      await expect((await supplies("Picture")).getByLabel("Dock picture title", { exact: true })).toBeVisible();
+      await expect((await supplies("Text")).getByLabel("Style Text words", { exact: true })).toBeVisible();
       await page.getByRole("button", { name: "Close editing dock", exact: true }).click();
       await page.screenshot({ path: `${screenshotDir}/fullscreen-${dimensions.width}.png`, fullPage: false });
       await page.getByRole("button", { name: "Exit full screen", exact: true }).click();
@@ -336,11 +354,13 @@ async function main() {
       assert.equal(await snapshot(), before);
     }
     await page.getByRole("button", { name: "Enter full screen", exact: true }).click();
-    await page.getByRole("button", { name: "Edit supplies", exact: true }).click();
-    await page.getByLabel("Dock scene", { exact: true }).selectOption("jungle-river");
+    await page.getByRole("button", { name: "Picture", exact: true }).click();
+    await (await supplies("Picture")).getByLabel("Dock scene", { exact: true }).selectOption("jungle-river");
     await expect(canvas()).toHaveAttribute("aria-label", "Jungle River Adventure coloring canvas");
     const river = await fixture(3);
-    await page.getByRole("button", { name: "Bucket", exact: true }).click(); await at(river.seed);
+    await page.getByRole("button", { name: "Bucket", exact: true }).click();
+    await page.getByRole("button", { name: "Close editing dock", exact: true }).click();
+    const blankRiver = await snapshot(); await at(river.seed); assert.notEqual(await snapshot(), blankRiver);
     const riverPainted = await snapshot();
     await canvas().press("Escape");
     await expect(page.getByRole("button", { name: "Enter full screen", exact: true })).toBeVisible();
@@ -349,10 +369,10 @@ async function main() {
 
     // Storage failure must never prevent drawing or silently claim a save.
     await page.evaluate(() => { Storage.prototype.setItem = () => { throw new DOMException("Full", "QuotaExceededError"); }; });
-    await page.getByRole("button", { name: "Poppy", exact: true }).click();
+    await (await supplies("Colors")).getByRole("button", { name: "Poppy", exact: true }).click();
     await canvas().focus(); await canvas().press("ArrowRight"); await canvas().press("Enter");
     await expect(page.getByRole("region", { name: "Coloring Adventures", exact: true }).getByRole("alert")).toContainText("couldn’t save your progress");
-    await expect(page.getByRole("button", { name: "Download picture", exact: true })).toBeEnabled();
+    await expect((await supplies("Picture")).getByRole("button", { name: "Download picture", exact: true })).toBeEnabled();
     assert.deepEqual(errors, []);
     console.log("Coloring browser checks passed: drawing tools, brush cursor, gallery previews, undo/redo, saves, remembered supplies, mobile colors, mouse/touch panning, fit, keyboard, downloads, picture review, completion retry, and storage errors.");
   } finally { await browser.close(); }
