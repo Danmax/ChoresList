@@ -10,6 +10,7 @@ import { drawWaterLife, drawOrangutan, drawPineapple } from '@/lib/jungle-water-
 import { useEffect, useRef, useState } from 'react';
 import { RUNNER_DIFFICULTIES, type RunnerDifficulty, type CoffeeSpecial, GEMS, spiderPosition, slothPosition, airBoost, FLIP_SECONDS, vinePosition, birdHeight, crocodileFrame, hippoFrame, createRunner, dashBoost, duckRunner, FLOOR, forwardDashRunner, hesitateRunner, heroMove, isAirAttack, jumpRunner, kickRunner, KI_MAX, LEVELS, levelSeconds, PLAYER_X, punchRunner, runnerScore, specialRunner, STRONG_DIVE_SECONDS, travelSpeed, stepRunner, type Runner } from '@/lib/jungle-runner';
 import { JungleLeaderboard } from '@/components/jungle-leaderboard';
+import { JungleRunnerMenu } from './jungle-runner-menu';
 import styles from './jungle-runner.module.css';
 
 // Canvas artwork keeps shells and moving limbs crisp at every display density.
@@ -932,27 +933,7 @@ export function JungleVineSwing({ onExit, onFinish, onRunStart, finishLabel = 'S
     <div className={`${styles.shell} mx-auto my-auto w-full max-w-4xl shrink-0`}>
       <header className={`${styles.header} mb-2 flex items-center justify-between gap-2`}><h2 className="font-black">Jungle Runner</h2><div className="flex gap-2">{playerId && <button type="button" onClick={() => setShowLeaderboard(true)} className="rounded-xl bg-yellow-300 px-3 py-2 font-black text-emerald-950">🏆 Top 100</button>}<button type="button" onClick={() => void shareGame()} className="rounded-xl bg-cyan-300 px-3 py-2 font-black text-emerald-950">{shareCopied ? '✓ Copied' : '↗ Share'}</button><button onClick={pause} disabled={hud.phase !== 'playing'} className="rounded-xl bg-white/10 px-3 py-2 disabled:opacity-40">{hud.paused ? 'Resume' : 'Pause'}</button><button onClick={onExit} className="rounded-xl bg-white/10 px-3 py-2">Exit</button></div></header>
       {showLeaderboard && playerId && <JungleLeaderboard memberId={playerId} onClose={() => setShowLeaderboard(false)} />}
-      {hud.phase === 'ready' && (
-        <fieldset className={`${styles.setup} mb-3 rounded-xl bg-white/10 p-3`}>
-          <legend className="px-1 text-sm font-black">Choose your run</legend>
-          <div className="mb-3 grid grid-cols-2 gap-2">
-            <button type="button" aria-pressed={runMode === 'adventure'} onClick={() => selectMode('adventure')} className={`rounded-lg px-3 py-2 text-sm font-black ${runMode === 'adventure' ? 'bg-yellow-300 text-emerald-950' : 'bg-emerald-900 text-white'}`}>Adventure Mode <small className="block font-bold">All {LEVELS.length} stages</small></button>
-            <button type="button" aria-pressed={runMode === 'stage'} onClick={() => selectMode('stage')} className={`rounded-lg px-3 py-2 text-sm font-black ${runMode === 'stage' ? 'bg-yellow-300 text-emerald-950' : 'bg-emerald-900 text-white'}`}>Select a Stage <small className="block font-bold">Play one level</small></button>
-          </div>
-          {runMode === 'stage' && <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">{LEVELS.map((level, index) => <button key={level.name} type="button" aria-pressed={selectedLevel === index} onClick={() => selectLevel(index)} className={`rounded-lg px-2 py-2 text-xs font-black ${selectedLevel === index ? 'bg-cyan-300 text-emerald-950' : 'bg-emerald-900 text-white'}`}><span className="block">{index + 1}. {level.name}</span>{index >= 6 && <small className="font-bold">Boss stage</small>}</button>)}</div>}
-          <span className="px-1 text-sm font-black">Difficulty</span>
-          <div className="grid grid-cols-3 gap-2">
-            {(Object.keys(RUNNER_DIFFICULTIES) as RunnerDifficulty[]).map((value) => (
-              <label key={value} className={`cursor-pointer rounded-lg px-3 py-2 text-center text-sm font-black ${difficulty === value ? 'bg-yellow-300 text-emerald-950' : 'bg-emerald-900 text-white'}`}>
-                <input type="radio" name="runner-difficulty" value={value} checked={difficulty === value} onChange={() => selectDifficulty(value)} className="mr-2 accent-emerald-700" />
-                {RUNNER_DIFFICULTIES[value].label}
-              </label>
-            ))}
-          </div>
-          <p className="mt-2 text-center text-xs text-emerald-100">{runMode === 'adventure' ? `Adventure Mode: complete all ${LEVELS.length} stages in one run.` : `Selected stage: ${LEVELS[selectedLevel].name}. Win this stage to complete it.`} · {RUNNER_DIFFICULTIES[difficulty].description}</p>
-          <button type="button" onClick={start} className="mt-3 w-full rounded-xl bg-yellow-300 px-5 py-3 text-base font-black text-emerald-950 shadow-lg">{runMode === 'stage' ? `Play ${LEVELS[selectedLevel].name}` : 'Start adventure'}</button>
-        </fieldset>
-      )}
+      {hud.phase === 'ready' && <JungleRunnerMenu mode={runMode} selectedLevel={selectedLevel} difficulty={difficulty} onMode={selectMode} onLevel={selectLevel} onDifficulty={selectDifficulty} onStart={start} />}
       <div className={`${styles.stats} mb-2 flex justify-between gap-2 text-sm font-black`}><span>🍌 {hud.bananas} <small className="block text-yellow-200">{hud.bananas % 100}/100 → +1 life</small></span><span>❤️ {hud.lives} lives</span><span>{hud.bossStarted ? `${hud.bossIcon} ${hud.bossHp}/${hud.bossMax} HP` : `${hud.seconds}s`} · {hud.score} pts</span></div>
       <p className={`${styles.status} mb-2 text-xs font-bold text-yellow-200`}>{RUNNER_DIFFICULTIES[difficulty].label} · Level {hud.level + 1}/{LEVELS.length} · {LEVELS[hud.level].name} · {hud.move.toUpperCase()} · {hud.speed.toFixed(1)}× pace{hud.espresso > 0 ? ` · ☕ espresso ${hud.espresso.toFixed(1)}s` : ''} · ⭐ {hud.golden} gold · 🍒 {hud.cherries} · 💎 {hud.gems}/{LEVELS.length} · {GEMS[hud.level].name}: {hud.levelGem ? "collected" : "find it!"}</p>
       {(hud.streak > 0 || hud.bestStreak > 1) && <p className={`${styles.streak} mb-2 rounded-lg bg-orange-500/20 px-3 py-1 text-sm font-black text-orange-100`} aria-live="polite">{hud.streak > 0 ? `💥 ${hud.combo > 0 ? `${hud.combo} HIT COMBO · ` : ''}${hud.streak} HIT STREAK` : '💥 STREAK ENDED'} · Best {hud.bestStreak}</p>}

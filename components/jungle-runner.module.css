@@ -10,6 +10,51 @@
   display: none;
 }
 
+/* The ready screen scrolls as a single menu at every viewport size. */
+.root[data-game-screen='false'] {
+  overflow: auto;
+  background: radial-gradient(ellipse at 15% 0%, #214335 0%, transparent 55%), #0b1c16;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+
+.root[data-game-screen='false'] .shell {
+  display: block;
+  width: 100%;
+  max-width: 1000px;
+  height: auto;
+}
+
+.root[data-game-screen='false'] .header {
+  flex-wrap: wrap;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #ffffff12;
+}
+
+.root[data-game-screen='false'] .header h2 {
+  font-size: 13px;
+  color: #b7d1c2;
+  letter-spacing: -.02em;
+}
+
+.root[data-game-screen='false'] .header button {
+  padding: 7px 12px;
+  border: 1px solid #ffffff16;
+  background: #ffffff06;
+  border-radius: 9px;
+  color: #d8ebdf;
+  font-size: 11px;
+}
+
+.root[data-game-screen='false'] .header button:disabled,
+.root[data-game-screen='false'] .stats,
+.root[data-game-screen='false'] .status,
+.root[data-game-screen='false'] .ki,
+.root[data-game-screen='false'] .stage,
+.root[data-game-screen='false'] .controls,
+.root[data-game-screen='false'] .help {
+  display: none;
+}
+
 @media (orientation: landscape) and (max-height: 600px) {
   .root {
     justify-content: flex-start;

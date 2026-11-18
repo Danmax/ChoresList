@@ -15,6 +15,12 @@ async function checkStageMenu(browser: Browser) {
     try {
       await page.goto(`${process.env.TEST_BASE_URL ?? 'http://127.0.0.1:3000'}/play/jungle`);
       await page.getByRole('button', { name: 'Play free demo' }).click();
+      if (viewport.width === 1366) {
+        await expect(page.getByRole('button', { name: 'Start adventure', exact: true })).toBeVisible();
+        await page.getByRole('radio', { name: /Hard/ }).check();
+        await expect(page.getByRole('radio', { name: /Hard/ })).toBeChecked();
+        await page.screenshot({ path: '/tmp/jungle-modern-adventure.png', fullPage: true });
+      }
       const root = page.locator('section[data-game-screen="false"]');
       await root.evaluate(element => { element.scrollTop = 0; });
       const mode = page.getByRole('button', { name: 'Select a Stage' });
@@ -26,13 +32,13 @@ async function checkStageMenu(browser: Browser) {
       await expect(page.getByRole('button', { name: /^\d+\./ })).toHaveCount(LEVELS.length);
       for (const [index, level] of LEVELS.entries()) {
         const button = page.getByRole('button', { name: `${index + 1}. ${level.name}`, exact: index < 6 });
-        await button.scrollIntoViewIfNeeded();
+        await button.evaluate(element => element.scrollIntoView({ block: 'center', inline: 'nearest' }));
         await expect(button).toBeInViewport({ ratio: 1 });
         await button.click();
         await expect(button).toHaveAttribute('aria-pressed', 'true');
       }
       const play = page.getByRole('button', { name: 'Play Moonlit Monster Hollow', exact: true });
-      await play.scrollIntoViewIfNeeded();
+      await play.evaluate(element => element.scrollIntoView({ block: 'center', inline: 'nearest' }));
       await expect(play).toBeInViewport({ ratio: 1 });
       if (viewport.width === 390 || viewport.width === 1024 || viewport.width === 844) {
         await page.screenshot({ path: `/tmp/jungle-stage-menu-${viewport.width}.png`, fullPage: true });
@@ -40,6 +46,7 @@ async function checkStageMenu(browser: Browser) {
       await play.click();
       await expect(page.locator('section[data-playing="true"]')).toBeVisible();
       await expect(page.locator('p').filter({ hasText: /Level 9\/9/ })).toContainText('Moonlit Monster Hollow');
+      if (viewport.width === 1366) await expect(page.locator('p').filter({ hasText: /Level 9\/9/ })).toContainText('Hard');
     } finally {
       await page.close();
     }
