@@ -1,4 +1,4 @@
-export type GameKey = "sunny-farm" | "block-drop" | "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot" | "shape-safari" | "codebreaker-quest" | "tic-tac-toe" | "burger-rush" | "jungle-vine-swing" | "chess-quest" | "pocket-pals";
+export type GameKey = "coloring-adventures" | "sunny-farm" | "block-drop" | "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot" | "shape-safari" | "codebreaker-quest" | "tic-tac-toe" | "burger-rush" | "jungle-vine-swing" | "chess-quest" | "pocket-pals";
 export type GameRewardType = "none" | "points" | "tickets";
 
 export type GameDefinition = {
@@ -14,6 +14,11 @@ export type GameDefinition = {
 };
 
 export const GAME_DEFINITIONS: GameDefinition[] = [
+  {
+    key: "coloring-adventures", title: "Coloring Adventures",
+    description: "Bring jungle landscapes to life with a paint bucket, brushes, and playful patterns. Save your colors and download your masterpiece.",
+    icon: "Palette", ageMin: 3, ageMax: 18, playTime: "Color at your own pace", color: "#527a4d", bg: "#edf2e2",
+  },
   {
     key: "sunny-farm", title: "Sunny Farm Helpers",
     description: "Drive the tractor, care for your animals, collect eggs, and grow a happy little farm.",
@@ -150,6 +155,7 @@ export const DEFAULT_GAME_SETTINGS: Record<GameKey, {
   requiresChoresComplete: boolean;
   dailyPlayLimit: number;
 }> = {
+  "coloring-adventures": { enabled: true, rewardType: "none", rewardPoints: 5, rewardTickets: 0, requiresChoresComplete: false, dailyPlayLimit: 0 },
   "sunny-farm": { enabled: true, rewardType: "none", rewardPoints: 5, rewardTickets: 0, requiresChoresComplete: false, dailyPlayLimit: 0 },
   "block-drop": {
     enabled: true,

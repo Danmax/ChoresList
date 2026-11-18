@@ -1,0 +1,115 @@
+export const COLORING_SCENES = [
+  { id: "treasure-jungle", title: "Treasure Jungle", subtitle: "A little adventure. A lot of gold.", image: "/games/coloring/treasure-jungle.png" },
+  { id: "crocodile-creek", title: "Crocodile Creek", subtitle: "Make a splash with your favorite colors.", image: "/games/coloring/crocodile-creek.png" },
+  { id: "jungle-friends", title: "Jungle Friends", subtitle: "A whole jungle of happy little friends.", image: "/games/coloring/jungle-friends.png" },
+] as const;
+
+export type ColoringSceneId = typeof COLORING_SCENES[number]["id"];
+export type ColoringTool = "bucket" | "brush" | "pattern" | "eraser" | "picker";
+export type ColoringPattern = "dots" | "stripes" | "stars";
+export type RGB = readonly [number, number, number];
+export type ColoringPixels = { width: number; height: number; data: Uint8ClampedArray };
+type Bounds = { left: number; top: number; right: number; bottom: number; area: number };
+export type ColoringRegions = { width: number; height: number; labels: Int32Array; bounds: Bounds[]; paintable: number };
+
+export const COLORING_COLORS = [
+  { name: "Poppy", hex: "#ed6464" }, { name: "Tangerine", hex: "#f3994b" },
+  { name: "Sunshine", hex: "#f4ce54" }, { name: "Lime", hex: "#a9cb6a" },
+  { name: "Leaf", hex: "#58a17b" }, { name: "Lagoon", hex: "#52b9b0" },
+  { name: "Sky", hex: "#69b9e5" }, { name: "Blueberry", hex: "#6387d4" },
+  { name: "Lilac", hex: "#ad8bd3" }, { name: "Orchid", hex: "#d47fbc" },
+  { name: "Rose", hex: "#eea7b4" }, { name: "Peach", hex: "#f4c4a1" },
+  { name: "Sand", hex: "#dfc18c" }, { name: "Cocoa", hex: "#a57757" },
+  { name: "Slate", hex: "#667884" }, { name: "Snow", hex: "#ffffff" },
+] as const;
+
+// Segment the original drawing once. Colors never become boundaries, so an
+// already painted shape can be filled again without leaking into its neighbors.
+export function createColoringRegions(image: ColoringPixels): ColoringRegions {
+  const { width, height, data } = image;
+  const count = width * height;
+  const labels = new Int32Array(count);
+  const queue = new Int32Array(count);
+  const bounds: Bounds[] = [{ left: 0, top: 0, right: 0, bottom: 0, area: 0 }];
+  let paintable = 0;
+  for (let i = 0; i < count; i++) {
+    const offset = i * 4;
+    const brightness = data[offset] * .299 + data[offset + 1] * .587 + data[offset + 2] * .114;
+    if (data[offset + 3] > 128 && brightness < 180) labels[i] = -1;
+    else paintable++;
+  }
+  for (let i = 0; i < count; i++) {
+    if (labels[i] !== 0) continue;
+    const id = bounds.length;
+    const region: Bounds = { left: width, top: height, right: 0, bottom: 0, area: 0 };
+    let head = 0, tail = 1;
+    queue[0] = i;
+    labels[i] = id;
+    while (head < tail) {
+      const pixel = queue[head++];
+      const x = pixel % width, y = Math.floor(pixel / width);
+      region.left = Math.min(region.left, x); region.right = Math.max(region.right, x);
+      region.top = Math.min(region.top, y); region.bottom = Math.max(region.bottom, y);
+      region.area++;
+      if (x > 0 && labels[pixel - 1] === 0) { labels[pixel - 1] = id; queue[tail++] = pixel - 1; }
+      if (x + 1 < width && labels[pixel + 1] === 0) { labels[pixel + 1] = id; queue[tail++] = pixel + 1; }
+      if (y > 0 && labels[pixel - width] === 0) { labels[pixel - width] = id; queue[tail++] = pixel - width; }
+      if (y + 1 < height && labels[pixel + width] === 0) { labels[pixel + width] = id; queue[tail++] = pixel + width; }
+    }
+    bounds.push(region);
+  }
+  return { width, height, labels, bounds, paintable };
+}
+
+export function coloringRegionAt(regions: ColoringRegions, x: number, y: number): number {
+  if (x < 0 || y < 0 || x >= regions.width || y >= regions.height) return -1;
+  return regions.labels[Math.floor(y) * regions.width + Math.floor(x)];
+}
+
+export function hexToRgb(hex: string): RGB {
+  return [Number.parseInt(hex.slice(1, 3), 16), Number.parseInt(hex.slice(3, 5), 16), Number.parseInt(hex.slice(5, 7), 16)];
+}
+
+const STAR = Array.from({ length: 10 }, (_, i) => {
+  const angle = i * Math.PI / 5 - Math.PI / 2;
+  const radius = i % 2 ? 4 : 9;
+  return [16 + Math.cos(angle) * radius, 16 + Math.sin(angle) * radius];
+});
+
+function patternInk(x: number, y: number, pattern: ColoringPattern): boolean {
+  if (pattern === "dots") return ((x % 22) - 11) ** 2 + ((y % 22) - 11) ** 2 < 16;
+  if (pattern === "stripes") return (x + y) % 22 < 7;
+  const px = x % 32, py = y % 32;
+  let inside = false;
+  for (let i = 0, j = STAR.length - 1; i < STAR.length; j = i++) {
+    const [ax, ay] = STAR[i], [bx, by] = STAR[j];
+    if ((ay > py) !== (by > py) && px < (bx - ax) * (py - ay) / (by - ay) + ax) inside = !inside;
+  }
+  return inside;
+}
+
+export function fillColoringRegion(pixels: ColoringPixels, regions: ColoringRegions, id: number, color: RGB, pattern?: ColoringPattern): boolean {
+  const bounds = regions.bounds[id];
+  if (!bounds || id < 1) return false;
+  const light = color.map((channel) => Math.round(channel + (255 - channel) * .8));
+  let changed = false;
+  for (let y = bounds.top; y <= bounds.bottom; y++) for (let x = bounds.left; x <= bounds.right; x++) {
+    const pixel = y * regions.width + x;
+    if (regions.labels[pixel] !== id) continue;
+    const offset = pixel * 4;
+    const rgb = !pattern || patternInk(x, y, pattern) ? color : light;
+    if (pixels.data[offset] !== rgb[0] || pixels.data[offset + 1] !== rgb[1] || pixels.data[offset + 2] !== rgb[2] || pixels.data[offset + 3] !== 255) changed = true;
+    pixels.data[offset] = rgb[0]; pixels.data[offset + 1] = rgb[1]; pixels.data[offset + 2] = rgb[2]; pixels.data[offset + 3] = 255;
+  }
+  return changed;
+}
+
+export function coloringCoverage(pixels: ColoringPixels, regions: ColoringRegions): number {
+  let colored = 0;
+  for (let i = 0; i < regions.labels.length; i++) if (regions.labels[i] > 0 && pixels.data[i * 4 + 3] > 0) colored++;
+  return regions.paintable ? colored / regions.paintable : 0;
+}
+
+export function coloringStorageKey(memberId: string, sceneId: ColoringSceneId): string {
+  return `coloring-adventures:v1:${encodeURIComponent(memberId)}:${sceneId}`;
+}

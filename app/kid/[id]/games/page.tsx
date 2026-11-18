@@ -3,7 +3,7 @@
 import { type DragEvent, type MouseEvent as ReactMouseEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
-import { ArrowLeft, Blocks, BookOpen, CheckCircle2, ChefHat, Circle, Crown, FileText, Gamepad2, Grid3X3, KeyRound, PawPrint, Puzzle, RefreshCw, Scissors, Shapes, Swords, TreePine, Trophy } from "lucide-react";
+import { ArrowLeft, Blocks, BookOpen, CheckCircle2, ChefHat, Circle, Crown, FileText, Gamepad2, Grid3X3, KeyRound, Palette, PawPrint, Puzzle, RefreshCw, Scissors, Shapes, Swords, TreePine, Trophy } from "lucide-react";
 import { toast } from "sonner";
 import { MemberAvatar } from "@/components/member-avatar";
 import { JungleVineSwing } from "@/components/jungle-runner";
@@ -13,6 +13,7 @@ import { createTriviaRound, type TriviaLevel } from "@/lib/bible-trivia";
 import { BlockDrop } from "@/components/block-drop";
 import { SunnyFarm } from "@/components/sunny-farm";
 import { PocketPals } from "@/components/pocket-pals";
+import { ColoringAdventures } from "@/components/coloring-adventures";
 import { PET_SPECIES } from "@/lib/pocket-pals";
 import type { GameKey } from "@/lib/games";
 
@@ -80,6 +81,7 @@ function shuffle<T>(items: T[]) {
 }
 
 function iconForGame(key: string) {
+  if (key === "coloring-adventures") return Palette;
   if (key === "block-drop") return Blocks;
   if (key === "pocket-pals") return PawPrint;
   if (key === "rock-paper-scissors-shoot") return Swords;
@@ -210,6 +212,8 @@ export default function KidGamesPage() {
           onBack={() => setShowJohnnyMenu(false)}
           onStart={() => { setShowJohnnyMenu(false); setReward(null); setActiveGame("jungle-vine-swing"); }}
         />
+      ) : activeGame === "coloring-adventures" ? (
+        <ColoringAdventures memberId={member.id} playerName={member.name} onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("coloring-adventures", score, duration, metadata)} />
       ) : activeGame === "sunny-farm" ? (
         <SunnyFarm memberId={member.id} playerName={member.name} onExit={() => { setActiveGame(null); void load(); }} />
       ) : activeGame === "pocket-pals" ? (
@@ -248,6 +252,13 @@ export default function KidGamesPage() {
             const status = availability[game.key];
             const Icon = iconForGame(game.key);
             const locked = !status?.available;
+            if (game.key === "coloring-adventures") {
+              return <button key={game.key} type="button" disabled={locked} onClick={() => { setReward(null); setActiveGame("coloring-adventures"); }} className="group relative min-h-64 overflow-hidden rounded-3xl border-2 border-[#d9e3cb] bg-[#faf9f0] text-left shadow-sm transition-shadow hover:shadow-md disabled:opacity-65">
+                <span className="absolute inset-y-0 right-0 w-3/4 bg-cover bg-center opacity-25 transition-transform group-hover:scale-105" style={{ backgroundImage: "url('/games/coloring/treasure-jungle.png')" }} />
+                <span className="absolute inset-0 bg-gradient-to-r from-[#faf9f0] via-[#faf9f0]/80 to-transparent" />
+                <span className="relative flex min-h-64 flex-col items-start justify-end p-5"><span className="mb-auto inline-flex items-center gap-2 rounded-full bg-[#e9efdf] px-3 py-1 text-xs font-bold text-[#64814f]"><Palette size={14} /> A little color. A little wonder.</span><span className="mt-5 text-2xl font-black text-[#3d5b3e]">Coloring Adventures</span><span className="mt-1 max-w-64 text-sm font-semibold text-[#7c8b6a]">Bring your jungle to life with brushes, buckets, and playful patterns.</span><span className="mt-3 flex gap-1.5" aria-hidden="true">{["#ed6464", "#f3994b", "#f4ce54", "#58a17b", "#69b9e5", "#ad8bd3"].map((color) => <span key={color} className="h-4 w-4 rounded-full" style={{ background: color }} />)}</span><span className="mt-4 rounded-xl bg-[#527a4d] px-4 py-2 text-xs font-bold text-white">{locked ? status?.reason ?? "Locked" : "Open your art studio →"}</span></span>
+              </button>;
+            }
             if (game.key === "sunny-farm") {
               return <button key={game.key} type="button" disabled={locked} onClick={() => { setReward(null); setActiveGame("sunny-farm"); }} className="group relative min-h-64 overflow-hidden rounded-3xl border-2 border-lime-200 text-left shadow-sm disabled:opacity-65">
                 <span className="absolute inset-0 bg-cover bg-center transition-transform group-hover:scale-105" style={{ backgroundImage: "url('/games/sunny-farm/hub.webp')" }} />
