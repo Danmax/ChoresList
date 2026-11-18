@@ -291,3 +291,20 @@
   .tool { width: 100%; min-height: 58px; }
 }
 .fullScreen .tools { display: flex; }
+.textSectionTool { border-color: #ded0e7; background: #f5f0f8; color: #80638f; }
+.textEditorSection { border-top: 2px solid #ded0e7; padding-top: 12px; }
+.textGroupHeading { margin: 20px 0 10px; padding-top: 14px; border-top: 1px solid #e7dfee; font-size: 12px; font-weight: 800; color: #765586; }
+.textGroupHeading:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+@font-face { font-family: "Coloring Bangers"; src: url("/games/coloring/fonts/bangers.ttf") format("truetype"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Coloring Pacifico"; src: url("/games/coloring/fonts/pacifico.ttf") format("truetype"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Coloring Marker"; src: url("/games/coloring/fonts/marker.ttf") format("truetype"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Coloring Stencil"; src: url("/games/coloring/fonts/stencil.ttf") format("truetype"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Coloring Rye"; src: url("/games/coloring/fonts/rye.ttf") format("truetype"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Coloring Fredoka"; src: url("/games/coloring/fonts/fredoka.ttf") format("truetype"); font-weight: 300 700; font-display: swap; }
+.letteringSamples { margin: 12px 0; color: #765586; font-size: 12px; }
+.letteringSamples summary { min-height: 40px; padding: 10px 0; cursor: pointer; font-weight: 750; }
+.letteringSamples > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.letteringSamples button { min-width: 0; min-height: 74px; padding: 8px 5px; border: 1px solid #e0d5e5; border-radius: 9px; background: #fffdf9; }
+.letteringSamples button[aria-pressed="true"] { border-color: #9164a8; background: #f3ebf8; }
+.letteringSamples button span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 21px; color: #46364e; }
+.letteringSamples button small { display: block; margin-top: 6px; font-size: 9px; }

@@ -59,7 +59,7 @@ async function main() {
       await route.fulfill({ json: response });
     });
     async function supplies(section: "Colors" | "Brush" | "Patterns" | "Text" | "Picture") {
-      const aside = page.getByRole("complementary", { name: "Art supplies", includeHidden: true });
+      const aside = page.locator("aside[data-panel]");
       const key = { Colors: "colors", Brush: "brush", Patterns: "patterns", Text: "text", Picture: "picture" }[section];
       if (await aside.getAttribute("data-panel") !== key || !(await aside.isVisible())) await page.getByRole("button", { name: section, exact: true }).click();
       return page;
@@ -279,9 +279,16 @@ async function main() {
       assert.notEqual(await snapshot(), before, `${style} brush adds paint`);
       await page.getByRole("button", { name: "Undo", exact: true }).click(); assert.equal(await snapshot(), before);
     }
+    await supplies("Text");
+    await page.getByText("Browse lettering styles", { exact: true }).click();
+    for (const label of ["Comic hero", "Swirly script", "Bold marker", "Adventure stencil", "Wild West", "Bubble letters"]) {
+      await page.getByRole("button", { name: `Use ${label} lettering`, exact: true }).click();
+      await expect(page.getByRole("img", { name: "Live text preview", exact: true })).toBeVisible();
+    }
+    await page.getByText("Browse lettering styles", { exact: true }).click();
     const beforeText = await snapshot();
     await (await supplies("Text")).getByLabel("Style Text words", { exact: true }).fill("Jungle magic!");
-    await (await supplies("Text")).getByLabel("Text font", { exact: true }).selectOption("serif");
+    await (await supplies("Text")).getByLabel("Text font", { exact: true }).selectOption("comic");
     await (await supplies("Text")).getByLabel("Text effect", { exact: true }).selectOption("shadow");
     await (await supplies("Text")).getByRole("button", { name: "Place text on picture", exact: true }).click();
     await canvas().focus(); await canvas().press("Enter");
@@ -289,6 +296,7 @@ async function main() {
     await expect((await supplies("Text")).getByRole("img", { name: "Live text preview", exact: true })).toBeVisible();
     const storedTexts = () => page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).texts, coloringStorageKey("coloring-preview", "jungle-friends"));
     const originalLabel = (await storedTexts())[0];
+    assert.equal(originalLabel.font, "comic");
     await canvas().press("ArrowRight");
     assert.equal((await storedTexts())[0].x, originalLabel.x + 5);
     await page.getByRole("button", { name: "Undo", exact: true }).click();

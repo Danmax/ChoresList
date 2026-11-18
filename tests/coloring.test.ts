@@ -108,3 +108,15 @@ test("editable text saves validate effects and clamp restored lettering sizes", 
   assert.equal(restoreColoringTexts([{ ...label, size: 999 }])[0].size, 120);
   assert.deepEqual(restoreColoringTexts(undefined), []);
 });
+
+test("all lettering styles survive saved-text validation and their bundled fonts exist", async () => {
+  const { COLORING_LETTERING, coloringTextFont, restoreColoringTexts } = await import("../lib/coloring-text");
+  const { stat } = await import("node:fs/promises");
+  assert.equal(COLORING_LETTERING.length, 10);
+  for (const lettering of COLORING_LETTERING) {
+    const restored = restoreColoringTexts([{ id: "lettering", text: "Adventure", x: 300, y: 200, color: "#ed6464", size: 56, font: lettering.id, style: "outline", outlineColor: "#202d3a", outlineWidth: 8 }]);
+    assert.equal(restored[0]?.font, lettering.id);
+    assert.match(coloringTextFont(lettering.id, 56), /56px/);
+  }
+  for (const filename of ["bangers", "pacifico", "marker", "stencil", "rye", "fredoka"]) assert.ok((await stat(`public/games/coloring/fonts/${filename}.ttf`)).size > 10000);
+});

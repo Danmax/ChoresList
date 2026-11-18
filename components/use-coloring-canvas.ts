@@ -6,7 +6,7 @@ import {
   type ColoringBrush, type ColoringPattern, type ColoringRegions, type ColoringSceneId, type ColoringTool,
 } from "@/lib/coloring";
 
-import { drawColoringText, restoreColoringTexts, textBounds, type ColoringText } from "@/lib/coloring-text";
+import { coloringTextFont, drawColoringText, restoreColoringTexts, textBounds, type ColoringText } from "@/lib/coloring-text";
 
 type Snapshot = { pixels: ImageData; texts: ColoringText[] };
 type Point = { x: number; y: number };
@@ -188,6 +188,7 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
         } catch {
           if (!cancelled) setSaveWarning("Saved progress couldn’t be opened. You can start a new picture or download this one.");
         }
+        await Promise.all(current.texts.map((item) => document.fonts.load(coloringTextFont(item.font, item.size))));
         if (cancelled) return;
         editor.current = current;
         refresh();
@@ -263,6 +264,14 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
   function addText(point: Point, text: string, color: string, size: number, font: string, style: string, outlineColor = "#202d3a", outlineWidth = 8) {
     endStroke(); const current = editor.current;
     if (!current || !text.trim() || current.texts.length >= 50) return;
+    const fontSpec = coloringTextFont(font, size);
+    if (!document.fonts.check(fontSpec)) {
+      setStatus("Loading your lettering…");
+      void document.fonts.load(fontSpec).then(() => {
+        if (editor.current === current) addText(point, text, color, size, font, style, outlineColor, outlineWidth);
+      }).catch(() => setStatus("Lettering couldn’t load. Please choose another style."));
+      return;
+    }
     const before = snapshot(current);
     current.texts.push({ id: crypto.randomUUID(), text: text.trim().slice(0, 80), x: Math.max(30, Math.min(current.paint.width - 30, point.x)), y: Math.max(size, Math.min(current.paint.height - size, point.y)), color, size, font, style, outlineColor, outlineWidth });
     selectedText.current = current.texts.length - 1; commit(before);
