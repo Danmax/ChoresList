@@ -44,7 +44,7 @@ npm run db:deploy
 
 ## Coloring Adventures
 
-Open Coloring Adventures from a child's Games screen to color four jungle
+Open Coloring Adventures from a child's Games screen to color six jungle
 landscapes with a bucket, brush, dots/stripes/stars, eraser, and color picker.
 The brush stays inside its starting shape by default; turn off “Stay inside
 the lines” for free drawing. Zoom to reach small details, use Move to drag the

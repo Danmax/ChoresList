@@ -375,6 +375,21 @@ async function main() {
     await open(); await expect(canvas()).toHaveAttribute("aria-label", "Jungle River Adventure coloring canvas");
     assert.equal(await snapshot(), riverPainted, "new scene progress survives fullscreen exit and reload");
 
+    for (const index of [4, 5]) {
+      const scene = COLORING_SCENES[index], sample = await fixture(index);
+      await page.getByRole("button", { name: scene.title, exact: true }).click();
+      await expect(canvas()).toHaveAttribute("aria-label", `${scene.title} coloring canvas`);
+      await page.getByRole("button", { name: "Bucket", exact: true }).click();
+      await (await supplies("Colors")).getByRole("button", { name: "Leaf", exact: true }).click();
+      await canvas().scrollIntoViewIfNeeded();
+      const blank = await snapshot(); await at(sample.seed);
+      const painted = await snapshot(); assert.notEqual(painted, blank, `${scene.title} supports bucket coloring`);
+      await open(); await expect(canvas()).toHaveAttribute("aria-label", `${scene.title} coloring canvas`);
+      assert.equal(await snapshot(), painted, `${scene.title} saves separately and reopens correctly`);
+    }
+    await page.getByRole("button", { name: "Jungle River Adventure", exact: true }).click();
+    await expect(canvas()).toHaveAttribute("aria-label", "Jungle River Adventure coloring canvas");
+
     // Storage failure must never prevent drawing or silently claim a save.
     await page.evaluate(() => { Storage.prototype.setItem = () => { throw new DOMException("Full", "QuotaExceededError"); }; });
     await (await supplies("Colors")).getByRole("button", { name: "Poppy", exact: true }).click();
