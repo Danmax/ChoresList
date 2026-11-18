@@ -144,7 +144,7 @@ export function ColoringAdventures({ memberId, playerName, onExit, onFinish }: {
             <button type="button" title="Start over" aria-label="Start over" disabled={!drawing.ready || drawing.coverage <= 0 || finishing} onClick={() => setConfirmClear(true)}><RotateCcw size={16} /></button>
           </div>
           <span className={styles.paperLabel}>YOUR LITTLE MASTERPIECE</span>
-          <label className={styles.zoom}><ZoomIn size={16} /><span className={styles.srOnly}>Canvas zoom</span><select value={zoom} onChange={(event) => setZoom(Number(event.target.value))}><option value={100}>100%</option><option value={150}>150%</option><option value={200}>200%</option><option value={300}>300%</option></select></label>
+          <label className={styles.zoom}><ZoomIn size={16} /><span className={styles.srOnly}>Canvas zoom</span><select aria-label="Canvas zoom" value={zoom} onChange={(event) => setZoom(Number(event.target.value))}><option value={100}>100%</option><option value={150}>150%</option><option value={200}>200%</option><option value={300}>300%</option></select></label>
         </div>
         <div className={styles.viewport}>
           <div className={styles.paper} style={{ width: `${zoom}%` }}>

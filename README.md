@@ -42,6 +42,26 @@ npm run db:deploy
 
 `GIPHY_API_KEY` is optional and enables GIF search on event message boards. Members can still paste an HTTPS GIF URL when it is not configured.
 
+## Coloring Adventures
+
+Open Coloring Adventures from a child's Games screen to color three jungle
+landscapes with a bucket, brush, dots/stripes/stars, eraser, and color picker.
+The brush stays inside its starting shape by default; turn off “Stay inside
+the lines” for free drawing. Zoom to reach small details on a touch screen.
+Undo/redo keeps the last 12 changes, and Start over can also be undone.
+
+Pictures save automatically per child and scene in this browser's local
+storage. They stay on this device; use Download picture for a PNG copy.
+Parents can configure access and optional completion rewards under Parent →
+Games. The game uses the existing game settings and session models, so it
+needs no new database migration.
+
+Run `npm run test:coloring` for fill boundaries, patterns, assets, and registry
+checks. With a local app running on port 3017, run
+`npm run test:coloring:browser` for desktop, touch, storage, and export checks;
+`COLORING_TEST_URL` overrides the server URL. Screenshots and an exported
+picture are written to `/tmp/coloring-preview` by default.
+
 ## Sunny Farm Helpers
 
 A farm game in each child’s Games screen: collect hay, feed and brush the horse,

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
-import { chromium, expect, type Locator, type Page } from "@playwright/test";
+import { chromium, expect } from "@playwright/test";
 import sharp from "sharp";
 import { COLORING_SCENES, coloringStorageKey, createColoringRegions } from "../lib/coloring";
 import { DEFAULT_GAME_SETTINGS, GAME_DEFINITIONS } from "../lib/games";
@@ -159,7 +159,7 @@ async function main() {
     await page.evaluate(() => { Storage.prototype.setItem = () => { throw new DOMException("Full", "QuotaExceededError"); }; });
     await page.getByRole("button", { name: "Poppy", exact: true }).click();
     await canvas().focus(); await canvas().press("ArrowRight"); await canvas().press("Enter");
-    await expect(page.getByRole("alert")).toContainText("couldn’t save your progress");
+    await expect(page.getByRole("region", { name: "Coloring Adventures", exact: true }).getByRole("alert")).toContainText("couldn’t save your progress");
     await expect(page.getByRole("button", { name: "Download picture", exact: true })).toBeEnabled();
     assert.deepEqual(errors, []);
     console.log("Coloring browser checks passed: buckets, patterns, brush boundaries, free drawing, erasing, eyedropper, undo/redo, per-child and per-scene saves, reload, touch, zoom, keyboard, downloads, completion, and storage errors.");
