@@ -49,7 +49,7 @@ landscapes with a bucket, brush, dots/stripes/stars, eraser, and color picker.
 The brush stays inside its starting shape by default; turn off “Stay inside
 the lines” for free drawing. Zoom to reach small details, use Move to drag the
 picture with a mouse or finger, and Fit picture to see the whole scene again.
-Recent colors stay above the canvas on desktop, phone, and full screen. Edit
+The eight most recently used colors stay above the canvas on desktop, phone, and full screen. Edit
 Picture title in the Picture section to name each picture; the title also names its PNG download. The
 left toolbar is ordered Picture, Bucket, Brush, Patterns, Text, Colors, Eraser,
 and Pan picture. The eyedropper is inside Colors. Each icon opens its focused
@@ -57,6 +57,10 @@ section instead of one long supplies list. Text has a dedicated Text editor
 section with Create text, Font & effects, and Manage text boxes groups. Picture shows the actual artwork
 preview, scene description, painted coverage, main paint colors, and text labels.
 The supplies panel offers seven patterns, four brush styles, and five themed palettes.
+Patterns have size, spacing, rotation, and optional custom background controls
+with matching previews. Colors lets each child create named palettes and save
+the selected color into new or existing palettes. Palettes and pattern settings
+are remembered on this device.
 Style Text offers ten lettering styles, including six bundled display fonts
 (comic, script, marker, stencil, western, and rounded bubble letters). Browse
 lettering styles previews each font with your words; the live effect preview

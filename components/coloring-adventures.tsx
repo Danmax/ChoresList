@@ -2,9 +2,10 @@
 
 import { type CSSProperties, type KeyboardEvent, type PointerEvent, useEffect, useId, useRef, useState } from "react";
 import { ArrowLeft, Check, CheckCircle2, ChevronRight, Download, Eraser, Eye, Maximize, Minimize, Type, Images, Hand, Leaf, LoaderCircle, PaintBucket, Paintbrush, Palette, Pipette, Redo2, RotateCcw, Scan, Share2, Sparkles, Star, Undo2, X, ZoomIn } from "lucide-react";
-import { COLORING_COLORS, COLORING_SCENES, COLORING_THEMES, type ColoringBrush, coloringPreferences, coloringStorageKey, type ColoringPattern, type ColoringSceneId, type ColoringTool } from "@/lib/coloring";
+import { COLORING_COLORS, COLORING_SCENES, fillColoringRegion, hexToRgb, COLORING_THEMES, type ColoringBrush, coloringPreferences, coloringStorageKey, type ColoringPattern, type ColoringSceneId, type ColoringTool } from "@/lib/coloring";
 import { useColoringCanvas } from "./use-coloring-canvas";
 import { COLORING_LETTERING, coloringTextFont, drawColoringText } from "@/lib/coloring-text";
+import { DEFAULT_PATTERN_SETTINGS, normalizePatternSettings, restoreColorPalettes, type PatternSettings, type SavedColorPalette } from "@/lib/coloring-supplies";
 import styles from "./coloring-adventures.module.css";
 
 const TOOLS = [
@@ -34,10 +35,15 @@ function TextPreview({ words, color, size, font, effect, outlineColor, outlineWi
   return <canvas ref={ref} width={320} height={130} className={styles.textPreview} role="img" aria-label="Live text preview" />;
 }
 
-function PatternPreview({ pattern, color }: { pattern: ColoringPattern; color: string }) {
-  return <span className={`${styles.patternPreview} ${styles[pattern]}`} style={{ "--paint": color } as CSSProperties} aria-hidden="true">
-    {pattern === "stars" && <><Star size={13} fill="currentColor" /><Star size={13} fill="currentColor" /><Star size={13} fill="currentColor" /></>}
-  </span>;
+function PatternPreview({ pattern, color, settings = DEFAULT_PATTERN_SETTINGS }: { pattern: ColoringPattern; color: string; settings?: PatternSettings }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const width = 160, height = 80, ctx = ref.current?.getContext("2d"); if (!ctx) return;
+    const pixels = ctx.createImageData(width, height);
+    fillColoringRegion(pixels, { width, height, labels: new Int32Array(width * height).fill(1), bounds: [{ left: 0, top: 0, right: 0, bottom: 0, area: 0 }, { left: 0, top: 0, right: width - 1, bottom: height - 1, area: width * height }], paintable: width * height }, 1, hexToRgb(color), pattern, settings);
+    ctx.putImageData(pixels, 0, 0);
+  }, [pattern, color, settings]);
+  return <canvas ref={ref} width={160} height={80} className={styles.patternSample} aria-label={`${pattern} preview`} role="img" />;
 }
 
 async function savedColoringThumbnail(paintImage: string, outlinePath: string) {
@@ -74,6 +80,13 @@ export function ColoringAdventures({ memberId, playerName, onExit, onFinish }: {
   const [tool, setTool] = useState<ColoringTool>("bucket");
   const [color, setColor] = useState<string>(COLORING_COLORS[4].hex);
   const [pattern, setPattern] = useState<ColoringPattern>("dots");
+  const [patternSettings, setPatternSettings] = useState<PatternSettings>(DEFAULT_PATTERN_SETTINGS);
+  const [customPalettes, setCustomPalettes] = useState<SavedColorPalette[]>([]);
+  const [suppliesLoadedFor, setSuppliesLoadedFor] = useState<string | null>(null);
+  const [savePaletteId, setSavePaletteId] = useState("new");
+  const [paletteName, setPaletteName] = useState("");
+  const [paletteNotice, setPaletteNotice] = useState("");
+  const [supplyError, setSupplyError] = useState("");
   const [brush, setBrush] = useState<ColoringBrush>("round");
   const [theme, setTheme] = useState("Jungle");
   const [pictureTitle, setPictureTitle] = useState("");
@@ -163,6 +176,39 @@ export function ColoringAdventures({ memberId, playerName, onExit, onFinish }: {
       if (document.fullscreenElement === studioRef.current) void document.exitFullscreen().catch(() => {});
     };
   }, [fullScreen]);
+  const availablePalettes = [...COLORING_THEMES.map((item) => ({ ...item, id: item.name })), ...customPalettes];
+  const activePalette = availablePalettes.find((item) => item.id === theme) ?? availablePalettes[0];
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(`coloring-adventures:${encodeURIComponent(memberId)}:supplies`) ?? "null");
+      const palettes = restoreColorPalettes(saved?.palettes);
+      setCustomPalettes(palettes); setPatternSettings(normalizePatternSettings(saved?.patternSettings));
+      setSavePaletteId(palettes[0]?.id ?? "new");
+    } catch { setSupplyError("Saved art supplies couldn’t be opened on this device."); }
+    setSuppliesLoadedFor(memberId);
+  }, [memberId]);
+  useEffect(() => {
+    if (suppliesLoadedFor !== memberId) return;
+    try {
+      localStorage.setItem(`coloring-adventures:${encodeURIComponent(memberId)}:supplies`, JSON.stringify({ palettes: customPalettes, patternSettings })); setSupplyError("");
+    } catch { setSupplyError("This browser couldn’t save palettes and pattern settings. They are available for this visit."); }
+  }, [memberId, suppliesLoadedFor, customPalettes, patternSettings]);
+  function saveCurrentColor() {
+    const name = paletteName.trim();
+    if (savePaletteId === "new" && !name) return;
+    const existing = customPalettes.find((item) => item.id === savePaletteId || (savePaletteId === "new" && item.name.toLowerCase() === name.toLowerCase()));
+    if (existing) {
+      if (existing.colors.includes(color)) { setPaletteNotice("That color is already in this palette."); return; }
+      if (existing.colors.length >= 64) { setPaletteNotice("This palette is full. Create another palette."); return; }
+      setCustomPalettes((items) => items.map((item) => item.id === existing.id ? { ...item, colors: [...item.colors, color] } : item));
+      setSavePaletteId(existing.id); setTheme(existing.id);
+    } else {
+      if (customPalettes.length >= 24) { setPaletteNotice("You can save up to 24 palettes."); return; }
+      const palette = { id: `custom-${crypto.randomUUID()}`, name, colors: [color] };
+      setCustomPalettes((items) => [...items, palette]); setSavePaletteId(palette.id); setTheme(palette.id);
+    }
+    setPaletteName(""); setPaletteNotice("Color added to your palette.");
+  }
   const colorName = COLORING_COLORS.find((item) => item.hex === color)?.name ?? "Custom color";
 
   useEffect(() => {
@@ -234,7 +280,7 @@ export function ColoringAdventures({ memberId, playerName, onExit, onFinish }: {
   }
 
   function rememberColor(next: string) {
-    setRecentColors((previous) => previous[0] === next ? previous : [next, ...previous.filter((item) => item !== next)].slice(0, 4));
+    setRecentColors((previous) => previous[0] === next ? previous : [next, ...previous.filter((item) => item !== next)].slice(0, 8));
   }
 
   function chooseColor(next: string) {
@@ -273,7 +319,7 @@ export function ColoringAdventures({ memberId, playerName, onExit, onFinish }: {
       drawing.addText(at, text, textColor, textSize, textFont, textStyle, outlineColor, outlineWidth);
       setPlacingText(false); setMovingText(true); return;
     }
-    const picked = drawing.dab(at, { tool, color, size, pattern, stayInLines, brush }, pointerId);
+    const picked = drawing.dab(at, { tool, color, size, pattern, stayInLines, brush, patternSettings }, pointerId);
     if (picked) chooseColor(picked);
     else if (tool === "bucket" || tool === "brush" || tool === "pattern") rememberColor(color);
   }
@@ -459,19 +505,22 @@ export function ColoringAdventures({ memberId, playerName, onExit, onFinish }: {
       </div>
 
       <aside id={`${hintId}-supplies`} className={`${styles.supplies} ${dockOpen ? styles.dockOpen : ""}`} aria-label={panel === "text" ? "Text editor" : "Art supplies"} data-panel={panel}>
+        {supplyError && <p className={styles.warning} role="alert">{supplyError}</p>}
         <div className={styles.dockHeader}><strong>{PANEL_TITLES[panel]}</strong>{fullScreen && <button type="button" aria-label="Close editing dock" onClick={() => setDockOpen(false)}><X size={20} /></button>}</div>
         <section className={styles.supplyPanel} hidden={panel !== "generate"} aria-label="Starting color controls"><p className={styles.starterExplanation}>Give your picture a colorful head start, then make it your own.</p><label className={styles.supplyField}>Color style<select aria-label="Starting color style" value={starterStyle} onChange={(event) => setStarterStyle(event.target.value as "scenery" | "complementary")}><option value="scenery">Scenery-inspired shades</option><option value="complementary">Random complementary colors</option></select></label><p className={styles.starterExplanation}>{starterStyle === "scenery" ? "Natural greens, water blues, earthy animal colors, and treasure gold. Small details stay yours to finish." : "Creates a fresh palette using opposite hues, with lighter and darker shades."}</p><label className={styles.stayInLines}><input type="checkbox" checked={keepColors} onChange={(event) => setKeepColors(event.target.checked)} />Keep my colors</label><p className={styles.localNote}>Keeps any shape you have already painted. Turn off to recolor the scene. Text stays intact.</p><button type="button" className={styles.downloadButton} disabled={!drawing.ready || finishing} onClick={() => { drawing.generateColors(starterStyle, keepColors); if (fullScreen) setDockOpen(false); }}>Generate colors</button><p className={styles.localNote}>Try another palette any time. Undo restores the previous picture.</p></section>
         <div className={styles.supplyPanel} hidden={panel !== "colors"}>
-        <div className={styles.creativeSection}><label className={styles.supplyField}>Themed palette<select aria-label="Themed palette" value={theme} onChange={(event) => setTheme(event.target.value)}>{COLORING_THEMES.map((item) => <option key={item.name}>{item.name}</option>)}</select></label><div className={styles.themeColors}>{COLORING_THEMES.find((item) => item.name === theme)!.colors.map((hex) => <button key={hex} type="button" aria-label={`${theme} ${hex}`} title={hex} style={{ background: hex }} onClick={() => chooseColor(hex)} aria-pressed={color === hex} />)}</div></div>
+        <div className={styles.creativeSection}><label className={styles.supplyField}>Themed palette<select aria-label="Themed palette" value={activePalette.id} onChange={(event) => setTheme(event.target.value)}>{availablePalettes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><div className={styles.themeColors}>{activePalette.colors.map((hex) => <button key={hex} type="button" aria-label={`${activePalette.name} ${hex}`} title={hex} style={{ background: hex }} onClick={() => chooseColor(hex)} aria-pressed={color === hex} />)}</div></div>
         <button type="button" className={styles.downloadButton} aria-label="Pick color" aria-pressed={tool === "picker"} onClick={() => { chooseTool("picker"); if (fullScreen) setDockOpen(false); }}><Pipette size={17} />Eyedropper</button>
         <div className={styles.paletteHeading}><div><p className={styles.sectionLabel}>MAKE IT YOURS</p><h3>Your colors</h3></div><Palette size={19} /></div>
         <div className={styles.palette} role="group" aria-label="Color palette">{COLORING_COLORS.map((item) => <button key={item.name} type="button" aria-label={item.name} aria-pressed={color === item.hex} title={item.name} className={styles.swatch} style={{ "--paint": item.hex } as CSSProperties} onClick={() => chooseColor(item.hex)}>{color === item.hex && <Check size={18} strokeWidth={3} style={{ color: item.hex === "#ffffff" || item.name === "Sunshine" ? "#454e43" : "white" }} />}</button>)}</div>
         <label className={styles.customColor}><input type="color" aria-label="Custom color" value={color} onChange={(event) => chooseColor(event.target.value)} /><span><strong>{colorName}</strong><small>or mix your own color</small></span><ChevronRight size={15} /></label>
         {recentColors.length > 0 && <div className={styles.recentColors}><p className={styles.supplyLabel}>Your recent colors</p><div role="group" aria-label="Recent colors">{recentColors.map((hex) => <button key={hex} type="button" aria-label={`Recent ${hex}`} title={hex} aria-pressed={color === hex} style={{ "--paint": hex } as CSSProperties} onClick={() => chooseColor(hex)}>{color === hex && <Check size={14} />}</button>)}</div></div>}
 
+        <div className={styles.creativeSection}><h3 className={styles.supplyLabel}>Save your colors</h3><label className={styles.supplyField}>Save to palette<select aria-label="Save to palette" value={savePaletteId} onChange={(event) => { setSavePaletteId(event.target.value); setPaletteNotice(""); }}><option value="new">New palette…</option>{customPalettes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>{savePaletteId === "new" && <label className={styles.supplyField}>Palette name<input aria-label="New palette name" value={paletteName} maxLength={40} placeholder="My favorite colors" onChange={(event) => setPaletteName(event.target.value)} /></label>}<button type="button" className={styles.downloadButton} disabled={savePaletteId === "new" && !paletteName.trim()} onClick={saveCurrentColor}>Save current color</button>{paletteNotice && <p className={styles.localNote} role="status">{paletteNotice}</p>}<p className={styles.localNote}>Custom palettes save per child on this device.</p></div>
         </div><div className={styles.supplyPanel} hidden={panel !== "patterns"}>
-        <div className={styles.patternSection}><div className={styles.supplyLabel}><span>Play with patterns</span><Sparkles size={15} /></div><div className={styles.patterns}>{PATTERNS.map((item) => <button key={item.id} type="button" aria-label={`${item.label} pattern`} aria-pressed={tool === "pattern" && pattern === item.id} onClick={() => { setPattern(item.id); chooseTool("pattern"); }}><PatternPreview pattern={item.id} color={color} /><span>{item.label}</span></button>)}</div></div>
+        <div className={styles.patternSection}><div className={styles.supplyLabel}><span>Play with patterns</span><Sparkles size={15} /></div><div className={styles.patterns}>{PATTERNS.map((item) => <button key={item.id} type="button" aria-label={`${item.label} pattern`} aria-pressed={tool === "pattern" && pattern === item.id} onClick={() => { setPattern(item.id); chooseTool("pattern"); }}><PatternPreview pattern={item.id} color={color} settings={patternSettings} /><span>{item.label}</span></button>)}</div></div>
 
+        <div className={styles.patternSettings}><h3 className={styles.supplyLabel}>Pattern configuration</h3><label className={styles.supplyField}>Size: {Math.round(patternSettings.scale * 100)}%<input aria-label="Pattern size" type="range" min={.5} max={3} step={.1} value={patternSettings.scale} onChange={(event) => setPatternSettings({ ...patternSettings, scale: Number(event.target.value) })} /></label><label className={styles.supplyField}>Spacing: {Math.round(patternSettings.spacing * 100)}%<input aria-label="Pattern spacing" type="range" min={.5} max={3} step={.1} value={patternSettings.spacing} onChange={(event) => setPatternSettings({ ...patternSettings, spacing: Number(event.target.value) })} /></label><label className={styles.supplyField}>Rotation: {patternSettings.angle}°<input aria-label="Pattern rotation" type="range" min={0} max={180} step={5} value={patternSettings.angle} onChange={(event) => setPatternSettings({ ...patternSettings, angle: Number(event.target.value) })} /></label><label className={styles.stayInLines}><input type="checkbox" checked={patternSettings.background !== null} onChange={(event) => setPatternSettings({ ...patternSettings, background: event.target.checked ? "#ffffff" : null })} />Custom background color</label>{patternSettings.background !== null && <label className={styles.supplyField}>Background<input aria-label="Pattern background color" type="color" value={patternSettings.background} onChange={(event) => setPatternSettings({ ...patternSettings, background: event.target.value })} /></label>}<PatternPreview pattern={pattern} color={color} settings={patternSettings} /><button type="button" className={styles.quietButton} onClick={() => setPatternSettings({ ...DEFAULT_PATTERN_SETTINGS })}>Reset pattern settings</button><p className={styles.localNote}>Uses your selected paint color. Tap a shape to apply these settings.</p></div>
         </div><div className={styles.supplyPanel} hidden={panel !== "brush"}>
         <label className={styles.supplyField}>Brush style<select aria-label="Brush style" value={brush} onChange={(event) => { setBrush(event.target.value as ColoringBrush); chooseTool("brush"); }}><option value="round">Round brush</option><option value="marker">Soft marker</option><option value="pencil">Sketch pencil</option><option value="ribbon">Ribbon brush</option></select></label>
         <div className={styles.brushSection}><label className={styles.supplyLabel} htmlFor={`${hintId}-size`}><span>Brush size</span><span className={styles.sizeValue} aria-hidden="true">{size}px</span></label><div className={styles.sizeControl}><span className={styles.smallBrush} /><input id={`${hintId}-size`} type="range" aria-label="Brush size" aria-valuetext={`${size} pixels`} min={6} max={80} step={2} value={size} onChange={(event) => setSize(Number(event.target.value))} /><span className={styles.largeBrush} /></div><label className={styles.stayInLines}><input type="checkbox" checked={stayInLines} onChange={(event) => setStayInLines(event.target.checked)} /><span>Stay inside the lines</span></label></div>

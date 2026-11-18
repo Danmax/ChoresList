@@ -442,6 +442,42 @@ async function main() {
     await page.getByRole("button", { name: "Jungle River Adventure", exact: true }).click();
     await expect(canvas()).toHaveAttribute("aria-label", "Jungle River Adventure coloring canvas");
 
+    await supplies("Colors");
+    await page.getByRole("button", { name: "Poppy", exact: true }).click();
+    await page.getByLabel("New palette name", { exact: true }).fill("My jungle colors");
+    await page.getByRole("button", { name: "Save current color", exact: true }).click();
+    await page.getByRole("button", { name: "Sky", exact: true }).click();
+    await page.getByRole("button", { name: "Save current color", exact: true }).click();
+    await expect(page.getByRole("button", { name: "My jungle colors #ed6464", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "My jungle colors #69b9e5", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Save current color", exact: true }).click();
+    await expect(page.getByText("That color is already in this palette.", { exact: true })).toBeVisible();
+    for (const name of ["Poppy", "Tangerine", "Sunshine", "Lime", "Leaf", "Lagoon", "Sky", "Blueberry"]) await page.getByRole("button", { name, exact: true }).click();
+    await expect(page.getByRole("group", { name: "Quick colors", exact: true }).getByRole("button")).toHaveCount(8);
+    await supplies("Patterns");
+    await page.getByRole("button", { name: "Stripes pattern", exact: true }).click();
+    const patternPreview = page.getByRole("img", { name: "stripes preview", exact: true }).last();
+    const defaultPatternPreview = await patternPreview.evaluate((node) => (node as HTMLCanvasElement).toDataURL());
+    await page.getByLabel("Pattern size", { exact: true }).press("End");
+    await page.getByLabel("Pattern spacing", { exact: true }).press("Home");
+    await page.getByLabel("Pattern rotation", { exact: true }).press("Home");
+    for (let i = 0; i < 9; i++) await page.getByLabel("Pattern rotation", { exact: true }).press("ArrowRight");
+    await page.getByLabel("Custom background color", { exact: true }).check();
+    assert.notEqual(await patternPreview.evaluate((node) => (node as HTMLCanvasElement).toDataURL()), defaultPatternPreview);
+    await open();
+    await expect(page.getByRole("group", { name: "Quick colors", exact: true }).getByRole("button")).toHaveCount(8);
+    await supplies("Patterns");
+    await expect(page.getByLabel("Pattern size", { exact: true })).toHaveValue("3");
+    await expect(page.getByLabel("Pattern spacing", { exact: true })).toHaveValue("0.5");
+    await expect(page.getByLabel("Pattern rotation", { exact: true })).toHaveValue("45");
+    await expect(page.getByLabel("Custom background color", { exact: true })).toBeChecked();
+    await supplies("Colors");
+    await page.getByLabel("Themed palette", { exact: true }).selectOption({ label: "My jungle colors" });
+    await expect(page.getByRole("button", { name: "My jungle colors #69b9e5", exact: true })).toBeVisible();
+    await open("another-child"); await supplies("Colors");
+    await expect(page.getByLabel("Themed palette", { exact: true }).getByRole("option", { name: "My jungle colors", exact: true })).toHaveCount(0);
+    await open();
+
     // Storage failure must never prevent drawing or silently claim a save.
     await page.evaluate(() => { Storage.prototype.setItem = () => { throw new DOMException("Full", "QuotaExceededError"); }; });
     await (await supplies("Colors")).getByRole("button", { name: "Poppy", exact: true }).click();

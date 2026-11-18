@@ -1,3 +1,4 @@
+import { normalizePatternSettings, type PatternSettings } from "./coloring-supplies";
 export const COLORING_SCENES = [
   { id: "treasure-jungle", description: "A monkey and jaguar discover a treasure chest among jungle leaves and flowers.", title: "Treasure Jungle", subtitle: "A little adventure. A lot of gold.", image: "/games/coloring/treasure-jungle.png" },
   { id: "crocodile-creek", description: "A smiling crocodile swims below a monkey beside water lilies and river plants.", title: "Crocodile Creek", subtitle: "Make a splash with your favorite colors.", image: "/games/coloring/crocodile-creek.png" },
@@ -41,7 +42,7 @@ export function coloringPreferences(value: unknown): ColoringPreferences {
   const isColor = (color: unknown): color is string => typeof color === "string" && /^#[a-f\d]{6}$/i.test(color);
   return {
     color: isColor(saved.color) ? saved.color.toLowerCase() : COLORING_COLORS[4].hex,
-    recentColors: Array.isArray(saved.recentColors) ? [...new Set(saved.recentColors.filter(isColor).map((color) => color.toLowerCase()))].slice(0, 4) : [],
+    recentColors: Array.isArray(saved.recentColors) ? [...new Set(saved.recentColors.filter(isColor).map((color) => color.toLowerCase()))].slice(0, 8) : [],
     size: typeof saved.size === "number" && Number.isFinite(saved.size) ? Math.min(80, Math.max(6, Math.round(saved.size / 2) * 2)) : 28,
     pattern: ["stripes", "stars", "checks", "waves", "hearts", "crosshatch"].includes(String(saved.pattern)) ? saved.pattern as ColoringPattern : "dots",
     stayInLines: typeof saved.stayInLines === "boolean" ? saved.stayInLines : true,
@@ -101,17 +102,19 @@ const STAR = Array.from({ length: 10 }, (_, i) => {
   return [16 + Math.cos(angle) * radius, 16 + Math.sin(angle) * radius];
 });
 
-function patternInk(x: number, y: number, pattern: ColoringPattern): boolean {
-  if (pattern === "dots") return ((x % 22) - 11) ** 2 + ((y % 22) - 11) ** 2 < 16;
-  if (pattern === "stripes") return (x + y) % 22 < 7;
-  if (pattern === "checks") return (Math.floor(x / 12) + Math.floor(y / 12)) % 2 === 0;
-  if (pattern === "waves") return (y + Math.sin(x / 9) * 5) % 20 < 5;
-  if (pattern === "crosshatch") return (x + y) % 20 < 3 || ((x - y) % 20 + 20) % 20 < 3;
+function wrap(value: number, period: number) { return ((value % period) + period) % period; }
+
+function patternInk(x: number, y: number, pattern: ColoringPattern, spacing = 1): boolean {
+  if (pattern === "dots") return (wrap(x, 22 * spacing) - 11 * spacing) ** 2 + (wrap(y, 22 * spacing) - 11 * spacing) ** 2 < 16;
+  if (pattern === "stripes") return wrap(x + y, 22 * spacing) < 7;
+  if (pattern === "checks") return (Math.floor(x / (12 * spacing)) + Math.floor(y / (12 * spacing))) % 2 === 0;
+  if (pattern === "waves") return wrap(y + Math.sin(x / (9 * spacing)) * 5, 20 * spacing) < 5;
+  if (pattern === "crosshatch") return wrap(x + y, 20 * spacing) < 3 || wrap(x - y, 20 * spacing) < 3;
   if (pattern === "hearts") {
-    const hx = ((x % 30) - 15) / 10, hy = (14 - (y % 30)) / 10;
+    const hx = (wrap(x, 30 * spacing) - 15 * spacing) / 10, hy = (14 * spacing - wrap(y, 30 * spacing)) / 10;
     return (hx * hx + hy * hy - .65) ** 3 - hx * hx * hy ** 3 < 0;
   }
-  const px = x % 32, py = y % 32;
+  const px = wrap(x, 32 * spacing) - 16 * (spacing - 1), py = wrap(y, 32 * spacing) - 16 * (spacing - 1);
   let inside = false;
   for (let i = 0, j = STAR.length - 1; i < STAR.length; j = i++) {
     const [ax, ay] = STAR[i], [bx, by] = STAR[j];
@@ -120,16 +123,18 @@ function patternInk(x: number, y: number, pattern: ColoringPattern): boolean {
   return inside;
 }
 
-export function fillColoringRegion(pixels: ColoringPixels, regions: ColoringRegions, id: number, color: RGB, pattern?: ColoringPattern): boolean {
+export function fillColoringRegion(pixels: ColoringPixels, regions: ColoringRegions, id: number, color: RGB, pattern?: ColoringPattern, settings?: PatternSettings): boolean {
   const bounds = regions.bounds[id];
   if (!bounds || id < 1) return false;
-  const light = color.map((channel) => Math.round(channel + (255 - channel) * .8));
+  const options = normalizePatternSettings(settings);
+  const radians = options.angle * Math.PI / 180, cos = Math.cos(radians), sin = Math.sin(radians);
+  const light = options.background ? hexToRgb(options.background) : color.map((channel) => Math.round(channel + (255 - channel) * .8));
   let changed = false;
   for (let y = bounds.top; y <= bounds.bottom; y++) for (let x = bounds.left; x <= bounds.right; x++) {
     const pixel = y * regions.width + x;
     if (regions.labels[pixel] !== id) continue;
     const offset = pixel * 4;
-    const rgb = !pattern || patternInk(x, y, pattern) ? color : light;
+    const rgb = !pattern || patternInk((x * cos + y * sin) / options.scale, (y * cos - x * sin) / options.scale, pattern, options.spacing) ? color : light;
     if (pixels.data[offset] !== rgb[0] || pixels.data[offset + 1] !== rgb[1] || pixels.data[offset + 2] !== rgb[2] || pixels.data[offset + 3] !== 255) changed = true;
     pixels.data[offset] = rgb[0]; pixels.data[offset + 1] = rgb[1]; pixels.data[offset + 2] = rgb[2]; pixels.data[offset + 3] = 255;
   }

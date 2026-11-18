@@ -10,6 +10,8 @@ import { coloringTextFont, drawColoringText, restoreColoringTexts, textBounds, t
 
 import { generateStarterColors, type StarterColorStyle } from "@/lib/coloring-starter";
 
+import type { PatternSettings } from "@/lib/coloring-supplies";
+
 type Snapshot = { pixels: ImageData; texts: ColoringText[] };
 type Point = { x: number; y: number };
 type Editor = {
@@ -25,7 +27,7 @@ type Editor = {
   coverage: number;
 };
 type Stroke = { pointerId: number; before: Snapshot; last: Point };
-type BrushOptions = { tool: ColoringTool; color: string; size: number; pattern: ColoringPattern; stayInLines: boolean; brush?: ColoringBrush };
+type BrushOptions = { tool: ColoringTool; color: string; size: number; pattern: ColoringPattern; stayInLines: boolean; brush?: ColoringBrush; patternSettings?: PatternSettings };
 const HISTORY_LIMIT = 12;
 
 function different(a: ImageData, b: ImageData) {
@@ -231,7 +233,7 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
     const before = { pixels: ctx.getImageData(0, 0, paint.width, paint.height), texts: structuredClone(current.texts) };
     if (options.tool === "bucket" || options.tool === "pattern") {
       const pixels = ctx.getImageData(0, 0, paint.width, paint.height);
-      if (fillColoringRegion(pixels, regions, id, hexToRgb(options.color), options.tool === "pattern" ? options.pattern : undefined)) {
+      if (fillColoringRegion(pixels, regions, id, hexToRgb(options.color), options.tool === "pattern" ? options.pattern : undefined, options.patternSettings)) {
         ctx.putImageData(pixels, 0, 0); commit(before);
       }
       return;

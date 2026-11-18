@@ -322,3 +322,6 @@
 .quickColors button[aria-pressed="true"] { outline: 1.5px solid #7e986b; outline-offset: -3px; }
 .quickColors button svg { border-radius: 100%; background: white; color: #345c48; }
 .fullScreen .paper { width: calc(min(100%, (100dvh - 170px) * 1.777) * var(--canvas-zoom)) !important; }
+.patternSample { display: block; width: 100%; height: auto; border-radius: 6px; }
+.patternSettings { margin-top: 18px; }
+.patternSettings > .patternSample { margin: 14px 0; border: 1px solid #dce2cf; }

@@ -74,7 +74,7 @@ test("remembered art supplies tolerate old or broken data and keep a small, uniq
   const defaults = { color: "#58a17b", recentColors: [], size: 28, pattern: "dots", stayInLines: true };
   for (const invalid of [null, undefined, "wrong", 42, [], { color: "red", size: NaN, pattern: "unknown", stayInLines: "false", recentColors: "bad" }]) assert.deepEqual(coloringPreferences(invalid), defaults);
   assert.deepEqual(coloringPreferences({ color: "#AABBCC", recentColors: ["#ABCDEF", "#abcdef", null, "red", "#112233", "#445566", "#778899", "#000000"], size: 47, pattern: "stars", stayInLines: false }), {
-    color: "#aabbcc", recentColors: ["#abcdef", "#112233", "#445566", "#778899"], size: 48, pattern: "stars", stayInLines: false,
+    color: "#aabbcc", recentColors: ["#abcdef", "#112233", "#445566", "#778899", "#000000"], size: 48, pattern: "stars", stayInLines: false,
   });
   assert.equal(coloringPreferences({ size: -99 }).size, 6);
   assert.equal(coloringPreferences({ size: 9999 }).size, 80);
@@ -173,4 +173,26 @@ test("scenery starters use appropriate animal, water, and treasure shades", asyn
     if (kind === "water") assert.ok(b > r && g > r);
     if (kind === "gray") assert.ok(Math.max(r, g, b) - Math.min(r, g, b) < 40);
   }
+});
+
+test("pattern settings change the fill, preserve outlines, and support a custom background", async () => {
+  const { normalizePatternSettings } = await import("../lib/coloring-supplies");
+  const regions = createColoringRegions(paper(160, 100));
+  const id = coloringRegionAt(regions, 10, 10), base = paint(160, 100);
+  fillColoringRegion(base, regions, id, [20, 100, 200], "stripes");
+  for (const settings of [{ scale: 2, spacing: 1, angle: 0, background: null }, { scale: 1, spacing: 2, angle: 0, background: null }, { scale: 1, spacing: 1, angle: 45, background: null }, { scale: 1, spacing: 1, angle: 0, background: "#ff00ff" }]) {
+    const pixels = paint(160, 100);
+    fillColoringRegion(pixels, regions, id, [20, 100, 200], "stripes", settings);
+    assert.notDeepEqual(pixels.data, base.data);
+    assert.deepEqual(pixel(pixels, 81, 50), [0, 0, 0, 0]);
+  }
+  assert.deepEqual(normalizePatternSettings({ scale: NaN, spacing: 99, angle: -1, background: "bad" }), { scale: 1, spacing: 3, angle: 0, background: null });
+});
+
+test("recent colors keep eight unique entries and saved palettes normalize safely", async () => {
+  const { restoreColorPalettes } = await import("../lib/coloring-supplies");
+  const colors = Array.from({ length: 10 }, (_, i) => `#${String(i).repeat(6)}`);
+  assert.deepEqual(coloringPreferences({ recentColors: [colors[0], ...colors] }).recentColors, colors.slice(0, 8));
+  assert.deepEqual(restoreColorPalettes([{ id: "custom-1", name: " My colors ", colors: ["#ABCDEF", "#abcdef", "bad", "#123456"] }, { id: "custom-1", name: "duplicate", colors: ["#123456"] }, { id: "other", name: "bad", colors }]), [{ id: "custom-1", name: "My colors", colors: ["#abcdef", "#123456"] }]);
+  assert.deepEqual(restoreColorPalettes(null), []);
 });
