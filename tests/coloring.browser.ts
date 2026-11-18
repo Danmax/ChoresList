@@ -245,6 +245,36 @@ async function main() {
     await expect(page.getByRole("button", { name: "Recent #a138ce", exact: true })).toHaveCount(0);
     await open();
 
+    await page.getByLabel("Picture title", { exact: true }).fill("Rainbow Jungle");
+    await page.getByLabel("Themed palette", { exact: true }).selectOption("Ocean");
+    await page.getByRole("button", { name: "Ocean #0891b2", exact: true }).click();
+    await expect(page.getByLabel("Custom color", { exact: true })).toHaveValue("#0891b2");
+    for (const label of ["Checks", "Waves", "Hearts", "Weave"]) {
+      await page.getByRole("button", { name: `${label} pattern`, exact: true }).click();
+      await expect(page.getByRole("button", { name: `${label} pattern`, exact: true })).toHaveAttribute("aria-pressed", "true");
+    }
+    await page.getByRole("button", { name: "Poppy", exact: true }).click();
+    for (const style of ["marker", "pencil", "ribbon", "round"]) {
+      const before = await snapshot();
+      await page.getByLabel("Brush style", { exact: true }).selectOption(style);
+      await canvas().focus(); await canvas().press("Enter");
+      assert.notEqual(await snapshot(), before, `${style} brush adds paint`);
+      await page.getByRole("button", { name: "Undo", exact: true }).click(); assert.equal(await snapshot(), before);
+    }
+    const beforeText = await snapshot();
+    await page.getByLabel("Style Text words", { exact: true }).fill("Jungle magic!");
+    await page.getByLabel("Text font", { exact: true }).selectOption("serif");
+    await page.getByLabel("Text effect", { exact: true }).selectOption("shadow");
+    await page.getByRole("button", { name: "Place text on picture", exact: true }).click();
+    await canvas().focus(); await canvas().press("Enter");
+    const withText = await snapshot(); assert.notEqual(withText, beforeText);
+    await page.getByRole("button", { name: "Undo", exact: true }).click(); assert.equal(await snapshot(), beforeText);
+    await page.getByRole("button", { name: "Redo", exact: true }).click(); assert.equal(await snapshot(), withText);
+    await open(); assert.equal(await snapshot(), withText);
+    await expect(page.getByLabel("Picture title", { exact: true })).toHaveValue("Rainbow Jungle");
+    const titledDownload = page.waitForEvent("download"); await page.getByRole("button", { name: "Download picture", exact: true }).click();
+    assert.equal((await titledDownload).suggestedFilename(), "rainbow-jungle.png");
+
     // Storage failure must never prevent drawing or silently claim a save.
     await page.evaluate(() => { Storage.prototype.setItem = () => { throw new DOMException("Full", "QuotaExceededError"); }; });
     await page.getByRole("button", { name: "Poppy", exact: true }).click();

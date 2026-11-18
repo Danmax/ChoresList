@@ -49,7 +49,12 @@ landscapes with a bucket, brush, dots/stripes/stars, eraser, and color picker.
 The brush stays inside its starting shape by default; turn off “Stay inside
 the lines” for free drawing. Zoom to reach small details, use Move to drag the
 picture with a mouse or finger, and Fit picture to see the whole scene again.
-A quick color strip stays beside the canvas on phones. The brush cursor shows
+A quick color strip stays beside the canvas on phones. Edit Picture title above
+the canvas to name each picture; the title also names its PNG download. The
+supplies panel offers seven patterns, four brush styles, and five themed palettes.
+Style Text lets you enter words, choose lettering and an effect, then tap the
+picture to place the text. Text becomes part of the artwork: Undo removes it,
+and saved pictures and PNG downloads include it. The brush cursor shows
 the actual stroke size, and the color picker returns to your previous painting
 tool. Undo/redo keeps the last 12 changes, and Start over can also be undone.
 

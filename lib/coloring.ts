@@ -6,7 +6,15 @@ export const COLORING_SCENES = [
 
 export type ColoringSceneId = typeof COLORING_SCENES[number]["id"];
 export type ColoringTool = "bucket" | "brush" | "pattern" | "eraser" | "picker" | "pan";
-export type ColoringPattern = "dots" | "stripes" | "stars";
+export type ColoringPattern = "dots" | "stripes" | "stars" | "checks" | "waves" | "hearts" | "crosshatch";
+export type ColoringBrush = "round" | "marker" | "pencil" | "ribbon";
+export const COLORING_THEMES = [
+  { name: "Jungle", colors: ["#276749", "#58a17b", "#a9cb6a", "#dfc18c", "#a57757", "#f4ce54"] },
+  { name: "Ocean", colors: ["#164e63", "#0891b2", "#52b9b0", "#69b9e5", "#bae6fd", "#fef3c7"] },
+  { name: "Sunset", colors: ["#7c3aed", "#d47fbc", "#ed6464", "#f3994b", "#f4ce54", "#f4c4a1"] },
+  { name: "Candy", colors: ["#eea7b4", "#ad8bd3", "#a5f3fc", "#bbf7d0", "#fef08a", "#fbcfe8"] },
+  { name: "Autumn", colors: ["#92400e", "#b45309", "#ea580c", "#eab308", "#78716c", "#a3a635"] },
+] as const;
 export type RGB = readonly [number, number, number];
 export type ColoringPixels = { width: number; height: number; data: Uint8ClampedArray };
 type Bounds = { left: number; top: number; right: number; bottom: number; area: number };
@@ -32,7 +40,7 @@ export function coloringPreferences(value: unknown): ColoringPreferences {
     color: isColor(saved.color) ? saved.color.toLowerCase() : COLORING_COLORS[4].hex,
     recentColors: Array.isArray(saved.recentColors) ? [...new Set(saved.recentColors.filter(isColor).map((color) => color.toLowerCase()))].slice(0, 4) : [],
     size: typeof saved.size === "number" && Number.isFinite(saved.size) ? Math.min(80, Math.max(6, Math.round(saved.size / 2) * 2)) : 28,
-    pattern: saved.pattern === "stripes" || saved.pattern === "stars" ? saved.pattern : "dots",
+    pattern: ["stripes", "stars", "checks", "waves", "hearts", "crosshatch"].includes(String(saved.pattern)) ? saved.pattern as ColoringPattern : "dots",
     stayInLines: typeof saved.stayInLines === "boolean" ? saved.stayInLines : true,
   };
 }
@@ -93,6 +101,13 @@ const STAR = Array.from({ length: 10 }, (_, i) => {
 function patternInk(x: number, y: number, pattern: ColoringPattern): boolean {
   if (pattern === "dots") return ((x % 22) - 11) ** 2 + ((y % 22) - 11) ** 2 < 16;
   if (pattern === "stripes") return (x + y) % 22 < 7;
+  if (pattern === "checks") return (Math.floor(x / 12) + Math.floor(y / 12)) % 2 === 0;
+  if (pattern === "waves") return (y + Math.sin(x / 9) * 5) % 20 < 5;
+  if (pattern === "crosshatch") return (x + y) % 20 < 3 || ((x - y) % 20 + 20) % 20 < 3;
+  if (pattern === "hearts") {
+    const hx = ((x % 30) - 15) / 10, hy = (14 - (y % 30)) / 10;
+    return (hx * hx + hy * hy - .65) ** 3 - hx * hx * hy ** 3 < 0;
+  }
   const px = x % 32, py = y % 32;
   let inside = false;
   for (let i = 0, j = STAR.length - 1; i < STAR.length; j = i++) {

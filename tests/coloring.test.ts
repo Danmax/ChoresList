@@ -33,7 +33,7 @@ test("bucket fills respect the original outline and recolor the same whole regio
 
 test("dots, stripes, and stars fill with two tones and can be replaced by a solid color", () => {
   const regions = createColoringRegions(paper(160, 100));
-  for (const pattern of ["dots", "stripes", "stars"] as const) {
+  for (const pattern of ["dots", "stripes", "stars", "checks", "waves", "hearts", "crosshatch"] as const) {
     const pixels = paint(160, 100);
     const id = coloringRegionAt(regions, 10, 10);
     fillColoringRegion(pixels, regions, id, [20, 100, 200], pattern);

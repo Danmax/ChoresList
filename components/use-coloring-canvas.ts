@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   coloringCoverage, coloringRegionAt, coloringStorageKey, createColoringRegions, fillColoringRegion, hexToRgb,
-  type ColoringPattern, type ColoringRegions, type ColoringSceneId, type ColoringTool,
+  type ColoringBrush, type ColoringPattern, type ColoringRegions, type ColoringSceneId, type ColoringTool,
 } from "@/lib/coloring";
 
 type Point = { x: number; y: number };
@@ -19,7 +19,7 @@ type Editor = {
   coverage: number;
 };
 type Stroke = { pointerId: number; before: ImageData; last: Point };
-type BrushOptions = { tool: ColoringTool; color: string; size: number; pattern: ColoringPattern; stayInLines: boolean };
+type BrushOptions = { tool: ColoringTool; color: string; size: number; pattern: ColoringPattern; stayInLines: boolean; brush?: ColoringBrush };
 const HISTORY_LIMIT = 12;
 
 function different(a: ImageData, b: ImageData) {
@@ -213,8 +213,12 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
     const erase = options.tool === "eraser";
     ctx.globalCompositeOperation = erase ? "destination-out" : "source-over";
     ctx.fillStyle = options.color; ctx.strokeStyle = options.color;
-    ctx.lineWidth = options.size; ctx.lineCap = "round"; ctx.lineJoin = "round";
-    ctx.beginPath(); ctx.arc(point.x, point.y, options.size / 2, 0, Math.PI * 2); ctx.fill();
+    const style = erase ? "round" : options.brush ?? "round";
+    ctx.globalAlpha = style === "marker" ? .3 : 1;
+    ctx.lineWidth = options.size * (style === "pencil" ? .3 : style === "ribbon" ? .65 : 1);
+    ctx.lineCap = style === "ribbon" ? "square" : "round"; ctx.lineJoin = "round";
+    if (style === "pencil") ctx.setLineDash([1, 3]);
+    ctx.beginPath(); ctx.arc(point.x, point.y, ctx.lineWidth / 2, 0, Math.PI * 2); ctx.fill();
     stroke.current = { pointerId, before, last: point };
     render();
   }
@@ -226,6 +230,25 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
     current.ctx.lineTo(point.x, point.y); current.ctx.stroke();
     active.last = point;
     render();
+  }
+
+  function addText(point: Point, text: string, color: string, size: number, font: string, style: string) {
+    endStroke();
+    const current = editor.current;
+    if (!current || !text.trim()) return;
+    const { ctx, paint } = current;
+    const before = ctx.getImageData(0, 0, paint.width, paint.height);
+    ctx.save();
+    ctx.font = `bold ${size}px ${font}`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    const width = Math.min(paint.width - 20, ctx.measureText(text.trim()).width);
+    const x = Math.max(width / 2 + 10, Math.min(paint.width - width / 2 - 10, point.x));
+    const y = Math.max(size, Math.min(paint.height - size, point.y));
+    ctx.fillStyle = color;
+    if (style === "shadow") { ctx.shadowColor = "#00000088"; ctx.shadowBlur = 4; ctx.shadowOffsetX = 3; ctx.shadowOffsetY = 3; }
+    if (style === "outline") { ctx.strokeStyle = "white"; ctx.lineWidth = Math.max(3, size / 10); ctx.lineJoin = "round"; ctx.strokeText(text.trim(), x, y, paint.width - 20); }
+    ctx.fillText(text.trim(), x, y, paint.width - 20);
+    ctx.restore(); commit(before);
   }
 
   function travel(direction: "undo" | "redo") {
@@ -264,7 +287,7 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
   }
 
   return { canvasRef, ready, error, saveWarning, status, history, coverage, dab, move, endStroke, travel, clear, download,
-    artwork,
+    artwork, addText,
     retry: () => setReload((n) => n + 1),
     marks: () => editor.current?.marks ?? 0,
   };
