@@ -72,6 +72,10 @@ the actual stroke size, and the color picker returns to your previous painting
 tool. Full screen expands the canvas on phones and tablets with an icon dock on the
 left. Edit supplies opens colors, brushes, patterns, styled text, titles, and scene
 selection. Exit full screen (or Escape) returns to the regular layout.
+The sparkle icon opens Starting colors: scenery-inspired shades or a random
+complementary palette. Keep my colors preserves already painted shapes; turn it
+off to recolor. Generation uses the existing drawing regions and scene guide
+points locally, preserves text, saves progress, and is one undoable change.
 Undo/redo keeps the last 12 changes, and Start over can also be undone.
 
 Pictures save automatically per child and scene in this browser's local

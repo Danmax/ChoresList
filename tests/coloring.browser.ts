@@ -338,6 +338,25 @@ async function main() {
     await page.getByRole("button", { name: "Undo", exact: true }).click(); assert.equal((await storedTexts()).length, 1);
     assert.equal(await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).image, coloringStorageKey("coloring-preview", "jungle-friends")), paintBeforeDelete);
 
+    const beforeStarter = await snapshot(), labelsBeforeStarter = await storedTexts();
+    await page.getByRole("button", { name: "Generate starting colors", exact: true }).click();
+    await expect(page.getByLabel("Keep my colors", { exact: true })).toBeChecked();
+    await page.getByLabel("Starting color style", { exact: true }).selectOption("complementary");
+    await page.getByRole("button", { name: "Generate colors", exact: true }).click();
+    const started = await snapshot(); assert.notEqual(started, beforeStarter);
+    assert.deepEqual(await storedTexts(), labelsBeforeStarter);
+    await page.getByRole("button", { name: "Undo", exact: true }).click(); assert.equal(await snapshot(), beforeStarter);
+    await page.getByRole("button", { name: "Redo", exact: true }).click(); assert.equal(await snapshot(), started);
+    await page.getByLabel("Keep my colors", { exact: true }).uncheck();
+    await page.getByRole("button", { name: "Generate colors", exact: true }).click(); assert.notEqual(await snapshot(), started);
+    await page.getByRole("button", { name: "Undo", exact: true }).click(); assert.equal(await snapshot(), started);
+    await page.getByRole("button", { name: "Undo", exact: true }).click(); assert.equal(await snapshot(), beforeStarter);
+    await page.getByLabel("Starting color style", { exact: true }).selectOption("scenery");
+    await page.getByRole("button", { name: "Generate colors", exact: true }).click();
+    await page.screenshot({ path: `${screenshotDir}/generated-starter.png`, fullPage: true });
+    await open(); assert.notEqual(await snapshot(), beforeStarter, "generated colors save and reopen");
+    assert.deepEqual(await storedTexts(), labelsBeforeStarter);
+
     const titledDownload = page.waitForEvent("download"); await (await supplies("Picture")).getByRole("button", { name: "Download picture", exact: true }).click();
     assert.equal((await titledDownload).suggestedFilename(), "rainbow-jungle.png");
 

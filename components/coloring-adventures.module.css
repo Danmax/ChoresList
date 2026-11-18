@@ -308,3 +308,7 @@
 .letteringSamples button[aria-pressed="true"] { border-color: #9164a8; background: #f3ebf8; }
 .letteringSamples button span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 21px; color: #46364e; }
 .letteringSamples button small { display: block; margin-top: 6px; font-size: 9px; }
+.generateTool { margin-top: auto; color: #b99a55; }
+.starterExplanation { font-size: 12px; line-height: 1.8; color: #68765d; margin: 12px 0; }
+.fullScreen .generateTool { margin-top: 8px; }
+@media (max-width: 760px) { .generateTool { margin-top: 0; } }

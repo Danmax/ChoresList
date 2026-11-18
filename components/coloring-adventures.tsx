@@ -15,8 +15,8 @@ const TOOLS = [
   { id: "picker", label: "Pick color", icon: Pipette, shortcut: "I", hint: "Tap a painted area to pick its color." },
   { id: "pan", label: "Pan picture", icon: Hand, shortcut: "H", hint: "Zoom in, then drag to explore your picture. Your colors stay put." },
 ] as const;
-type SupplyPanel = "colors" | "brush" | "patterns" | "text" | "picture";
-const PANEL_TITLES = { colors: "Colors & palettes", brush: "Brush & eraser", patterns: "Patterns", text: "Text editor", picture: "Your creation" };
+type SupplyPanel = "generate" | "colors" | "brush" | "patterns" | "text" | "picture";
+const PANEL_TITLES = { generate: "Starting colors", colors: "Colors & palettes", brush: "Brush & eraser", patterns: "Patterns", text: "Text editor", picture: "Your creation" };
 const PATTERNS: { id: ColoringPattern; label: string }[] = [{ id: "dots", label: "Dots" }, { id: "stripes", label: "Stripes" }, { id: "stars", label: "Stars" }, { id: "checks", label: "Checks" }, { id: "waves", label: "Waves" }, { id: "hearts", label: "Hearts" }, { id: "crosshatch", label: "Weave" }];
 
 function TextPreview({ words, color, size, font, effect, outlineColor, outlineWidth }: { words: string; color: string; size: number; font: string; effect: string; outlineColor: string; outlineWidth: number }) {
@@ -63,6 +63,8 @@ export function ColoringAdventures({ memberId, playerName, onExit, onFinish }: {
   onFinish: (score: number, durationSeconds: number, metadata: Record<string, unknown>) => void | Promise<void>;
 }) {
   const [fullScreen, setFullScreen] = useState(false);
+  const [starterStyle, setStarterStyle] = useState<"scenery" | "complementary">("scenery");
+  const [keepColors, setKeepColors] = useState(true);
   const [panel, setPanel] = useState<SupplyPanel>("colors");
   const [dockOpen, setDockOpen] = useState(false);
   const studioRef = useRef<HTMLElement>(null);
@@ -383,7 +385,7 @@ export function ColoringAdventures({ memberId, playerName, onExit, onFinish }: {
         {fullScreen && <>
           <button type="button" className={styles.tool} aria-label="Exit full screen" title="Exit full screen" onClick={leaveFullScreen}><Minimize size={23} /><span>Exit full screen</span></button>
         </>}
-        <span className={styles.toolDecoration} aria-hidden="true"><Sparkles size={23} /></span>
+        <button type="button" className={`${styles.tool} ${styles.generateTool} ${panel === "generate" ? styles.activeTool : ""}`} aria-label="Generate starting colors" title="Generate starting colors" aria-pressed={panel === "generate"} aria-controls={`${hintId}-supplies`} onClick={() => openPanel("generate")} disabled={finishing}><Sparkles size={23} /><span>Start colors</span></button>
       </nav>
 
       <div className={styles.workbench}>
@@ -421,6 +423,7 @@ export function ColoringAdventures({ memberId, playerName, onExit, onFinish }: {
 
       <aside id={`${hintId}-supplies`} className={`${styles.supplies} ${dockOpen ? styles.dockOpen : ""}`} aria-label={panel === "text" ? "Text editor" : "Art supplies"} data-panel={panel}>
         <div className={styles.dockHeader}><strong>{PANEL_TITLES[panel]}</strong>{fullScreen && <button type="button" aria-label="Close editing dock" onClick={() => setDockOpen(false)}><X size={20} /></button>}</div>
+        <section className={styles.supplyPanel} hidden={panel !== "generate"} aria-label="Starting color controls"><p className={styles.starterExplanation}>Give your picture a colorful head start, then make it your own.</p><label className={styles.supplyField}>Color style<select aria-label="Starting color style" value={starterStyle} onChange={(event) => setStarterStyle(event.target.value as "scenery" | "complementary")}><option value="scenery">Scenery-inspired shades</option><option value="complementary">Random complementary colors</option></select></label><p className={styles.starterExplanation}>{starterStyle === "scenery" ? "Natural greens, water blues, earthy animal colors, and treasure gold. Small details stay yours to finish." : "Creates a fresh palette using opposite hues, with lighter and darker shades."}</p><label className={styles.stayInLines}><input type="checkbox" checked={keepColors} onChange={(event) => setKeepColors(event.target.checked)} />Keep my colors</label><p className={styles.localNote}>Keeps any shape you have already painted. Turn off to recolor the scene. Text stays intact.</p><button type="button" className={styles.downloadButton} disabled={!drawing.ready || finishing} onClick={() => { drawing.generateColors(starterStyle, keepColors); if (fullScreen) setDockOpen(false); }}>Generate colors</button><p className={styles.localNote}>Try another palette any time. Undo restores the previous picture.</p></section>
         <div className={styles.supplyPanel} hidden={panel !== "colors"}>
         <div className={styles.creativeSection}><label className={styles.supplyField}>Themed palette<select aria-label="Themed palette" value={theme} onChange={(event) => setTheme(event.target.value)}>{COLORING_THEMES.map((item) => <option key={item.name}>{item.name}</option>)}</select></label><div className={styles.themeColors}>{COLORING_THEMES.find((item) => item.name === theme)!.colors.map((hex) => <button key={hex} type="button" aria-label={`${theme} ${hex}`} title={hex} style={{ background: hex }} onClick={() => chooseColor(hex)} aria-pressed={color === hex} />)}</div></div>
         <div className={styles.paletteHeading}><div><p className={styles.sectionLabel}>MAKE IT YOURS</p><h3>Your colors</h3></div><Palette size={19} /></div>

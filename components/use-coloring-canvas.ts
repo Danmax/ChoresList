@@ -8,6 +8,8 @@ import {
 
 import { coloringTextFont, drawColoringText, restoreColoringTexts, textBounds, type ColoringText } from "@/lib/coloring-text";
 
+import { generateStarterColors, type StarterColorStyle } from "@/lib/coloring-starter";
+
 type Snapshot = { pixels: ImageData; texts: ColoringText[] };
 type Point = { x: number; y: number };
 type Editor = {
@@ -331,6 +333,17 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
     refresh(); persist();
   }
 
+  function generateColors(style: StarterColorStyle, keepExisting: boolean) {
+    endStroke(); const current = editor.current;
+    if (!current) return;
+    const before = snapshot(current);
+    const pixels = current.ctx.getImageData(0, 0, current.paint.width, current.paint.height);
+    const changed = generateStarterColors(pixels, current.regions, scene.id, style, Math.floor(Math.random() * 0x100000000), keepExisting);
+    if (!changed) { setStatus("No more empty shapes to auto-color. Turn off Keep my colors to try a new palette."); return; }
+    current.ctx.putImageData(pixels, 0, 0); commit(before);
+    setStatus("Starting colors added. Keep coloring, or Undo to restore your picture.");
+  }
+
   function clear() {
     endStroke();
     const current = editor.current;
@@ -357,7 +370,7 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
   }
 
   return { canvasRef, ready, error, saveWarning, status, history, coverage, dab, move, endStroke, travel, clear, download,
-    artwork, paintColors, addText, beginTextDrag, moveTextDrag, nudgeText, textLabels, selectedTextId, selectText, deleteSelectedText,
+    artwork, paintColors, generateColors, addText, beginTextDrag, moveTextDrag, nudgeText, textLabels, selectedTextId, selectText, deleteSelectedText,
     retry: () => setReload((n) => n + 1),
     marks: () => editor.current?.marks ?? 0,
   };

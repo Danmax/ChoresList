@@ -120,3 +120,36 @@ test("all lettering styles survive saved-text validation and their bundled fonts
   }
   for (const filename of ["bangers", "pacifico", "marker", "stencil", "rye", "fredoka"]) assert.ok((await stat(`public/games/coloring/fonts/${filename}.ttf`)).size > 10000);
 });
+
+test("starter palettes are repeatable, varied, outline-safe, and protect painted shapes", async () => {
+  const { generateStarterColors } = await import("../lib/coloring-starter");
+  const regions = createColoringRegions(paper(80, 60));
+  for (const style of ["scenery", "complementary"] as const) {
+    const first = paint(80, 60), same = paint(80, 60), next = paint(80, 60);
+    assert.ok(generateStarterColors(first, regions, "vine-swing", style, 42) > 0);
+    generateStarterColors(same, regions, "vine-swing", style, 42);
+    generateStarterColors(next, regions, "vine-swing", style, 43);
+    assert.deepEqual(first.data, same.data); assert.notDeepEqual(first.data, next.data);
+    assert.deepEqual(pixel(first, 40, 10), [0, 0, 0, 0]);
+    assert.equal(generateStarterColors(first, regions, "vine-swing", style, 99, true), 0);
+    const partial = paint(80, 60), offset = (10 * 80 + 10) * 4;
+    partial.data.set([240, 20, 60, 255], offset);
+    generateStarterColors(partial, regions, "vine-swing", style, 42, true);
+    assert.deepEqual(pixel(partial, 10, 10), [240, 20, 60, 255]);
+    assert.deepEqual(pixel(partial, 20, 20), [0, 0, 0, 0], "a partly brushed shape stays untouched");
+    assert.equal(pixel(partial, 60, 20)[3], 255);
+    assert.ok(generateStarterColors(partial, regions, "vine-swing", style, 43, false) > 0);
+    assert.equal(pixel(partial, 20, 20)[3], 255);
+  }
+});
+
+test("starter colors work for all six actual scenes without painting across the ink", async () => {
+  const { generateStarterColors } = await import("../lib/coloring-starter");
+  for (const scene of COLORING_SCENES) {
+    const { data, info } = await sharp(`public${scene.image}`).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    const regions = createColoringRegions({ width: info.width, height: info.height, data: new Uint8ClampedArray(data) });
+    const pixels = paint(info.width, info.height);
+    assert.ok(generateStarterColors(pixels, regions, scene.id, "scenery", 42) > regions.paintable * .5, `${scene.title} gets useful starting coverage`);
+    for (let i = 0; i < regions.labels.length; i++) if (regions.labels[i] < 1) assert.equal(pixels.data[i * 4 + 3], 0);
+  }
+});
