@@ -54,7 +54,10 @@ the canvas to name each picture; the title also names its PNG download. The
 supplies panel offers seven patterns, four brush styles, and five themed palettes.
 Style Text lets you enter words, choose lettering and an effect, then tap the
 picture to place the text. New text stays on a separate movable layer above the scene outlines. Move text
-allows dragging or arrow-key adjustments, including after reload. The live
+allows dragging or arrow-key adjustments, including after reload. Select a text
+box in the Style Text dropdown (or tap it with Move text), then use Delete
+selected text to remove just that label. Delete/Backspace also works on the
+canvas in Move text mode. Deletions save immediately and support undo/redo. The live
 preview shows lettering, fill, outline thickness/color, neon glow, and bedazzled
 sparkles before placement. Undo/redo includes text moves; PNG downloads include
 the text. Older rasterized labels remain part of the original paint layer. The brush cursor shows

@@ -270,3 +270,5 @@
 .fullScreen .paper { flex-shrink: 0; margin: auto; }
 .textPreview { display: block; width: 100%; height: auto; margin: 12px 0; border: 1px solid #dce2cf; border-radius: 10px; }
 .canvas[data-tool="text-move"] { cursor: move; }
+.deleteTextButton { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 44px; margin-top: 8px; border: 1px solid #e7bdb4; border-radius: 10px; background: #fff2ed; color: #963f35; font-size: 12px; font-weight: 750; }
+.deleteTextButton:hover:not(:disabled) { background: #fbe1d8; }

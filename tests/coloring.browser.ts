@@ -288,6 +288,30 @@ async function main() {
     assert.ok((await storedTexts())[0].x > savedLabel.x + 10, "saved text can be dragged after reload");
     await page.getByRole("button", { name: "Undo", exact: true }).click(); assert.equal(await snapshot(), withText);
 
+    // Remove a chosen saved label after other edits, without changing paint or its neighbor.
+    await page.getByLabel("Style Text words", { exact: true }).fill("Keep this label");
+    await page.getByRole("button", { name: "Place text on picture", exact: true }).click();
+    await canvas().focus(); await canvas().press("Enter");
+    await page.getByRole("button", { name: "Brush", exact: true }).click();
+    await page.getByRole("button", { name: "Sky", exact: true }).click();
+    await canvas().focus(); await canvas().press("Enter");
+    const paintBeforeDelete = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).image, coloringStorageKey("coloring-preview", "jungle-friends"));
+    const bothLabels = await storedTexts(); assert.equal(bothLabels.length, 2);
+    await page.getByLabel("Select text box", { exact: true }).selectOption(bothLabels[0].id);
+    await page.getByRole("button", { name: "Delete selected text", exact: true }).click();
+    assert.deepEqual((await storedTexts()).map((label: { id: string }) => label.id), [bothLabels[1].id]);
+    assert.equal(await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).image, coloringStorageKey("coloring-preview", "jungle-friends")), paintBeforeDelete);
+    await page.getByRole("button", { name: "Undo", exact: true }).click(); assert.equal((await storedTexts()).length, 2);
+    await page.getByRole("button", { name: "Redo", exact: true }).click(); assert.equal((await storedTexts()).length, 1);
+    await open();
+    assert.equal((await storedTexts()).length, 1);
+    await expect(page.getByRole("button", { name: "Delete selected text", exact: true })).toBeDisabled();
+    await page.getByRole("button", { name: "Move text", exact: true }).click();
+    await page.getByLabel("Select text box", { exact: true }).selectOption(bothLabels[1].id);
+    await canvas().focus(); await canvas().press("Backspace"); assert.equal((await storedTexts()).length, 0);
+    await page.getByRole("button", { name: "Undo", exact: true }).click(); assert.equal((await storedTexts()).length, 1);
+    assert.equal(await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).image, coloringStorageKey("coloring-preview", "jungle-friends")), paintBeforeDelete);
+
     const titledDownload = page.waitForEvent("download"); await page.getByRole("button", { name: "Download picture", exact: true }).click();
     assert.equal((await titledDownload).suggestedFilename(), "rainbow-jungle.png");
 

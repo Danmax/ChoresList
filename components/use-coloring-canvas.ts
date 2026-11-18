@@ -52,6 +52,8 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
   const textDrag = useRef<{ index: number; dx: number; dy: number; before: Snapshot } | null>(null);
   const selectedText = useRef<number | null>(null);
   const stroke = useRef<Stroke | null>(null);
+  const [textLabels, setTextLabels] = useState<{ id: string; text: string }[]>([]);
+  const [selectedTextId, setSelectedTextId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
   const [saveWarning, setSaveWarning] = useState("");
@@ -95,6 +97,8 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
     const current = editor.current;
     if (!current) return;
     setHistory({ undo: current.undo.length, redo: current.redo.length });
+    setTextLabels(current.texts.map(({ id, text }) => ({ id, text })));
+    setSelectedTextId(selectedText.current === null ? null : current.texts[selectedText.current]?.id ?? null);
     current.coverage = coloringCoverage(current.ctx.getImageData(0, 0, current.paint.width, current.paint.height), current.regions);
     if (current.texts.length) current.coverage = Math.max(.01, current.coverage);
     setCoverage(current.coverage);
@@ -135,6 +139,7 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
 
   useEffect(() => {
     let cancelled = false;
+    setTextLabels([]); setSelectedTextId(null);
     setReady(false); setError(""); setSaveWarning(""); setCoverage(0);
     setHistory({ undo: 0, redo: 0 }); setStatus("Getting your picture ready…");
     editor.current = null;
@@ -260,11 +265,12 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
     for (let index = current.texts.length - 1; index >= 0; index--) {
       const item = current.texts[index], bounds = textBounds(current.ctx, item, current.paint.width);
       if (point.x >= bounds.left && point.x <= bounds.right && point.y >= bounds.top && point.y <= bounds.bottom) {
-        selectedText.current = index;
+        selectedText.current = index; setSelectedTextId(item.id);
         textDrag.current = { index, dx: item.x - point.x, dy: item.y - point.y, before: snapshot(current) };
         setStatus("Drag your text to move it. Arrow keys make small adjustments."); return;
       }
     }
+    selectedText.current = null; setSelectedTextId(null);
     setStatus("Drag a text label to move it. Pan picture moves the zoomed view.");
   }
   function moveTextDrag(point: Point) {
@@ -281,6 +287,20 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
     if (!item) return;
     item.x = Math.max(30, Math.min(current.paint.width - 30, item.x + dx));
     item.y = Math.max(item.size, Math.min(current.paint.height - item.size, item.y + dy)); commit(before);
+  }
+
+  function selectText(id: string) {
+    endStroke();
+    const index = editor.current?.texts.findIndex((item) => item.id === id) ?? -1;
+    selectedText.current = index >= 0 ? index : null;
+    setSelectedTextId(index >= 0 ? id : null);
+  }
+  function deleteSelectedText() {
+    endStroke(); const current = editor.current, index = selectedText.current;
+    if (!current || index === null || !current.texts[index]) return;
+    const before = snapshot(current);
+    current.texts.splice(index, 1); selectedText.current = null;
+    commit(before); setStatus("Text box deleted. Undo restores it.");
   }
 
   function travel(direction: "undo" | "redo") {
@@ -320,7 +340,7 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
   }
 
   return { canvasRef, ready, error, saveWarning, status, history, coverage, dab, move, endStroke, travel, clear, download,
-    artwork, addText, beginTextDrag, moveTextDrag, nudgeText,
+    artwork, addText, beginTextDrag, moveTextDrag, nudgeText, textLabels, selectedTextId, selectText, deleteSelectedText,
     retry: () => setReload((n) => n + 1),
     marks: () => editor.current?.marks ?? 0,
   };
