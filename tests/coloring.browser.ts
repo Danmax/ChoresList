@@ -37,12 +37,17 @@ async function main() {
   try {
     const page = await browser.newPage({ viewport: { width: 1440, height: 1160 } });
     const errors: string[] = [], sessions: Record<string, unknown>[] = [];
+    let failNextFinish = false;
     page.on("pageerror", (error) => errors.push(error.message));
     await page.route("**/api/**", async (route) => {
       const url = new URL(route.request().url());
       let response: object = { matches: [] };
       if (url.pathname === "/api/games") {
         if (route.request().method() === "POST") {
+          if (failNextFinish) {
+            failNextFinish = false;
+            await route.fulfill({ status: 503, json: { error: "Temporarily unavailable" } }); return;
+          }
           sessions.push(route.request().postDataJSON()); response = { reward: { type: "none", points: 0, tickets: 0 } };
         } else {
           const member = { id: url.searchParams.get("memberId") ?? "coloring-preview", name: "Alex", age: 8, avatar: "🧒", color: "#58a17b", totalPoints: 0 };
@@ -99,17 +104,24 @@ async function main() {
     await page.getByRole("button", { name: "Bucket", exact: true }).click();
     await page.getByRole("button", { name: "Leaf", exact: true }).click(); await at(first.seed);
     const green = await snapshot();
+    await expect(page.getByRole("img", { name: "Your colored Treasure Jungle picture", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Poppy", exact: true }).click();
     await page.getByRole("button", { name: "Pick color", exact: true }).click(); await at(first.seed);
     await expect(page.getByRole("button", { name: "Leaf", exact: true })).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByRole("button", { name: "Bucket", exact: true })).toHaveAttribute("aria-pressed", "true");
     await page.reload(); await page.getByRole("button", { name: /Coloring Adventures/ }).click(); await expect(canvas()).toBeVisible();
     assert.equal(await snapshot(), green, "progress survives a reload");
+    await expect(page.getByRole("img", { name: "Your colored Treasure Jungle picture", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Crocodile Creek", exact: true }).click(); await expect(canvas()).toHaveAttribute("aria-label", "Crocodile Creek coloring canvas");
     await page.getByRole("button", { name: "Sky", exact: true }).click(); await at(second.seed);
     const creek = await snapshot();
     await page.getByRole("button", { name: "Treasure Jungle", exact: true }).click(); await expect(canvas()).toHaveAttribute("aria-label", "Treasure Jungle coloring canvas"); assert.equal(await snapshot(), green);
     await page.getByRole("button", { name: "Crocodile Creek", exact: true }).click(); await expect(canvas()).toHaveAttribute("aria-label", "Crocodile Creek coloring canvas"); assert.equal(await snapshot(), creek);
+    await page.evaluate((keys) => { for (const key of keys) { const saved = JSON.parse(localStorage.getItem(key)!); delete saved.thumbnail; localStorage.setItem(key, JSON.stringify(saved)); } }, [coloringStorageKey("coloring-preview", "treasure-jungle"), coloringStorageKey("coloring-preview", "crocodile-creek")]);
+    await open();
+    await expect(page.getByRole("img", { name: "Your colored Treasure Jungle picture", exact: true })).toBeVisible();
+    await expect(page.getByRole("img", { name: "Your colored Crocodile Creek picture", exact: true })).toBeVisible();
+    assert.equal(await snapshot(), creek, "original saves gain previews without changing their artwork");
     await open("another-child"); assert.equal(await snapshot(), empty, "another child has a separate picture");
     await open(); await expect(canvas()).toHaveAttribute("aria-label", "Crocodile Creek coloring canvas"); assert.equal(await snapshot(), creek);
     await page.getByRole("button", { name: "Treasure Jungle", exact: true }).click(); await expect(canvas()).toHaveAttribute("aria-label", "Treasure Jungle coloring canvas");
@@ -120,7 +132,13 @@ async function main() {
     await page.getByRole("button", { name: "Start over", exact: true }).click(); await page.getByRole("button", { name: "Keep coloring", exact: true }).click(); assert.equal(await snapshot(), green);
     await page.getByRole("button", { name: "Start over", exact: true }).click(); await page.getByRole("button", { name: "Start fresh", exact: true }).click(); assert.equal(await snapshot(), empty);
     await page.getByRole("button", { name: "Brush", exact: true }).click();
+    await page.getByRole("button", { name: "Leaf", exact: true }).click();
     const start = await at(first.seed, "position"), end = await at(first.other, "position");
+    await page.mouse.move(start.x, start.y);
+    const cursor = page.locator('[class*="brushCursor"]');
+    await expect(cursor).toBeVisible();
+    const cursorBox = (await cursor.boundingBox())!, canvasBox = (await canvas().boundingBox())!;
+    assert.ok(Math.abs(cursorBox.width - canvasBox.width * 28 / 1280) < 2, "cursor shows the brush's actual size");
     await page.mouse.move(start.x, start.y); await page.mouse.down(); await page.mouse.move(end.x, end.y, { steps: 15 }); await page.mouse.up();
     assert.deepEqual(await paintedPixel(first.seed), [88, 161, 123, 255]);
     assert.deepEqual(await paintedPixel(first.other), [0, 0, 0, 0], "brush stays in its starting shape");
@@ -131,13 +149,23 @@ async function main() {
     await page.mouse.move(start.x, start.y); await page.mouse.down(); await page.mouse.move(end.x, end.y, { steps: 15 }); await page.mouse.up();
     assert.deepEqual(await paintedPixel(first.other), [88, 161, 123, 255], "free brush can cross shapes");
     await page.getByLabel("Stay inside the lines", { exact: true }).check();
+    await page.getByRole("button", { name: "Pick color", exact: true }).click(); await at(first.seed);
+    await expect(page.getByRole("button", { name: "Brush", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await page.getByRole("button", { name: "Eraser", exact: true }).click();
+    await page.getByRole("button", { name: "Leaf", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Brush", exact: true })).toHaveAttribute("aria-pressed", "true");
     const downloadEvent = page.waitForEvent("download"); await page.getByRole("button", { name: "Download picture", exact: true }).click();
     const download = await downloadEvent; assert.equal(download.suggestedFilename(), "treasure-jungle.png");
     await download.saveAs(`${screenshotDir}/export.png`);
 
     await page.setViewportSize({ width: 390, height: 844 });
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "mobile layout must fit");
-    await page.getByRole("button", { name: "Bucket", exact: true }).click(); await page.getByRole("button", { name: "Sunshine", exact: true }).click();
+    const quick = page.getByRole("group", { name: "Quick colors", exact: true });
+    await expect(quick).toBeVisible();
+    const quickSwatch = quick.getByRole("button", { name: "Quick Sunshine", exact: true });
+    const swatchBox = (await quickSwatch.boundingBox())!;
+    assert.ok(swatchBox.width >= 44 && swatchBox.height >= 44, "quick colors have generous touch targets");
+    await page.getByRole("button", { name: "Bucket", exact: true }).click(); await quickSwatch.click();
     await canvas().scrollIntoViewIfNeeded();
     const touchPoint = await at(first.seed, "position"), touch = await page.context().newCDPSession(page);
     await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [touchPoint] });
@@ -146,23 +174,85 @@ async function main() {
     await page.screenshot({ path: `${screenshotDir}/studio-mobile.png`, fullPage: true });
     await page.getByLabel("Canvas zoom", { exact: true }).selectOption("200");
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "zoom scrolls inside the canvas");
-    await page.getByLabel("Canvas zoom", { exact: true }).selectOption("100");
+    const viewport = page.getByTestId("coloring-viewport");
+    await viewport.scrollIntoViewIfNeeded();
+    await viewport.evaluate((node) => { node.scrollLeft = 0; node.scrollTop = 0; });
+    await page.getByRole("button", { name: "Move", exact: true }).click();
+    await viewport.scrollIntoViewIfNeeded();
+    const beforePan = await snapshot(), panBox = (await viewport.boundingBox())!;
+    await page.mouse.move(panBox.x + panBox.width * .7, panBox.y + panBox.height / 2); await page.mouse.down();
+    await page.mouse.move(panBox.x + panBox.width * .3, panBox.y + panBox.height / 2, { steps: 10 }); await page.mouse.up();
+    assert.ok(await viewport.evaluate((node) => node.scrollLeft) > 40, "Move lets players explore a zoomed picture");
+    assert.equal(await snapshot(), beforePan, "moving never adds paint");
+    // A finger must pan too; drawing deliberately disables native touch scrolling.
+    await viewport.evaluate((node) => { node.scrollLeft = 0; });
+    await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: panBox.x + panBox.width * .7, y: panBox.y + panBox.height / 2 }] });
+    await touch.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: panBox.x + panBox.width * .3, y: panBox.y + panBox.height / 2 }] });
+    await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    assert.ok(await viewport.evaluate((node) => node.scrollLeft) > 40, "touch panning works");
+    assert.equal(await snapshot(), beforePan);
+    await page.getByRole("button", { name: "Fit picture", exact: true }).click();
+    await expect(page.getByLabel("Canvas zoom", { exact: true })).toHaveValue("100");
+    await expect.poll(() => viewport.evaluate((node) => node.scrollLeft)).toBe(0);
     await page.getByRole("button", { name: "Jungle Friends", exact: true }).click(); await expect(canvas()).toHaveAttribute("aria-label", "Jungle Friends coloring canvas");
+    await page.getByRole("button", { name: "Bucket", exact: true }).click();
     await canvas().focus(); await canvas().press("ArrowRight"); await canvas().press("Enter");
     await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeEnabled();
-    await page.getByRole("button", { name: "Finish picture", exact: true }).click(); await expect(page.getByText("Game saved.", { exact: true })).toBeVisible();
+    const finishedPicture = await snapshot();
+    await page.getByRole("button", { name: "Finish picture", exact: true }).click();
+    const review = page.getByRole("dialog", { name: "Look what you made!", exact: true });
+    await expect(review).toBeVisible();
+    await expect(review.getByRole("img", { name: "Your finished Jungle Friends picture", exact: true })).toHaveAttribute("src", finishedPicture);
+    assert.equal(sessions.length, 0, "previewing a picture does not finish the game");
+    await review.press("Escape"); await expect(review).not.toBeVisible();
+    await expect(page.getByRole("button", { name: "Finish picture", exact: true })).toBeFocused();
+    await page.getByRole("button", { name: "Finish picture", exact: true }).click();
+    await review.getByRole("button", { name: "Keep coloring", exact: true }).click(); assert.equal(await snapshot(), finishedPicture);
+    await page.getByRole("button", { name: "Finish picture", exact: true }).click();
+    const previewDownload = page.waitForEvent("download"); await review.getByRole("button", { name: "Download PNG", exact: true }).click();
+    assert.equal((await previewDownload).suggestedFilename(), "jungle-friends.png");
+    await page.screenshot({ path: `${screenshotDir}/picture-preview-mobile.png`, fullPage: true });
+    failNextFinish = true;
+    await review.getByRole("button", { name: "Save & return to games", exact: true }).click();
+    await expect(review.getByRole("alert")).toContainText("Your picture is still here");
+    await expect(review).toBeVisible(); assert.equal(await snapshot(), finishedPicture);
+    await review.getByRole("button", { name: "Save & return to games", exact: true }).click(); await expect(page.getByText("Game saved.", { exact: true })).toBeVisible();
     assert.equal(sessions.length, 1); assert.equal(sessions[0].gameKey, "coloring-adventures");
     assert.equal((sessions[0].metadata as { scene: string }).scene, "jungle-friends");
 
-    // Storage failure must never prevent drawing or silently claim a save.
+    // Custom colors and supplies survive a reload without leaking to another child.
     await page.getByRole("button", { name: /Coloring Adventures/ }).click(); await expect(canvas()).toBeVisible();
+    await page.getByLabel("Custom color", { exact: true }).evaluate((node) => {
+      const input = node as HTMLInputElement;
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "#a138ce");
+      input.dispatchEvent(new Event("input", { bubbles: true })); input.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await expect(page.getByRole("button", { name: "Recent #a138ce", exact: true })).toBeVisible();
+    const brushSize = page.getByLabel("Brush size", { exact: true });
+    await brushSize.press("Home");
+    for (let i = 0; i < 21; i++) await brushSize.press("ArrowRight");
+    await page.getByLabel("Stay inside the lines", { exact: true }).uncheck();
+    await page.getByRole("button", { name: "Stars pattern", exact: true }).click();
+    await open();
+    await expect(page.getByLabel("Custom color", { exact: true })).toHaveValue("#a138ce");
+    await expect(page.getByLabel("Brush size", { exact: true })).toHaveValue("48");
+    await expect(page.getByLabel("Stay inside the lines", { exact: true })).not.toBeChecked();
+    await expect(page.getByRole("button", { name: "Recent #a138ce", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Patterns", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Stars pattern", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await open("another-child");
+    await expect(page.getByLabel("Custom color", { exact: true })).toHaveValue("#58a17b");
+    await expect(page.getByRole("button", { name: "Recent #a138ce", exact: true })).toHaveCount(0);
+    await open();
+
+    // Storage failure must never prevent drawing or silently claim a save.
     await page.evaluate(() => { Storage.prototype.setItem = () => { throw new DOMException("Full", "QuotaExceededError"); }; });
     await page.getByRole("button", { name: "Poppy", exact: true }).click();
     await canvas().focus(); await canvas().press("ArrowRight"); await canvas().press("Enter");
     await expect(page.getByRole("region", { name: "Coloring Adventures", exact: true }).getByRole("alert")).toContainText("couldn’t save your progress");
     await expect(page.getByRole("button", { name: "Download picture", exact: true })).toBeEnabled();
     assert.deepEqual(errors, []);
-    console.log("Coloring browser checks passed: buckets, patterns, brush boundaries, free drawing, erasing, eyedropper, undo/redo, per-child and per-scene saves, reload, touch, zoom, keyboard, downloads, completion, and storage errors.");
+    console.log("Coloring browser checks passed: drawing tools, brush cursor, gallery previews, undo/redo, saves, remembered supplies, mobile colors, mouse/touch panning, fit, keyboard, downloads, picture review, completion retry, and storage errors.");
   } finally { await browser.close(); }
 }
 

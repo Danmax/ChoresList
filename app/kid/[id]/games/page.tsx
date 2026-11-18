@@ -157,6 +157,7 @@ export default function KidGamesPage() {
     });
     const data = await res.json().catch(() => null);
     if (!res.ok) {
+      if (gameKey === "coloring-adventures") throw new Error(data?.error ?? "Could not save game");
       toast.error(data?.error ?? "Could not save game");
       await load();
       return;

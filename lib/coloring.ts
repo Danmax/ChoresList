@@ -5,7 +5,7 @@ export const COLORING_SCENES = [
 ] as const;
 
 export type ColoringSceneId = typeof COLORING_SCENES[number]["id"];
-export type ColoringTool = "bucket" | "brush" | "pattern" | "eraser" | "picker";
+export type ColoringTool = "bucket" | "brush" | "pattern" | "eraser" | "picker" | "pan";
 export type ColoringPattern = "dots" | "stripes" | "stars";
 export type RGB = readonly [number, number, number];
 export type ColoringPixels = { width: number; height: number; data: Uint8ClampedArray };
@@ -22,6 +22,20 @@ export const COLORING_COLORS = [
   { name: "Sand", hex: "#dfc18c" }, { name: "Cocoa", hex: "#a57757" },
   { name: "Slate", hex: "#667884" }, { name: "Snow", hex: "#ffffff" },
 ] as const;
+
+export type ColoringPreferences = { color: string; recentColors: string[]; size: number; pattern: ColoringPattern; stayInLines: boolean };
+
+export function coloringPreferences(value: unknown): ColoringPreferences {
+  const saved = value && typeof value === "object" ? value as Record<string, unknown> : {};
+  const isColor = (color: unknown): color is string => typeof color === "string" && /^#[a-f\d]{6}$/i.test(color);
+  return {
+    color: isColor(saved.color) ? saved.color.toLowerCase() : COLORING_COLORS[4].hex,
+    recentColors: Array.isArray(saved.recentColors) ? [...new Set(saved.recentColors.filter(isColor).map((color) => color.toLowerCase()))].slice(0, 4) : [],
+    size: typeof saved.size === "number" && Number.isFinite(saved.size) ? Math.min(80, Math.max(6, Math.round(saved.size / 2) * 2)) : 28,
+    pattern: saved.pattern === "stripes" || saved.pattern === "stars" ? saved.pattern : "dots",
+    stayInLines: typeof saved.stayInLines === "boolean" ? saved.stayInLines : true,
+  };
+}
 
 // Segment the original drawing once. Colors never become boundaries, so an
 // already painted shape can be filled again without leaking into its neighbors.
@@ -62,7 +76,7 @@ export function createColoringRegions(image: ColoringPixels): ColoringRegions {
 }
 
 export function coloringRegionAt(regions: ColoringRegions, x: number, y: number): number {
-  if (x < 0 || y < 0 || x >= regions.width || y >= regions.height) return -1;
+  if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x >= regions.width || y >= regions.height) return -1;
   return regions.labels[Math.floor(y) * regions.width + Math.floor(x)];
 }
 

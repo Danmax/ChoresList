@@ -15,8 +15,10 @@ type Editor = {
   undo: ImageData[];
   redo: ImageData[];
   marks: number;
+  thumbnail: string;
+  coverage: number;
 };
-type Stroke = { pointerId: number; before: ImageData; last: Point; color: string; size: number; erase: boolean };
+type Stroke = { pointerId: number; before: ImageData; last: Point };
 type BrushOptions = { tool: ColoringTool; color: string; size: number; pattern: ColoringPattern; stayInLines: boolean };
 const HISTORY_LIMIT = 12;
 
@@ -51,6 +53,7 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
   const [history, setHistory] = useState({ undo: 0, redo: 0 });
   const [coverage, setCoverage] = useState(0);
   const [reload, setReload] = useState(0);
+  const [artwork, setArtwork] = useState<{ sceneId: ColoringSceneId; thumbnail: string; hasPaint: boolean } | null>(null);
 
   const render = useCallback(() => {
     const canvas = canvasRef.current, current = editor.current;
@@ -71,6 +74,7 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
       localStorage.setItem(coloringStorageKey(memberId, scene.id), JSON.stringify({
         version: 1, width: current.paint.width, height: current.paint.height,
         image: current.paint.toDataURL("image/png"), marks: current.marks,
+        thumbnail: current.coverage > 0 ? current.thumbnail : null,
       }));
       setSaveWarning("");
       setStatus("Saved on this device");
@@ -84,9 +88,18 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
     const current = editor.current;
     if (!current) return;
     setHistory({ undo: current.undo.length, redo: current.redo.length });
-    setCoverage(coloringCoverage(current.ctx.getImageData(0, 0, current.paint.width, current.paint.height), current.regions));
+    current.coverage = coloringCoverage(current.ctx.getImageData(0, 0, current.paint.width, current.paint.height), current.regions);
+    setCoverage(current.coverage);
     render();
-  }, [render]);
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const thumbnail = document.createElement("canvas");
+      thumbnail.width = 320; thumbnail.height = Math.round(320 * canvas.height / canvas.width);
+      thumbnail.getContext("2d")?.drawImage(canvas, 0, 0, thumbnail.width, thumbnail.height);
+      current.thumbnail = thumbnail.toDataURL("image/webp", .8);
+      setArtwork({ sceneId: scene.id, thumbnail: current.thumbnail, hasPaint: current.coverage > 0 });
+    }
+  }, [render, scene.id]);
 
   const commit = useCallback((before: ImageData) => {
     const current = editor.current;
@@ -131,7 +144,7 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
         ctx.drawImage(ink, 0, 0);
         const regions = createColoringRegions(ctx.getImageData(0, 0, paint.width, paint.height));
         ctx.clearRect(0, 0, paint.width, paint.height);
-        const current: Editor = { paint, ink, ctx, regions, undo: [], redo: [], marks: 0 };
+        const current: Editor = { paint, ink, ctx, regions, undo: [], redo: [], marks: 0, thumbnail: "", coverage: 0 };
         let restored = false;
         try {
           const raw = localStorage.getItem(coloringStorageKey(memberId, scene.id));
@@ -175,7 +188,7 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
 
   function dab(point: Point, options: BrushOptions, pointerId: number): string | undefined {
     const current = editor.current;
-    if (!current || stroke.current) return;
+    if (!current || stroke.current || options.tool === "pan") return;
     const { ctx, paint, regions } = current;
     const id = coloringRegionAt(regions, point.x, point.y);
     if (options.tool === "picker") {
@@ -202,7 +215,7 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
     ctx.fillStyle = options.color; ctx.strokeStyle = options.color;
     ctx.lineWidth = options.size; ctx.lineCap = "round"; ctx.lineJoin = "round";
     ctx.beginPath(); ctx.arc(point.x, point.y, options.size / 2, 0, Math.PI * 2); ctx.fill();
-    stroke.current = { pointerId, before, last: point, color: options.color, size: options.size, erase };
+    stroke.current = { pointerId, before, last: point };
     render();
   }
 
@@ -251,6 +264,7 @@ export function useColoringCanvas(memberId: string, scene: { id: ColoringSceneId
   }
 
   return { canvasRef, ready, error, saveWarning, status, history, coverage, dab, move, endStroke, travel, clear, download,
+    artwork,
     retry: () => setReload((n) => n + 1),
     marks: () => editor.current?.marks ?? 0,
   };

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import sharp from "sharp";
-import { coloringCoverage, coloringRegionAt, coloringStorageKey, COLORING_SCENES, createColoringRegions, fillColoringRegion, hexToRgb, type ColoringPixels } from "../lib/coloring";
+import { coloringCoverage, coloringPreferences, coloringRegionAt, coloringStorageKey, COLORING_SCENES, createColoringRegions, fillColoringRegion, hexToRgb, type ColoringPixels } from "../lib/coloring";
 import { DEFAULT_GAME_SETTINGS, gameByKey } from "../lib/games";
 
 function paper(width = 40, height = 30): ColoringPixels {
@@ -55,7 +55,7 @@ test("antialiased dark boundaries, image edges, and invalid fill points stay saf
   }
   const regions = createColoringRegions(original);
   assert.notEqual(coloringRegionAt(regions, 19, 10), coloringRegionAt(regions, 21, 10));
-  for (const [x, y] of [[-1, 0], [40, 0], [0, 30], [0, -1], [20, 10]]) assert.equal(coloringRegionAt(regions, x, y), -1);
+  for (const [x, y] of [[-1, 0], [40, 0], [0, 30], [0, -1], [20, 10], [NaN, 1], [1, Infinity]]) assert.equal(coloringRegionAt(regions, x, y), -1);
   const pixels = paint();
   assert.equal(fillColoringRegion(pixels, regions, -1, [0, 0, 0]), false);
   assert.equal(fillColoringRegion(pixels, regions, 9999, [0, 0, 0]), false);
@@ -68,6 +68,16 @@ test("saved pictures are separated by child and scene", () => {
   assert.notEqual(a, coloringStorageKey("child-2", "treasure-jungle"));
   assert.notEqual(a, coloringStorageKey("child-1", "jungle-friends"));
   assert.notEqual(coloringStorageKey("a:b", "jungle-friends"), coloringStorageKey("a%3Ab", "jungle-friends"));
+});
+
+test("remembered art supplies tolerate old or broken data and keep a small, unique color history", () => {
+  const defaults = { color: "#58a17b", recentColors: [], size: 28, pattern: "dots", stayInLines: true };
+  for (const invalid of [null, undefined, "wrong", 42, [], { color: "red", size: NaN, pattern: "unknown", stayInLines: "false", recentColors: "bad" }]) assert.deepEqual(coloringPreferences(invalid), defaults);
+  assert.deepEqual(coloringPreferences({ color: "#AABBCC", recentColors: ["#ABCDEF", "#abcdef", null, "red", "#112233", "#445566", "#778899", "#000000"], size: 47, pattern: "stars", stayInLines: false }), {
+    color: "#aabbcc", recentColors: ["#abcdef", "#112233", "#445566", "#778899"], size: 48, pattern: "stars", stayInLines: false,
+  });
+  assert.equal(coloringPreferences({ size: -99 }).size, 6);
+  assert.equal(coloringPreferences({ size: 9999 }).size, 80);
 });
 
 test("all supplied jungle drawings contain usable, enclosed coloring regions", async () => {

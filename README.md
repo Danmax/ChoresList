@@ -47,11 +47,18 @@ npm run db:deploy
 Open Coloring Adventures from a child's Games screen to color three jungle
 landscapes with a bucket, brush, dots/stripes/stars, eraser, and color picker.
 The brush stays inside its starting shape by default; turn off “Stay inside
-the lines” for free drawing. Zoom to reach small details on a touch screen.
-Undo/redo keeps the last 12 changes, and Start over can also be undone.
+the lines” for free drawing. Zoom to reach small details, use Move to drag the
+picture with a mouse or finger, and Fit picture to see the whole scene again.
+A quick color strip stays beside the canvas on phones. The brush cursor shows
+the actual stroke size, and the color picker returns to your previous painting
+tool. Undo/redo keeps the last 12 changes, and Start over can also be undone.
 
 Pictures save automatically per child and scene in this browser's local
-storage. They stay on this device; use Download picture for a PNG copy.
+storage. Scene cards show colored previews, and recent colors, custom colors,
+brush size, pattern choice, and the outline setting are remembered per child.
+Finish picture opens a preview with download and keep-coloring options before
+returning to Games. A failed completion request keeps the artwork open for retry.
+Pictures stay on this device; use Download picture for a PNG copy.
 Parents can configure access and optional completion rewards under Parent →
 Games. The game uses the existing game settings and session models, so it
 needs no new database migration.
