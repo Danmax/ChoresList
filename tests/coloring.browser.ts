@@ -275,6 +275,38 @@ async function main() {
     const titledDownload = page.waitForEvent("download"); await page.getByRole("button", { name: "Download picture", exact: true }).click();
     assert.equal((await titledDownload).suggestedFilename(), "rainbow-jungle.png");
 
+    // The expanded workspace must work even when native fullscreen is unavailable.
+    await page.evaluate("Object.defineProperty(Element.prototype, 'requestFullscreen', { configurable: true, value: function () { return Promise.reject(new Error('Unavailable')); } })");
+    for (const dimensions of [{ width: 390, height: 844 }, { width: 1024, height: 768 }]) {
+      await page.setViewportSize(dimensions);
+      const before = await snapshot();
+      await page.getByRole("button", { name: "Enter full screen", exact: true }).click();
+      const studio = page.getByRole("region", { name: "Coloring Adventures", exact: true });
+      await expect(studio).toHaveAttribute("data-fullscreen", "true");
+      const bounds = (await studio.boundingBox())!;
+      assert.equal(Math.round(bounds.width), dimensions.width); assert.equal(Math.round(bounds.height), dimensions.height);
+      assert.equal(await snapshot(), before, "fullscreen preserves artwork");
+      await page.getByRole("button", { name: "Edit supplies", exact: true }).click();
+      await expect(page.getByLabel("Dock picture title", { exact: true })).toBeVisible();
+      await expect(page.getByLabel("Style Text words", { exact: true })).toBeVisible();
+      await page.getByRole("button", { name: "Close editing dock", exact: true }).click();
+      await page.screenshot({ path: `${screenshotDir}/fullscreen-${dimensions.width}.png`, fullPage: false });
+      await page.getByRole("button", { name: "Exit full screen", exact: true }).click();
+      await expect(studio).toHaveAttribute("data-fullscreen", "false");
+      assert.equal(await snapshot(), before);
+    }
+    await page.getByRole("button", { name: "Enter full screen", exact: true }).click();
+    await page.getByRole("button", { name: "Edit supplies", exact: true }).click();
+    await page.getByLabel("Dock scene", { exact: true }).selectOption("jungle-river");
+    await expect(canvas()).toHaveAttribute("aria-label", "Jungle River Adventure coloring canvas");
+    const river = await fixture(3);
+    await page.getByRole("button", { name: "Bucket", exact: true }).click(); await at(river.seed);
+    const riverPainted = await snapshot();
+    await canvas().press("Escape");
+    await expect(page.getByRole("button", { name: "Enter full screen", exact: true })).toBeVisible();
+    await open(); await expect(canvas()).toHaveAttribute("aria-label", "Jungle River Adventure coloring canvas");
+    assert.equal(await snapshot(), riverPainted, "new scene progress survives fullscreen exit and reload");
+
     // Storage failure must never prevent drawing or silently claim a save.
     await page.evaluate(() => { Storage.prototype.setItem = () => { throw new DOMException("Full", "QuotaExceededError"); }; });
     await page.getByRole("button", { name: "Poppy", exact: true }).click();

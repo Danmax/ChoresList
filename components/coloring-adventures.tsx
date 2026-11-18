@@ -1,7 +1,7 @@
 "use client";
 
 import { type CSSProperties, type KeyboardEvent, type PointerEvent, useEffect, useId, useRef, useState } from "react";
-import { ArrowLeft, Check, CheckCircle2, ChevronRight, Download, Eraser, Eye, Hand, Leaf, LoaderCircle, PaintBucket, Paintbrush, Palette, Pipette, Redo2, RotateCcw, Scan, Sparkles, Star, Undo2, X, ZoomIn } from "lucide-react";
+import { ArrowLeft, Check, CheckCircle2, ChevronRight, Download, Eraser, Eye, Maximize, Minimize, SlidersHorizontal, Hand, Leaf, LoaderCircle, PaintBucket, Paintbrush, Palette, Pipette, Redo2, RotateCcw, Scan, Sparkles, Star, Undo2, X, ZoomIn } from "lucide-react";
 import { COLORING_COLORS, COLORING_SCENES, COLORING_THEMES, type ColoringBrush, coloringPreferences, coloringStorageKey, type ColoringPattern, type ColoringSceneId, type ColoringTool } from "@/lib/coloring";
 import { useColoringCanvas } from "./use-coloring-canvas";
 import styles from "./coloring-adventures.module.css";
@@ -44,6 +44,11 @@ export function ColoringAdventures({ memberId, playerName, onExit, onFinish }: {
   onExit: () => void;
   onFinish: (score: number, durationSeconds: number, metadata: Record<string, unknown>) => void | Promise<void>;
 }) {
+  const [fullScreen, setFullScreen] = useState(false);
+  const [dockOpen, setDockOpen] = useState(false);
+  const studioRef = useRef<HTMLElement>(null);
+  const nativeFullScreen = useRef(false);
+  const fullScreenButtonRef = useRef<HTMLButtonElement>(null);
   const [sceneId, setSceneId] = useState<ColoringSceneId>(COLORING_SCENES[0].id);
   const [tool, setTool] = useState<ColoringTool>("bucket");
   const [color, setColor] = useState<string>(COLORING_COLORS[4].hex);
@@ -90,6 +95,45 @@ export function ColoringAdventures({ memberId, playerName, onExit, onFinish }: {
     if (titleLoaded !== titleKey) return;
     try { localStorage.setItem(titleKey, pictureTitle); } catch { /* Artwork saving reports storage errors. */ }
   }, [titleKey, titleLoaded, pictureTitle]);
+  function leaveFullScreen() {
+    drawing.endStroke();
+    if (document.fullscreenElement === studioRef.current) void document.exitFullscreen().catch(() => {});
+    setFullScreen(false); setDockOpen(false);
+    fullScreenButtonRef.current?.focus({ preventScroll: true });
+  }
+  async function enterFullScreen() {
+    drawing.endStroke(); setFullScreen(true); setDockOpen(false); changeZoom(100);
+    try {
+      if (studioRef.current?.requestFullscreen) {
+        await studioRef.current.requestFullscreen(); nativeFullScreen.current = true;
+      }
+    } catch { /* The viewport-sized workspace also works without browser fullscreen. */ }
+  }
+  useEffect(() => {
+    if (!fullScreen) return;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const changed = () => {
+      if (nativeFullScreen.current && !document.fullscreenElement) {
+        nativeFullScreen.current = false; setFullScreen(false); setDockOpen(false);
+      }
+    };
+    const escape = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape" && !reviewRef.current?.open) {
+        setDockOpen(false); setFullScreen(false);
+        if (document.fullscreenElement === studioRef.current) void document.exitFullscreen().catch(() => {});
+      }
+    };
+    document.addEventListener("fullscreenchange", changed);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.body.style.overflow = overflow;
+      document.removeEventListener("fullscreenchange", changed);
+      document.removeEventListener("keydown", escape);
+      nativeFullScreen.current = false;
+      if (document.fullscreenElement === studioRef.current) void document.exitFullscreen().catch(() => {});
+    };
+  }, [fullScreen]);
   const colorName = COLORING_COLORS.find((item) => item.hex === color)?.name ?? "Custom color";
 
   useEffect(() => {
@@ -280,13 +324,14 @@ export function ColoringAdventures({ memberId, playerName, onExit, onFinish }: {
     } finally { setFinishing(false); }
   }
 
-  return <section className={styles.studio} aria-label="Coloring Adventures" aria-busy={finishing} onKeyDown={studioKeyboard}>
+  return <section ref={studioRef} className={`${styles.studio} ${fullScreen ? styles.fullScreen : ""}`} style={{ "--canvas-zoom": zoom / 100 } as CSSProperties} data-fullscreen={fullScreen} aria-label="Coloring Adventures" aria-busy={finishing} onKeyDown={studioKeyboard}>
     <header className={styles.header}>
       <div className={styles.brand}>
         <span className={styles.brandIcon}><Palette size={26} strokeWidth={1.8} /></span>
         <div><p className={styles.eyebrow}>A LITTLE COLOR, A LITTLE WONDER</p><h2>Coloring Adventures<span className={styles.titleDot}>.</span></h2></div>
       </div>
       <div className={styles.headerActions}>
+        <button ref={fullScreenButtonRef} type="button" className={styles.quietButton} aria-label="Enter full screen" disabled={finishing} onClick={() => void enterFullScreen()}><Maximize size={18} /><span>Full screen</span></button>
         <button type="button" className={styles.quietButton} disabled={finishing} onClick={() => { drawing.endStroke(); onExit(); }}><ArrowLeft size={16} /><span>Games</span></button>
         <button ref={finishButtonRef} type="button" className={styles.finishButton} disabled={!drawing.ready || drawing.coverage <= 0 || finishing} onClick={() => { drawing.endStroke(); setFinishError(""); setReviewImage(drawing.canvasRef.current?.toDataURL("image/png") ?? null); }}><CheckCircle2 size={17} /><span>Finish picture</span></button>
       </div>
@@ -300,6 +345,10 @@ export function ColoringAdventures({ memberId, playerName, onExit, onFinish }: {
         {TOOLS.map(({ id, icon: Icon, label, shortcut }) => <button key={id} type="button" className={`${styles.tool} ${tool === id ? styles.activeTool : ""}`} aria-label={label} title={`${label} (${shortcut})`} aria-keyshortcuts={shortcut} aria-pressed={tool === id} onClick={() => chooseTool(id)} disabled={finishing}>
           <Icon size={23} strokeWidth={1.7} /><span>{label}</span>
         </button>)}
+        {fullScreen && <>
+          <button type="button" className={styles.tool} aria-label="Edit supplies" title="Colors, patterns, brushes, text, and scenes" aria-expanded={dockOpen} aria-controls={`${hintId}-supplies`} onClick={() => setDockOpen(!dockOpen)}><SlidersHorizontal size={23} /><span>Edit supplies</span></button>
+          <button type="button" className={styles.tool} aria-label="Exit full screen" title="Exit full screen" onClick={leaveFullScreen}><Minimize size={23} /><span>Exit full screen</span></button>
+        </>}
         <span className={styles.toolDecoration} aria-hidden="true"><Sparkles size={23} /></span>
       </nav>
 
@@ -336,7 +385,9 @@ export function ColoringAdventures({ memberId, playerName, onExit, onFinish }: {
         {drawing.saveWarning && <p className={styles.warning} role="alert">{drawing.saveWarning}</p>}
       </div>
 
-      <aside className={styles.supplies} aria-label="Art supplies">
+      <aside id={`${hintId}-supplies`} className={`${styles.supplies} ${dockOpen ? styles.dockOpen : ""}`} aria-label="Art supplies">
+        {fullScreen && <div className={styles.dockHeader}><strong>Art supplies</strong><button type="button" aria-label="Close editing dock" onClick={() => setDockOpen(false)}><X size={20} /></button></div>}
+        {fullScreen && <><label className={styles.supplyField}>Picture title<input aria-label="Dock picture title" maxLength={80} value={pictureTitle} placeholder={scene.title} onChange={(event) => setPictureTitle(event.target.value)} /></label><label className={styles.supplyField}>Scene<select aria-label="Dock scene" value={sceneId} onChange={(event) => { selectScene(event.target.value as ColoringSceneId); setDockOpen(false); }}>{COLORING_SCENES.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label></>}
         <div className={styles.creativeSection}><label className={styles.supplyField}>Themed palette<select aria-label="Themed palette" value={theme} onChange={(event) => setTheme(event.target.value)}>{COLORING_THEMES.map((item) => <option key={item.name}>{item.name}</option>)}</select></label><div className={styles.themeColors}>{COLORING_THEMES.find((item) => item.name === theme)!.colors.map((hex) => <button key={hex} type="button" aria-label={`${theme} ${hex}`} title={hex} style={{ background: hex }} onClick={() => chooseColor(hex)} aria-pressed={color === hex} />)}</div></div>
         <div className={styles.paletteHeading}><div><p className={styles.sectionLabel}>MAKE IT YOURS</p><h3>Your colors</h3></div><Palette size={19} /></div>
         <div className={styles.palette} role="group" aria-label="Color palette">{COLORING_COLORS.map((item) => <button key={item.name} type="button" aria-label={item.name} aria-pressed={color === item.hex} title={item.name} className={styles.swatch} style={{ "--paint": item.hex } as CSSProperties} onClick={() => chooseColor(item.hex)}>{color === item.hex && <Check size={18} strokeWidth={3} style={{ color: item.hex === "#ffffff" || item.name === "Sunshine" ? "#454e43" : "white" }} />}</button>)}</div>
@@ -348,14 +399,14 @@ export function ColoringAdventures({ memberId, playerName, onExit, onFinish }: {
         <label className={styles.supplyField}>Brush style<select aria-label="Brush style" value={brush} onChange={(event) => { setBrush(event.target.value as ColoringBrush); chooseTool("brush"); }}><option value="round">Round brush</option><option value="marker">Soft marker</option><option value="pencil">Sketch pencil</option><option value="ribbon">Ribbon brush</option></select></label>
         <div className={styles.brushSection}><label className={styles.supplyLabel} htmlFor={`${hintId}-size`}><span>Brush size</span><span className={styles.sizeValue} aria-hidden="true">{size}px</span></label><div className={styles.sizeControl}><span className={styles.smallBrush} /><input id={`${hintId}-size`} type="range" aria-label="Brush size" aria-valuetext={`${size} pixels`} min={6} max={80} step={2} value={size} onChange={(event) => setSize(Number(event.target.value))} /><span className={styles.largeBrush} /></div><label className={styles.stayInLines}><input type="checkbox" checked={stayInLines} onChange={(event) => setStayInLines(event.target.checked)} /><span>Stay inside the lines</span></label></div>
 
-        <div className={styles.creativeSection}><h3 className={styles.supplyLabel}>Style Text</h3><label className={styles.supplyField}>Your words<input aria-label="Style Text words" value={text} maxLength={80} placeholder="My jungle adventure!" onChange={(event) => setText(event.target.value)} /></label><label className={styles.supplyField}>Lettering<select aria-label="Text font" value={textFont} onChange={(event) => setTextFont(event.target.value)}><option value="sans-serif">Playful bold</option><option value="serif">Storybook</option><option value="cursive">Handwritten</option><option value="monospace">Typewriter</option></select></label><label className={styles.supplyField}>Text effect<select aria-label="Text effect" value={textStyle} onChange={(event) => setTextStyle(event.target.value)}><option value="outline">White outline</option><option value="shadow">Drop shadow</option><option value="plain">Plain color</option></select></label><label className={styles.supplyField}>Text size<input aria-label="Text size" type="range" min={20} max={120} step={4} value={textSize} onChange={(event) => setTextSize(Number(event.target.value))} /></label><button type="button" className={styles.downloadButton} disabled={!text.trim() || !drawing.ready} aria-pressed={placingText} onClick={() => { drawing.endStroke(); setPlacingText(!placingText); }}>{placingText ? "Cancel text placement" : "Place text on picture"}</button><p className={styles.localNote}>Uses your selected color. Tap to place; Undo to remove.</p></div>
+        <div className={styles.creativeSection}><h3 className={styles.supplyLabel}>Style Text</h3><label className={styles.supplyField}>Your words<input aria-label="Style Text words" value={text} maxLength={80} placeholder="My jungle adventure!" onChange={(event) => setText(event.target.value)} /></label><label className={styles.supplyField}>Lettering<select aria-label="Text font" value={textFont} onChange={(event) => setTextFont(event.target.value)}><option value="sans-serif">Playful bold</option><option value="serif">Storybook</option><option value="cursive">Handwritten</option><option value="monospace">Typewriter</option></select></label><label className={styles.supplyField}>Text effect<select aria-label="Text effect" value={textStyle} onChange={(event) => setTextStyle(event.target.value)}><option value="outline">White outline</option><option value="shadow">Drop shadow</option><option value="plain">Plain color</option></select></label><label className={styles.supplyField}>Text size<input aria-label="Text size" type="range" min={20} max={120} step={4} value={textSize} onChange={(event) => setTextSize(Number(event.target.value))} /></label><button type="button" className={styles.downloadButton} disabled={!text.trim() || !drawing.ready} aria-pressed={placingText} onClick={() => { drawing.endStroke(); setPlacingText(!placingText); if (fullScreen) setDockOpen(false); }}>{placingText ? "Cancel text placement" : "Place text on picture"}</button><p className={styles.localNote}>Uses your selected color. Tap to place; Undo to remove.</p></div>
         <div className={styles.littleNote}><Star size={18} /><p>A purple monkey?<br />A rainbow river?<br /><strong>You&apos;re the artist.</strong></p></div>
         <button type="button" className={styles.downloadButton} disabled={!drawing.ready || finishing} onClick={() => drawing.download(displayTitle)}><Download size={17} />Download picture</button>
         <p className={styles.localNote}>Progress saves on this device.</p>
       </aside>
     </div>
 
-    <div className={styles.sceneHeading}><div><span className={styles.eyebrow}>THE JUNGLE COLLECTION</span><h3>Where will your colors go?</h3></div><span className={styles.sceneCount}>3 places to imagine <Leaf size={14} /></span></div>
+    <div className={styles.sceneHeading}><div><span className={styles.eyebrow}>THE JUNGLE COLLECTION</span><h3>Where will your colors go?</h3></div><span className={styles.sceneCount}>{COLORING_SCENES.length} places to imagine <Leaf size={14} /></span></div>
     <div className={styles.scenes} role="group" aria-label="Choose a coloring scene">{COLORING_SCENES.map((item, index) => <button key={item.id} type="button" className={`${styles.sceneCard} ${item.id === sceneId ? styles.activeScene : ""}`} aria-label={item.title} aria-pressed={item.id === sceneId} onClick={() => selectScene(item.id)} disabled={finishing}>
       <div className={styles.sceneImage} data-painted={!!gallery[item.id]}><img src={gallery[item.id] || item.image} alt={gallery[item.id] ? `Your colored ${item.title} picture` : ""} loading="lazy" /><span className={styles.sceneNumber}>0{index + 1}</span>{item.id === sceneId && <span className={styles.sceneCheck}><Check size={15} /></span>}</div><div className={styles.sceneText}><strong>{item.title}</strong><span>{item.subtitle}</span><small className={styles.sceneProgress}>{gallery[item.id] ? <><span /> Continue coloring</> : "A fresh adventure"}</small></div>
     </button>)}</div>

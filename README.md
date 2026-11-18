@@ -44,7 +44,7 @@ npm run db:deploy
 
 ## Coloring Adventures
 
-Open Coloring Adventures from a child's Games screen to color three jungle
+Open Coloring Adventures from a child's Games screen to color four jungle
 landscapes with a bucket, brush, dots/stripes/stars, eraser, and color picker.
 The brush stays inside its starting shape by default; turn off “Stay inside
 the lines” for free drawing. Zoom to reach small details, use Move to drag the
@@ -56,7 +56,10 @@ Style Text lets you enter words, choose lettering and an effect, then tap the
 picture to place the text. Text becomes part of the artwork: Undo removes it,
 and saved pictures and PNG downloads include it. The brush cursor shows
 the actual stroke size, and the color picker returns to your previous painting
-tool. Undo/redo keeps the last 12 changes, and Start over can also be undone.
+tool. Full screen expands the canvas on phones and tablets with an icon dock on the
+left. Edit supplies opens colors, brushes, patterns, styled text, titles, and scene
+selection. Exit full screen (or Escape) returns to the regular layout.
+Undo/redo keeps the last 12 changes, and Start over can also be undone.
 
 Pictures save automatically per child and scene in this browser's local
 storage. Scene cards show colored previews, and recent colors, custom colors,

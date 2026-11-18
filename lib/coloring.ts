@@ -2,6 +2,7 @@ export const COLORING_SCENES = [
   { id: "treasure-jungle", title: "Treasure Jungle", subtitle: "A little adventure. A lot of gold.", image: "/games/coloring/treasure-jungle.png" },
   { id: "crocodile-creek", title: "Crocodile Creek", subtitle: "Make a splash with your favorite colors.", image: "/games/coloring/crocodile-creek.png" },
   { id: "jungle-friends", title: "Jungle Friends", subtitle: "A whole jungle of happy little friends.", image: "/games/coloring/jungle-friends.png" },
+  { id: "jungle-river", title: "Jungle River Adventure", subtitle: "A wild river, a brave explorer, and a splash of color.", image: "/games/coloring/jungle-river.png" },
 ] as const;
 
 export type ColoringSceneId = typeof COLORING_SCENES[number]["id"];
