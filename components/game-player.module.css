@@ -1,0 +1,14 @@
+.player { min-width: 0; scroll-margin-top: 12px; }
+.toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 12px; background: #fffdf6; color: #344a2e; border-radius: 16px 16px 0 0; font-size: 12px; font-weight: 800; }
+.toolbar > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.toolbar button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; flex-shrink: 0; min-height: 44px; padding: 6px 12px; border: 1px solid #d6ddcc; border-radius: 10px; background: #f1f5e9; touch-action: manipulation; }
+.toolbar button:focus-visible { outline: 3px solid #266cc5; outline-offset: 2px; }
+.content { min-width: 0; }
+.expanded { position: fixed; inset: 0; z-index: 80; width: 100%; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; background: #f5f7ee; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+.expanded .toolbar { flex-shrink: 0; border-radius: 0; border-bottom: 1px solid #dce3d2; }
+.expanded .content { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 8px; }
+.expanded[data-game-player="sunny-farm"] .content { display: flex; overflow: hidden; padding: 0; }
+.expanded .content [data-memory-board] { max-width: min(32rem, max(208px, calc(100dvh - 230px))); }
+@media (pointer: coarse), (max-width: 1024px) {
+  .content button:not([data-farm-target]):not([data-farm-basket]), .content select, .content summary { min-height: 44px; }
+}

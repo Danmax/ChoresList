@@ -117,15 +117,15 @@ export function BlockDrop({ onExit, onFinish }: {
   }
 
   return (
-    <section className="mx-auto max-w-3xl overflow-hidden rounded-3xl border border-slate-700 bg-slate-950 p-4 text-white shadow-xl sm:p-6">
-      <div className="mb-5 flex items-center justify-between gap-3">
+    <section data-columns={isColumns} className={`${styles.game} mx-auto max-w-3xl overflow-hidden rounded-3xl border border-slate-700 bg-slate-950 p-4 text-white shadow-xl sm:p-6`}>
+      <div className={`${styles.header} mb-5 flex items-center justify-between gap-3`}>
         <div>
           <p className="mb-1 text-xs font-black uppercase tracking-[0.2em] text-cyan-300">{isColumns ? "Cycle · Match · Cascade" : "Stack · Rotate · Clear"}</p>
           <h2 className="flex items-center gap-2 text-2xl font-black"><Blocks className="text-cyan-300" /> Block Drop</h2>
         </div>
         <button type="button" onClick={onExit} disabled={saving} className={CONTROL}>Exit</button>
       </div>
-      {!game && <div className="mb-5 space-y-3">
+      {!game && <div className={`${styles.setup} mb-5 space-y-3`}>
         <div role="group" aria-label="Game mode" className="grid grid-cols-2 gap-2">
           <button type="button" aria-pressed={!isColumns} onClick={() => setMode("blocks")} className={`${CONTROL} ${!isColumns ? "border-cyan-300 bg-cyan-300/20" : ""}`}>Classic blocks</button>
           <button type="button" aria-pressed={isColumns} onClick={() => setMode("columns")} className={`${CONTROL} ${isColumns ? "border-cyan-300 bg-cyan-300/20" : ""}`}>Gem &amp; Fruit Columns</button>
@@ -135,7 +135,7 @@ export function BlockDrop({ onExit, onFinish }: {
           <button type="button" aria-pressed={theme === "fruits"} onClick={() => setTheme("fruits")} className={`${CONTROL} flex-1 ${theme === "fruits" ? "border-cyan-300 bg-cyan-300/20" : ""}`}>🍒 Fruits</button>
         </div>}
       </div>}
-      <div className="grid grid-cols-[minmax(0,1fr)_6rem] gap-3 sm:grid-cols-[minmax(0,1fr)_10rem] sm:gap-5">
+      <div className={`${styles.playfield} grid grid-cols-[minmax(0,1fr)_6rem] gap-3 sm:grid-cols-[minmax(0,1fr)_10rem] sm:gap-5`}>
         <div>
           <div
             ref={boardRef}
@@ -159,7 +159,7 @@ export function BlockDrop({ onExit, onFinish }: {
               if (event.repeat && (action === "drop" || action === "rotate")) return;
               act(action);
             }}
-            className={`relative mx-auto w-full max-w-[300px] overflow-hidden rounded-xl border-2 border-slate-600 bg-slate-900 p-1 outline-none focus-visible:border-cyan-300 ${tetris ? styles.tetrisBoard : ""} ${paused ? styles.paused : ""}`}
+            className={`${styles.board} relative mx-auto w-full max-w-[300px] overflow-hidden rounded-xl border-2 border-slate-600 bg-slate-900 p-1 outline-none focus-visible:border-cyan-300 ${tetris ? styles.tetrisBoard : ""} ${paused ? styles.paused : ""}`}
           >
             <div aria-hidden="true" className={`grid gap-px ${isColumns ? "grid-cols-6" : "grid-cols-10"}`}>
               {display.flatMap((row, y) => row.map((cell, x) => (
@@ -194,7 +194,7 @@ export function BlockDrop({ onExit, onFinish }: {
       </div>
       {!isColumns && <p role="status" aria-atomic="true" className="sr-only">{clearingRows.size ? (tetris ? "Tetris! Four lines cleared!" : `${clearingRows.size} ${clearingRows.size === 1 ? "line" : "lines"} cleared!`) : ""}</p>}
       {isColumns && <p role="status" className="mt-3 text-center text-sm font-black text-amber-200">{columns?.chain ? `${columns.chain}× chain · Best ${columns.bestChain}×` : "Match 3 or more. Set up a chain!"}</p>}
-      <div className="mx-auto mt-4 grid max-w-md grid-cols-4 gap-2">
+      <div className={`${styles.controls} mx-auto mt-4 grid max-w-md grid-cols-4 gap-2`}>
         <button type="button" aria-label="Move left" disabled={!running || clearing} onClick={() => act("left")} className={CONTROL}><ArrowLeft size={22} /></button>
         <button type="button" aria-label={isColumns ? "Cycle symbols" : "Rotate block"} disabled={!running || clearing} onClick={() => act("rotate")} className={CONTROL}><RotateCw size={22} />{isColumns && <span className="sr-only">Cycle</span>}</button>
         <button type="button" aria-label="Move right" disabled={!running || clearing} onClick={() => act("right")} className={CONTROL}><ArrowRight size={22} /></button>
@@ -202,8 +202,8 @@ export function BlockDrop({ onExit, onFinish }: {
         <button type="button" disabled={!running || clearing} onClick={() => act("drop")} className={`${CONTROL} col-span-2`}><ChevronsDown size={20} />Drop</button>
         <button type="button" disabled={!game || finished} onClick={() => { setPaused((value) => !value); boardRef.current?.focus(); }} className={`${CONTROL} col-span-2`}>{paused ? <Play size={18} /> : <Pause size={18} />}{paused ? "Resume" : "Pause"}</button>
       </div>
-      <p id="block-drop-instructions" className="mx-auto mt-4 max-w-md text-center text-xs leading-5 text-slate-400">Tap the buttons, or focus the board to use ← → to move, ↑ to {isColumns ? "cycle symbols" : "rotate"}, ↓ to fall faster, and Space to drop. P or Esc pauses. {isColumns ? "Match 3+ in any direction. Clear 30 symbols to level up!" : "Clear 10 lines to level up!"}</p>
-      {game && !finished && <div className="mt-4 text-center"><button type="button" disabled={game.pieces === 0 || clearing} onClick={() => setEnded(true)} className="min-h-11 rounded-xl px-4 text-sm font-bold text-slate-300 underline decoration-slate-600 underline-offset-4 disabled:opacity-40">Finish &amp; save</button></div>}
+      <p id="block-drop-instructions" className={`${styles.instructions} mx-auto mt-4 max-w-md text-center text-xs leading-5 text-slate-400`}>Tap the buttons, or focus the board to use ← → to move, ↑ to {isColumns ? "cycle symbols" : "rotate"}, ↓ to fall faster, and Space to drop. P or Esc pauses. {isColumns ? "Match 3+ in any direction. Clear 30 symbols to level up!" : "Clear 10 lines to level up!"}</p>
+      {game && !finished && <div className={`${styles.finish} mt-4 text-center`}><button type="button" disabled={game.pieces === 0 || clearing} onClick={() => setEnded(true)} className="min-h-11 rounded-xl px-4 text-sm font-bold text-slate-300 underline decoration-slate-600 underline-offset-4 disabled:opacity-40">Finish &amp; save</button></div>}
     </section>
   );
 }

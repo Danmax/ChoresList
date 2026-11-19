@@ -4,6 +4,10 @@ Open a child's Games screen and choose **Sunny Farm Helpers**. Parent → Games 
 
 ## Play
 
+Games open in a viewport-sized player on phones and tablets. **Full screen** also works on desktop, with a browser fullscreen request when supported and an in-page fallback otherwise. **Exit full screen** or Escape restores the page without restarting the game. The farm map, activity scene, tools, crop choices, and scene navigation fit the available height in portrait and landscape. **Your farm basket & breakfast trail** opens the inventory and breakfast shortcuts above the scene; close it to resume play. Scene headings receive keyboard focus without moving the page.
+
+Run `npm run test:games:responsive` against a local server on port 3017 (or set `GAMES_TEST_URL`) to check all 13 games at phone and tablet sizes, farm scene transitions and completion controls, Block Drop controls, and fullscreen state preservation.
+
 Eight farm stops form one player-paced farm day. Feed the horse and cow directly with a tap; barn hay is always available. Gather field hay to stock your basket too. Feed/brush the horse, feed/milk the cow, feed chickens/collect three eggs, guide/shear sheep, feed ducks, pick apples, and plant/water/harvest carrots, tomatoes, and corn. Each step saves to the child's server-side `FarmProgress`; inventory and completed stops survive navigation and devices. No timer, decay, or missed-day penalty. The optional narration toggle uses the browser's speech synthesis when available; all instructions remain visible.
 
 Once all eight stops are complete, celebrate on the map. This records one game session and awards the parent's configured points or tickets once. Starting another farm day resets task inventory while retaining completed-day count. Farm days are play rounds, not calendar dates. Existing daily play limits count completed rounds using the app's shared game-day convention.

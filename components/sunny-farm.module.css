@@ -40,3 +40,108 @@
 @media(prefers-reduced-motion:reduce){.toyPlaying{animation:none}}
 
 .cropPicker{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:0 18px 14px;padding:12px 16px;border:1px solid #dfd0a9;border-radius:16px;background:#f3ead3;font-size:12px}.cropPicker strong,.cropPicker>span{flex-basis:100%}.cropPicker button{min-height:44px;padding:8px 14px;border:2px solid #d3c59d;border-radius:12px;background:#fffbed;cursor:pointer;font-weight:700}.cropPicker button[aria-pressed=true]{border-color:#577c37;background:#e1edc8}.cropPicker button:disabled{opacity:.6;cursor:wait}.cropPicker>span{color:#65724e}@media(max-width:640px){.cropPicker{margin:0 9px 10px;padding:10px;gap:7px}.cropPicker button{flex:1;padding:8px}}
+
+/* Keep the play area stable as scenes and tool instructions change. */
+.farmInfo { position: relative; z-index: 25; background: #fff8e7; border-bottom: 1px solid #e7dfc4; }
+.farmInfo summary { min-height: 44px; padding: 12px 18px; cursor: pointer; font-size: 12px; }
+:global([data-game-expanded="true"]) .farm { display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 0; max-width: none; border: 0; border-radius: 0; }
+:global([data-game-expanded="true"]) .farm > * { flex-shrink: 0; }
+:global([data-game-expanded="true"]) .header { padding: 6px 12px; gap: 8px; }
+:global([data-game-expanded="true"]) .brand { display: none; }
+:global([data-game-expanded="true"]) .header .audioSettings { margin-left: auto; }
+:global([data-game-expanded="true"]) .daybar { padding: 4px 12px; min-height: 28px; }
+:global([data-game-expanded="true"]) .farmInfo .infoContent { position: absolute; top: 100%; left: 0; right: 0; max-height: 55dvh; overflow: auto; background: #fffaf0; box-shadow: 0 8px 20px #344a2e33; }
+:global([data-game-expanded="true"]) .mapHeading,
+:global([data-game-expanded="true"]) .activityHeader { padding: 6px 12px; gap: 10px; min-height: 52px; }
+:global([data-game-expanded="true"]) .mapHeading .eyebrow,
+:global([data-game-expanded="true"]) .activityHeader .eyebrow { display: none; }
+:global([data-game-expanded="true"]) .mapHeading h3,
+:global([data-game-expanded="true"]) .activityHeader h3 { font-size: 20px; margin: 0; }
+:global([data-game-expanded="true"]) .map { flex: 1; min-height: 0; aspect-ratio: auto; margin: 0 8px; }
+:global([data-game-expanded="true"]) .mapStops { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 10px; }
+:global([data-game-expanded="true"]) .mapStop { position: static; transform: none; width: 100%; min-height: 44px; min-width: 0; justify-content: center; }
+:global([data-game-expanded="true"]) .stopArt { flex: 0 1 auto; height: clamp(28px, 9dvh, 110px); min-height: 0; max-height: 110px; width: 100%; }
+:global([data-game-expanded="true"]) .stopLabel { font-size: 11px; padding: 5px 7px; }
+:global([data-game-expanded="true"]) .stopVerb { font-size: 9px; }
+:global([data-game-expanded="true"]) .map .sceneToy { top: 24px !important; }
+:global([data-game-expanded="true"]) .map .sceneToy:first-child { left: calc(100% - 24px) !important; }
+:global([data-game-expanded="true"]) .map .sceneToy:last-child { left: 24px !important; }
+:global([data-game-expanded="true"]) .mapFooter,
+:global([data-game-expanded="true"]) .activityFooter { padding: 7px 12px; gap: 8px; }
+:global([data-game-expanded="true"]) .mapFooter > span,
+:global([data-game-expanded="true"]) .exploreHint,
+:global([data-game-expanded="true"]) .instructions { display: none; }
+:global([data-game-expanded="true"]) .status { min-height: 30px; padding: 6px 12px; }
+:global([data-game-expanded="true"]) .error { margin: 0 8px 6px; padding: 6px; }
+:global([data-game-expanded="true"]) .workbench { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+:global([data-game-expanded="true"]) .workbench > div:not(.toolTray):not(.carriedTool) { display: flex; flex: 1; min-height: 0; }
+:global([data-game-expanded="true"]) .activityScene { width: 100%; flex: 1; min-height: 0 !important; aspect-ratio: auto; margin: 0 8px; }
+:global([data-game-expanded="true"]) .toolTray { flex-shrink: 0; min-height: 62px; margin: 0 8px 6px; padding: 6px 10px; gap: 10px; align-items: center; }
+:global([data-game-expanded="true"]) .toolTray small { display: none; }
+:global([data-game-expanded="true"]) .toolTray p { font-size: 11px; margin: 2px 0; }
+:global([data-game-expanded="true"]) .pickupTool { min-height: 48px; min-width: 110px; flex-direction: row; padding: 3px 8px; }
+:global([data-game-expanded="true"]) .pickupTool svg { width: 42px; height: 36px; }
+:global([data-game-expanded="true"]) .pickupTool > span:first-child { font-size: 28px; }
+:global([data-game-expanded="true"]) .foodSource { height: 48px; min-height: 44px; }
+:global([data-game-expanded="true"]) .simpleHint { gap: 10px; }
+:global([data-game-expanded="true"]) .cropPicker { flex-wrap: nowrap; margin: 0 8px 6px; padding: 4px 8px; gap: 6px; }
+:global([data-game-expanded="true"]) .cropPicker strong,
+:global([data-game-expanded="true"]) .cropPicker > span { display: none; }
+:global([data-game-expanded="true"]) .cropPicker button { flex: 1; padding: 5px; }
+:global([data-game-expanded="true"]) .celebration { flex: 1; min-height: 0; padding: 12px; gap: 8px; overflow: auto; }
+@media (max-width: 600px) and (orientation: portrait) {
+  :global([data-game-expanded="true"]) .mapStops { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(4, minmax(0, 1fr)); gap: 4px 10px; padding: 8px; }
+  :global([data-game-expanded="true"]) .stopArt { max-height: 65px; }
+  :global([data-game-expanded="true"]) .header { flex-wrap: wrap; }
+  :global([data-game-expanded="true"]) .audioSettings { margin-left: 0; }
+  :global([data-game-expanded="true"]) .stopVerb { display: none; }
+  :global([data-game-expanded="true"]) .activityFooter .stepTrack { display: none; }
+}
+@media (max-height: 600px) and (orientation: landscape) {
+  :global([data-game-expanded="true"]) .farm { display: grid; grid-template-columns: 260px minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; gap: 4px 0; }
+  :global([data-game-expanded="true"]) .header { grid-column: 1; grid-row: 1; flex-wrap: nowrap; padding: 4px 8px; }
+  :global([data-game-expanded="true"]) .header .smallButton { padding: 6px; font-size: 10px; min-width: 44px; }
+  :global([data-game-expanded="true"]) .audioSettings summary { padding: 8px; font-size: 10px; }
+  :global([data-game-expanded="true"]) .daybar { display: none; }
+  :global([data-game-expanded="true"]) .farmInfo { grid-column: 1; grid-row: 3; }
+  :global([data-game-expanded="true"]) .farmInfo .infoContent { top: auto; bottom: 100%; width: min(400px, 90vw); max-height: 60dvh; }
+  :global([data-game-expanded="true"]) .mapHeading,
+  :global([data-game-expanded="true"]) .activityHeader { grid-column: 2; grid-row: 1; align-self: start; }
+  :global([data-game-expanded="true"]) .map { grid-column: 2; grid-row: 2; height: 100%; }
+  :global([data-game-expanded="true"]) .mapFooter,
+  :global([data-game-expanded="true"]) .activityFooter { grid-column: 2; grid-row: 3; }
+  :global([data-game-expanded="true"]) .status { grid-column: 1; grid-row: 2; align-self: end; }
+  :global([data-game-expanded="true"]) .error { grid-column: 2; grid-row: 2; align-self: start; z-index: 30; }
+  :global([data-game-expanded="true"]) .workbench { grid-column: 2; grid-row: 2; }
+  :global([data-game-expanded="true"]) .toolTray { min-height: 44px; padding: 3px 6px; }
+  :global([data-game-expanded="true"]) .toolTray strong { font-size: 10px; }
+  :global([data-game-expanded="true"]) .toolTray p { font-size: 10px; }
+  :global([data-game-expanded="true"]) .cropPicker { grid-column: 1; grid-row: 2; flex-wrap: wrap; align-self: start; }
+  :global([data-game-expanded="true"]) .cropPicker button { flex-basis: 100%; }
+  :global([data-game-expanded="true"]) .celebration { grid-column: 2; grid-row: 1 / -1; }
+  :global([data-game-expanded="true"]) .stopArt { max-height: 50px; }
+  :global([data-game-expanded="true"]) .stopVerb { display: none; }
+  :global([data-game-expanded="true"]) .activityFooter > span,
+  :global([data-game-expanded="true"]) .stepTrack { display: none; }
+  :global([data-game-expanded="true"]) .activityFooter button { font-size: 10px; padding: 6px 9px; }
+  :global([data-game-expanded="true"]) .collectionBasket > svg { height: 65px; }
+}
+@media (max-height: 700px) and (orientation: portrait) {
+  :global([data-game-expanded="true"]) .farm { position: relative; }
+  :global([data-game-expanded="true"]) .daybar { display: none; }
+  :global([data-game-expanded="true"]) .header { padding-right: 64px; }
+  :global([data-game-expanded="true"]) .audioSettings summary { font-size: 0; list-style: none; min-width: 44px; padding: 8px; text-align: center; }
+  :global([data-game-expanded="true"]) .audioSettings summary::after { content: "⚙"; font-size: 20px; }
+  :global([data-game-expanded="true"]) .farmInfo { position: absolute; top: 6px; right: 12px; border: 0; background: none; }
+  :global([data-game-expanded="true"]) .farmInfo summary { font-size: 0; list-style: none; width: 44px; padding: 8px; border: 1px solid #dedfc9; border-radius: 10px; text-align: center; }
+  :global([data-game-expanded="true"]) .farmInfo summary::after { content: "🧺"; font-size: 20px; }
+  :global([data-game-expanded="true"]) .farmInfo .infoContent { left: auto; width: min(400px, 92vw); }
+  :global([data-game-expanded="true"]) .activityHeader { min-height: 48px; padding: 2px 12px; }
+  :global([data-game-expanded="true"]) .activityHeader h3 { font-size: 16px; }
+  :global([data-game-expanded="true"]) .activityIcon { display: none; }
+  :global([data-game-expanded="true"]) .toolTray { min-height: 56px; }
+  :global([data-game-expanded="true"]) .toolTray > div > strong,
+  :global([data-game-expanded="true"]) .simpleHint strong { display: none; }
+  :global([data-game-expanded="true"]) .toolTray p { font-size: 10px; line-height: 1.35; }
+  :global([data-game-expanded="true"]) .status { position: absolute; width: 1px; height: 1px; min-height: 0; padding: 0; overflow: hidden; clip-path: inset(50%); }
+}

@@ -12,6 +12,7 @@ import { FamilyMultiplayerGame } from "@/components/family-multiplayer-games";
 import { createTriviaRound, type TriviaLevel } from "@/lib/bible-trivia";
 import { BlockDrop } from "@/components/block-drop";
 import { SunnyFarm } from "@/components/sunny-farm";
+import { GamePlayer } from "@/components/game-player";
 import { PocketPals } from "@/components/pocket-pals";
 import { ColoringAdventures } from "@/components/coloring-adventures";
 import { PET_SPECIES } from "@/lib/pocket-pals";
@@ -208,6 +209,7 @@ export default function KidGamesPage() {
         onOpen={(gameKey) => { setReward(null); setShowJohnnyMenu(false); setActiveGame(gameKey); }}
       />
 
+      <GamePlayer gameKey={activeGame} title={games.find(game => game.key === activeGame)?.title ?? "Games"}>
       {showJohnnyMenu ? (
         <JohnnyAdventureMenu
           onBack={() => setShowJohnnyMenu(false)}
@@ -331,6 +333,7 @@ export default function KidGamesPage() {
           })}
         </section>
       )}
+      </GamePlayer>
     </div>
   );
 }
@@ -587,7 +590,7 @@ function MemoryMatch({
         </div>
         <button type="button" onClick={onExit} className="rounded-2xl bg-slate-100 px-4 py-2 text-sm font-black text-slate-600">Exit</button>
       </div>
-      <div className="mx-auto grid w-full max-w-lg grid-cols-4 gap-2 sm:gap-3">
+      <div data-memory-board className="mx-auto grid w-full max-w-lg grid-cols-4 gap-2 sm:gap-3">
         {cards.map((card, index) => {
           const visible = card.matched || picked.includes(index);
           return (

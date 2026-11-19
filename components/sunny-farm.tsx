@@ -33,6 +33,7 @@ export function SunnyFarm({ memberId, playerName, onExit }: { memberId: string; 
   const [loaded, setLoaded] = useState(false);
   const inFlight = useRef(false);
   const titleRef = useRef<HTMLHeadingElement>(null);
+  const farmInfoRef = useRef<HTMLDetailsElement>(null);
   const load = useCallback(async () => {
     try {
       const res = await fetch(`/api/sunny-farm?memberId=${encodeURIComponent(memberId)}`, { cache: "no-store" });
@@ -43,8 +44,9 @@ export function SunnyFarm({ memberId, playerName, onExit }: { memberId: string; 
     finally { setLoaded(true); }
   }, [memberId]);
   useEffect(() => { void load(); }, [load]);
-  useEffect(() => { titleRef.current?.focus(); }, [taskId]);
+  useEffect(() => { titleRef.current?.focus({ preventScroll: true }); }, [taskId]);
   function openTask(id: FarmTaskId) {
+    if (farmInfoRef.current) farmInfoRef.current.open = false;
     setReaction(null); setTaskId(id); setError(""); setMessage(taskDefinition(id)!.hint);
     audio.say(`Let’s visit the ${taskDefinition(id)!.title.toLowerCase()}.`);
   }
@@ -98,7 +100,10 @@ export function SunnyFarm({ memberId, playerName, onExit }: { memberId: string; 
     </header>
     {!loaded ? <div className={styles.loading}><LoaderCircle className="animate-spin" /> Opening your farm…</div> : !farm ? <div className={styles.loading}><p role="alert">{error}</p><button className={styles.primary} onClick={() => { setLoaded(false); void load(); }}>Try again</button></div> : <>
       <div className={styles.daybar}><span><strong>{playerName}&apos;s farm</strong> · Day {farm.round}</span><div className={styles.hearts} aria-label={`${count} of 8 farm stops complete`}>{FARM_TASKS.map(t => <Heart key={t.id} size={19} fill={taskComplete(farm, t.id) ? "#e99473" : "none"} color={taskComplete(farm, t.id) ? "#d67856" : "#c4c7ac"} />)}</div><span className={styles.saved}>{busy ? "Saving…" : "✓ Saved"}</span></div>
+      <details ref={farmInfoRef} className={styles.farmInfo}><summary>🧺 Your farm basket & breakfast trail</summary><div className={styles.infoContent}>
       {!farm.celebrated && <div className={styles.journey}><div><strong>{breakfast.every(g => g.ready) ? "Breakfast basket ready!" : "Let’s make a farm breakfast!"}</strong><span>Happy hens → eggs · happy cow → milk · orchard → apples</span></div><div className={styles.journeyGoods}>{breakfast.map(g => <button key={g.item} onClick={() => openTask(g.task)} aria-label={`Breakfast ${g.label}: ${g.amount} of ${g.goal}`}><span aria-hidden="true">{inventoryIcons[g.item]}</span> {Math.min(g.amount, g.goal)}/{g.goal} {g.label} {g.ready && "✓"}</button>)}</div></div>}
+      <div className={styles.basketBar}><span className={styles.basketTitle}>Your farm basket</span>{Object.entries({ ...farm.inventory, tomatoes: farm.inventory.tomatoes ?? 0, corn: farm.inventory.corn ?? 0 }).map(([name, amount]) => <span key={name} className={styles.inventory} aria-label={`${amount} ${name}`}><span aria-hidden="true">{inventoryIcons[name as keyof typeof inventoryIcons]}</span><strong>{amount}</strong><span>{name}</span></span>)}</div>
+      </div></details>
       {farm.celebrated ? <div className={styles.celebration} style={{ backgroundImage: "linear-gradient(#fff8e6cf,#fff8e6eb),url('/games/sunny-farm/hub.webp')" }}>
         <div className={styles.ribbon}>★ FARM HELPER ★</div><h3>Everyone is happy!</h3><p>You gathered, grew, and gave a little love.</p>
         <div className={styles.animalParade}>{(["horse", "cow", "sheep", "chicken"] as const).map(animal => <FarmSprite key={animal} animal={animal} pose={celebrating ? 5 : 0} />)}</div>
@@ -134,7 +139,6 @@ export function SunnyFarm({ memberId, playerName, onExit }: { memberId: string; 
         </div>
         <div className={styles.mapFooter}><span>Explore freely, or follow the farm trail.</span>{nextStop && <button className={styles.primary} onClick={() => openTask(nextStop)}>Let’s visit the {taskDefinition(nextStop)!.title.toLowerCase()} →</button>}{farmReady(farm) && <button className={styles.primary} disabled={busy} onClick={() => void act("celebrate")}>Celebrate our happy farm! ★</button>}</div>
       </>}
-      <div className={styles.basketBar}><span className={styles.basketTitle}>Your farm basket</span>{Object.entries({ ...farm.inventory, tomatoes: farm.inventory.tomatoes ?? 0, corn: farm.inventory.corn ?? 0 }).map(([name, amount]) => <span key={name} className={styles.inventory} aria-label={`${amount} ${name}`}><span aria-hidden="true">{inventoryIcons[name as keyof typeof inventoryIcons]}</span><strong>{amount}</strong><span>{name}</span></span>)}</div>
       <div className={styles.status} role="status" aria-live="polite">{busy ? "Saving your helping hands…" : message}</div>
       {error && <p className={styles.error} role="alert">{error}</p>}
     </>}

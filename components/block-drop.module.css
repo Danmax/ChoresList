@@ -1,3 +1,29 @@
+/* Size the board from the available height, leaving room for touch controls. */
+:global([data-game-expanded="true"]) .game { display: flex; flex-direction: column; height: 100%; min-height: 0; padding: 10px; }
+:global([data-game-expanded="true"]) .header { flex-shrink: 0; margin-bottom: 8px; }
+:global([data-game-expanded="true"]) .header p { display: none; }
+:global([data-game-expanded="true"]) .setup { flex-shrink: 0; margin-bottom: 8px; }
+:global([data-game-expanded="true"]) .playfield { flex: 1; min-height: 0; grid-template-columns: minmax(0, 1fr) 90px; gap: 10px; }
+:global([data-game-expanded="true"]) .playfield > div { display: flex; min-height: 0; justify-content: center; }
+:global([data-game-expanded="true"]) .board { width: auto; height: 100%; max-width: 100%; aspect-ratio: 1 / 2; margin: 0; }
+:global([data-game-expanded="true"]) .game[data-columns="true"] .board { aspect-ratio: 6 / 13; }
+:global([data-game-expanded="true"]) .board > div:first-child { height: 100%; grid-auto-rows: minmax(0, 1fr); }
+:global([data-game-expanded="true"]) .board > div:first-child > div { min-height: 0; aspect-ratio: auto; font-size: clamp(12px, 3dvh, 24px); }
+:global([data-game-expanded="true"]) .playfield aside { overflow: auto; }
+:global([data-game-expanded="true"]) .playfield aside > div { padding: 8px; }
+:global([data-game-expanded="true"]) .controls { flex-shrink: 0; width: 100%; margin-top: 8px; }
+:global([data-game-expanded="true"]) .controls button { min-height: 44px; padding: 6px; }
+:global([data-game-expanded="true"]) .instructions { display: none; }
+:global([data-game-expanded="true"]) .finish { flex-shrink: 0; margin-top: 4px; }
+@media (orientation: landscape) and (max-height: 600px) {
+  :global([data-game-expanded="true"]) .game { display: grid; grid-template-columns: minmax(0, 1fr) 220px; grid-template-rows: auto minmax(0, 1fr) auto; gap: 8px; }
+  :global([data-game-expanded="true"]) .header { grid-column: 1 / -1; margin: 0; }
+  :global([data-game-expanded="true"]) .playfield { grid-column: 1; grid-row: 2 / 4; }
+  :global([data-game-expanded="true"]) .setup { grid-column: 2; grid-row: 2; align-self: start; }
+  :global([data-game-expanded="true"]) .controls { grid-column: 2; grid-row: 3; margin: 0; }
+  :global([data-game-expanded="true"]) .finish { grid-column: 2; grid-row: 2; align-self: end; }
+}
+
 .lineFlash {
   position: relative;
   animation: lineGlow var(--clear-duration) ease-out both;

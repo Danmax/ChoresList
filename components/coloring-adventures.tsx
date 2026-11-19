@@ -70,6 +70,9 @@ export function ColoringAdventures({ memberId, playerName, onExit, onFinish }: {
   onFinish: (score: number, durationSeconds: number, metadata: Record<string, unknown>) => void | Promise<void>;
 }) {
   const [fullScreen, setFullScreen] = useState(false);
+  useEffect(() => {
+    setFullScreen(window.matchMedia("(max-width: 1024px), (pointer: coarse)").matches);
+  }, []);
   const [starterStyle, setStarterStyle] = useState<StarterColorStyle>("scenery");
   const [keepColors, setKeepColors] = useState(true);
   const [panel, setPanel] = useState<SupplyPanel>("colors");

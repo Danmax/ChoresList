@@ -217,7 +217,9 @@ async function main() {
       }
       await expect(page.getByText("Happy & cared for!")).toBeVisible();
       if (task.id === "garden") {
+        await page.getByText("🧺 Your farm basket & breakfast trail", { exact: true }).click();
         for (const crop of FARM_CROPS) await expect(page.getByLabel(`3 ${crop.inventory}`, { exact: true })).toBeVisible();
+        await page.getByText("🧺 Your farm basket & breakfast trail", { exact: true }).click();
       }
       if (task.id === "garden") await page.screenshot({ path: "/tmp/sunny-farm-preview/garden-desktop.png", fullPage: true });
       if (task.id === "horse") {
@@ -232,6 +234,7 @@ async function main() {
         await page.getByRole("button", { name: "Farm map", exact: true }).click();
       } else await page.getByRole("button", { name: "Back to the farm →", exact: true }).click();
     }
+    await page.getByText("🧺 Your farm basket & breakfast trail", { exact: true }).click();
     await expect(page.getByText("Breakfast basket ready!", { exact: true })).toBeVisible();
     await expect(page.getByLabel("3 eggs", { exact: true })).toBeVisible();
     await expect(page.getByLabel("1 milk", { exact: true })).toBeVisible();

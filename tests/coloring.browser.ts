@@ -84,6 +84,10 @@ async function main() {
       await page.goto(`${baseUrl}/kid/${memberId}/games`);
       await page.getByRole("button", { name: /Coloring Adventures/ }).click();
       await expect(canvas()).toBeVisible();
+      // Most drawing checks exercise page mode; the responsive suite covers automatic fullscreen.
+      if (await page.getByRole("button", { name: "Exit full screen", exact: true }).isVisible()) {
+        await page.getByRole("button", { name: "Exit full screen", exact: true }).click();
+      }
     }
     async function at(point: { x: number; y: number }, action: "click" | "position" = "click") {
       const node = canvas(), box = (await node.boundingBox())!;
