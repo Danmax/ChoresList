@@ -18,7 +18,7 @@ export function FarmWorkbench({ task, targets, busy, waiting = false, onComplete
   const [held, setHeld] = useState<string | null>(null);
   const heldRef = useRef<string | null>(null);
   function carry(target: string | null) { heldRef.current = target; setHeld(target); }
-  const simple = tool.motion === "feed" || tool.motion === "collect";
+  const simple = tool.motion === "feed" || tool.motion === "collect" || tool.motion === "squeeze";
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
   const [progress, setProgress] = useState<Record<string, number>>({});
   const root = useRef<HTMLDivElement>(null);
@@ -29,7 +29,7 @@ export function FarmWorkbench({ task, targets, busy, waiting = false, onComplete
   const busyRef = useRef(busy); busyRef.current = busy;
   const current = useRef({ targets, tool, onComplete }); current.current = { targets, tool, onComplete };
   useEffect(() => {
-    setSelected(previous => task === "garden" ? previous : tool.motion === "feed" || tool.motion === "collect");
+    setSelected(previous => task === "garden" ? previous : tool.motion === "feed" || tool.motion === "collect" || tool.motion === "squeeze");
     carry(null); setProgress({}); work.current = {};
     // A new garden tool may already be dragging from its tray into a plot.
     if (task !== "garden") { setCursor(null); gesture.current = null; }
@@ -59,7 +59,7 @@ export function FarmWorkbench({ task, targets, busy, waiting = false, onComplete
   useEffect(() => {
     const timer = window.setInterval(() => {
       const g = gesture.current;
-      if (g?.target && current.current.tool.motion === "pour" && !busyRef.current && !completed.current) {
+      if (g?.target && (current.current.tool.motion === "pour" || current.current.tool.motion === "squeeze") && !busyRef.current && !completed.current) {
         work.current[g.target] = Math.min(1, (work.current[g.target] ?? 0) + .1);
         setProgress({ ...work.current });
         if (work.current[g.target] >= 1) finish(g.target);
@@ -90,7 +90,7 @@ export function FarmWorkbench({ task, targets, busy, waiting = false, onComplete
       setProgress({ ...work.current });
       if (work.current[target] >= 1) finish(target);
     }
-    if (tool.motion === "pour" || tool.motion === "rub") g.target = target;
+    if (tool.motion === "pour" || tool.motion === "rub" || tool.motion === "squeeze") g.target = target;
     if (tool.motion === "pull" && g.target) {
       const direction = g.target.startsWith("harvest") ? g.startY - e.clientY : g.target.startsWith("herd") ? e.clientX - g.startX : e.clientY - g.startY;
       work.current[g.target] = Math.min(1, Math.max(0, direction / 55));
@@ -112,6 +112,11 @@ export function FarmWorkbench({ task, targets, busy, waiting = false, onComplete
   function activate(target: string) {
     if (busy || completed.current || !targets.includes(target)) return;
     if (tool.motion === "feed") finish(target);
+    if (tool.motion === "squeeze") {
+      work.current[target] = Math.min(1, (work.current[target] ?? 0) + .25);
+      setProgress({ ...work.current });
+      if (work.current[target] >= 1) finish(target);
+    }
     if (tool.motion === "collect") { carry(target); root.current?.querySelector<HTMLButtonElement>("[data-farm-basket]")?.focus({ preventScroll: true }); }
   }
   function overBasket(x: number, y: number) {
@@ -136,6 +141,7 @@ export function FarmWorkbench({ task, targets, busy, waiting = false, onComplete
     work.current[target] = Math.min(1, (work.current[target] ?? 0) + .25);
     setProgress({ ...work.current }); if (work.current[target] >= 1) finish(target);
   } }}><div ref={root} className={`${styles.workbench} ${selected ? styles.toolEquipped : ""}`} onPointerDown={down} onPointerMove={move} onPointerUp={e => {
+    if (tool.motion === "squeeze" && gesture.current) { const target = hit(e.clientX, e.clientY); if (target) activate(target); }
     if (tool.motion === "collect" && heldRef.current && overBasket(e.clientX, e.clientY)) finish(heldRef.current);
     if (gesture.current && tool.motion === "feed") { const target = hit(e.clientX, e.clientY); if (target) finish(target); }
     if (gesture.current && tool.motion === "drag") { const target = hit(e.clientX, e.clientY); if (target && Math.hypot(e.clientX - gesture.current.startX, e.clientY - gesture.current.startY) > 20) finish(target); }
@@ -145,10 +151,10 @@ export function FarmWorkbench({ task, targets, busy, waiting = false, onComplete
       {task === "garden" ? <><div className={styles.gardenTools} role="group" aria-label="Garden tools">{["till", "plant", "water", "harvest"].map(choice => {
         const option = farmTool(task, choice), equipped = selected && tool.id === option.id;
         return <button key={choice} type="button" disabled={busy} className={styles.pickupTool} aria-label={`${equipped ? "Put down" : "Pick up"} ${option.label}`} aria-pressed={equipped} onPointerDown={e => pickUp(e, choice)} onClick={e => { if (e.detail === 0) { setGardenTool(choice); if (equipped) putDown(); else setSelected(true); } }}><ToolArt tool={option} /><span>{option.label}</span></button>;
-      })}</div><p className={styles.gardenToolHint}>{waiting ? "Your crops are growing. Visit another farm stop, or watch them sprout!" : targets.length === 0 ? "Harvest complete! Your produce is in the farm basket." : tool.instruction}<small>Keyboard: select a tool, focus a matching plot, then press the arrow keys four times.</small></p></> : targets.length > 0 && simple ? <div className={styles.simpleHint}>{tool.motion === "feed" ? <button type="button" className={styles.foodSource} aria-label={`Carry ${tool.label.toLowerCase()}`} onPointerDown={e => pickUp(e)}><ToolArt tool={tool} /></button> : <span aria-hidden="true">🧺</span>}<div><strong>{tool.motion === "feed" ? "A little meal, a happy friend" : held ? "Now put it in the basket" : "From the farm to your basket"}</strong><p>{tool.instruction}</p><small>{tool.motion === "collect" ? "Keyboard: Enter to pick up, then Enter on the basket. Escape returns the item." : "Tap an animal to feed it. Keyboard: Enter on the animal."}</small></div></div> : targets.length > 0 ? <><button type="button" disabled={busy} className={styles.pickupTool} aria-pressed={selected} onPointerDown={e => pickUp(e)} onClick={e => { if (e.detail === 0) { if (selected) putDown(); else setSelected(true); } }}><ToolArt tool={tool} /><span>{selected ? "Put down" : "Pick up"}<strong>{tool.label}</strong></span></button><div><strong>{selected ? `${tool.label} in hand` : "Choose your tool first"}</strong><p>{tool.instruction}</p><small>Keyboard: pick up the tool, Tab to a work spot, then use the arrow keys four times. Escape puts the tool down.</small></div></> : <p>Tools away. A job well done!</p>}
+      })}</div><p className={styles.gardenToolHint}>{waiting ? "Your crops are growing. Visit another farm stop, or watch them sprout!" : targets.length === 0 ? "Harvest complete! Your produce is in the farm basket." : tool.instruction}<small>Keyboard: select a tool, focus a matching plot, then press the arrow keys four times.</small></p></> : targets.length > 0 && simple ? <div className={styles.simpleHint}>{tool.motion === "feed" ? <button type="button" className={styles.foodSource} aria-label={`Carry ${tool.label.toLowerCase()}`} onPointerDown={e => pickUp(e)}><ToolArt tool={tool} /></button> : <span aria-hidden="true">🧺</span>}<div><strong>{tool.motion === "feed" ? "A little meal, a happy friend" : held ? "Now put it in the basket" : tool.motion === "squeeze" ? "Gentle squeezes, fresh milk" : "From the farm to your basket"}</strong><p>{tool.instruction}</p><small>{tool.motion === "collect" ? "Keyboard: Enter to pick up, then Enter on the basket. Escape returns the item." : tool.motion === "squeeze" ? "Hold to milk, or tap the spot four times. You can stop and continue." : "Tap an animal to feed it. Keyboard: Enter on the animal."}</small></div></div> : targets.length > 0 ? <><button type="button" disabled={busy} className={styles.pickupTool} aria-pressed={selected} onPointerDown={e => pickUp(e)} onClick={e => { if (e.detail === 0) { if (selected) putDown(); else setSelected(true); } }}><ToolArt tool={tool} /><span>{selected ? "Put down" : "Pick up"}<strong>{tool.label}</strong></span></button><div><strong>{selected ? `${tool.label} in hand` : "Choose your tool first"}</strong><p>{tool.instruction}</p><small>Keyboard: pick up the tool, Tab to a work spot, then use the arrow keys four times. Escape puts the tool down.</small></div></> : <p>Tools away. A job well done!</p>}
     </div>
     <div>{children}</div>
-    {(selected || simple) && cursor && (tool.motion !== "collect" || held) && <div className={styles.carriedTool} style={{ left: cursor.x, top: cursor.y }}>{held ? <FarmSprite item={held.startsWith("egg") ? "egg" : "apple"} /> : <ToolArt tool={tool} />}</div>}
+    {(selected || simple) && cursor && (tool.motion !== "collect" || held) && tool.motion !== "squeeze" && <div className={styles.carriedTool} style={{ left: cursor.x, top: cursor.y }}>{held ? <FarmSprite item={held.startsWith("egg") ? "egg" : "apple"} /> : <ToolArt tool={tool} />}</div>}
   </div></WorkContext.Provider>;
 }
 export function FarmWorkTarget({ target, label, children, className, style, disabled }: { target: string; label: string; children: ReactNode; className: string; style: CSSProperties; disabled: boolean }) {

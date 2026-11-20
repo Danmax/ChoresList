@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { FARM_CROPS, applyHayfieldDrive, farmHayfield, cropTime, gardenPlot, taskComplete, bedCrop, activeTargets, applyFarmAction, farmBreakfast, nextFarmStop, celebrateFarm, completedTasks, createFarm, FARM_TASKS, farmReady, nextFarmDay, type FarmState } from "../lib/sunny-farm";
+import { FARM_CROPS, chickenNests, taskTargets, applyHayfieldDrive, farmHayfield, cropTime, gardenPlot, taskComplete, bedCrop, activeTargets, applyFarmAction, farmBreakfast, nextFarmStop, celebrateFarm, completedTasks, createFarm, FARM_TASKS, farmReady, nextFarmDay, type FarmState } from "../lib/sunny-farm";
 
 import { hayfieldRoute } from "./helpers/sunny-farm-hayfield";
 
@@ -10,15 +10,17 @@ function helpAll(farm: FarmState, task: typeof FARM_TASKS[number]) {
     for (let i = 0; i < commands.length; i += 32) farm = applyHayfieldDrive(farm, commands.slice(i, i + 32));
     return farm;
   }
-  for (const stage of task.stages) for (const target of stage) farm = applyFarmAction(farm, task.id, target, undefined, target.startsWith("harvest-") ? 200_000 : 1000);
+  const stages = task.id === "chickens" ? [["feed"], taskTargets(farm, "chickens").slice(1)] : task.stages;
+  for (const stage of stages) for (const target of stage) farm = applyFarmAction(farm, task.id, target, undefined, target.startsWith("harvest-") ? 200_000 : 1000);
   return farm;
 }
 test("connected farm loop supplies hay, saves goods, and celebrates once", () => {
   let farm = createFarm(100);
+  const eggCount = chickenNests(farm).flatMap(nest => nest.eggs).length;
   for (const task of FARM_TASKS) farm = helpAll(farm, task);
   assert.equal(completedTasks(farm), 8);
   assert.equal(farmReady(farm), true);
-  assert.deepEqual(farm.inventory, { hay: 7, milk: 1, eggs: 3, wool: 3, apples: 3, carrots: 9, ...Object.fromEntries(FARM_CROPS.filter(c => c.id !== "carrot").map(c => [c.inventory, 0])) });
+  assert.deepEqual(farm.inventory, { hay: 7, milk: 1, eggs: eggCount, wool: 3, apples: 3, carrots: 9, ...Object.fromEntries(FARM_CROPS.filter(c => c.id !== "carrot").map(c => [c.inventory, 0])) });
   farm = celebrateFarm(farm);
   assert.equal(farm.completedDays, 1);
   assert.throws(() => celebrateFarm(farm), /already/);
@@ -40,8 +42,9 @@ test("rejects out-of-order steps, duplicates, invented tasks, and premature rewa
   assert.throws(() => applyFarmAction(farm, "hay", "bale-2"), /Drive/);
   assert.equal(farm.done.hay.length, 0, "actions must not mutate the previous saved state");
 });
-test("targets can be collected in any order within a stage and survive JSON saves", () => {
+test("legacy eggs can be collected in any order and survive JSON saves", () => {
   let farm = createFarm();
+  delete farm.coopEggs;
   farm = applyFarmAction(farm, "chickens", "feed");
   farm = applyFarmAction(farm, "chickens", "egg-2");
   farm = JSON.parse(JSON.stringify(farm));
@@ -169,4 +172,60 @@ test("crop timers show seconds, minutes and exact readiness without negative val
   assert.equal(cropTime(120_000), "2m");
   assert.equal(cropTime(1), "1s");
   assert.equal(cropTime(-1), "0s");
+});
+
+
+test("horse eats harvested apples and carrots before or after grooming without using hay", () => {
+  let farm = createFarm();
+  assert.throws(() => applyFarmAction(farm, "horse", "treat-apple"), /Harvest/);
+  farm = applyFarmAction(farm, "orchard", "apple-0");
+  farm = applyFarmAction(farm, "garden", "till-0");
+  farm = applyFarmAction(farm, "garden", "plant-0", "carrot");
+  farm = applyFarmAction(farm, "garden", "water-0", undefined, 1000);
+  farm = applyFarmAction(farm, "garden", "harvest-0", undefined, 46_000);
+  farm.inventory.hay = 2;
+  const before = structuredClone(farm);
+  farm = applyFarmAction(farm, "horse", "treat-apple");
+  assert.equal(before.inventory.apples, 1);
+  assert.equal(farm.inventory.apples, 0);
+  assert.equal(farm.inventory.hay, 2);
+  assert.deepEqual(activeTargets(farm, "horse"), ["brush-0", "brush-1", "brush-2"]);
+  for (const target of activeTargets(farm, "horse")) farm = applyFarmAction(farm, "horse", target);
+  farm = applyFarmAction(farm, "horse", "treat-carrot");
+  assert.equal(farm.inventory.carrots, 0);
+  assert.equal(taskComplete(farm, "horse"), true);
+  assert.equal(farm.done.horse.length, 4);
+  assert.throws(() => applyFarmAction(farm, "horse", "treat-carrot"), /Harvest/);
+  assert.throws(() => applyFarmAction(farm, "cow", "treat-apple"), /already/);
+  farm.inventory.apples = 1;
+  assert.throws(() => applyFarmAction({ ...farm, celebrated: true }, "horse", "treat-apple"), /another farm day/);
+});
+
+test("each of six stalls holds 0–3 saved eggs, with no invented or duplicate collections", () => {
+  for (const counts of [[0, 1, 2, 3, 0, 3], [0, 0, 0, 0, 0, 0], [3, 3, 3, 3, 3, 3]]) {
+    let farm = createFarm(); farm.coopEggs = counts;
+    const expected = counts.reduce((a, b) => a + b, 0);
+    assert.deepEqual(chickenNests(farm).map(n => n.eggs.length), counts);
+    assert.throws(() => applyFarmAction(farm, "chickens", "egg-3-0"), /another step/);
+    farm = applyFarmAction(farm, "chickens", "feed");
+    farm = JSON.parse(JSON.stringify(farm));
+    assert.deepEqual(farm.coopEggs, counts);
+    for (const target of activeTargets(farm, "chickens").reverse()) {
+      farm = applyFarmAction(farm, "chickens", target);
+      assert.throws(() => applyFarmAction(farm, "chickens", target), /already/);
+    }
+    assert.equal(farm.inventory.eggs, expected);
+    assert.equal(taskComplete(farm, "chickens"), true);
+    assert.throws(() => applyFarmAction(farm, "chickens", "egg-5-3"), /already/);
+    const breakfast = farmBreakfast(farm).find(g => g.item === "eggs")!;
+    assert.equal(breakfast.goal, Math.min(3, expected));
+    assert.equal(breakfast.ready, true);
+  }
+});
+
+test("new rounds roll counts once, including empty and full stalls", t => {
+  const random = t.mock.method(Math, "random", () => 0);
+  assert.deepEqual(createFarm().coopEggs, [0, 0, 0, 0, 0, 0]);
+  random.mock.mockImplementation(() => .99999);
+  assert.deepEqual(createFarm().coopEggs, [3, 3, 3, 3, 3, 3]);
 });

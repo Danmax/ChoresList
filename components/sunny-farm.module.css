@@ -244,3 +244,38 @@
   .ripePlot .plotCaption>span,.ripePlot .plotCaption>strong{display:none}
   .ripePlot .plotCaption::after{content:"✓";font-size:14px;font-weight:900;color:#476236}
 }
+
+.horseTreats{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:0 18px 8px;color:#4d6436;font-size:12px}
+.horseTreats>button{display:flex;align-items:center;gap:5px;min-height:44px;padding:3px 10px;border:1px solid #b6c58f;border-radius:12px;background:#fff9e5;cursor:pointer}
+.horseTreats>button:disabled{opacity:.5;cursor:default}.horseTreats svg{width:35px;height:35px}.horseTreats small{font-size:11px}
+.milkSpot{width:22%;min-width:60px;border:2px dashed #fff5bf;background:#fff1c044;z-index:3;padding:3px}
+.squeezeSpot{display:grid;place-items:center;width:44px;height:38px;font-size:28px;border-radius:50%;background:#ffe6b2;box-shadow:0 0 0 5px #fff9d233;transform:scale(calc(1 - var(--work) * .15))}
+.milkSpot .workObject{overflow:visible;transform:none!important}.milkSpot .targetLabel{font-size:10px}.milkSpot .workMeter{bottom:-8px}
+.milkSpot .milkStream{position:absolute;top:22px;right:30%;width:160%;height:80px;overflow:visible;opacity:0;animation:milkFlow .45s linear infinite;pointer-events:none}
+.milkingBucket{position:absolute;display:flex;flex-direction:column;align-items:center;pointer-events:none}.milkingBucket svg{width:100%;height:auto;filter:drop-shadow(0 4px 2px #513d2733)}
+.milkingBucket>span{font-size:10px;white-space:nowrap;background:#fff8df;border-radius:8px;padding:3px 7px;color:#536239}.milkingBucket rect{transition:y .25s}
+.chickenWalker{position:absolute;transform:translate(-50%,-50%);aspect-ratio:250/196;animation:chickenWander 10s ease-in-out infinite;animation-delay:var(--walk-delay);pointer-events:none}
+.chickenWalker>svg{width:100%;height:100%;animation:chickenBob .6s ease-in-out infinite}.chickenWalker .chickenFriend{pointer-events:auto;width:100%;height:100%;padding:0;border:0;min-width:60px}
+.chickenWalker .chickenFriend .workObject{height:100%}.chickenWalker .chickenFriend svg{width:100%;height:100%;animation:chickenBob .6s ease-in-out infinite}
+.chickenWalker .targetLabel{position:absolute;bottom:-4px;left:50%;transform:translateX(-50%)}
+.chickenWalker:has(:hover),.chickenWalker:has(:focus-visible),.chickenWalker[data-feeding]{animation-play-state:paused}
+.chickenWalker[data-feeding]>svg{animation:chickenPeck .55s ease-in-out infinite}
+.scatteredFeed{position:absolute;inset:0;pointer-events:none}.scatteredFeed i{position:absolute;width:6px;height:4px;background:#ebbd58;border:1px solid #a87628;border-radius:50%;box-shadow:0 1px 1px #57321455;animation:grainScatter .85s both;animation-delay:var(--grain-delay)}
+.coopNest{position:absolute;height:12%;transform:translate(-50%,-50%);pointer-events:none}
+.coopNest .nestEgg{pointer-events:auto;width:36%;min-width:30px;padding:0}.coopNest .nestEgg svg{height:clamp(30px,4vw,52px)}.coopNest .targetLabel{display:none}
+.coopNest .nestEgg:focus-visible{outline:3px solid #fff4ab;outline-offset:3px}
+.nestCount{position:absolute;left:50%;bottom:-8px;transform:translateX(-50%);white-space:nowrap;font-size:10px;padding:2px 6px;background:#fff4d0e8;border-radius:8px;color:#795a2d}
+:global([data-game-expanded="true"]) .workbench>.horseTreats{display:flex;flex:0 0 auto;min-height:44px;margin:0 8px 5px}
+:global([data-game-expanded="true"]) .horseTreats small{display:none}
+@keyframes milkFlow{to{stroke-dashoffset:-34}}
+@keyframes chickenWander{0%,100%{translate:0 0}25%{translate:calc(var(--walk-direction) * 22px) -7px}60%{translate:calc(var(--walk-direction) * -18px) 3px}80%{translate:calc(var(--walk-direction) * -6px) -5px}}
+@keyframes chickenBob{0%,100%{rotate:-1deg}50%{rotate:1deg;translate:0 -2px}}
+@keyframes chickenPeck{0%,100%{rotate:0deg}50%{rotate:4deg;translate:0 3px}}
+@keyframes grainScatter{0%{opacity:0;transform:translate(calc(var(--grain-drift) * -1),-105px) scale(.5)}20%{opacity:1}75%{transform:translate(0,-4px)}90%{transform:translate(2px,0)}100%{opacity:1;transform:translate(0,0)}}
+@media(max-width:640px){.horseTreats{margin-inline:9px;gap:5px}.horseTreats>span,.horseTreats small{display:none}.horseTreats>button{flex:1;font-size:11px}.horseTreats svg{width:27px;height:27px}.coopNest .nestEgg{min-width:26px}.nestCount{font-size:8px;padding:2px 4px}.animalBody .milkSpot{min-width:56px}.milkSpot .milkStream{height:60px}.chickenWalker .targetLabel{font-size:8px}.milkingBucket>span{font-size:8px}}
+@media(prefers-reduced-motion:reduce){.chickenWalker,.chickenWalker>svg,.chickenWalker .chickenFriend svg,.milkSpot .milkStream,.scatteredFeed i{animation:none}.milkingBucket rect{transition:none}}
+
+.workbench:active .milkSpot .milkStream{opacity:clamp(0,calc(var(--work) * 10),1)}
+:global([data-game-expanded="true"]) .workbench>div:not(.toolTray):not(.carriedTool){flex-direction:column}
+:global([data-game-expanded="true"]) .workbench .horseTreats{flex:0 0 auto;min-height:44px;margin:0 8px 5px}
+@media(max-width:640px){.coopNest .nestEgg{left:50%!important;min-width:44px;min-height:44px}.coopNest .nestEgg~.nestEgg{display:none}}

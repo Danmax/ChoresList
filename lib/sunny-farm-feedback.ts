@@ -11,7 +11,7 @@ export const FARM_RESPONSES: Record<FarmFeedbackKind, readonly string[]> = {
   celebrate: ["What a lovely day on the farm!", "Everyone is cared for. Hooray!", "A farm full of happy friends!"],
 };
 export function feedbackKind(task: FarmTaskId, target: string): FarmFeedbackKind {
-  if (target === "feed" || target.startsWith("duck")) return "feed";
+  if (target === "feed" || target.startsWith("treat-") || target.startsWith("duck")) return "feed";
   if (target.startsWith("egg")) return "egg";
   if (target.startsWith("apple")) return "fruit";
   if (target === "milk-finish") return "milk";

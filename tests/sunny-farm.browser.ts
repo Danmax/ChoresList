@@ -22,6 +22,7 @@ async function main() {
   const errors: string[] = [];
   page.on("pageerror", err => errors.push(err.message));
   let farm = createFarm(), version = 0, rewards = 0, failNext = false, conflictNext = false;
+  delete farm.coopEggs; // Keep the existing full-round legacy-save coverage deterministic.
   const member = { id: "farm-preview", name: "Alex", age: 7, avatar: "🧒", color: "#a78bfa", totalPoints: 0 };
   await mkdir("/tmp/sunny-farm-preview", { recursive: true });
   await page.route("**/api/**", async route => {
@@ -60,6 +61,7 @@ async function main() {
       await page.waitForTimeout(80); return;
     }
     const gardenAction = label.startsWith("Hoe bed") ? "till" : label.startsWith("Plant bed") ? "plant" : label.startsWith("Water bed") ? "water" : label.startsWith("Harvest bed") ? "harvest" : null;
+    if (label === "Milk cow") { for (let i = 0; i < 4; i++) await page.getByRole("button", { name: label, exact: true }).press("Enter"); await page.waitForTimeout(100); return; }
     const pickup = gardenAction ? page.getByRole("button", { name: new RegExp(`(Pick up|Put down) ${farmTool("garden", gardenAction).label}`) }) : page.getByRole("button", { name: /Pick up|Put down/ });
     if (await pickup.getAttribute("aria-pressed") !== "true") await pickup.click();
     const target = page.getByRole("button", { name: label, exact: true });
@@ -129,7 +131,7 @@ async function main() {
     await page.reload();
     await page.getByRole("button", { name: /Sunny Farm Helpers/ }).click();
     await expect(page.getByRole("button", { name: "Hayfield: all done" })).toBeVisible();
-    const labels: Record<string, string> = { feed: "Feed hay", "milk-left": "Squeeze left", "milk-right": "Squeeze right", "milk-finish": "Finish milking" };
+    const labels: Record<string, string> = { feed: "Feed hay", "milk-left": "Milk cow", "milk-right": "Milk cow", "milk-finish": "Milk cow" };
     for (const task of FARM_TASKS.slice(1)) {
       await page.getByRole("button", { name: `${task.title}: ${task.verb}`, exact: true }).click();
       const sceneToys = page.locator('[aria-label="Explore this scene"] button');
@@ -140,7 +142,7 @@ async function main() {
       for (const stage of task.stages) for (const target of stage) {
         if (farm.done[task.id].includes(target)) continue;
         const i = Number(target.split("-").at(-1)) + 1;
-        const label = task.id === "chickens" && target === "feed" ? "Scatter grain" : labels[target] ?? (target.startsWith("brush") ? `Brush spot ${i}` : target.startsWith("egg") ? `Collect egg ${i}` : target.startsWith("herd") ? `Guide sheep ${i}` : target.startsWith("wool") ? `Clip wool ${i}` : target.startsWith("duck") ? `Feed duck ${i}` : target.startsWith("apple") ? `Pick apple ${i}` : target.startsWith("till") ? `Hoe bed ${i}` : target.startsWith("plant") ? `Plant bed ${i}` : target.startsWith("water") ? `Water bed ${i}` : `Harvest bed ${i}`);
+        const label = task.id === "chickens" && target === "feed" ? "Scatter grain" : labels[target] ?? (target.startsWith("brush") ? ["Brush tail", "Brush body", "Brush mane"][i - 1] : target.startsWith("egg") ? `Collect egg ${i}` : target.startsWith("herd") ? `Guide sheep ${i}` : target.startsWith("wool") ? `Clip wool ${i}` : target.startsWith("duck") ? `Feed duck ${i}` : target.startsWith("apple") ? `Pick apple ${i}` : target.startsWith("till") ? `Hoe bed ${i}` : target.startsWith("plant") ? `Plant bed ${i}` : target.startsWith("water") ? `Water bed ${i}` : `Harvest bed ${i}`);
         if (task.id === "garden" && target.startsWith("plant-")) {
           const crop = FARM_CROPS[i - 1];
           await page.getByRole("button", { name: crop.label, exact: true }).click();

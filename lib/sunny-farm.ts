@@ -18,9 +18,9 @@ export function bedCrop(state: FarmState, bed: number) {
 }
 export const FARM_TASKS = [
   { id: "hay", title: "Hayfield", verb: "Gather hay", icon: "🚜", scene: "field", hint: "Drive the tractor to mow 100% of the field. Then use the pickup truck to collect bundles and deliver them to the barn.", stages: [["mow"], ["haul"], ["deliver"]] },
-  { id: "horse", title: "Horse stable", verb: "Feed & brush", icon: "🐴", scene: "stable", hint: "Tap the horse to feed it, then brush its coat.", stages: [["feed"], ["brush-0", "brush-1", "brush-2"]] },
-  { id: "cow", title: "Cow barn", verb: "Feed & milk", icon: "🐮", scene: "barn", hint: "Tap the cow to feed it, then collect milk for our farm breakfast.", stages: [["feed"], ["milk-left"], ["milk-right"], ["milk-finish"]] },
-  { id: "chickens", title: "Chicken coop", verb: "Feed & collect eggs", icon: "🐔", scene: "coop", hint: "Tap a chicken to feed the flock, then move the eggs from their nests into the basket.", stages: [["feed"], ["egg-0", "egg-1", "egg-2"]] },
+  { id: "horse", title: "Horse stable", verb: "Feed & brush", icon: "🐴", scene: "stable", hint: "Feed the horse hay or a harvested apple or carrot, then brush its tail, body, and mane.", stages: [["feed"], ["brush-0", "brush-1", "brush-2"]] },
+  { id: "cow", title: "Cow barn", verb: "Feed & milk", icon: "🐮", scene: "barn", hint: "Tap the cow to feed it, then hold under its udder to fill the milk bucket.", stages: [["feed"], ["milk-left"], ["milk-right"], ["milk-finish"]] },
+  { id: "chickens", title: "Chicken coop", verb: "Feed & collect eggs", icon: "🐔", scene: "coop", hint: "Feed the wandering chickens, then collect the eggs. Each stall can have 0–3 eggs waiting.", stages: [["feed"], ["egg-0", "egg-1", "egg-2"]] },
   { id: "sheep", title: "Sheep meadow", verb: "Guide & shear", icon: "🐑", scene: "pasture", hint: "Use the shepherd’s crook to guide the sheep, then sweep the clippers over their wool.", stages: [["herd-0", "herd-1", "herd-2"], ["wool-0", "wool-1", "wool-2"]] },
   { id: "ducks", title: "Duck pond", verb: "Feed the ducks", icon: "🦆", scene: "pond", hint: "Tap each duck to give it pellets.", stages: [["duck-0", "duck-1", "duck-2"]] },
   { id: "orchard", title: "Apple orchard", verb: "Pick apples", icon: "🍎", scene: "hub", hint: "Move ripe apples into your basket for our farm breakfast.", stages: [["apple-0", "apple-1", "apple-2"]] },
@@ -32,6 +32,8 @@ export type FarmState = {
   done: Record<FarmTaskId, string[]>;
   gardenCrops?: Partial<Record<number, FarmCropId>>;
   gardenWateredAt?: Partial<Record<number, number>>;
+  /** Generated once per round, one count for each of the six nesting stalls. */
+  coopEggs?: number[];
   hayfield?: HayfieldState;
   inventory: { hay: number; eggs: number; milk: number; wool: number; apples: number; carrots: number } & Partial<Record<typeof FARM_CROPS[number]["inventory"], number>>;
 };
@@ -39,7 +41,18 @@ export class FarmRuleError extends Error {}
 export function createFarm(now = Date.now(), completedDays = 0): FarmState {
   return { schema: 1, round: completedDays + 1, completedDays, startedAt: now, celebrated: false,
     done: Object.fromEntries(FARM_TASKS.map(t => [t.id, [] as string[]])) as FarmState["done"],
-    inventory: { hay: 0, eggs: 0, milk: 0, wool: 0, apples: 0, carrots: 0, ...Object.fromEntries(FARM_CROPS.map(c => [c.inventory, 0])) }, gardenCrops: {}, gardenWateredAt: {}, hayfield: createHayfield() };
+    inventory: { hay: 0, eggs: 0, milk: 0, wool: 0, apples: 0, carrots: 0, ...Object.fromEntries(FARM_CROPS.map(c => [c.inventory, 0])) }, gardenCrops: {}, gardenWateredAt: {}, coopEggs: Array.from({ length: 6 }, () => Math.floor(Math.random() * 4)), hayfield: createHayfield() };
+}
+/** Old saves keep their original three eggs and collection IDs. */
+export function chickenNests(state: FarmState) {
+  return Array.from({ length: 6 }, (_, stall) => ({ stall,
+    eggs: state.coopEggs
+      ? Array.from({ length: state.coopEggs[stall] ?? 0 }, (_, i) => `egg-${stall}-${i}`)
+      : stall < 3 ? [] : [`egg-${stall - 3}`],
+  }));
+}
+export function taskTargets(state: FarmState, taskId: FarmTaskId): string[] {
+  return taskId === "chickens" ? ["feed", ...chickenNests(state).flatMap(nest => nest.eggs)] : [...taskDefinition(taskId)!.stages.flat()];
 }
 export function farmHayfield(state: FarmState) { return state.hayfield ?? createHayfield(state.done.hay); }
 export function applyHayfieldDrive(state: FarmState, commands: unknown): FarmState {
@@ -66,6 +79,7 @@ export function gardenPlot(state: FarmState, bed: number, now = Date.now()) {
   return { crop, phase, action, remainingMs, growth: Math.max(0, Math.min(1, 1 - remainingMs / crop.growMs)) };
 }
 export function activeTargets(state: FarmState, taskId: FarmTaskId, now = Date.now()): string[] {
+  if (taskId === "chickens") return state.done.chickens.includes("feed") ? taskTargets(state, taskId).filter(target => !state.done.chickens.includes(target)) : ["feed"];
   if (taskId === "hay") {
     const field = farmHayfield(state), progress = hayfieldProgress(field);
     return progress.complete ? [] : progress.percent < 100 ? ["mow"] : field.vehicle === "tractor" ? ["haul"] : ["deliver"];
@@ -86,6 +100,15 @@ export function applyFarmAction(state: FarmState, taskId: unknown, target: unkno
   if (!task || typeof target !== "string") throw new FarmRuleError("Choose a farm activity.");
   if (task.id === "hay") throw new FarmRuleError("Drive the tractor and pickup truck to finish the hayfield.");
   if (state.celebrated) throw new FarmRuleError("Start another farm day to play again.");
+  if (task.id === "horse" && (target === "treat-apple" || target === "treat-carrot")) {
+    if (crop !== undefined) throw new FarmRuleError("Choose a harvested treat.");
+    const item = target === "treat-apple" ? "apples" : "carrots";
+    if (state.inventory[item] < 1) throw new FarmRuleError("Harvest this treat first.");
+    const next = structuredClone(state);
+    next.inventory[item]--;
+    if (!next.done.horse.includes("feed")) next.done.horse.push("feed");
+    return next;
+  }
   if (task.id === "garden" && /^harvest-[0-8]$/.test(target) && gardenPlot(state, Number(target.split("-")[1]), now).phase === "growing") throw new FarmRuleError("This crop is still growing. Come back when its timer is ready.");
   if (!activeTargets(state, task.id, now).includes(target)) throw new FarmRuleError("That step is already done, or another step comes first.");
   const planting = task.id === "garden" && target.startsWith("plant-");
@@ -117,8 +140,8 @@ export function nextFarmDay(state: FarmState, now = Date.now()) {
 
 /** One shared purpose across locations, derived from saved goods and care. */
 export function farmBreakfast(state: FarmState) {
-  const goods = [{ item: "eggs", label: "Eggs", goal: 3, task: "chickens" }, { item: "milk", label: "Milk", goal: 1, task: "cow" }, { item: "apples", label: "Apples", goal: 3, task: "orchard" }] as const;
-  return goods.map(g => ({ ...g, amount: state.inventory[g.item], ready: state.inventory[g.item] >= g.goal }));
+  const goods = [{ item: "eggs", label: "Eggs", goal: Math.min(3, chickenNests(state).flatMap(nest => nest.eggs).length), task: "chickens" }, { item: "milk", label: "Milk", goal: 1, task: "cow" }, { item: "apples", label: "Apples", goal: 3, task: "orchard" }] as const;
+  return goods.map(g => ({ ...g, amount: state.inventory[g.item], ready: state.inventory[g.item] >= g.goal && (g.item !== "eggs" || state.done.chickens.includes("feed")) }));
 }
 export function nextFarmStop(state: FarmState): FarmTaskId | null {
   // A short story through breakfast first, then the rest of the farm. Exploration remains open.

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { ArrowLeft, Check, Heart, LoaderCircle, Volume2, VolumeX } from "lucide-react";
-import { FARM_CROPS, cropTime, gardenPlot, type FarmCropId, activeTargets, completedTasks, farmBreakfast, nextFarmStop, FARM_TASKS, farmReady, taskComplete, taskDefinition, type FarmState, type FarmTaskId } from "@/lib/sunny-farm";
+import { FARM_CROPS, chickenNests, taskTargets, cropTime, gardenPlot, type FarmCropId, activeTargets, completedTasks, farmBreakfast, nextFarmStop, FARM_TASKS, farmReady, taskComplete, taskDefinition, type FarmState, type FarmTaskId } from "@/lib/sunny-farm";
 import { HayfieldGame, type HayfieldHandle, type HayDriveResult } from "./sunny-farm-hayfield";
 import { hayfieldProgress, type HayCommand } from "@/lib/sunny-farm-hayfield";
 import { farmHayfield } from "@/lib/sunny-farm";
@@ -91,7 +91,7 @@ export function SunnyFarm({ memberId, playerName, onExit }: { memberId: string; 
       syncClock(data.serverNow); savedRef.current = data; setSaved(data);
       if (action === "help" && taskId) {
         const kind = feedbackKind(taskId, target ?? "");
-        const text = respond(taskComplete(data.farm, taskId) ? "complete" : kind);
+        const text = respond(kind === "feed" ? kind : taskComplete(data.farm, taskId) ? "complete" : kind);
         setReaction({ task: taskId, text, kind: kind === "feed" ? "eat" : taskComplete(data.farm, taskId) ? "happy" : "care" });
         setMessage(text);
         const animal: Partial<Record<FarmTaskId, FarmSound>> = { horse: "horse", cow: "cow", chickens: "chickens", sheep: "sheep", ducks: "ducks" };
@@ -179,6 +179,10 @@ export function SunnyFarm({ memberId, playerName, onExit }: { memberId: string; 
           </div>}
         </>}
         {task.id === "hay" ? <div className={styles.hayActivity}><HayfieldGame ref={hayfieldRef} farm={farm} onDrive={driveHay} /></div> : <FarmWorkbench key={task.id} task={task.id} targets={targets} busy={busy} waiting={task.id === "garden" && growing.length > 0 && targets.length === 0} onComplete={(target, tool) => void act("help", target, tool)}>
+        {task.id === "horse" && <div className={styles.horseTreats} data-tool-tray role="group" aria-label="Horse harvest treats">
+          <span>Share your harvest</span>{(["apple", "carrot"] as const).map(item => <button key={item} type="button" disabled={busy || farm.inventory[item === "apple" ? "apples" : "carrots"] < 1} onClick={() => void act("help", `treat-${item}`, `treat-${item}`)} aria-label={`Feed horse one ${item}`}><FarmSprite item={item} /><span>{item === "apple" ? "Apple" : "Carrot"} · {farm.inventory[item === "apple" ? "apples" : "carrots"]}</span></button>)}
+          <small>Pick apples or harvest carrots to bring a treat.</small>
+        </div>}
         <div className={`${styles.scene} ${styles.activityScene} ${task.id === "garden" ? styles.gardenScene : ""}`} style={{ backgroundImage: `url('/games/sunny-farm/${task.scene}.webp')` }} aria-label={`${task.title} activity`}>
           <ActivityArtwork now={now} taskId={task.id} farm={farm} targets={targets} busy={busy} eating={reaction?.task === task.id && reaction.kind === "eat"} happy={reaction?.task === task.id && reaction.kind === "happy"} />
           <FarmExplore key={task.id} scene={task.id} onExplore={explore} />
@@ -187,7 +191,7 @@ export function SunnyFarm({ memberId, playerName, onExit }: { memberId: string; 
         </div>
         </FarmWorkbench>}
         {task.id !== "hay" && <p className={styles.exploreHint}>Explore too: tap the little ✦ surprises around the scene.</p>}
-        <div className={styles.activityFooter}><button type="button" className={styles.smallButton} onClick={() => { const hint = task.id === "hay" ? task.hint : task.id === "garden" ? gardenHint : farmTool(task.id, targets[0] ?? "").instruction; setMessage(hint); audio.say(hint, true); }}>Hear or read a hint</button><span>{task.id === "garden" ? `${harvested} / 9 plots harvested` : `${farm.done[task.id].length} / ${task.stages.flat().length} little steps`}</span><div className={styles.stepTrack}><span style={{ width: `${(task.id === "garden" ? harvested / 9 : farm.done[task.id].length / task.stages.flat().length) * 100}%` }} /></div>{done && nextStop && <button className={styles.primary} onClick={() => openTask(nextStop)}>Next: {taskDefinition(nextStop)!.title} →</button>}{done && <button className={styles.smallButton} onClick={() => { setTaskId(null); setMessage("Another happy friend! Choose your next farm stop."); }}>Back to the farm →</button>}</div>
+        <div className={styles.activityFooter}><button type="button" className={styles.smallButton} onClick={() => { const hint = task.id === "hay" ? task.hint : task.id === "garden" ? gardenHint : farmTool(task.id, targets[0] ?? "").instruction; setMessage(hint); audio.say(hint, true); }}>Hear or read a hint</button><span>{task.id === "garden" ? `${harvested} / 9 plots harvested` : `${farm.done[task.id].length} / ${taskTargets(farm, task.id).length} little steps`}</span><div className={styles.stepTrack}><span style={{ width: `${(task.id === "garden" ? harvested / 9 : farm.done[task.id].length / taskTargets(farm, task.id).length) * 100}%` }} /></div>{done && nextStop && <button className={styles.primary} onClick={() => openTask(nextStop)}>Next: {taskDefinition(nextStop)!.title} →</button>}{done && <button className={styles.smallButton} onClick={() => { setTaskId(null); setMessage("Another happy friend! Choose your next farm stop."); }}>Back to the farm →</button>}</div>
       </> : <>
         <div className={styles.mapHeading}><div><span className={styles.eyebrow}>Welcome to your sunny little corner</span><h3 ref={titleRef} tabIndex={-1}>Who shall we help today?</h3></div><span className={styles.dayPill}>{count} / 8 happy stops</span></div>
         <div className={`${styles.scene} ${styles.map}`} style={{ backgroundImage: "url('/games/sunny-farm/hub.webp')" }}>
@@ -212,23 +216,33 @@ function ActivityArtwork({ taskId: id, farm, targets, busy, eating, happy, now }
   if (id === "horse") return <>
     <div className={`${styles.animalBody} ${styles.horseBody}`}>
       {targets.includes("feed") ? targetButton("feed", 50, 50, "Feed horse", <FarmSprite animal="horse" pose={0} className={styles.animalSprite} label="Your farm horse" />, styles.directAnimal) : <FarmSprite animal="horse" pose={eating ? 4 : happy ? 5 : 0} className={styles.animalSprite} label="Your farm horse" />}
-      {[0, 1, 2].map(i => targetButton(`brush-${i}`, 31 + i * 15, 60 - i * 3, `Brush spot ${i + 1}`, <span className={styles.dust}>✦</span>, styles.patch))}
+      {([[13, 65, "tail"], [43, 59, "body"], [66, 27, "mane"]] as const).map(([x, y, part], i) => targetButton(`brush-${i}`, x, y, `Brush ${part}`, <span className={styles.dust}>✦</span>, styles.patch))}
     </div>
   </>;
   if (id === "cow") return <>
     <div className={`${styles.animalBody} ${styles.cowBody}`}>
       {targets.includes("feed") ? targetButton("feed", 50, 50, "Feed cow", <FarmSprite animal="cow" pose={0} className={styles.animalSprite} label="Your farm cow" />, styles.directAnimal) : <FarmSprite animal="cow" pose={eating ? 4 : happy ? 5 : 0} className={styles.animalSprite} label="Your farm cow" />}
-      {targetButton("milk-left", 32, 82, "Squeeze left", <span className={styles.handle}>↓</span>)}
-      {targetButton("milk-right", 45, 82, "Squeeze right", <span className={styles.handle}>↓</span>)}
-      {targetButton("milk-finish", 38, 82, "Finish milking", <span className={styles.handle}>↓</span>)}
-      {art(seen("milk-finish") ? "milk" : "pail", 59, 75, 24)}
-      {seen("milk-left") && !seen("milk-finish") && <span className={styles.milkProgress} style={place(68, 69)}>{seen("milk-right") ? "⅔" : "⅓"} full</span>}
+      {targets.filter(target => target.startsWith("milk")).map(target => targetButton(target, 38, 76, "Milk cow", <><span className={styles.squeezeSpot}>🤏</span><svg className={styles.milkStream} viewBox="0 0 100 80" aria-hidden="true"><path d="M85 5 Q80 40 15 70" fill="none" stroke="#fffdf1" strokeWidth="6" strokeLinecap="round" strokeDasharray="8 9" /></svg></>, styles.milkSpot))}
+      <div className={styles.milkingBucket} style={place(7, 77, 27)} role="img" aria-label={`Milk bucket ${seen("milk-finish") ? "full" : seen("milk-right") ? "two thirds full" : seen("milk-left") ? "one third full" : "empty"}`}>
+        <svg viewBox="0 0 100 110" aria-hidden="true"><defs><clipPath id="farm-pail-fill"><path d="m18 38 8 60q24 12 48 0l8-60Z" /></clipPath></defs><path d="M22 40C-3 0 103 0 78 40" fill="none" stroke="#738b90" strokeWidth="6"/><path d="m18 38 8 60q24 12 48 0l8-60Z" fill="#b8cbd0" stroke="#607e86" strokeWidth="4"/><rect x="18" y={99 - (seen("milk-finish") ? 60 : seen("milk-right") ? 40 : seen("milk-left") ? 20 : 0)} width="64" height="70" fill="#fffcdf" clipPath="url(#farm-pail-fill)"/><ellipse cx="50" cy="38" rx="32" ry="8" fill="#829ba1" stroke="#607e86" strokeWidth="3"/><path d="M33 51 38 91" stroke="#fff" opacity=".4" strokeWidth="5"/></svg>
+        <span>{seen("milk-finish") ? "Full!" : seen("milk-right") ? "⅔ full" : seen("milk-left") ? "⅓ full" : "Milk bucket"}</span>
+      </div>
     </div>
   </>;
   if (id === "chickens") return <>
-    {[0, 1, 2].map(i => targets.includes("feed") ? targetButton("feed", 36 + i * 25, 74, `Feed chicken ${i + 1}`, <FarmSprite animal="chicken" pose={0} />, styles.chickenFriend) : <FarmSprite key={i} animal="chicken" pose={eating ? 4 : 0} className={styles.prop} style={place(25 + i * 25, 56, 20)} />)}
-    {[0, 1, 2].map(i => targetButton(`egg-${i}`, 57 + i * 16, 39, `Collect egg ${i + 1}`, <FarmSprite item="egg" />, styles.nestEgg))}
-    <FarmCollectionBasket count={farm.inventory.eggs} style={place(3, 69, 22)} />
+    {[0, 1, 2].map(i => <div key={i} className={styles.chickenWalker} data-feeding={eating || undefined} style={{ ...place(37 + i * 23, 78 + (i % 2) * 7, 18), "--walk-delay": `${-i * 2.7}s`, "--walk-direction": i === 1 ? -1 : 1 } as CSSProperties}>
+      {targets.includes("feed") ? targetButton("feed", 50, 50, `Feed chicken ${i + 1}`, <FarmSprite animal="chicken" pose={0} />, styles.chickenFriend) : <FarmSprite animal="chicken" pose={eating ? 4 : 0} />}
+    </div>)}
+    {seen("feed") && <div className={styles.scatteredFeed} data-farm-grain aria-hidden="true">{Array.from({ length: 45 }, (_, i) => <i key={i} style={{ left: `${31 + (i * 17 % 63)}%`, top: `${76 + (i * 7 % 18)}%`, "--grain-drift": `${(i % 7 - 3) * 9}px`, "--grain-delay": `${i % 9 * .06}s` } as CSSProperties} />)}</div>}
+    {chickenNests(farm).map(({ stall, eggs }) => {
+      const remaining = eggs.filter(egg => !seen(egg));
+      const x = 57 + stall % 3 * 16, y = stall < 3 ? 35 : 59;
+      return <div key={stall} className={styles.coopNest} style={place(x, y, 15)} role="group" aria-label={`Stall ${stall + 1}: ${remaining.length} eggs`}>
+        {remaining.map((egg, i) => targetButton(egg, 25 + i * 25, 40 - (i % 2) * 15, farm.coopEggs ? `Collect egg ${eggs.indexOf(egg) + 1} from stall ${stall + 1}` : `Collect egg ${Number(egg.split("-")[1]) + 1}`, <FarmSprite item="egg" />, styles.nestEgg))}
+        {seen("feed") && <span className={styles.nestCount}>{remaining.length === 0 ? "No eggs" : `${remaining.length} ${remaining.length === 1 ? "egg" : "eggs"}`}</span>}
+      </div>;
+    })}
+    <FarmCollectionBasket count={farm.inventory.eggs} style={place(3, 73, 22)} />
   </>;
   if (id === "sheep") return <>
     {[0, 1, 2].map(i => !seen(`herd-${i}`) ? targetButton(`herd-${i}`, 23 + i * 25, 60 + (i % 2) * 13, `Guide sheep ${i + 1}`, <FarmSprite animal="sheep" />, styles.sheepTarget) : null)}
