@@ -8,7 +8,7 @@ Games open in a viewport-sized player on phones and tablets. **Full screen** als
 
 Run `npm run test:games:responsive` against a local server on port 3017 (or set `GAMES_TEST_URL`) to check all 13 games at phone and tablet sizes, farm scene transitions and completion controls, Block Drop controls, and fullscreen state preservation.
 
-Eight farm stops form one player-paced farm day. Feed the horse and cow directly with a tap; barn hay is always available. Gather field hay to stock your basket too. Feed/brush the horse, feed/milk the cow, feed chickens/collect three eggs, guide/shear sheep, feed ducks, pick apples, and plant/water/harvest carrots, tomatoes, and corn. Each step saves to the child's server-side `FarmProgress`; inventory and completed stops survive navigation and devices. No timer, decay, or missed-day penalty. The optional narration toggle uses the browser's speech synthesis when available; all instructions remain visible.
+Eight farm stops form one player-paced farm day. Feed the horse and cow directly with a tap; barn hay is always available. Gather field hay to stock your basket too. Feed/brush the horse, feed/milk the cow, feed chickens/collect three eggs, guide/shear sheep, feed ducks, pick apples, and hoe/plant/water/harvest nine plots of wheat, vegetables, and fruit. Each step saves to the child's server-side `FarmProgress`; inventory and completed stops survive navigation and devices. Crops have short growth timers; there is no decay or missed-day penalty. The optional narration toggle uses the browser's speech synthesis when available; all instructions remain visible.
 
 Once all eight stops are complete, celebrate on the map. This records one game session and awards the parent's configured points or tickets once. Starting another farm day resets task inventory while retaining completed-day count. Farm days are play rounds, not calendar dates. Existing daily play limits count completed rounds using the app's shared game-day convention.
 
@@ -16,7 +16,7 @@ Tap a horse, cow, chicken, or duck directly to feed it. Horse and cow targets co
 
 Keyboard controls: Enter feeds an animal. For collecting, Enter picks up the item and focuses the basket; Enter on the basket deposits it. For other care work, select the tool, Tab to a work spot, and press arrow keys four times. Escape puts the tool away. Touch, mouse, and pen share the same pointer controls. Partial strokes are temporary until the step finishes; completed steps save as before.
 
-The garden uses the supplied 3×3 field background (`garden.webp`). All nine beds must be planted, watered, and harvested; crops are drawn on the actual beds. Existing saves retain completed steps and can continue across the remaining beds. No database migration is needed for this interaction update.
+The garden uses the supplied 3×3 field background (`garden.webp`). Each plot can be hoed, planted, watered, and harvested independently. All nine plots must be harvested to finish the garden; crops, growth stages, and countdowns are drawn on the actual beds. Existing saves retain completed steps and can continue across the remaining beds. Previously watered plots without timestamps remain ready to harvest. No database migration is needed for this interaction update.
 
 ## Database
 
@@ -60,7 +60,7 @@ A persistent breakfast goal links eggs from the coop, milk from the cow, and app
 
 Research used publisher-owned listings rather than unofficial game clones:
 
-- [Hay Day, Supercell’s Google Play listing](https://play.google.com/store/apps/details?id=com.supercell.hayday) describes growing crops, feeding livestock, collecting animal products, and filling orders. Our adaptation is a small visible breakfast goal across existing areas, without real-time waiting or new currencies.
+- [Hay Day, Supercell’s Google Play listing](https://play.google.com/store/apps/details?id=com.supercell.hayday) describes growing crops, feeding livestock, collecting animal products, and filling orders. Our adaptation is a small visible breakfast goal across existing areas, alongside short crop timers and without new currencies.
 - [Toca Life: Farm, publisher listing](https://galaxystore.samsung.com/detail/com.tocaboca.tocalifefarm.samsung) describes feeding animals, milking cows, gathering eggs, and using farm produce. Our adaptation favors large direct animal interactions and tangible item movement. These implementation choices are our design interpretation, not a claim that those games use identical controls.
 
 The feeding fix handles pointer release as well as keyboard clicks; pointer capture formerly redirected clicks away from the animal button. Browser coverage now verifies direct mouse feeding without field hay, direct touch feeding of cow/chickens/ducks, basket drops, an outside drop that does not save an egg, keyboard collection, error recovery, and the existing full round. Shared-rule tests verify the breakfast goal and hay inventory behavior. No schema migration is needed.
@@ -78,6 +78,26 @@ Each scene, including the farm map, has two optional marked surprises. Click or 
 Browser checks exercise actual local audio decoding/playback, default silence, separate effects/reader controls, voice preview, varied toy replies without saved-state changes, timed pose resets, and the full existing farm loop. Speech output is instrumented during browser tests; subjective voice quality still needs listening on the intended device.
 
 
-## Garden crop choices
+## Garden plots, tools, and harvest times
 
-Choose Carrots, Tomatoes, or Corn before planting an empty garden bed. Each of the nine beds saves its own crop, so one garden can grow all three. Water all beds, then harvest the matching produce into the farm basket. Mature crops use the existing atlas artwork. Crop choices and tomato/corn counts are stored in the existing JSON farm state; no database migration is required. Older planted beds remain carrots, and starting another farm day clears crop choices and harvest counts.
+Choose a garden tool, then work on any matching plot. The **Garden hoe** prepares empty soil with strokes. **Planting seeds** pours the selected seed into a prepared plot. The **Watering can** starts that plot’s growth timer. The **Harvest sickle** collects a ripe crop with an upward pull. Keyboard players select a tool, focus a matching plot, and press an arrow key four times. A tool cannot work on an incompatible plot. Seed choices stay available in a horizontally scrolling tray on smaller screens.
+
+Each of the nine plots grows independently, so you can water the first plot while the other eight are empty. The garden summary shows growing, ready, and harvested counts; the map also shows crops ready to harvest. Sprouts develop into recognizable plants and ripe crops. Seeds and tools are free. One harvest per plot contributes one item to the basket; another farm day starts a fresh crop patch.
+
+| Crop | Type | Time after watering |
+| --- | --- | --- |
+| Wheat | Grain | 30 seconds |
+| Carrots | Vegetable | 45 seconds |
+| Tomatoes | Vegetable | 1 minute |
+| Corn | Vegetable | 1 minute 30 seconds |
+| Strawberries | Fruit | 1 minute 15 seconds |
+| Potatoes | Vegetable | 1 minute |
+| Blueberries | Fruit | 1 minute 45 seconds |
+| Pumpkins | Vegetable | 2 minutes |
+| Watermelons | Fruit | 2 minutes 30 seconds |
+
+Watering timestamps and crop IDs save in the existing JSON farm state. Timers continue while visiting animals, navigating away, or closing the game. The client follows the server clock and refreshes its display every second; the server independently rejects early harvests. Ripe crops stay ready indefinitely. A waiting garden never counts as completed, and harvesting the same plot twice is rejected.
+
+No database migration is required. Older crops retain their variety (or carrots where no variety was recorded), older watered plots are immediately ripe, and older harvested plots remain completed. Starting another farm day clears plot choices, timers, and inventory. New crop and tool illustrations are inline SVG and require no external artwork or network calls.
+
+Rule tests cover every crop’s exact timer boundary, independent plot actions, JSON save/reload, old saves, duplicate harvests, and round resets. Browser coverage plants all nine varieties, verifies saved growing plots after reload, advances the fixture clock to readiness, and harvests each variety into its own basket count. Browser fixtures use no live household data.

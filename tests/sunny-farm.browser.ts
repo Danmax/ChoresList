@@ -8,12 +8,16 @@ async function main() {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1280, height: 1100 } });
   await page.addInitScript(() => {
+    // Exercise the same in-page fullscreen fallback used on phones and tablets.
+    Element.prototype.requestFullscreen = () => Promise.reject(new Error("Unsupported in this browser fixture"));
     const log = window as unknown as { farmAudioStarts: number[]; farmSpeech: string[] };
     log.farmAudioStarts = []; log.farmSpeech = [];
     const start = AudioBufferSourceNode.prototype.start;
     AudioBufferSourceNode.prototype.start = function (...args: Parameters<typeof start>) { log.farmAudioStarts.push(this.buffer?.duration ?? 0); return start.apply(this, args); };
     window.speechSynthesis.speak = utterance => { log.farmSpeech.push(utterance.text); };
   });
+  await page.clock.install();
+  let serverOffset = 0;
   const errors: string[] = [];
   page.on("pageerror", err => errors.push(err.message));
   let farm = createFarm(), version = 0, rewards = 0, failNext = false, conflictNext = false;
@@ -30,13 +34,13 @@ async function main() {
         if (conflictNext) { conflictNext = false; version++; await route.fulfill({ status: 409, json: { error: "Farm updated in another tab." } }); return; }
         try {
           if (body.version !== version) throw new Error("Stale version");
-          if (body.action === "help") { if (body.tool !== farmTool(body.task, body.target).id) throw new Error("Wrong tool"); farm = applyFarmAction(farm, body.task, body.target, body.crop); }
+          if (body.action === "help") { if (body.tool !== farmTool(body.task, body.target).id) throw new Error("Wrong tool"); farm = applyFarmAction(farm, body.task, body.target, body.crop, Date.now() + serverOffset); }
           else if (body.action === "celebrate") { farm = celebrateFarm(farm); rewards++; }
           else if (body.action === "next-day") farm = nextFarmDay(farm);
           version++;
         } catch (err) { status = 400; response = { error: String(err) }; }
       }
-      if (status === 200) response = { farm, version };
+      if (status === 200) response = { farm, version, serverNow: Date.now() + serverOffset };
     }
     await route.fulfill({ status, json: response });
   });
@@ -53,7 +57,8 @@ async function main() {
       await page.getByRole("button", { name: "Put item in basket", exact: true }).press("Enter");
       await page.waitForTimeout(80); return;
     }
-    const pickup = page.getByRole("button", { name: /Pick up|Put down/ });
+    const gardenAction = label.startsWith("Hoe bed") ? "till" : label.startsWith("Plant bed") ? "plant" : label.startsWith("Water bed") ? "water" : label.startsWith("Harvest bed") ? "harvest" : null;
+    const pickup = gardenAction ? page.getByRole("button", { name: new RegExp(`(Pick up|Put down) ${farmTool("garden", gardenAction).label}`) }) : page.getByRole("button", { name: /Pick up|Put down/ });
     if (await pickup.getAttribute("aria-pressed") !== "true") await pickup.click();
     const target = page.getByRole("button", { name: label, exact: true });
     await expect(target).toHaveAttribute("aria-disabled", "false");
@@ -117,16 +122,16 @@ async function main() {
       for (const stage of task.stages) for (const target of stage) {
         if (farm.done[task.id].includes(target)) continue;
         const i = Number(target.split("-").at(-1)) + 1;
-        const label = task.id === "chickens" && target === "feed" ? "Scatter grain" : labels[target] ?? (target.startsWith("brush") ? `Brush spot ${i}` : target.startsWith("egg") ? `Collect egg ${i}` : target.startsWith("herd") ? `Guide sheep ${i}` : target.startsWith("wool") ? `Clip wool ${i}` : target.startsWith("duck") ? `Feed duck ${i}` : target.startsWith("apple") ? `Pick apple ${i}` : target.startsWith("plant") ? `Plant bed ${i}` : target.startsWith("water") ? `Water bed ${i}` : `Harvest bed ${i}`);
+        const label = task.id === "chickens" && target === "feed" ? "Scatter grain" : labels[target] ?? (target.startsWith("brush") ? `Brush spot ${i}` : target.startsWith("egg") ? `Collect egg ${i}` : target.startsWith("herd") ? `Guide sheep ${i}` : target.startsWith("wool") ? `Clip wool ${i}` : target.startsWith("duck") ? `Feed duck ${i}` : target.startsWith("apple") ? `Pick apple ${i}` : target.startsWith("till") ? `Hoe bed ${i}` : target.startsWith("plant") ? `Plant bed ${i}` : target.startsWith("water") ? `Water bed ${i}` : `Harvest bed ${i}`);
         if (task.id === "garden" && target.startsWith("plant-")) {
-          const crop = FARM_CROPS[(i - 1) % 3];
+          const crop = FARM_CROPS[i - 1];
           await page.getByRole("button", { name: crop.label, exact: true }).click();
           await work(label);
-          await expect(page.locator(`[data-crop="${crop.id}"]`)).toHaveCount(Math.ceil(i / 3));
+          await expect(page.locator(`[data-crop="${crop.id}"]`)).toHaveCount(1);
           if (target === "plant-8") {
             await open();
             await page.getByRole("button", { name: `${task.title}: ${task.verb}`, exact: true }).click();
-            for (const savedCrop of FARM_CROPS) await expect(page.locator(`[data-crop="${savedCrop.id}"]`)).toHaveCount(3);
+            for (const savedCrop of FARM_CROPS) await expect(page.locator(`[data-crop="${savedCrop.id}"]`)).toHaveCount(1);
             await page.setViewportSize({ width: 390, height: 844 });
             await page.screenshot({ path: "/tmp/sunny-farm-preview/mixed-garden-mobile.png", fullPage: true });
             await page.setViewportSize({ width: 1280, height: 1100 });
@@ -207,18 +212,37 @@ async function main() {
           await expect(bed).toHaveCount(0);
         } else await work(label);
         if (task.id === "garden" && target === "water-8") {
+          await expect(page.getByLabel("Garden harvest status")).toHaveText("0 ready · 9 growing · 0/9 harvested");
+          await expect(page.getByRole("button", { name: "Harvest bed 1", exact: true })).toHaveCount(0);
+          // A growing garden must survive a reload without completing itself.
+          await open();
+          await page.getByRole("button", { name: `${task.title}: ${task.verb}`, exact: true }).click();
+          await expect(page.getByLabel("Garden harvest status")).toContainText("9 growing");
+          await page.screenshot({ path: "/tmp/sunny-farm-preview/garden-growing.png", fullPage: true });
+          serverOffset += 160_000;
+          await page.clock.fastForward(160_000);
+          await expect(page.getByLabel("Garden harvest status")).toHaveText("9 ready · 0 growing · 0/9 harvested");
           await page.screenshot({ path: "/tmp/sunny-farm-preview/mixed-garden-grown-desktop.png", fullPage: true });
           await page.setViewportSize({ width: 390, height: 844 });
           await page.screenshot({ path: "/tmp/sunny-farm-preview/mixed-garden-grown-mobile.png", fullPage: true });
           const gardenScene = await page.getByLabel("Vegetable garden activity", { exact: true }).boundingBox();
           if (!gardenScene || gardenScene.x + gardenScene.width > 390) throw new Error("Mobile garden extends past the screen");
+          await page.getByRole("button", { name: "Enter full screen", exact: true }).click();
+          for (const size of [{ width: 390, height: 844 }, { width: 320, height: 568 }, { width: 844, height: 390 }]) {
+            await page.setViewportSize(size);
+            await expect(page.getByRole("button", { name: "Harvest bed 9", exact: true })).toBeVisible();
+            const plotRects = await page.locator('[data-farm-target^="harvest-"]').evaluateAll(els => els.map(el => { const rect = el.getBoundingClientRect(); return { top: rect.top, bottom: rect.bottom }; }));
+            for (let plot = 0; plot < 6; plot++) if (plotRects[plot].bottom > plotRects[plot + 3].top + 1) throw new Error(`Garden plot targets overlap at ${size.width}px`);
+            await page.screenshot({ path: `/tmp/sunny-farm-preview/ripe-farm-${size.width}.png` });
+          }
+          await page.getByRole("button", { name: "Exit full screen", exact: true }).click();
           await page.setViewportSize({ width: 1280, height: 1100 });
         }
       }
       await expect(page.getByText("Happy & cared for!")).toBeVisible();
       if (task.id === "garden") {
         await page.getByText("🧺 Your farm basket & breakfast trail", { exact: true }).click();
-        for (const crop of FARM_CROPS) await expect(page.getByLabel(`3 ${crop.inventory}`, { exact: true })).toBeVisible();
+        for (const crop of FARM_CROPS) await expect(page.getByLabel(`1 ${crop.inventory}`, { exact: true })).toBeVisible();
         await page.getByText("🧺 Your farm basket & breakfast trail", { exact: true }).click();
       }
       if (task.id === "garden") await page.screenshot({ path: "/tmp/sunny-farm-preview/garden-desktop.png", fullPage: true });
@@ -271,6 +295,57 @@ async function main() {
     await page.mouse.move(horseBox.x + horseBox.width / 2, horseBox.y + horseBox.height / 2, { steps: 12 }); await page.mouse.up();
     await expect(horse).toHaveCount(0);
     if (!farm.done.horse.includes("feed")) throw new Error("Direct food-to-animal drag did not save");
+    await page.getByRole("button", { name: "Farm map", exact: true }).click();
+    await page.getByRole("button", { name: "Vegetable garden: Plant, water & harvest", exact: true }).click();
+    await page.getByRole("button", { name: "Wheat", exact: true }).click();
+    // An incompatible tool must never complete a plot through keyboard or pointer work.
+    await page.getByRole("button", { name: "Pick up Planting seeds", exact: true }).click();
+    const emptyPlot = page.getByRole("button", { name: "Hoe bed 1", exact: true });
+    await expect(emptyPlot).toHaveAttribute("aria-disabled", "true");
+    const beforeWrongTool = version;
+    for (let i = 0; i < 4; i++) await emptyPlot.press("ArrowUp");
+    if (version !== beforeWrongTool) throw new Error("Wrong garden tool saved work");
+    await page.getByRole("button", { name: "Pick up Garden hoe", exact: true }).click();
+    await emptyPlot.scrollIntoViewIfNeeded();
+    const soil = (await emptyPlot.boundingBox())!;
+    const soilX = soil.x + soil.width / 2, soilY = soil.y + soil.height / 2;
+    await page.mouse.move(soilX, soilY); await page.mouse.down();
+    for (let n = 0; n < 18; n++) await page.mouse.move(soilX + (n % 2 ? -16 : 16), soilY, { steps: 3 });
+    await page.mouse.up();
+    await expect(page.getByRole("button", { name: "Plant bed 1", exact: true })).toBeVisible();
+    // Drag a different tool straight out of the tray and hold over the prepared plot.
+    const seedTool = page.getByRole("button", { name: "Pick up Planting seeds", exact: true });
+    await seedTool.scrollIntoViewIfNeeded();
+    const seedBox = (await seedTool.boundingBox())!;
+    const plantBox = (await page.getByRole("button", { name: "Plant bed 1", exact: true }).boundingBox())!;
+    await page.mouse.move(seedBox.x + seedBox.width / 2, seedBox.y + seedBox.height / 2); await page.mouse.down();
+    await page.mouse.move(plantBox.x + plantBox.width / 2, plantBox.y + plantBox.height / 2, { steps: 8 });
+    await page.waitForTimeout(1300); await page.mouse.up();
+    await expect(page.getByRole("button", { name: "Water bed 1", exact: true })).toBeVisible();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByRole("button", { name: "Pick up Watering can", exact: true }).click();
+    const waterPlot = page.getByRole("button", { name: "Water bed 1", exact: true });
+    await waterPlot.scrollIntoViewIfNeeded();
+    const waterBox = (await waterPlot.boundingBox())!;
+    const gardenTouch = await page.context().newCDPSession(page);
+    await gardenTouch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: waterBox.x + waterBox.width / 2, y: waterBox.y + waterBox.height / 2 }] });
+    await page.waitForTimeout(1300);
+    await gardenTouch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await expect(page.getByLabel("Garden harvest status")).toContainText("1 growing");
+    await expect(page.getByRole("button", { name: "Hoe bed 2", exact: true })).toBeVisible();
+    serverOffset += 31_000;
+    await page.clock.fastForward(31_000);
+    await expect(page.getByRole("button", { name: "Harvest bed 1", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Pick up Harvest sickle", exact: true }).click();
+    const ripePlot = page.getByRole("button", { name: "Harvest bed 1", exact: true });
+    await ripePlot.scrollIntoViewIfNeeded();
+    const ripeBox = (await ripePlot.boundingBox())!;
+    const ripeX = ripeBox.x + ripeBox.width / 2, ripeY = ripeBox.y + ripeBox.height / 2;
+    await gardenTouch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: ripeX, y: ripeY }] });
+    await gardenTouch.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: ripeX, y: ripeY - 65 }] });
+    await gardenTouch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await expect(page.getByLabel("Garden harvest status")).toContainText("1/9 harvested");
+    if (farm.inventory.wheat !== 1 || farm.done.garden.length !== 4) throw new Error("Independent plot harvest did not save exactly one crop");
     if (errors.length) throw new Error(errors.join("\n"));
     console.log("Farm browser checks passed: all eight activities, save/reload, error retry, conflicts, one celebration, new day, and mobile layout.");
   } finally { await browser.close(); }

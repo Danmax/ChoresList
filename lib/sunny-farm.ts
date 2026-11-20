@@ -1,13 +1,19 @@
 /** Shared farm rules. Only the server persists actions and awards completion rewards. */
 export const FARM_CROPS = [
-  { id: "carrot", label: "Carrots", icon: "🥕", inventory: "carrots", plant: "carrotPlant" },
-  { id: "tomato", label: "Tomatoes", icon: "🍅", inventory: "tomatoes", plant: "tomatoPlant" },
-  { id: "corn", label: "Corn", icon: "🌽", inventory: "corn", plant: "cornPlant" },
+  { id: "wheat", label: "Wheat", icon: "🌾", inventory: "wheat", growMs: 30_000, kind: "Grain" },
+  { id: "carrot", label: "Carrots", icon: "🥕", inventory: "carrots", growMs: 45_000, kind: "Vegetable" },
+  { id: "tomato", label: "Tomatoes", icon: "🍅", inventory: "tomatoes", growMs: 60_000, kind: "Vegetable" },
+  { id: "corn", label: "Corn", icon: "🌽", inventory: "corn", growMs: 90_000, kind: "Vegetable" },
+  { id: "strawberry", label: "Strawberries", icon: "🍓", inventory: "strawberries", growMs: 75_000, kind: "Fruit" },
+  { id: "potato", label: "Potatoes", icon: "🥔", inventory: "potatoes", growMs: 60_000, kind: "Vegetable" },
+  { id: "blueberry", label: "Blueberries", icon: "🫐", inventory: "blueberries", growMs: 105_000, kind: "Fruit" },
+  { id: "pumpkin", label: "Pumpkins", icon: "🎃", inventory: "pumpkins", growMs: 120_000, kind: "Vegetable" },
+  { id: "watermelon", label: "Watermelons", icon: "🍉", inventory: "watermelons", growMs: 150_000, kind: "Fruit" },
 ] as const;
 export type FarmCropId = typeof FARM_CROPS[number]["id"];
 /** Beds planted before crop selection was added remain carrots. */
 export function bedCrop(state: FarmState, bed: number) {
-  return FARM_CROPS.find(crop => crop.id === state.gardenCrops?.[bed]) ?? FARM_CROPS[0];
+  return FARM_CROPS.find(crop => crop.id === state.gardenCrops?.[bed]) ?? FARM_CROPS[1];
 }
 export const FARM_TASKS = [
   { id: "hay", title: "Hayfield", verb: "Gather hay", icon: "🚜", scene: "field", hint: "Pick up the tractor keys and drive to each hay bale to fill your trailer.", stages: [["bale-0", "bale-1", "bale-2"]] },
@@ -17,23 +23,39 @@ export const FARM_TASKS = [
   { id: "sheep", title: "Sheep meadow", verb: "Guide & shear", icon: "🐑", scene: "pasture", hint: "Use the shepherd’s crook to guide the sheep, then sweep the clippers over their wool.", stages: [["herd-0", "herd-1", "herd-2"], ["wool-0", "wool-1", "wool-2"]] },
   { id: "ducks", title: "Duck pond", verb: "Feed the ducks", icon: "🦆", scene: "pond", hint: "Tap each duck to give it pellets.", stages: [["duck-0", "duck-1", "duck-2"]] },
   { id: "orchard", title: "Apple orchard", verb: "Pick apples", icon: "🍎", scene: "hub", hint: "Move ripe apples into your basket for our farm breakfast.", stages: [["apple-0", "apple-1", "apple-2"]] },
-  { id: "garden", title: "Vegetable garden", verb: "Plant, water & harvest", icon: "🥕", scene: "garden", hint: "Pick up seeds, water the nine beds with your watering can, then harvest your carrots, tomatoes, and corn.", stages: [Array.from({ length: 9 }, (_, i) => `plant-${i}`), Array.from({ length: 9 }, (_, i) => `water-${i}`), Array.from({ length: 9 }, (_, i) => `harvest-${i}`)] },
+  { id: "garden", title: "Vegetable garden", verb: "Plant, water & harvest", icon: "🌾", scene: "garden", hint: "Hoe a plot, choose seeds, then plant and water. Each crop grows in its own time. Visit your animals while you wait!", stages: [Array.from({ length: 9 }, (_, i) => `till-${i}`), Array.from({ length: 9 }, (_, i) => `plant-${i}`), Array.from({ length: 9 }, (_, i) => `water-${i}`), Array.from({ length: 9 }, (_, i) => `harvest-${i}`)] },
 ] as const;
 export type FarmTaskId = typeof FARM_TASKS[number]["id"];
 export type FarmState = {
   schema: 1; round: number; completedDays: number; startedAt: number; celebrated: boolean;
   done: Record<FarmTaskId, string[]>;
   gardenCrops?: Partial<Record<number, FarmCropId>>;
-  inventory: { hay: number; eggs: number; milk: number; wool: number; apples: number; carrots: number; tomatoes?: number; corn?: number };
+  gardenWateredAt?: Partial<Record<number, number>>;
+  inventory: { hay: number; eggs: number; milk: number; wool: number; apples: number; carrots: number } & Partial<Record<typeof FARM_CROPS[number]["inventory"], number>>;
 };
 export class FarmRuleError extends Error {}
 export function createFarm(now = Date.now(), completedDays = 0): FarmState {
   return { schema: 1, round: completedDays + 1, completedDays, startedAt: now, celebrated: false,
     done: Object.fromEntries(FARM_TASKS.map(t => [t.id, [] as string[]])) as FarmState["done"],
-    inventory: { hay: 0, eggs: 0, milk: 0, wool: 0, apples: 0, carrots: 0, tomatoes: 0, corn: 0 }, gardenCrops: {} };
+    inventory: { hay: 0, eggs: 0, milk: 0, wool: 0, apples: 0, carrots: 0, ...Object.fromEntries(FARM_CROPS.map(c => [c.inventory, 0])) }, gardenCrops: {}, gardenWateredAt: {} };
 }
 export function taskDefinition(id: unknown) { return FARM_TASKS.find(t => t.id === id); }
-export function activeTargets(state: FarmState, taskId: FarmTaskId): string[] {
+export function cropTime(ms: number) {
+  const seconds = Math.max(0, Math.ceil(ms / 1000));
+  return seconds >= 60 ? `${Math.floor(seconds / 60)}m${seconds % 60 ? ` ${seconds % 60}s` : ""}` : `${seconds}s`;
+}
+/** Watering timestamps are server-owned; older watered saves are already ripe. */
+export function gardenPlot(state: FarmState, bed: number, now = Date.now()) {
+  const done = state.done.garden;
+  const crop = bedCrop(state, bed);
+  const wateredAt = state.gardenWateredAt?.[bed];
+  const remainingMs = wateredAt === undefined ? 0 : Math.max(0, wateredAt + crop.growMs - now);
+  const phase = done.includes(`harvest-${bed}`) ? "harvested" : !done.includes(`plant-${bed}`) ? (done.includes(`till-${bed}`) ? "tilled" : "empty") : !done.includes(`water-${bed}`) ? "planted" : remainingMs > 0 ? "growing" : "ready";
+  const action = phase === "empty" ? `till-${bed}` : phase === "tilled" ? `plant-${bed}` : phase === "planted" ? `water-${bed}` : phase === "ready" ? `harvest-${bed}` : null;
+  return { crop, phase, action, remainingMs, growth: Math.max(0, Math.min(1, 1 - remainingMs / crop.growMs)) };
+}
+export function activeTargets(state: FarmState, taskId: FarmTaskId, now = Date.now()): string[] {
+  if (taskId === "garden") return Array.from({ length: 9 }, (_, i) => gardenPlot(state, i, now).action).filter((target): target is string => target !== null);
   const task = taskDefinition(taskId)!;
   for (const stage of task.stages) {
     const remaining = stage.filter(target => !state.done[taskId].includes(target));
@@ -41,18 +63,20 @@ export function activeTargets(state: FarmState, taskId: FarmTaskId): string[] {
   }
   return [];
 }
-export function taskComplete(state: FarmState, taskId: FarmTaskId) { return activeTargets(state, taskId).length === 0; }
+export function taskComplete(state: FarmState, taskId: FarmTaskId) { return taskId === "garden" ? Array.from({ length: 9 }, (_, i) => `harvest-${i}`).every(t => state.done.garden.includes(t)) : activeTargets(state, taskId).length === 0; }
 export function completedTasks(state: FarmState) { return FARM_TASKS.filter(t => taskComplete(state, t.id)).length; }
 export function farmReady(state: FarmState) { return completedTasks(state) === FARM_TASKS.length; }
-export function applyFarmAction(state: FarmState, taskId: unknown, target: unknown, crop?: unknown): FarmState {
+export function applyFarmAction(state: FarmState, taskId: unknown, target: unknown, crop?: unknown, now = Date.now()): FarmState {
   const task = taskDefinition(taskId);
   if (!task || typeof target !== "string") throw new FarmRuleError("Choose a farm activity.");
   if (state.celebrated) throw new FarmRuleError("Start another farm day to play again.");
-  if (!activeTargets(state, task.id).includes(target)) throw new FarmRuleError("That step is already done, or another step comes first.");
+  if (task.id === "garden" && /^harvest-[0-8]$/.test(target) && gardenPlot(state, Number(target.split("-")[1]), now).phase === "growing") throw new FarmRuleError("This crop is still growing. Come back when its timer is ready.");
+  if (!activeTargets(state, task.id, now).includes(target)) throw new FarmRuleError("That step is already done, or another step comes first.");
   const planting = task.id === "garden" && target.startsWith("plant-");
-  if (crop !== undefined && (!planting || !FARM_CROPS.some(c => c.id === crop))) throw new FarmRuleError("Choose carrot, tomato, or corn seeds before planting.");
+  if (crop !== undefined && (!planting || !FARM_CROPS.some(c => c.id === crop))) throw new FarmRuleError("Choose seeds from the seed tray before planting.");
   const next = structuredClone(state);
   if (planting) next.gardenCrops = { ...next.gardenCrops, [Number(target.split("-")[1])]: (crop ?? "carrot") as FarmCropId };
+  if (task.id === "garden" && target.startsWith("water-")) next.gardenWateredAt = { ...next.gardenWateredAt, [Number(target.split("-")[1])]: now };
   next.done[task.id].push(target);
   if (task.id === "hay") next.inventory.hay++;
   if (target === "feed" && (task.id === "horse" || task.id === "cow")) next.inventory.hay = Math.max(0, next.inventory.hay - 1);

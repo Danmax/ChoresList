@@ -34,7 +34,7 @@ export const GET = withErrors(async (req) => {
   if (ctx.error) return ctx.error;
   const saved = await prisma.farmProgress.upsert({ where: { memberId: ctx.member.id },
     create: { memberId: ctx.member.id, householdId: ctx.actor.householdId, state: jsonState(createFarm()) }, update: {} });
-  return NextResponse.json({ farm: saved.state, version: saved.version }, { headers: { "Cache-Control": "private, no-store" } });
+  return NextResponse.json({ farm: saved.state, version: saved.version, serverNow: Date.now() }, { headers: { "Cache-Control": "private, no-store" } });
 });
 
 export const POST = withErrors(async (req) => {
@@ -81,7 +81,7 @@ export const POST = withErrors(async (req) => {
       }
       return { farm: next, version: saved.version + 1, reward };
     });
-    return NextResponse.json(result);
+    return NextResponse.json({ ...result, serverNow: Date.now() });
   } catch (error) {
     if (error instanceof FarmConflict) return NextResponse.json({ error: "Your farm changed in another tab. Reloading your saved farm." }, { status: 409 });
     if (error instanceof FarmRuleError || error instanceof FarmLimit) return NextResponse.json({ error: error.message }, { status: error instanceof FarmLimit ? 429 : 400 });
