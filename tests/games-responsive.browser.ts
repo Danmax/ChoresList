@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { chromium, expect, type Locator } from "@playwright/test";
 import { DEFAULT_GAME_SETTINGS, GAME_DEFINITIONS } from "../lib/games";
+import { createHayfield } from "../lib/sunny-farm-hayfield";
 import { createFarm, FARM_TASKS } from "../lib/sunny-farm";
 import { createPet, petDay } from "../lib/pocket-pals";
 
@@ -64,6 +65,7 @@ async function main() {
             }
             await page.screenshot({ path: `/tmp/games-responsive/farm-${size.width}x${size.height}.png` });
             farmFixture.done.hay = [...FARM_TASKS[0].stages.flat()];
+            farmFixture.hayfield = createHayfield(["bale-0", "bale-1", "bale-2"]);
             await open(game.title);
             await page.getByRole("button", { name: "Hayfield: all done", exact: true }).click();
             await inScreen(page.getByRole("button", { name: "Back to the farm →", exact: true }), "Completed scene return");

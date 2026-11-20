@@ -2,7 +2,8 @@ import { chromium, expect } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import { DEFAULT_GAME_SETTINGS, GAME_DEFINITIONS } from "../lib/games";
 import { farmTool } from "../lib/sunny-farm-tools";
-import { activeTargets, applyFarmAction, celebrateFarm, createFarm, FARM_CROPS, FARM_TASKS, nextFarmDay } from "../lib/sunny-farm";
+import { hayfieldRoute } from "./helpers/sunny-farm-hayfield";
+import { activeTargets, applyFarmAction, applyHayfieldDrive, farmHayfield, celebrateFarm, createFarm, FARM_CROPS, FARM_TASKS, nextFarmDay } from "../lib/sunny-farm";
 
 async function main() {
   const browser = await chromium.launch({ headless: true });
@@ -35,6 +36,7 @@ async function main() {
         try {
           if (body.version !== version) throw new Error("Stale version");
           if (body.action === "help") { if (body.tool !== farmTool(body.task, body.target).id) throw new Error("Wrong tool"); farm = applyFarmAction(farm, body.task, body.target, body.crop, Date.now() + serverOffset); }
+          else if (body.action === "drive-hay") farm = applyHayfieldDrive(farm, body.commands);
           else if (body.action === "celebrate") { farm = celebrateFarm(farm); rewards++; }
           else if (body.action === "next-day") farm = nextFarmDay(farm);
           version++;
@@ -98,14 +100,30 @@ async function main() {
     if (farm.inventory.hay !== 0) throw new Error("Starter feeding created negative hay");
     await page.getByRole("button", { name: "Farm map", exact: true }).click();
     await page.getByRole("button", { name: "Hayfield: Gather hay", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Drive pickup truck", exact: true })).toBeDisabled();
+    const driveRight = page.getByRole("button", { name: "Drive right", exact: true });
     failNext = true;
-    await work("Collect hay 1");
+    await driveRight.press("Enter");
+    await page.clock.runFor(1100);
     await expect(page.getByRole("region", { name: "Sunny Farm Helpers" }).getByRole("alert")).toContainText("Connection lost");
-    await expect(page.getByRole("button", { name: "Collect hay 1", exact: true })).toBeEnabled();
+    await page.getByRole("button", { name: "Retry save", exact: true }).click();
+    await expect.poll(() => farmHayfield(farm).x).toBe(2);
     conflictNext = true;
-    await work("Collect hay 1");
+    await driveRight.press("Enter");
+    await page.clock.runFor(1100);
     await expect(page.getByRole("region", { name: "Sunny Farm Helpers" }).getByRole("alert")).toContainText("another tab");
-    for (const i of [3, 1, 2]) await work(`Collect hay ${i}`);
+    const route = hayfieldRoute(farmHayfield(farm));
+    for (const command of route) {
+      if (command === "truck") {
+        await expect(page.getByRole("progressbar", { name: "Hayfield mowed", exact: true })).toHaveAttribute("aria-valuenow", "100");
+        await page.screenshot({ path: "/tmp/sunny-farm-preview/hayfield-mowed.png", fullPage: true });
+        await page.getByRole("button", { name: "Drive pickup truck", exact: true }).click();
+      } else await page.getByRole("button", { name: `Drive ${command}`, exact: true }).press("Enter");
+      await page.waitForTimeout(5);
+    }
+    await expect.poll(() => farmHayfield(farm).delivered.length).toBe(9);
+    if (Number(farm.inventory.hay) !== 9) throw new Error("The barn did not receive nine hay bundles");
+    await page.screenshot({ path: "/tmp/sunny-farm-preview/hayfield-delivered.png", fullPage: true });
     await expect(page.getByText("Happy & cared for!")).toBeVisible();
     await page.getByRole("button", { name: "Back to the farm →", exact: true }).click();
     await page.reload();

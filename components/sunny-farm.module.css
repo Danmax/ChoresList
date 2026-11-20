@@ -147,6 +147,12 @@
 }
 
 /* The crop patch keeps seeds, tools, and individual plot timers in view. */
+.hayActivity{display:flex;min-width:0;min-height:0}
+:global([data-game-expanded="true"]) .hayActivity{flex:1}
+@media(max-height:600px) and (orientation:landscape){
+  :global([data-game-expanded="true"]) .hayActivity{grid-column:2;grid-row:2}
+  :global([data-game-expanded="true"]) .farm[data-farm-scene="hay"] .status{display:none}
+}
 .gardenOverview{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px 16px;padding:8px 20px;color:#3e6031;font-size:14px}
 .gardenOverview>span:last-child{color:#667345}
 .farm .cropPicker{display:flex;flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-x:contain;gap:8px;padding:8px;background:#e7edce;border-color:#c4d09e;scrollbar-width:thin}

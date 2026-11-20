@@ -1,8 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { FARM_CROPS, cropTime, gardenPlot, taskComplete, bedCrop, activeTargets, applyFarmAction, farmBreakfast, nextFarmStop, celebrateFarm, completedTasks, createFarm, FARM_TASKS, farmReady, nextFarmDay, type FarmState } from "../lib/sunny-farm";
+import { FARM_CROPS, applyHayfieldDrive, farmHayfield, cropTime, gardenPlot, taskComplete, bedCrop, activeTargets, applyFarmAction, farmBreakfast, nextFarmStop, celebrateFarm, completedTasks, createFarm, FARM_TASKS, farmReady, nextFarmDay, type FarmState } from "../lib/sunny-farm";
+
+import { hayfieldRoute } from "./helpers/sunny-farm-hayfield";
 
 function helpAll(farm: FarmState, task: typeof FARM_TASKS[number]) {
+  if (task.id === "hay") {
+    const commands = hayfieldRoute(farmHayfield(farm));
+    for (let i = 0; i < commands.length; i += 32) farm = applyHayfieldDrive(farm, commands.slice(i, i + 32));
+    return farm;
+  }
   for (const stage of task.stages) for (const target of stage) farm = applyFarmAction(farm, task.id, target, undefined, target.startsWith("harvest-") ? 200_000 : 1000);
   return farm;
 }
@@ -11,7 +18,7 @@ test("connected farm loop supplies hay, saves goods, and celebrates once", () =>
   for (const task of FARM_TASKS) farm = helpAll(farm, task);
   assert.equal(completedTasks(farm), 8);
   assert.equal(farmReady(farm), true);
-  assert.deepEqual(farm.inventory, { hay: 1, milk: 1, eggs: 3, wool: 3, apples: 3, carrots: 9, ...Object.fromEntries(FARM_CROPS.filter(c => c.id !== "carrot").map(c => [c.inventory, 0])) });
+  assert.deepEqual(farm.inventory, { hay: 7, milk: 1, eggs: 3, wool: 3, apples: 3, carrots: 9, ...Object.fromEntries(FARM_CROPS.filter(c => c.id !== "carrot").map(c => [c.inventory, 0])) });
   farm = celebrateFarm(farm);
   assert.equal(farm.completedDays, 1);
   assert.throws(() => celebrateFarm(farm), /already/);
@@ -30,8 +37,7 @@ test("rejects out-of-order steps, duplicates, invented tasks, and premature rewa
   assert.throws(() => applyFarmAction(farm, "bogus", "feed"), /Choose/);
   assert.throws(() => celebrateFarm(farm), /eight/);
   assert.throws(() => nextFarmDay(farm), /Finish/);
-  const next = applyFarmAction(farm, "hay", "bale-2");
-  assert.throws(() => applyFarmAction(next, "hay", "bale-2"), /already/);
+  assert.throws(() => applyFarmAction(farm, "hay", "bale-2"), /Drive/);
   assert.equal(farm.done.hay.length, 0, "actions must not mutate the previous saved state");
 });
 test("targets can be collected in any order within a stage and survive JSON saves", () => {
@@ -125,7 +131,7 @@ test("invalid crops and changes after planting leave saved progress unchanged", 
   for (const crop of ["dragonfruit", "", null, {}, ["corn"]]) assert.throws(() => applyFarmAction(farm, "garden", "plant-0", crop), /Choose/);
   const planted = applyFarmAction(farm, "garden", "plant-0", "tomato");
   assert.throws(() => applyFarmAction(planted, "garden", "plant-0", "corn"), /already/);
-  assert.throws(() => applyFarmAction(planted, "hay", "bale-0", "corn"), /Choose/);
+  assert.throws(() => applyFarmAction(planted, "horse", "feed", "corn"), /Choose/);
   assert.deepEqual(farm.gardenCrops, {});
   assert.deepEqual(farm.gardenWateredAt, {});
 });

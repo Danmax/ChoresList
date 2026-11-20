@@ -6,7 +6,8 @@ import { accessibleMember, gameActor, openChoreCount, todayStart } from "@/lib/g
 import { DEFAULT_GAME_SETTINGS } from "@/lib/games";
 import { rateLimit } from "@/lib/rate-limit";
 import { getLevelFromPoints } from "@/lib/points";
-import { applyFarmAction, celebrateFarm, createFarm, FarmRuleError, nextFarmDay, type FarmState } from "@/lib/sunny-farm";
+import { applyFarmAction, applyHayfieldDrive, celebrateFarm, createFarm, FarmRuleError, nextFarmDay, type FarmState } from "@/lib/sunny-farm";
+import { HayfieldRuleError } from "@/lib/sunny-farm-hayfield";
 
 import { farmTool } from "@/lib/sunny-farm-tools";
 import { taskDefinition } from "@/lib/sunny-farm";
@@ -55,6 +56,7 @@ export const POST = withErrors(async (req) => {
         if (!task || typeof body.target !== "string" || body.tool !== farmTool(task.id, body.target).id) throw new FarmRuleError("Pick up the right tool for this job first.");
         next = applyFarmAction(state, body.task, body.target, body.crop);
       }
+      else if (body.action === "drive-hay") next = applyHayfieldDrive(state, body.commands);
       else if (body.action === "celebrate") next = celebrateFarm(state);
       else if (body.action === "next-day") next = nextFarmDay(state);
       else throw new FarmRuleError("Choose a farm activity.");
@@ -84,7 +86,7 @@ export const POST = withErrors(async (req) => {
     return NextResponse.json({ ...result, serverNow: Date.now() });
   } catch (error) {
     if (error instanceof FarmConflict) return NextResponse.json({ error: "Your farm changed in another tab. Reloading your saved farm." }, { status: 409 });
-    if (error instanceof FarmRuleError || error instanceof FarmLimit) return NextResponse.json({ error: error.message }, { status: error instanceof FarmLimit ? 429 : 400 });
+    if (error instanceof FarmRuleError || error instanceof HayfieldRuleError || error instanceof FarmLimit) return NextResponse.json({ error: error.message }, { status: error instanceof FarmLimit ? 429 : 400 });
     throw error;
   }
 });

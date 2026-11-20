@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { ArrowLeft, Check, Heart, LoaderCircle, Volume2, VolumeX } from "lucide-react";
 import { FARM_CROPS, cropTime, gardenPlot, type FarmCropId, activeTargets, completedTasks, farmBreakfast, nextFarmStop, FARM_TASKS, farmReady, taskComplete, taskDefinition, type FarmState, type FarmTaskId } from "@/lib/sunny-farm";
+import { HayfieldGame, type HayfieldHandle, type HayDriveResult } from "./sunny-farm-hayfield";
+import { hayfieldProgress, type HayCommand } from "@/lib/sunny-farm-hayfield";
+import { farmHayfield } from "@/lib/sunny-farm";
 import { GardenPlots } from "./sunny-farm-crops";
 import { FarmCollectionBasket, FarmWorkbench, FarmWorkTarget } from "./sunny-farm-tools";
 import { useFarmAudio } from "./sunny-farm-audio";
@@ -19,6 +22,8 @@ const place = (x: number, y: number, width?: number): CSSProperties => ({ left: 
 
 export function SunnyFarm({ memberId, playerName, onExit }: { memberId: string; playerName: string; onExit: () => void }) {
   const [saved, setSaved] = useState<SavedFarm | null>(null);
+  const savedRef = useRef<SavedFarm | null>(null);
+  const hayfieldRef = useRef<HayfieldHandle>(null);
   const [taskId, setTaskId] = useState<FarmTaskId | null>(null);
   const [selectedCrop, setSelectedCrop] = useState<FarmCropId>("wheat");
   const [now, setNow] = useState(0);
@@ -54,13 +59,20 @@ export function SunnyFarm({ memberId, playerName, onExit }: { memberId: string; 
       const res = await fetch(`/api/sunny-farm?memberId=${encodeURIComponent(memberId)}`, { cache: "no-store" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Could not open your farm.");
-      syncClock(data.serverNow); setSaved(data); setError("");
+      syncClock(data.serverNow); savedRef.current = data; setSaved(data); setError(""); return data as SavedFarm;
     } catch (err) { setError(err instanceof Error ? err.message : "Could not open your farm."); }
     finally { setLoaded(true); }
   }, [memberId, syncClock]);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { titleRef.current?.focus({ preventScroll: true }); }, [taskId]);
+  async function afterHaySaved(leave: () => void) {
+    if (taskId === "hay" && hayfieldRef.current && !await hayfieldRef.current.save()) return;
+    leave();
+  }
   function openTask(id: FarmTaskId) {
+    void afterHaySaved(() => enterTask(id));
+  }
+  function enterTask(id: FarmTaskId) {
     if (farmInfoRef.current) farmInfoRef.current.open = false;
     setReaction(null); setTaskId(id); setError(""); setMessage(taskDefinition(id)!.hint);
     audio.say(`Let’s visit the ${taskDefinition(id)!.title.toLowerCase()}.`);
@@ -76,7 +88,7 @@ export function SunnyFarm({ memberId, playerName, onExit }: { memberId: string; 
         if (res.status === 409) await load();
         throw new Error(data.error ?? "Your farm could not save. Try again.");
       }
-      syncClock(data.serverNow); setSaved(data);
+      syncClock(data.serverNow); savedRef.current = data; setSaved(data);
       if (action === "help" && taskId) {
         const kind = feedbackKind(taskId, target ?? "");
         const text = respond(taskComplete(data.farm, taskId) ? "complete" : kind);
@@ -93,6 +105,33 @@ export function SunnyFarm({ memberId, playerName, onExit }: { memberId: string; 
     } catch (err) { setError(err instanceof Error ? err.message : "Please try again."); }
     finally { inFlight.current = false; setBusy(false); }
   }
+  async function driveHay(commands: HayCommand[]): Promise<HayDriveResult | null> {
+    const previous = savedRef.current;
+    if (!previous || inFlight.current) return null;
+    inFlight.current = true; setBusy(true); setError("");
+    try {
+      const res = await fetch("/api/sunny-farm", { method: "POST", keepalive: true, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ memberId, version: previous.version, action: "drive-hay", commands }) });
+      const data = await res.json();
+      if (!res.ok) {
+        if (res.status === 409) {
+          const current = await load(); setError(data.error ?? "Your saved hayfield changed in another tab.");
+          return current ? { farm: current.farm, reset: true } : null;
+        }
+        throw new Error(data.error ?? "Your drive could not save. Try again.");
+      }
+      syncClock(data.serverNow); savedRef.current = data; setSaved(data);
+      const before = hayfieldProgress(farmHayfield(previous.farm)), after = hayfieldProgress(farmHayfield(data.farm));
+      if (after.complete && !before.complete) { setMessage("The whole field is mowed and every bundle is safely in the barn!"); audio.play("success"); }
+      else if (after.percent === 100 && before.percent < 100) { setMessage("100% mowed! Your pickup truck is ready. Collect the bundles and drive to the barn bay."); audio.play("success"); }
+      else if (after.cargo.length < before.cargo.length) audio.play("collect");
+      return { farm: data.farm };
+    } catch (err) {
+      // Resolve a lost response before replaying moves, so deliveries never duplicate.
+      const current = await load();
+      setError(err instanceof Error ? err.message : "Your drive could not save.");
+      return current ? { farm: current.farm, retry: current.version === previous.version, reset: current.version !== previous.version } : null;
+    } finally { inFlight.current = false; setBusy(false); }
+  }
   const task = taskDefinition(taskId);
   const farm = saved?.farm;
   const count = farm ? completedTasks(farm) : 0;
@@ -108,7 +147,7 @@ export function SunnyFarm({ memberId, playerName, onExit }: { memberId: string; 
 
   return <section className={styles.farm} data-farm-scene={taskId ?? "map"} aria-label="Sunny Farm Helpers">
     <header className={styles.header}>
-      <button type="button" className={styles.smallButton} onClick={onExit}><ArrowLeft size={17} /> Games</button>
+      <button type="button" className={styles.smallButton} onClick={() => void afterHaySaved(onExit)}><ArrowLeft size={17} /> Games</button>
       <div className={styles.brand}><span className={styles.eyebrow}>A little care. A lot of happy.</span><h2>Sunny Farm Helpers<span aria-hidden="true"> ☀</span></h2></div>
       <button type="button" className={styles.smallButton} aria-label={audio.effects ? "Turn farm sounds off" : "Turn farm sounds on"} aria-pressed={audio.effects} onClick={audio.toggleEffects}>{audio.effects ? <Volume2 size={20} /> : <VolumeX size={20} />}</button>
       <details className={styles.audioSettings}><summary>Audio settings</summary><div>
@@ -131,7 +170,7 @@ export function SunnyFarm({ memberId, playerName, onExit }: { memberId: string; 
         {!!saved?.reward && (saved.reward.points > 0 || saved.reward.tickets > 0) && <p>You earned {saved.reward.points || saved.reward.tickets} {saved.reward.points ? "points" : "tickets"}!</p>}
         <button className={styles.primary} disabled={busy} onClick={() => void act("next-day")}>Start another farm day →</button><button className={styles.textButton} onClick={onExit}>Back to Games</button>
       </div> : task ? <>
-        <div className={styles.activityHeader}><button className={styles.smallButton} onClick={() => { setTaskId(null); setError(""); setMessage("Choose another spot to help."); }}><ArrowLeft size={17} /> Farm map</button><div><span className={styles.eyebrow}>{task.verb}</span><h3 ref={titleRef} tabIndex={-1}>{task.title}</h3></div><span className={styles.activityIcon} aria-hidden="true">{task.icon}</span></div>
+        <div className={styles.activityHeader}><button className={styles.smallButton} onClick={() => void afterHaySaved(() => { setTaskId(null); setError(""); setMessage("Choose another spot to help."); })}><ArrowLeft size={17} /> Farm map</button><div><span className={styles.eyebrow}>{task.verb}</span><h3 ref={titleRef} tabIndex={-1}>{task.title}</h3></div><span className={styles.activityIcon} aria-hidden="true">{task.icon}</span></div>
         {done && <div className={styles.instructions}><span aria-hidden="true">{done ? "💛" : "👉"}</span><p>{done ? "All done! Thank you for taking care of the farm." : farmTool(task.id, targets[0] ?? "").instruction}</p></div>}
         {task.id === "garden" && <>
           <div className={styles.gardenOverview}><strong>🌾 Your little crop patch</strong><span aria-live="polite" aria-label="Garden harvest status">{ripe} ready · {growing.length} growing · {harvested}/9 harvested</span><span>{growing.length ? `Next harvest in ${cropTime(Math.min(...growing.map(p => p.remainingMs)))}` : "Hoe · plant · water · harvest"}</span></div>
@@ -139,16 +178,16 @@ export function SunnyFarm({ memberId, playerName, onExit }: { memberId: string; 
             {FARM_CROPS.map(crop => <button type="button" key={crop.id} aria-label={crop.label} aria-pressed={selectedCrop === crop.id} disabled={busy} onClick={() => setSelectedCrop(crop.id)}><span aria-hidden="true">{crop.icon}</span><strong>{crop.label}</strong><small>{crop.kind} · {cropTime(crop.growMs)}</small></button>)}
           </div>}
         </>}
-        <FarmWorkbench key={task.id} task={task.id} targets={targets} busy={busy} waiting={task.id === "garden" && growing.length > 0 && targets.length === 0} onComplete={(target, tool) => void act("help", target, tool)}>
+        {task.id === "hay" ? <div className={styles.hayActivity}><HayfieldGame ref={hayfieldRef} farm={farm} onDrive={driveHay} /></div> : <FarmWorkbench key={task.id} task={task.id} targets={targets} busy={busy} waiting={task.id === "garden" && growing.length > 0 && targets.length === 0} onComplete={(target, tool) => void act("help", target, tool)}>
         <div className={`${styles.scene} ${styles.activityScene} ${task.id === "garden" ? styles.gardenScene : ""}`} style={{ backgroundImage: `url('/games/sunny-farm/${task.scene}.webp')` }} aria-label={`${task.title} activity`}>
           <ActivityArtwork now={now} taskId={task.id} farm={farm} targets={targets} busy={busy} eating={reaction?.task === task.id && reaction.kind === "eat"} happy={reaction?.task === task.id && reaction.kind === "happy"} />
           <FarmExplore key={task.id} scene={task.id} onExplore={explore} />
           {reaction?.task === task.id && <div className={styles.careReaction} aria-hidden="true">{reaction.text}</div>}
           {done && <div className={styles.doneBadge}><Check /> Happy & cared for!</div>}
         </div>
-        </FarmWorkbench>
-        <p className={styles.exploreHint}>Explore too: tap the little ✦ surprises around the scene.</p>
-        <div className={styles.activityFooter}><button type="button" className={styles.smallButton} onClick={() => { const hint = task.id === "garden" ? gardenHint : farmTool(task.id, targets[0] ?? "").instruction; setMessage(hint); audio.say(hint, true); }}>Hear or read a hint</button><span>{task.id === "garden" ? `${harvested} / 9 plots harvested` : `${farm.done[task.id].length} / ${task.stages.flat().length} little steps`}</span><div className={styles.stepTrack}><span style={{ width: `${(task.id === "garden" ? harvested / 9 : farm.done[task.id].length / task.stages.flat().length) * 100}%` }} /></div>{done && nextStop && <button className={styles.primary} onClick={() => openTask(nextStop)}>Next: {taskDefinition(nextStop)!.title} →</button>}{done && <button className={styles.smallButton} onClick={() => { setTaskId(null); setMessage("Another happy friend! Choose your next farm stop."); }}>Back to the farm →</button>}</div>
+        </FarmWorkbench>}
+        {task.id !== "hay" && <p className={styles.exploreHint}>Explore too: tap the little ✦ surprises around the scene.</p>}
+        <div className={styles.activityFooter}><button type="button" className={styles.smallButton} onClick={() => { const hint = task.id === "hay" ? task.hint : task.id === "garden" ? gardenHint : farmTool(task.id, targets[0] ?? "").instruction; setMessage(hint); audio.say(hint, true); }}>Hear or read a hint</button><span>{task.id === "garden" ? `${harvested} / 9 plots harvested` : `${farm.done[task.id].length} / ${task.stages.flat().length} little steps`}</span><div className={styles.stepTrack}><span style={{ width: `${(task.id === "garden" ? harvested / 9 : farm.done[task.id].length / task.stages.flat().length) * 100}%` }} /></div>{done && nextStop && <button className={styles.primary} onClick={() => openTask(nextStop)}>Next: {taskDefinition(nextStop)!.title} →</button>}{done && <button className={styles.smallButton} onClick={() => { setTaskId(null); setMessage("Another happy friend! Choose your next farm stop."); }}>Back to the farm →</button>}</div>
       </> : <>
         <div className={styles.mapHeading}><div><span className={styles.eyebrow}>Welcome to your sunny little corner</span><h3 ref={titleRef} tabIndex={-1}>Who shall we help today?</h3></div><span className={styles.dayPill}>{count} / 8 happy stops</span></div>
         <div className={`${styles.scene} ${styles.map}`} style={{ backgroundImage: "url('/games/sunny-farm/hub.webp')" }}>
@@ -160,7 +199,7 @@ export function SunnyFarm({ memberId, playerName, onExit }: { memberId: string; 
         </div>
         <div className={styles.mapFooter}><span>Explore freely, or follow the farm trail.</span>{nextStop && <button className={styles.primary} onClick={() => openTask(nextStop)}>Let’s visit the {taskDefinition(nextStop)!.title.toLowerCase()} →</button>}{farmReady(farm) && <button className={styles.primary} disabled={busy} onClick={() => void act("celebrate")}>Celebrate our happy farm! ★</button>}</div>
       </>}
-      <div className={styles.status} role="status" aria-live="polite">{busy ? "Saving your helping hands…" : message}</div>
+      <div className={styles.status} role="status" aria-live="polite">{busy && taskId !== "hay" ? "Saving your helping hands…" : message}</div>
       {error && <p className={styles.error} role="alert">{error}</p>}
     </>}
   </section>;
@@ -170,10 +209,6 @@ function ActivityArtwork({ taskId: id, farm, targets, busy, eating, happy, now }
   const seen = (target: string) => farm.done[id].includes(target);
   const targetButton = (target: string, x: number, y: number, label: string, children: ReactNode, extra = "") => targets.includes(target) ? <FarmWorkTarget key={`${target}-${label}`} target={target} label={label} className={`${styles.target} ${extra}`} style={place(x, y)} disabled={busy}>{children}<span className={styles.targetLabel}>{label}</span></FarmWorkTarget> : null;
   const art = (item: FarmItem, x: number, y: number, width: number, extra = "") => <FarmSprite item={item} className={`${styles.prop} ${extra}`} style={place(x, y, width)} label={item === "tractor" ? "Farm tractor" : undefined} />;
-  if (id === "hay") return <>
-    {art("tractor", 3 + farm.done.hay.length * 18, 26, 40, styles.tractor)}
-    {[0, 1, 2].map(i => targetButton(`bale-${i}`, 20 + i * 29, 72 - i * 8, `Collect hay ${i + 1}`, <span className={styles.hayBale} aria-hidden="true">🌾</span>))}
-  </>;
   if (id === "horse") return <>
     <div className={`${styles.animalBody} ${styles.horseBody}`}>
       {targets.includes("feed") ? targetButton("feed", 50, 50, "Feed horse", <FarmSprite animal="horse" pose={0} className={styles.animalSprite} label="Your farm horse" />, styles.directAnimal) : <FarmSprite animal="horse" pose={eating ? 4 : happy ? 5 : 0} className={styles.animalSprite} label="Your farm horse" />}
