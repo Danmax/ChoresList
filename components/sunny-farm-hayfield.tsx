@@ -95,7 +95,7 @@ export const HayfieldGame = forwardRef<HayfieldHandle, { farm: FarmState; onDriv
     if (direction) { event.preventDefault(); if (!event.repeat && !pausedRef.current) { destination.current = null; held.current = [...held.current.filter(d => d !== direction), direction]; move(direction); } }
     else if (event.key === "Escape") { stop(); }
   }} onKeyUp={event => { const direction = keyDirections[event.key] ?? keyDirections[event.key.toLowerCase()]; if (direction) { event.preventDefault(); held.current = held.current.filter(d => d !== direction); } }}>
-    <div className={styles.dashboard}>
+    <div className={styles.dashboard} role="group" aria-label="Hayfield progress">
       <div><span className={styles.kicker}>Mow · bundle · deliver</span><strong>{complete ? "A barn full of sunshine!" : field.vehicle === "tractor" ? "Make a clean sweep" : "Bring the hay home"}</strong></div>
       <div className={styles.meters}><div><span>Mowed <b>{progress.percent}%</b></span><div role="progressbar" aria-label="Hayfield mowed" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress.percent} className={styles.meter}><i style={{ width: `${progress.percent}%` }} /></div></div><span className={styles.delivery}><Truck size={17} /> <b>{field.delivered.length}/9</b> delivered</span></div>
     </div>

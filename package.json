@@ -26,6 +26,7 @@
     "test:pocket-pals": "node --import tsx --test tests/pocket-pals*.test.ts",
     "test:pocket-pals:browser": "node --import tsx tests/pocket-pals.browser.ts",
     "test:sunny-farm": "node --import tsx --test tests/sunny-farm.test.ts tests/sunny-farm-hayfield.test.ts",
+    "test:sunny-farm:driving": "node --import tsx tests/sunny-farm-hayfield.browser.ts",
     "test:sunny-farm:browser": "node --import tsx tests/sunny-farm.browser.ts",
     "test:games:responsive": "node --import tsx tests/games-responsive.browser.ts",
     "test:coloring": "node --import tsx --test tests/coloring.test.ts tests/coloring-feed.test.ts",

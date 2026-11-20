@@ -8,7 +8,7 @@ Games open in a viewport-sized player on phones and tablets. **Full screen** als
 
 Run `npm run test:games:responsive` against a local server on port 3017 (or set `GAMES_TEST_URL`) to check all 13 games at phone and tablet sizes, farm scene transitions and completion controls, Block Drop controls, and fullscreen state preservation.
 
-Eight farm stops form one player-paced farm day. Feed the horse and cow directly with a tap; barn hay is always available. Gather field hay to stock your basket too. Feed/brush the horse, feed/milk the cow, feed chickens/collect three eggs, guide/shear sheep, feed ducks, pick apples, and hoe/plant/water/harvest nine plots of wheat, vegetables, and fruit. Each step saves to the child's server-side `FarmProgress`; inventory and completed stops survive navigation and devices. Crops have short growth timers; there is no decay or missed-day penalty. The optional narration toggle uses the browser's speech synthesis when available; all instructions remain visible.
+Eight farm stops form one player-paced farm day. Feed the horse and cow directly with a tap; barn hay is always available. Mow the hayfield with a tractor, then deliver its bundles by pickup truck to stock your basket too. Feed/brush the horse, feed/milk the cow, feed chickens/collect three eggs, guide/shear sheep, feed ducks, pick apples, and hoe/plant/water/harvest nine plots of wheat, vegetables, and fruit. Each step saves to the child's server-side `FarmProgress`; inventory and completed stops survive navigation and devices. Crops have short growth timers; there is no decay or missed-day penalty. The optional narration toggle uses the browser's speech synthesis when available; all instructions remain visible.
 
 Once all eight stops are complete, celebrate on the map. This records one game session and awards the parent's configured points or tickets once. Starting another farm day resets task inventory while retaining completed-day count. Farm days are play rounds, not calendar dates. Existing daily play limits count completed rounds using the app's shared game-day convention.
 
@@ -35,7 +35,8 @@ Image preparation prompts:
 
 ## Verification
 
-- `npm run test:sunny-farm`: farm-rule tests.
+- `npm run test:sunny-farm`: farm and Hayfield driving rule tests.
+- `npm run test:sunny-farm:driving`: focused driving, touch, persistence, and responsive browser checks (local server on port 3017).
 - `npx tsc --noEmit`: TypeScript check.
 - `npx prisma validate`: schema check.
 - Start a local server on port 3017, then `npm run test:sunny-farm:browser`. Override the origin with `SUNNY_FARM_TEST_URL` if needed. Browser checks use an in-memory API fixture and do not modify real households. Coverage includes all activities, save/reload, retry after failure, stale-tab recovery, celebration, next round, and mobile interaction. Screenshots are written to `/tmp/sunny-farm-preview`.
@@ -101,3 +102,17 @@ Watering timestamps and crop IDs save in the existing JSON farm state. Timers co
 No database migration is required. Older crops retain their variety (or carrots where no variety was recorded), older watered plots are immediately ripe, and older harvested plots remain completed. Starting another farm day clears plot choices, timers, and inventory. New crop and tool illustrations are inline SVG and require no external artwork or network calls.
 
 Rule tests cover every crop’s exact timer boundary, independent plot actions, JSON save/reload, old saves, duplicate harvests, and round resets. Browser coverage plants all nine varieties, verifies saved growing plots after reload, advances the fixture clock to readiness, and harvests each variety into its own basket count. Browser fixtures use no live household data.
+
+## Hayfield tractor and pickup truck
+
+The Hayfield opens a top-down driving game in the same farm stop. First drive the tractor and attached mower over **100%** of the 216 golden field patches. The mower cuts a three-cell-wide swath; revisiting cut ground never increases coverage. Each of nine sections forms a hay bundle when all its patches are cut. An exact coverage meter prevents a small missed patch from being counted as finished.
+
+At 100%, **Drive pickup truck** switches to the separate blue truck parked beside the field. Drive over bundles to load them automatically. The truck carries three bundles at a time; drive to the marked **Barn bay** to unload before collecting more. The barn receives one hay inventory item per delivered bundle. All nine deliveries finish the stop. Mowing or picking up hay alone does not award inventory or finish the job. This still counts as one of the existing eight farm stops; the farm-day reward remains unchanged.
+
+Controls: Arrow keys or WASD drive in world directions. Hold the on-screen direction buttons for touch, mouse, or pen steering, or tap/drag a destination in the field to drive there. Release a direction to stop; pause parks the vehicle. Window blur, scene navigation, and pointer cancellation release held steering. No time limit, fuel, damage, or missed-day penalty is added.
+
+Driving saves in small serialized input batches. The browser replays pending moves over each acknowledgement so steering remains responsive during a save. Scene navigation flushes queued moves before leaving. Coverage, vehicle, position, loaded bundles, and delivered bundles persist in the existing farm JSON. After a failed save, **Retry save** resubmits pending moves. A version conflict or a lost response that already saved resets to the confirmed server state to avoid duplicate delivery credit.
+
+No schema migration or new image assets are required. The map, tractor, mower, truck, and bundles use scalable SVG artwork. Existing completed Hayfield saves stay completed; each previously collected legacy bale credits one third of the hauling job without re-awarding its existing inventory. New farm days start with an unmowed field and an empty truck.
+
+The shared engine tests cover unique coverage, the last missed patch, bundle formation, truck capacity, the loading bay, malformed commands, boundaries, inventory credit, round completion, and legacy saves. The full farm browser playthrough drives the tractor and truck through all nine deliveries. The focused driving browser checks continuous keyboard and touch controls, tap-to-drive coordinates, pausing, saved exits, reloads, lost responses, resumed truck cargo, and portrait/landscape phone layouts. All browser checks use isolated in-memory household fixtures.
