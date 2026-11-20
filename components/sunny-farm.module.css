@@ -258,14 +258,13 @@
 .chickenWalker>svg{width:100%;height:100%;animation:chickenBob .6s ease-in-out infinite}.chickenWalker .chickenFriend{pointer-events:auto;width:100%;height:100%;padding:0;border:0;min-width:60px}
 .chickenWalker .chickenFriend .workObject{height:100%}.chickenWalker .chickenFriend svg{width:100%;height:100%;animation:chickenBob .6s ease-in-out infinite}
 .chickenWalker .targetLabel{position:absolute;bottom:-4px;left:50%;transform:translateX(-50%)}
-.chickenWalker:has(:hover),.chickenWalker:has(:focus-visible),.chickenWalker[data-feeding]{animation-play-state:paused}
+.chickenWalker:has(:hover),.chickenWalker:has(:active),.chickenWalker:focus-within,.chickenWalker[data-feeding]{animation-play-state:paused}
 .chickenWalker[data-feeding]>svg{animation:chickenPeck .55s ease-in-out infinite}
 .scatteredFeed{position:absolute;inset:0;pointer-events:none}.scatteredFeed i{position:absolute;width:6px;height:4px;background:#ebbd58;border:1px solid #a87628;border-radius:50%;box-shadow:0 1px 1px #57321455;animation:grainScatter .85s both;animation-delay:var(--grain-delay)}
 .coopNest{position:absolute;height:12%;transform:translate(-50%,-50%);pointer-events:none}
 .coopNest .nestEgg{pointer-events:auto;width:36%;min-width:30px;padding:0}.coopNest .nestEgg svg{height:clamp(30px,4vw,52px)}.coopNest .targetLabel{display:none}
 .coopNest .nestEgg:focus-visible{outline:3px solid #fff4ab;outline-offset:3px}
 .nestCount{position:absolute;left:50%;bottom:-8px;transform:translateX(-50%);white-space:nowrap;font-size:10px;padding:2px 6px;background:#fff4d0e8;border-radius:8px;color:#795a2d}
-:global([data-game-expanded="true"]) .workbench>.horseTreats{display:flex;flex:0 0 auto;min-height:44px;margin:0 8px 5px}
 :global([data-game-expanded="true"]) .horseTreats small{display:none}
 @keyframes milkFlow{to{stroke-dashoffset:-34}}
 @keyframes chickenWander{0%,100%{translate:0 0}25%{translate:calc(var(--walk-direction) * 22px) -7px}60%{translate:calc(var(--walk-direction) * -18px) 3px}80%{translate:calc(var(--walk-direction) * -6px) -5px}}

@@ -75,6 +75,7 @@ async function main() {
   }
   try {
     await open();
+    if (!process.env.SUNNY_FARM_CARE_ONLY) {
     const toy = page.getByRole("button", { name: "Ring the farm bell", exact: true });
     await toy.click();
     const firstToyReply = await page.getByRole("region", { name: "Sunny Farm Helpers" }).getByRole("status").textContent();
@@ -94,7 +95,7 @@ async function main() {
     await page.screenshot({ path: "/tmp/sunny-farm-preview/map-desktop.png", fullPage: true });
     await page.getByRole("button", { name: "Horse stable: Feed & brush" }).click();
     await page.getByRole("button", { name: "Feed horse", exact: true }).click();
-    await expect(page.getByRole("button", { name: "Brush spot 1", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Brush tail", exact: true })).toBeVisible();
     const horseArt = page.getByRole("img", { name: "Your farm horse", exact: true });
     await expect(horseArt).toHaveAttribute("data-pose", "4");
     await expect(horseArt).toHaveAttribute("data-pose", "0", { timeout: 3000 });
@@ -160,7 +161,8 @@ async function main() {
           const animalLabel = task.id === "chickens" ? "Feed chicken 1" : `Feed ${task.id}`;
           const animalButton = page.getByRole("button", { name: animalLabel, exact: true });
           await page.setViewportSize({ width: 390, height: 844 });
-          await animalButton.scrollIntoViewIfNeeded();
+          if (task.id === "chickens") await animalButton.evaluate(el => el.scrollIntoView({ block: "center" }));
+          else await animalButton.scrollIntoViewIfNeeded();
           await page.screenshot({ path: `/tmp/sunny-farm-preview/${task.id}-feed-mobile.png`, fullPage: true });
           // Direct touch feeding must work without selecting a tool or a hidden hotspot.
           const box = (await animalButton.boundingBox())!;
@@ -207,7 +209,7 @@ async function main() {
           if (farm.done.horse.includes(target)) throw new Error("Click completed brushing without a tool");
           await page.getByRole("button", { name: /Pick up.*Grooming brush/ }).click();
           // Partial work on a second patch must survive completing the first.
-          const second = page.getByRole("button", { name: "Brush spot 2", exact: true });
+          const second = page.getByRole("button", { name: "Brush body", exact: true });
           await second.focus(); await second.press("ArrowUp");
           const box = (await spot.boundingBox())!;
           const x = box.x + box.width / 2, y = box.y + 15;
@@ -215,7 +217,7 @@ async function main() {
           for (let n = 0; n < 16; n++) await page.mouse.move(x + (n % 2 ? -12 : 12), y, { steps: 3 });
           await page.mouse.up();
           await expect(spot).toHaveCount(0);
-          await expect(page.getByRole("progressbar", { name: "Brush spot 2 progress" })).toHaveAttribute("aria-valuenow", "25");
+          await expect(page.getByRole("progressbar", { name: "Brush body progress" })).toHaveAttribute("aria-valuenow", "25");
         } else if (target === "water-0") {
           await page.getByRole("button", { name: /Pick up.*Watering can/ }).click();
           const bed = page.getByRole("button", { name: label, exact: true });
@@ -366,8 +368,86 @@ async function main() {
     await gardenTouch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
     await expect(page.getByLabel("Garden harvest status")).toContainText("1/9 harvested");
     if (farm.inventory.wheat !== 1 || farm.done.garden.length !== 4) throw new Error("Independent plot harvest did not save exactly one crop");
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+    const careTouch = await page.context().newCDPSession(page);
+    farm = createFarm(); farm = applyFarmAction(farm, "horse", "feed");
+    // Treats come from saved harvests, and failed saves never consume one.
+    farm = applyFarmAction(farm, "orchard", "apple-0");
+    farm = applyFarmAction(farm, "garden", "till-1");
+    farm = applyFarmAction(farm, "garden", "plant-1", "carrot");
+    farm = applyFarmAction(farm, "garden", "water-1", undefined, Date.now() - 60_000);
+    farm = applyFarmAction(farm, "garden", "harvest-1"); version++;
+    await open();
+    await page.getByRole("button", { name: "Horse stable: Feed & brush", exact: true }).click();
+    const appleTreat = page.getByRole("button", { name: "Feed horse one apple", exact: true });
+    const carrotTreat = page.getByRole("button", { name: "Feed horse one carrot", exact: true });
+    await expect(appleTreat).toBeEnabled(); await expect(carrotTreat).toBeEnabled();
+    failNext = true; await appleTreat.click();
+    await expect(page.getByRole("region", { name: "Sunny Farm Helpers" }).getByRole("alert")).toContainText("Connection lost");
+    if (farm.inventory.apples !== 1) throw new Error("Failed treat save consumed an apple");
+    await appleTreat.click(); await expect(appleTreat).toBeDisabled();
+    await carrotTreat.press("Enter"); await expect(carrotTreat).toBeDisabled();
+    if (Number(farm.inventory.apples) !== 0 || farm.inventory.carrots !== 0) throw new Error("Treat did not consume exactly one harvested item");
+    await page.screenshot({ path: "/tmp/sunny-farm-preview/horse-treats-mobile.png", fullPage: true });
+
+    // Direct holds, mouse taps, and touch holds all fill the same stationary bucket.
+    await page.getByRole("button", { name: "Farm map", exact: true }).click();
+    await page.getByRole("button", { name: "Cow barn: Feed & milk", exact: true }).click();
+    await page.getByRole("button", { name: "Feed cow", exact: true }).click();
+    await page.setViewportSize({ width: 1280, height: 1100 });
+    let milk = page.getByRole("button", { name: "Milk cow", exact: true });
+    await milk.scrollIntoViewIfNeeded();
+    let milkBox = (await milk.boundingBox())!;
+    await page.mouse.move(milkBox.x + milkBox.width / 2, milkBox.y + milkBox.height / 2);
+    await page.mouse.down(); await page.waitForTimeout(1300); await page.mouse.up();
+    await expect(page.getByRole("img", { name: "Milk bucket one third full", exact: true })).toBeVisible();
+    for (let i = 0; i < 4; i++) await milk.click();
+    await expect(page.getByRole("img", { name: "Milk bucket two thirds full", exact: true })).toBeVisible();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await milk.scrollIntoViewIfNeeded(); milkBox = (await milk.boundingBox())!;
+    await careTouch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: milkBox.x + milkBox.width / 2, y: milkBox.y + milkBox.height / 2 }] });
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: "/tmp/sunny-farm-preview/cow-milking-mobile.png", fullPage: true });
+    await page.waitForTimeout(1000);
+    await careTouch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await expect(page.getByRole("img", { name: "Milk bucket full", exact: true })).toBeVisible();
+    if (farm.inventory.milk !== 1) throw new Error("Hold-to-milk did not save one milk");
+
+    // All six stalls use saved counts, including empty stalls and three-egg stalls.
+    farm.coopEggs = [0, 1, 2, 3, 0, 3]; version++;
+    await open();
+    await page.getByRole("button", { name: "Chicken coop: Feed & collect eggs", exact: true }).click();
+    const walking = page.getByRole("button", { name: "Feed chicken 1", exact: true });
+    await expect.poll(() => walking.evaluate(el => el.parentElement!.getAnimations().length)).toBeGreaterThan(0);
+    await walking.focus(); await walking.click();
+    await expect(page.locator("[data-farm-grain] i")).toHaveCount(45);
+    await expect(page.getByRole("group", { name: "Stall 1: 0 eggs", exact: true })).toBeVisible();
+    await expect(page.getByRole("group", { name: "Stall 4: 3 eggs", exact: true })).toBeVisible();
+    await page.screenshot({ path: "/tmp/sunny-farm-preview/chicken-stalls-mobile.png", fullPage: true });
+    const firstEgg = page.getByRole("button", { name: "Collect egg 1 from stall 2", exact: true });
+    await firstEgg.press("Enter"); await page.getByRole("button", { name: "Put item in basket", exact: true }).press("Enter");
+    await expect(firstEgg).toHaveCount(0);
+    await open();
+    await page.getByRole("button", { name: "Chicken coop: Feed & collect eggs", exact: true }).click();
+    await expect(page.getByRole("group", { name: "Stall 2: 0 eggs", exact: true })).toBeVisible();
+    await page.setViewportSize({ width: 1280, height: 1100 });
+    await page.screenshot({ path: "/tmp/sunny-farm-preview/chicken-stalls-desktop.png", fullPage: true });
+    for (const target of activeTargets(farm, "chickens")) {
+      const [, stall, index] = target.split("-").map(Number);
+      await page.getByRole("button", { name: `Collect egg ${index + 1} from stall ${stall + 1}`, exact: true }).press("Enter");
+      await page.getByRole("button", { name: "Put item in basket", exact: true }).press("Enter");
+      await expect(page.locator(`[data-farm-target="${target}"]`)).toHaveCount(0);
+    }
+    if (farm.inventory.eggs !== 9) throw new Error("Stall eggs were duplicated or missed");
+    await expect(page.getByText("Happy & cared for!", { exact: true })).toBeVisible();
+    farm.coopEggs = [0, 0, 0, 0, 0, 0]; farm.done.chickens = []; farm.inventory.eggs = 0; version++;
+    await open(); await page.getByRole("button", { name: "Chicken coop: Feed & collect eggs", exact: true }).click();
+    await page.getByRole("button", { name: "Feed chicken 1", exact: true }).press("Enter");
+    await expect(page.getByText("Happy & cared for!", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Collect egg/ })).toHaveCount(0);
     if (errors.length) throw new Error(errors.join("\n"));
-    console.log("Farm browser checks passed: all eight activities, save/reload, error retry, conflicts, one celebration, new day, and mobile layout.");
+    console.log(process.env.SUNNY_FARM_CARE_ONLY ? "Farm care checks passed: harvest treats, failed saves, mouse/touch milking, wandering chickens, grain, saved stalls, and empty stalls." : "Farm browser checks passed: all eight activities, save/reload, error retry, conflicts, one celebration, new day, mobile layout, harvest treats, milking, and nesting stalls.");
   } finally { await browser.close(); }
 }
 main().catch(err => { console.error(err); process.exitCode = 1; });
