@@ -1,4 +1,4 @@
-export type GameKey = "coloring-adventures" | "sunny-farm" | "block-drop" | "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot" | "shape-safari" | "codebreaker-quest" | "tic-tac-toe" | "burger-rush" | "jungle-vine-swing" | "chess-quest" | "pocket-pals";
+export type GameKey = "melody-phone" | "coloring-adventures" | "sunny-farm" | "block-drop" | "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot" | "shape-safari" | "codebreaker-quest" | "tic-tac-toe" | "burger-rush" | "jungle-vine-swing" | "chess-quest" | "pocket-pals";
 export type GameRewardType = "none" | "points" | "tickets";
 
 export type GameDefinition = {
@@ -14,6 +14,11 @@ export type GameDefinition = {
 };
 
 export const GAME_DEFINITIONS: GameDefinition[] = [
+  {
+    key: "melody-phone", title: "Melody’s Play Phone",
+    description: "Tap musical numbers, count with Melody, and answer playful pretend calls. Little numbers, big discoveries!",
+    icon: "Phone", ageMin: 3, ageMax: 6, playTime: "Play at your own pace", color: "#4f8c70", bg: "#e6f4e9",
+  },
   {
     key: "coloring-adventures", title: "Coloring Adventures",
     description: "Bring jungle landscapes to life with a paint bucket, brushes, and playful patterns. Save your colors and download your masterpiece.",
@@ -155,6 +160,7 @@ export const DEFAULT_GAME_SETTINGS: Record<GameKey, {
   requiresChoresComplete: boolean;
   dailyPlayLimit: number;
 }> = {
+  "melody-phone": { enabled: true, rewardType: "none", rewardPoints: 5, rewardTickets: 0, requiresChoresComplete: false, dailyPlayLimit: 0 },
   "coloring-adventures": { enabled: true, rewardType: "none", rewardPoints: 5, rewardTickets: 0, requiresChoresComplete: false, dailyPlayLimit: 0 },
   "sunny-farm": { enabled: true, rewardType: "none", rewardPoints: 5, rewardTickets: 0, requiresChoresComplete: false, dailyPlayLimit: 0 },
   "block-drop": {

@@ -30,7 +30,9 @@
     "test:sunny-farm:browser": "node --import tsx tests/sunny-farm.browser.ts",
     "test:games:responsive": "node --import tsx tests/games-responsive.browser.ts",
     "test:coloring": "node --import tsx --test tests/coloring.test.ts tests/coloring-feed.test.ts",
-    "test:coloring:browser": "node --import tsx tests/coloring.browser.ts"
+    "test:coloring:browser": "node --import tsx tests/coloring.browser.ts",
+    "test:melody": "node --import tsx --test tests/melody-phone.test.ts",
+    "test:melody:browser": "node --import tsx tests/melody-phone.browser.ts"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"
@@ -72,7 +74,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "dotenv": "^17.4.2",
-    "shadcn": "^1.0.0",
+    "shadcn": "^4.23.0",
     "tailwindcss": "^4",
     "tsx": "^4.22.3",
     "typescript": "^5"
