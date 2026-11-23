@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import Link from "next/link";
 import { Check, Eye, EyeOff, Flower2, Home, Pencil, Play, RotateCcw, Sparkles, Square, Volume2, VolumeX } from "lucide-react";
-import { advanceTrace, distance, letterExample, letterStrokes, LETTER_LESSONS, lessonFor, readLetterGardenProgress, strokeFinished, strokePath, TRACING_LINES, type LetterCase, type LetterGardenProgress, type TracePoint } from "@/lib/letter-garden";
+import { advanceTrace, letterExample, letterStrokes, LETTER_LESSONS, lessonFor, readLetterGardenProgress, resumeTrace, strokeFinished, strokePath, TRACING_LINES, type LetterCase, type LetterGardenProgress, type TracePoint } from "@/lib/letter-garden";
 import { DEFAULT_MELODY_SOUND, readMelodySound, type MelodySoundSettings } from "@/lib/melody-sound";
 import { useMelodyAudio } from "./melody-phone-audio";
 import styles from "./letter-garden.module.css";
@@ -27,11 +27,10 @@ export function LetterGarden({ playerId, onExit, onFinish }: Props) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const board = useRef<SVGSVGElement>(null);
-  const input = useRef<{ id: number | "keyboard"; last: TracePoint } | null>(null);
+  const input = useRef<{ id: number | "keyboard"; last: TracePoint; attached: boolean } | null>(null);
   const loaded = useRef(false);
   const startedAt = useRef<number | null>(null);
   const practiced = useRef(new Set<string>());
-  const hintAt = useRef(0);
   const savingRef = useRef(false);
   const lesson = lessonFor(progress.selected);
   const strokes = useMemo(() => letterStrokes(lesson, progress.letterCase), [lesson, progress.letterCase]);
@@ -84,7 +83,7 @@ export function LetterGarden({ playerId, onExit, onFinish }: Props) {
 
   function tell(text: string) { setMessage(text); audio.speak(text); }
   function activate() { audio.activate(); startedAt.current ??= Date.now(); }
-  function stopDemo() { setDemonstrating(false); setDemo(null); audio.stopSpeech(); }
+  function stopDemo() { if (demonstrating) audio.stopSpeech(); setDemonstrating(false); setDemo(null); }
   function updateTrace(next: TracePosition) { trace.current = next; setPosition(next); }
 
   function choose(letter: string, letterCase = progress.letterCase) {
@@ -107,42 +106,53 @@ export function LetterGarden({ playerId, onExit, onFinish }: Props) {
   }
 
   function begin(point: TracePoint, id: number | "keyboard"): boolean {
-    if (saving || complete || input.current) return false;
+    if (saving || trace.current.stroke >= strokes.length || input.current) return false;
     activate(); stopDemo();
-    const target = strokes[trace.current.stroke]?.points[trace.current.point];
-    if (!target || distance(point, target) > 24) { tell(TRACING_LINES.retry); return false; }
-    input.current = { id, last: point }; setCursor(point);
+    // Keep following the same gesture even if it starts slightly off the dot.
+    // It attaches when the finger reaches the current stroke or its painted part.
+    input.current = { id, last: point, attached: false };
+    move(point);
     return true;
   }
 
   function move(point: TracePoint) {
     const current = input.current;
-    if (!current || complete || saving) return;
+    if (!current || trace.current.stroke >= strokes.length || saving) return;
     const stroke = strokes[trace.current.stroke];
     if (!stroke) return;
-    const nextPoint = advanceTrace(stroke.points, trace.current.point, current.last, point, progress.guided ? 23 : 19);
+    if (!current.attached) {
+      const resumed = resumeTrace(stroke.points, trace.current.point, point, progress.guided ? 38 : 30);
+      current.last = point; setCursor(point);
+      if (resumed === null) return;
+      current.attached = true;
+      updateTrace({ stroke: trace.current.stroke, point: resumed });
+    }
+    const nextPoint = advanceTrace(stroke.points, trace.current.point, current.last, point, progress.guided ? 30 : 24);
     updateTrace({ stroke: trace.current.stroke, point: nextPoint });
     current.last = point; setCursor(point);
-    if (distance(point, stroke.points[nextPoint]) > 45 && Date.now() - hintAt.current > 4500) {
-      hintAt.current = Date.now(); tell(TRACING_LINES.offTrail);
-    }
+    if (strokeFinished(stroke, nextPoint, point, progress.guided ? 32 : 26)) finishStroke();
   }
 
-  function lift(cancel = false) {
+  function finishStroke() {
     const current = input.current;
     if (!current) return;
-    input.current = null; setCursor(null);
-    const stroke = strokes[trace.current.stroke];
-    if (!stroke || cancel) return;
-    if (!strokeFinished(stroke, trace.current.point, current.last, progress.guided ? 23 : 19)) { tell(TRACING_LINES.resume); return; }
     const next = trace.current.stroke + 1;
     updateTrace({ stroke: next, point: 0 });
     if (next === strokes.length) {
+      input.current = null; setCursor(null);
+      if (typeof current.id === "number" && board.current?.hasPointerCapture(current.id)) board.current.releasePointerCapture(current.id);
       practiced.current.add(lessonId);
       setProgress(current => ({ ...current, completed: current.completed.includes(lessonId) ? current.completed : [...current.completed, lessonId] }));
       audio.effect("success"); tell(TRACING_LINES.complete);
-    } else { audio.effect("pop"); tell(`${TRACING_LINES.stroke} ${strokes[next].instruction}`); }
+    } else {
+      // Traveling to the next start does not paint a connecting line or require
+      // lifting/clicking again. Ordered tracing resumes when that start is reached.
+      current.attached = false;
+      audio.effect("pop"); tell(strokes[next].instruction);
+    }
   }
+
+  function lift() { input.current = null; setCursor(null); }
 
   function pointerPoint(event: { clientX: number; clientY: number }): TracePoint | null {
     const matrix = board.current?.getScreenCTM();
@@ -154,7 +164,7 @@ export function LetterGarden({ playerId, onExit, onFinish }: Props) {
   function pointerDown(event: PointerEvent<SVGSVGElement>) {
     if (!event.isPrimary || event.button !== 0) return;
     const point = pointerPoint(event);
-    if (point && begin(point, event.pointerId)) { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); }
+    if (point && begin(point, event.pointerId)) { event.preventDefault(); if (input.current) event.currentTarget.setPointerCapture(event.pointerId); }
   }
 
   function pointerMove(event: PointerEvent<SVGSVGElement>) {
@@ -171,7 +181,7 @@ export function LetterGarden({ playerId, onExit, onFinish }: Props) {
   }
 
   function keyboard(event: KeyboardEvent<SVGSVGElement>) {
-    if (event.key === "Escape") { stopDemo(); lift(true); return; }
+    if (event.key === "Escape") { stopDemo(); lift(); return; }
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       if (input.current?.id === "keyboard") lift();
@@ -214,7 +224,7 @@ export function LetterGarden({ playerId, onExit, onFinish }: Props) {
         <p className={styles.paperPrompt}>{complete ? "You grew a lovely little letter!" : demonstrating ? "Watch the little pencil, then have a go." : activeStroke?.instruction}</p>
         <svg ref={board} className={styles.paper} viewBox="0 0 360 400" role="application" aria-label={`Trace ${progress.letterCase} ${lesson.letter}`} aria-describedby="letter-garden-keyboard-help" tabIndex={0}
           onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp}
-          onPointerCancel={event => { if (input.current?.id === event.pointerId) lift(true); }} onLostPointerCapture={event => { if (input.current?.id === event.pointerId) lift(true); }} onKeyDown={keyboard}>
+          onPointerCancel={event => { if (input.current?.id === event.pointerId) lift(); }} onLostPointerCapture={event => { if (input.current?.id === event.pointerId) lift(); }} onKeyDown={keyboard}>
           <defs><pattern id="letter-paper-dots" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="10" cy="10" r=".7" fill="#e2eadd" /></pattern></defs>
           <rect width="360" height="400" fill="url(#letter-paper-dots)" />
           {[75, 160, 310, 375].map(y => <line key={y} x1="20" x2="340" y1={y} y2={y} stroke={y === 310 ? "#b5cfcc" : "#d6e4e0"} strokeWidth={y === 310 ? 1.5 : 1} strokeDasharray={y === 160 ? "6 7" : undefined} />)}

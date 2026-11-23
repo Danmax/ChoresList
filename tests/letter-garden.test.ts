@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { advanceTrace, distance, letterExample, letterStrokes, LETTER_LESSONS, lessonFor, readLetterGardenProgress, strokeFinished, tracingNarration } from "../lib/letter-garden";
+import { advanceTrace, distance, letterExample, letterStrokes, LETTER_LESSONS, lessonFor, readLetterGardenProgress, resumeTrace, strokeFinished, tracingNarration } from "../lib/letter-garden";
 import { narrationId, narrationParts } from "../lib/melody-sound";
 import manifest from "../lib/melody-voice-manifest.json";
 import { DEFAULT_GAME_SETTINGS, gameByKey } from "../lib/games";
@@ -78,6 +78,26 @@ test("saved letter stamps are bounded and cannot inject invalid letters or cases
   assert.equal(result.selected, "A");
   assert.equal(result.letterCase, "uppercase");
   assert.equal(result.guided, false);
+});
+
+test("almost-finished strokes complete without demanding the final exact pixel", () => {
+  const stroke = letterStrokes(lessonFor("L"), "uppercase")[0];
+  const nearEnd = stroke.points.length - 4;
+  assert.ok(strokeFinished(stroke, nearEnd, stroke.points[nearEnd]));
+  assert.equal(strokeFinished(stroke, Math.floor(stroke.points.length / 2), stroke.points[stroke.points.length - 1]), false);
+  const loop = letterStrokes(lessonFor("O"), "uppercase")[0];
+  assert.equal(strokeFinished(loop, 0, loop.points[0]), false, "nearby endpoints never bypass the tracing requirement");
+});
+
+test("resuming accepts an earlier painted point and a forgiving start without skipping untraced curves", () => {
+  const stroke = letterStrokes(lessonFor("A"), "uppercase")[0];
+  const middle = Math.floor(stroke.points.length / 2);
+  assert.equal(resumeTrace(stroke.points, middle, stroke.points[8]), middle);
+  assert.ok(resumeTrace(stroke.points, 0, { x: stroke.points[0].x + 30, y: stroke.points[0].y }) !== null);
+  assert.equal(resumeTrace(stroke.points, 0, stroke.points[stroke.points.length - 1]), null);
+  assert.equal(resumeTrace(stroke.points, middle, { x: NaN, y: 0 }), null);
+  const loop = letterStrokes(lessonFor("O"), "uppercase")[0];
+  assert.equal(resumeTrace(loop.points, 0, { x: 180, y: 192 }), null, "the center of a loop is not a valid start");
 });
 
 test("every letter example and stroke instruction has both natural voices", () => {

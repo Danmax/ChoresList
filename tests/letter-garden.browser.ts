@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { chromium, expect, type Page } from "@playwright/test";
-import { letterStrokes, lessonFor, type LetterCase, type TracePoint } from "../lib/letter-garden";
+import { letterStrokes, lessonFor, TRACING_LINES, type LetterCase, type TracePoint } from "../lib/letter-garden";
+import { narrationId } from "../lib/melody-sound";
 import { DEFAULT_GAME_SETTINGS, GAME_DEFINITIONS } from "../lib/games";
 
 declare global { interface Window { letterMedia: HTMLMediaElement[] } }
@@ -29,9 +30,9 @@ async function traceLetter(page: Page, letter: string, letterCase: LetterCase, t
         if (cdp) await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ ...point, id: 1 }] });
         else await page.mouse.move(point.x, point.y);
       }
+      await expect(page.getByRole("region", { name: "Letter Garden", exact: true })).toHaveAttribute("data-stroke", String(index + 1));
       if (cdp) await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
       else await page.mouse.up();
-      await expect(page.getByRole("region", { name: "Letter Garden", exact: true })).toHaveAttribute("data-stroke", String(index + 1));
     }
   } finally { await cdp?.detach(); }
 }
@@ -78,17 +79,49 @@ async function main() {
     await expect(game).toHaveAttribute("data-stroke", "0");
     await expect(page.getByText("1 of 52 letters grown", { exact: true })).toBeVisible();
 
-    // Resume a stroke after lifting early.
+    // A brief lift is quiet, and resuming can start on already-painted ink.
     await paper.scrollIntoViewIfNeeded();
     const stroke = letterStrokes(lessonFor("A"), "uppercase")[0];
     const middle = Math.floor(stroke.points.length / 2);
     const partial = await onPaper(page, [stroke.points[0], stroke.points[middle]]);
     await page.mouse.move(partial[0].x, partial[0].y); await page.mouse.down(); await page.mouse.move(partial[1].x, partial[1].y, { steps: 20 }); await page.mouse.up();
     await expect(game).toHaveAttribute("data-stroke", "0");
-    await expect(game.getByRole("status")).toContainText("Pick up");
-    const resume = await onPaper(page, [stroke.points[middle], stroke.points[stroke.points.length - 1]]);
+    assert.ok(await page.evaluate(id => !window.letterMedia.some(player => player.src.includes(id)), narrationId(TRACING_LINES.resume)), "brief lifts do not repeat the glowing-dot narration");
+    const resume = await onPaper(page, [stroke.points[Math.floor(middle / 2)], stroke.points[stroke.points.length - 1]]);
     await page.mouse.move(resume[0].x, resume[0].y); await page.mouse.down(); await page.mouse.move(resume[1].x, resume[1].y, { steps: 20 }); await page.mouse.up();
     await expect(game).toHaveAttribute("data-stroke", "1");
+
+    // One uninterrupted mouse drag completes all of A, including travel between strokes.
+    await page.getByRole("button", { name: "Try again", exact: true }).click();
+    await paper.scrollIntoViewIfNeeded();
+    const allStrokes = letterStrokes(lessonFor("A"), "uppercase");
+    const outside = (await onPaper(page, [{ x: 330, y: 30 }]))[0];
+    await page.mouse.move(outside.x, outside.y); await page.mouse.down();
+    for (const [index, stroke] of allStrokes.entries()) {
+      const points = await onPaper(page, stroke.points.filter((_, i) => i % 2 === 0 || i === stroke.points.length - 1));
+      await page.mouse.move(points[0].x, points[0].y, { steps: 15 });
+      for (const point of points.slice(1)) await page.mouse.move(point.x, point.y);
+      await expect(game).toHaveAttribute("data-stroke", String(index + 1));
+    }
+    await expect(game).toHaveAttribute("data-complete", "true");
+    await page.mouse.up();
+    assert.ok(await page.evaluate(ids => window.letterMedia.every(player => !ids.some(id => player.src.includes(id))), [narrationId(TRACING_LINES.resume), narrationId(TRACING_LINES.retry), narrationId(TRACING_LINES.offTrail)]), "normal tracing is not interrupted by correction prompts");
+
+    // The same continuous behavior works with a finger, without separate taps.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByRole("button", { name: "Try again", exact: true }).click();
+    await paper.scrollIntoViewIfNeeded();
+    const touch = await page.context().newCDPSession(page);
+    const touchStart = (await onPaper(page, [allStrokes[0].points[0]]))[0];
+    await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ ...touchStart, id: 1 }] });
+    for (const [index, stroke] of allStrokes.entries()) {
+      const points = await onPaper(page, stroke.points.filter((_, i) => i % 2 === 0 || i === stroke.points.length - 1));
+      for (const point of points) await touch.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ ...point, id: 1 }] });
+      await expect(game).toHaveAttribute("data-stroke", String(index + 1));
+    }
+    await expect(game).toHaveAttribute("data-complete", "true");
+    await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await touch.detach();
 
     await page.getByRole("button", { name: "Practice uppercase O, Orange", exact: true }).click();
     await paper.scrollIntoViewIfNeeded();

@@ -98,8 +98,20 @@ export function advanceTrace(points: readonly TracePoint[], progress: number, fr
   return cursor;
 }
 
-export function strokeFinished(stroke: LetterStroke, progress: number, position: TracePoint, tolerance = 22): boolean {
-  return progress >= stroke.points.length - 2 && distance(position, stroke.points[stroke.points.length - 1]) <= tolerance;
+/** Resume anywhere on the painted trail, or just ahead, without losing progress. */
+export function resumeTrace(points: readonly TracePoint[], progress: number, position: TracePoint, tolerance = 36): number | null {
+  if (!points.length || ![position.x, position.y].every(Number.isFinite)) return null;
+  if (progress === 0 && distance(position, points[0]) > tolerance) return null;
+  let nearest = -1, gap = tolerance;
+  for (let index = 0; index <= Math.min(points.length - 1, progress + 7); index++) {
+    const candidate = distance(position, points[index]);
+    if (candidate <= gap) { nearest = index; gap = candidate; }
+  }
+  return nearest < 0 ? null : Math.max(progress, nearest);
+}
+
+export function strokeFinished(stroke: LetterStroke, progress: number, position: TracePoint, tolerance = 30): boolean {
+  return progress >= Math.ceil((stroke.points.length - 1) * 0.92) && distance(position, stroke.points[stroke.points.length - 1]) <= tolerance;
 }
 
 export function lessonFor(letter: string): LetterLesson { return LETTER_LESSONS.find(lesson => lesson.letter === letter.toUpperCase()) ?? LETTER_LESSONS[0]; }
