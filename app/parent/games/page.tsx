@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Blocks, BookOpen, ChefHat, Copy, Crown, Gamepad2, Grid3X3, KeyRound, Palette, PawPrint, Phone, Puzzle, QrCode, RefreshCw, Save, Shapes, Swords, Tractor, TreePine, Users } from "lucide-react";
+import { Blocks, BookOpen, ChefHat, Copy, Crown, Gamepad2, Grid3X3, KeyRound, Palette, PawPrint, Pencil, Phone, Puzzle, QrCode, RefreshCw, Save, Shapes, Swords, Tractor, TreePine, Users } from "lucide-react";
 import { toast } from "sonner";
 import { LocalQrCode } from "@/components/local-qr-code";
 import { ParentPageHeader } from "@/components/parent-management-shell";
@@ -50,6 +50,7 @@ type GameShareGroup = { id: string; name: string; events: Array<{ id: string; ti
 type GameConnection = { id: string; householdName: string; createdAt: string };
 
 function iconForGame(key: string) {
+  if (key === "letter-garden") return Pencil;
   if (key === "melody-phone") return Phone;
   if (key === "coloring-adventures") return Palette;
   if (key === "sunny-farm") return Tractor;
@@ -68,6 +69,7 @@ function iconForGame(key: string) {
 }
 
 function gameLabel(key: string) {
+  if (key === "letter-garden") return "Little Letter Garden";
   if (key === "melody-phone") return "Melody’s Play Phone";
   if (key === "coloring-adventures") return "Coloring Adventures";
   if (key === "sunny-farm") return "Sunny Farm Helpers";

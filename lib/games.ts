@@ -1,4 +1,4 @@
-export type GameKey = "melody-phone" | "coloring-adventures" | "sunny-farm" | "block-drop" | "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot" | "shape-safari" | "codebreaker-quest" | "tic-tac-toe" | "burger-rush" | "jungle-vine-swing" | "chess-quest" | "pocket-pals";
+export type GameKey = "letter-garden" | "melody-phone" | "coloring-adventures" | "sunny-farm" | "block-drop" | "memory-match" | "bible-trivia" | "rock-paper-scissors-shoot" | "shape-safari" | "codebreaker-quest" | "tic-tac-toe" | "burger-rush" | "jungle-vine-swing" | "chess-quest" | "pocket-pals";
 export type GameRewardType = "none" | "points" | "tickets";
 
 export type GameDefinition = {
@@ -14,6 +14,11 @@ export type GameDefinition = {
 };
 
 export const GAME_DEFINITIONS: GameDefinition[] = [
+  {
+    key: "letter-garden", title: "Little Letter Garden",
+    description: "A is for Apple! Watch letters grow, then trace every uppercase and lowercase letter with your finger, mouse, or pen.",
+    icon: "Pencil", ageMin: 3, ageMax: 9, playTime: "A little practice at your own pace", color: "#83a477", bg: "#eff5e7",
+  },
   {
     key: "melody-phone", title: "Melody’s Play Phone",
     description: "Count with Melody, call your make-believe family, and play a listen-and-dial telephone game with natural character voices and happy sounds.",
@@ -160,6 +165,7 @@ export const DEFAULT_GAME_SETTINGS: Record<GameKey, {
   requiresChoresComplete: boolean;
   dailyPlayLimit: number;
 }> = {
+  "letter-garden": { enabled: true, rewardType: "none", rewardPoints: 5, rewardTickets: 0, requiresChoresComplete: false, dailyPlayLimit: 0 },
   "melody-phone": { enabled: true, rewardType: "none", rewardPoints: 5, rewardTickets: 0, requiresChoresComplete: false, dailyPlayLimit: 0 },
   "coloring-adventures": { enabled: true, rewardType: "none", rewardPoints: 5, rewardTickets: 0, requiresChoresComplete: false, dailyPlayLimit: 0 },
   "sunny-farm": { enabled: true, rewardType: "none", rewardPoints: 5, rewardTickets: 0, requiresChoresComplete: false, dailyPlayLimit: 0 },

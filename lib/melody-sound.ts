@@ -2,6 +2,7 @@ import { createMelodyState, melodyReducer, NUMBER_NAMES, type MelodyMode } from 
 import { FAMILY_STORIES, MELODY_LINES } from "./melody-pretend";
 import { FAMILY_ADVENTURES } from "./melody-family-library";
 import { CALL_INTROS, COUNT_PROMPTS, DIALOGUE_LIBRARY, DISCOVERY_OBJECTS, FIND_PROMPTS } from "./melody-content";
+import { tracingNarration } from "./letter-garden";
 
 export type MelodySoundSettings = {
   voice: "warm" | "story" | "device";
@@ -44,6 +45,7 @@ export function melodyNarrationCatalog(): Map<string, string> {
   const lines = new Map<string, string>();
   const add = (text: string) => narrationParts(text).forEach(part => lines.set(narrationId(part), part));
   add(createMelodyState().message);
+  tracingNarration().forEach(add);
   Object.values(MELODY_LINES).forEach(add);
   Object.values(FAMILY_STORIES).forEach(story => story.nodes.forEach(node => add(node.text)));
   Object.values(FAMILY_ADVENTURES).forEach(adventures => adventures.forEach(story => story.nodes.forEach(node => add(node.text))));

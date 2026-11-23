@@ -3,7 +3,7 @@
 import { type DragEvent, type MouseEvent as ReactMouseEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
-import { ArrowLeft, Blocks, BookOpen, CheckCircle2, ChefHat, Circle, Crown, FileText, Gamepad2, Grid3X3, KeyRound, Palette, PawPrint, Phone, Puzzle, RefreshCw, Scissors, Shapes, Swords, TreePine, Trophy } from "lucide-react";
+import { ArrowLeft, Blocks, BookOpen, CheckCircle2, ChefHat, Circle, Crown, FileText, Gamepad2, Grid3X3, KeyRound, Palette, PawPrint, Pencil, Phone, Puzzle, RefreshCw, Scissors, Shapes, Swords, TreePine, Trophy } from "lucide-react";
 import { toast } from "sonner";
 import { MemberAvatar } from "@/components/member-avatar";
 import { JungleVineSwing } from "@/components/jungle-runner";
@@ -16,6 +16,7 @@ import { GamePlayer } from "@/components/game-player";
 import { PocketPals } from "@/components/pocket-pals";
 import { ColoringAdventures } from "@/components/coloring-adventures";
 import { MelodyPhone } from "@/components/melody-phone";
+import { LetterGarden } from "@/components/letter-garden";
 import { PET_SPECIES } from "@/lib/pocket-pals";
 import type { GameKey } from "@/lib/games";
 
@@ -83,6 +84,7 @@ function shuffle<T>(items: T[]) {
 }
 
 function iconForGame(key: string) {
+  if (key === "letter-garden") return Pencil;
   if (key === "melody-phone") return Phone;
   if (key === "coloring-adventures") return Palette;
   if (key === "block-drop") return Blocks;
@@ -160,7 +162,7 @@ export default function KidGamesPage() {
     });
     const data = await res.json().catch(() => null);
     if (!res.ok) {
-      if (gameKey === "coloring-adventures" || gameKey === "melody-phone") throw new Error(data?.error ?? "Could not save game");
+      if (gameKey === "coloring-adventures" || gameKey === "melody-phone" || gameKey === "letter-garden") throw new Error(data?.error ?? "Could not save game");
       toast.error(data?.error ?? "Could not save game");
       await load();
       return;
@@ -217,6 +219,8 @@ export default function KidGamesPage() {
           onBack={() => setShowJohnnyMenu(false)}
           onStart={() => { setShowJohnnyMenu(false); setReward(null); setActiveGame("jungle-vine-swing"); }}
         />
+      ) : activeGame === "letter-garden" ? (
+        <LetterGarden playerId={member.id} onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("letter-garden", score, duration, metadata)} />
       ) : activeGame === "melody-phone" ? (
         <MelodyPhone playerId={member.id} age={member.age} onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("melody-phone", score, duration, metadata)} />
       ) : activeGame === "coloring-adventures" ? (
@@ -259,6 +263,13 @@ export default function KidGamesPage() {
             const status = availability[game.key];
             const Icon = iconForGame(game.key);
             const locked = !status?.available;
+            if (game.key === "letter-garden") {
+              return <button key={game.key} type="button" disabled={locked} onClick={() => { setReward(null); setActiveGame("letter-garden"); }} className="group relative min-h-64 overflow-hidden rounded-3xl border-2 border-[#dce6cd] bg-gradient-to-br from-[#f4f8eb] to-[#fcf4fc] p-5 text-left shadow-sm transition-shadow hover:shadow-md disabled:opacity-65">
+                <span className="inline-flex items-center gap-2 rounded-full bg-[#e7efd8] px-3 py-1 text-xs font-bold text-[#809667]"><Pencil size={14} /> A little practice. A little growing.</span>
+                <span className="my-4 flex items-center justify-center gap-4" aria-hidden="true"><span className="-rotate-6 rounded-2xl bg-[#f5e7ed] px-4 py-2 text-4xl font-black text-[#c596ad]">A</span><span className="rotate-6 rounded-2xl bg-[#f7edcf] px-4 py-2 text-4xl font-black text-[#c5aa65]">B</span><span className="-rotate-3 rounded-2xl bg-[#e1eee3] px-4 py-2 text-4xl font-black text-[#8bad87]">C</span><span className="text-4xl">🍎</span></span>
+                <span className="block text-2xl font-black text-[#526d47]">Little Letter Garden</span><span className="mt-1 block max-w-80 text-sm font-semibold text-[#89957c]">Watch a letter grow, then follow its little trail. Every letter, big and small.</span><span className="mt-4 inline-block rounded-xl bg-[#82a97e] px-4 py-2 text-sm font-bold text-white">{locked ? status?.reason ?? "Locked" : "Trace a little letter"}</span>
+              </button>;
+            }
             if (game.key === "melody-phone") {
               return <button key={game.key} type="button" disabled={locked} onClick={() => { setReward(null); setActiveGame("melody-phone"); }} className="group relative min-h-64 overflow-hidden rounded-3xl border-2 border-emerald-200 bg-[#eff9ef] text-left shadow-sm transition-shadow hover:shadow-md disabled:opacity-65">
                 <span className="absolute inset-y-0 right-0 w-1/2 bg-cover bg-center opacity-75 transition-transform group-hover:scale-105" style={{ backgroundImage: "url('/games/melody/phone.webp')" }} />
