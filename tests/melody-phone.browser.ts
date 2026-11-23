@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { chromium, expect } from "@playwright/test";
 import { DEFAULT_GAME_SETTINGS, GAME_DEFINITIONS } from "../lib/games";
+import { narrationId } from "../lib/melody-sound";
 
 declare global {
-  interface Window { melodySpoken: string[]; melodyCanceled: number }
+  interface Window { melodySpoken: string[]; melodyCanceled: number; melodyMedia: string[]; melodyPlayers: HTMLMediaElement[] }
 }
 
 const baseUrl = process.env.MELODY_TEST_URL ?? "http://127.0.0.1:3017";
@@ -19,6 +20,7 @@ async function main() {
     page.on("pageerror", error => errors.push(error.message));
     // Speech engines vary by OS. Verify requests to the speech API deterministically.
     await page.addInitScript(() => {
+      if (!localStorage.getItem("melody-sound:v1")) localStorage.setItem("melody-sound:v1", JSON.stringify({ voice: "device" }));
       window.melodySpoken = [];
       window.melodyCanceled = 0;
       Object.defineProperty(window, "speechSynthesis", { configurable: true, value: {
@@ -161,8 +163,118 @@ async function main() {
     assert.deepEqual((sessions[0].metadata as Record<string, unknown>).numbersDiscovered, [2]);
     assert.equal(await page.evaluate(() => document.body.style.overflow), "", "launcher exit restores scrolling");
     assert.ok(await page.evaluate(() => window.melodyCanceled > 0), "speech is canceled on exit");
+
+    const extra = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true, reducedMotion: "reduce" });
+    extra.on("pageerror", error => errors.push(error.message));
+    await extra.addInitScript(() => {
+      window.melodyMedia = []; window.melodyPlayers = [];
+      const play = HTMLMediaElement.prototype.play;
+      HTMLMediaElement.prototype.play = function () {
+        window.melodyMedia.push(this.currentSrc || this.src);
+        window.melodyPlayers.push(this);
+        return play.call(this);
+      };
+    });
+    await extra.goto(`${baseUrl}/play/melody`);
+    const extraGame = extra.getByRole("region", { name: "Melody's Play Phone", exact: true });
+    const extraNumber = (value: number) => extra.getByRole("button", { name: `Number ${value}`, exact: true });
+    await extra.getByRole("button", { name: "Voice and sound settings", exact: true }).click();
+    const soundDialog = extra.getByRole("dialog", { name: "Voices & happy sounds", exact: true });
+    await expect(soundDialog).toBeVisible();
+    await expect(soundDialog.getByRole("combobox", { name: "Story voice", exact: true })).toHaveValue("warm");
+    await soundDialog.getByRole("button", { name: "Try this voice", exact: true }).click();
+    await expect.poll(() => extra.evaluate(() => window.melodyMedia.some(src => src.includes("/voices/warm/")))).toBe(true);
+    await soundDialog.getByRole("combobox", { name: "Story voice", exact: true }).selectOption("story");
+    await soundDialog.getByRole("button", { name: "Try this voice", exact: true }).click();
+    await expect.poll(() => extra.evaluate(() => window.melodyMedia.some(src => src.includes("/voices/story/")))).toBe(true);
+    await soundDialog.getByRole("combobox", { name: "Ringtone", exact: true }).selectOption("bouncy");
+    await soundDialog.getByRole("button", { name: "Hear the ring", exact: true }).click();
+    await expect.poll(() => extra.evaluate(() => window.melodyMedia.some(src => src.includes("/ring-bouncy.wav")))).toBe(true);
+    await extra.screenshot({ path: `${screenshots}/voice-settings-mobile.png`, fullPage: true });
+    await soundDialog.getByRole("button", { name: "Done", exact: true }).click();
+    assert.equal(await extra.evaluate(() => window.melodyPlayers.every(player => player.paused || player.ended)), true, "closing settings cancels audio previews");
+
+    await extra.getByRole("button", { name: /^My family/ }).click();
+    await extra.getByRole("button", { name: /^Choose Grandma,/ }).click();
+    await expect(extra.getByRole("button", { name: "Choose someone else", exact: true })).toBeVisible();
+    for (const value of [3, 1, 2]) await extraNumber(value).tap();
+    await extra.getByRole("button", { name: "Call pretend family", exact: true }).first().click();
+    await expect(extraGame).toHaveAttribute("data-melody-phase", "dialing");
+    await expect(extra.getByRole("button", { name: /Star cookies/ })).toBeVisible();
+    await expect.poll(() => extra.evaluate(() => window.melodyMedia.some(src => src.includes("/outgoing.wav")))).toBe(true);
+    await extra.getByRole("button", { name: /Star cookies/ }).click();
+    await extra.getByRole("button", { name: /Magic sprinkles/ }).click();
+    await expect(extraGame).toHaveAttribute("data-melody-phase", "celebrating");
+    await extra.screenshot({ path: `${screenshots}/family-adventure-mobile.png`, fullPage: true });
+    await extra.getByRole("button", { name: "Say goodbye", exact: true }).click();
+    await extra.getByRole("button", { name: /Have Grandma call me/ }).click();
+    await expect(extraGame).toHaveAttribute("data-melody-phase", "ringing");
+    await extra.getByRole("button", { name: "Answer family call", exact: true }).first().click();
+    await expect(extra.getByRole("button", { name: /Star cookies/ })).toBeVisible();
+    await extra.getByRole("button", { name: "Hang up", exact: true }).click();
+    await extra.getByRole("button", { name: "Make your pretend family", exact: true }).click();
+    await extra.getByLabel("Name for grandma", { exact: true }).fill("Nana");
+    await extra.getByLabel("New pretend person's name", { exact: true }).fill("Teddy 123");
+    await extra.getByRole("button", { name: "Add", exact: true }).click();
+    await expect(extra.getByRole("button", { name: /^Choose Teddy 123,/ })).toBeVisible();
+    await extra.reload();
+    await extra.getByRole("button", { name: /^My family/ }).click();
+    await expect(extra.getByRole("button", { name: /^Choose Nana,/ })).toBeVisible();
+    await expect(extra.getByRole("button", { name: /^Choose Teddy 123,/ })).toBeVisible();
+    await extra.getByRole("button", { name: "Voice and sound settings", exact: true }).click();
+    await expect(soundDialog.getByRole("combobox", { name: "Story voice", exact: true })).toHaveValue("story");
+    await expect(soundDialog.getByRole("combobox", { name: "Ringtone", exact: true })).toHaveValue("bouncy");
+    await soundDialog.getByRole("button", { name: "Done", exact: true }).click();
+
+    await extra.clock.install();
+    await extra.getByRole("button", { name: /^Phone game/ }).click();
+    await extra.getByRole("button", { name: "Hear the secret number", exact: true }).click();
+    await expect(extraGame).toHaveAttribute("data-melody-phase", "listening");
+    await expect(extraNumber(2)).toBeDisabled();
+    await extra.clock.fastForward(6000);
+    await expect(extraGame).toHaveAttribute("data-melody-phase", "playing");
+    await extraNumber(8).tap();
+    await expect(extraGame.getByRole("status")).toContainText("try again");
+    await extra.getByRole("button", { name: "Hear the number again", exact: true }).click();
+    await extra.clock.fastForward(6000);
+    await extraNumber(2).tap();
+    await extraNumber(1).tap();
+    await expect(extraGame).toHaveAttribute("data-melody-phase", "celebrating");
+    await extra.screenshot({ path: `${screenshots}/telephone-mobile.png`, fullPage: true });
+    await extra.getByRole("button", { name: "Another number", exact: true }).click();
+    for (const label of ["Bubble pop", "Silly boing", "Magic sparkle"]) await extra.getByRole("button", { name: label, exact: true }).tap();
+    assert.ok(await extra.evaluate(() => window.melodyMedia.some(src => src.includes("/boing.wav"))));
+    await extra.getByRole("button", { name: "Mute sound", exact: true }).click();
+    const playsBeforeMute = await extra.evaluate(() => window.melodyMedia.length);
+    await extra.getByRole("button", { name: "Hear the secret number", exact: true }).click();
+    await extra.clock.fastForward(6000);
+    assert.equal(await extra.evaluate(() => window.melodyMedia.length), playsBeforeMute, "muted telephone still works visually without playing audio");
+    await expect(extraGame).toHaveAttribute("data-melody-phase", "playing");
+
+    const clip = narrationId("three!");
+    const decoded = await extra.evaluate(async paths => {
+      const audio = new AudioContext();
+      try {
+        return await Promise.all(paths.map(async path => {
+          const response = await fetch(path);
+          if (!response.ok) throw new Error(`Missing audio: ${path}`);
+          const buffer = await audio.decodeAudioData(await response.arrayBuffer());
+          return { duration: buffer.duration, channels: buffer.numberOfChannels };
+        }));
+      } finally { await audio.close(); }
+    }, [`/games/melody/voices/warm/${clip}.mp3`, `/games/melody/voices/story/${clip}.mp3`, "/games/melody/audio/ring-classic.wav"]);
+    assert.ok(decoded.every(audio => audio.duration > 0.2 && audio.channels >= 1), "both voices and the ringtone decode as playable audio");
+    for (const size of [{ width: 320, height: 568 }, { width: 844, height: 390 }, { width: 1440, height: 1000 }]) {
+      await extra.setViewportSize(size);
+      await extra.getByRole("button", { name: /^My family/ }).click();
+      assert.equal(await extra.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+      await extra.getByRole("button", { name: "Voice and sound settings", exact: true }).click();
+      const box = (await soundDialog.boundingBox())!;
+      assert.ok(box.x >= 0 && box.x + box.width <= size.width && box.y >= 0 && box.y + box.height <= size.height, "settings fit the screen");
+      await soundDialog.getByRole("button", { name: "Done", exact: true }).click();
+    }
     assert.deepEqual(errors, []);
-    console.log(`Melody browser checks passed: dialing, speech/mute/replay, both activities, calls, rest, 4 responsive sizes, launcher and save retry. Screenshots: ${screenshots}`);
+    console.log(`Melody browser checks passed: original learning games, natural voices, persisted sound settings, family dialing and stories, custom contacts, telephone memory/retry, real audio decoding, mute and responsive layouts. Screenshots: ${screenshots}`);
   } finally { await browser.close(); }
 }
 

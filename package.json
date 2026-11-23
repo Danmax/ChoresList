@@ -31,7 +31,7 @@
     "test:games:responsive": "node --import tsx tests/games-responsive.browser.ts",
     "test:coloring": "node --import tsx --test tests/coloring.test.ts tests/coloring-feed.test.ts",
     "test:coloring:browser": "node --import tsx tests/coloring.browser.ts",
-    "test:melody": "node --import tsx --test tests/melody-phone.test.ts",
+    "test:melody": "node --import tsx --test tests/melody-phone.test.ts tests/melody-phone-audio.test.ts",
     "test:melody:browser": "node --import tsx tests/melody-phone.browser.ts"
   },
   "prisma": {

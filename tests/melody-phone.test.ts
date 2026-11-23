@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createMelodyState, melodyQuestion, melodyReducer, type MelodyState } from "../lib/melody-phone";
 import { DEFAULT_GAME_SETTINGS, gameByKey } from "../lib/games";
+import { DEFAULT_PRETEND_CONTACTS, FAMILY_STORIES, MELODY_LINES, readPretendContacts, telephoneSequence } from "../lib/melody-pretend";
+import { readMelodySound } from "../lib/melody-sound";
 
 test("free play teaches all ten digits and repeated taps do not duplicate discoveries", () => {
   let state = createMelodyState();
@@ -116,4 +118,108 @@ test("the family game catalog includes a preschool game with optional rewards di
   assert.equal(gameByKey("melody-phone")?.ageMax, 6);
   assert.equal(DEFAULT_GAME_SETTINGS["melody-phone"].rewardType, "none");
   assert.equal(DEFAULT_GAME_SETTINGS["melody-phone"].dailyPlayLimit, 0);
+});
+
+test("pretend contacts are bounded, validated, and assigned unique toy numbers", () => {
+  assert.deepEqual(readPretendContacts(null), DEFAULT_PRETEND_CONTACTS);
+  assert.deepEqual(readPretendContacts([{ id: "bad", name: "Oops", emoji: "🧸", story: "__proto__" }]), DEFAULT_PRETEND_CONTACTS);
+  const contacts = readPretendContacts(Array.from({ length: 10 }, (_, index) => ({ id: `friend-${index}`, name: "  My pretend cousin with a long name  ", emoji: "🧸", story: "camp", number: [9, 1, 1] })));
+  assert.equal(contacts.length, 6);
+  assert.ok(contacts.every(contact => contact.name.length <= 24));
+  assert.equal(new Set(contacts.map(contact => contact.number.join(""))).size, 6);
+  assert.ok(contacts.every(contact => contact.number.join("") !== "911"));
+});
+
+test("family calls require the chosen toy number and a completed connection", () => {
+  const contact = DEFAULT_PRETEND_CONTACTS[0];
+  let state = melodyReducer(createMelodyState(), { type: "mode", mode: "family" });
+  state = melodyReducer(state, { type: "select-contact", contact });
+  state = melodyReducer(state, { type: "dial-family", contact });
+  assert.equal(state.familyConnected, false);
+  assert.equal(state.message, MELODY_LINES.notFound);
+  for (const number of contact.number) state = melodyReducer(state, { type: "number", number });
+  state = melodyReducer(state, { type: "erase" });
+  assert.deepEqual(state.familyDigits, [1, 2]);
+  state = melodyReducer(state, { type: "number", number: 3 });
+  state = melodyReducer(state, { type: "dial-family", contact });
+  assert.equal(state.phase, "dialing");
+  assert.equal(melodyReducer(state, { type: "number", number: 8 }), state);
+  const canceled = melodyReducer(state, { type: "hang-up" });
+  assert.equal(melodyReducer(canceled, { type: "connect-family" }), canceled, "late connection cannot reopen a canceled call");
+  state = melodyReducer(state, { type: "connect-family" });
+  assert.equal(state.familyConnected, true);
+  assert.equal(state.calls, 1);
+  assert.equal(melodyReducer(state, { type: "number", number: 8 }), state);
+  assert.equal(melodyReducer(state, { type: "family-choice", next: 4 }), state, "cannot skip story branches");
+});
+
+test("each pretend family adventure supports both branches and a warm goodbye", () => {
+  for (const contact of DEFAULT_PRETEND_CONTACTS) for (const branch of [1, 2]) {
+    let state = melodyReducer(createMelodyState(), { type: "mode", mode: "family" });
+    state = melodyReducer(state, { type: "incoming-family", contact });
+    assert.equal(state.phase, "ringing");
+    const dismissed = melodyReducer(state, { type: "dismiss" });
+    assert.equal(dismissed.mode, "family");
+    assert.equal(dismissed.message, MELODY_LINES.family);
+    state = melodyReducer(state, { type: "call" });
+    assert.equal(state.message, FAMILY_STORIES[contact.story].nodes[0].text);
+    state = melodyReducer(state, { type: "family-choice", next: branch });
+    state = melodyReducer(state, { type: "family-choice", next: 3 });
+    assert.equal(state.phase, "celebrating");
+    assert.equal(state.completed, 1);
+    assert.equal(melodyReducer(state, { type: "family-choice", next: 3 }), state, "cannot finish twice");
+    state = melodyReducer(state, { type: "next" });
+    assert.equal(state.familyConnected, false);
+    assert.equal(state.mode, "family");
+    assert.equal(state.message, MELODY_LINES.goodbye);
+  }
+});
+
+test("telephone memory waits for listening, retries gently, and advances only once", () => {
+  let state = melodyReducer(createMelodyState(), { type: "mode", mode: "telephone" });
+  assert.deepEqual(state.sequence, [2, 1]);
+  state = melodyReducer(state, { type: "number", number: 2 });
+  assert.deepEqual(state.echoed, []);
+  state = melodyReducer(state, { type: "listen" });
+  assert.equal(state.phase, "listening");
+  assert.equal(melodyReducer(state, { type: "number", number: 2 }), state);
+  state = melodyReducer(state, { type: "sequence-ready" });
+  state = melodyReducer(state, { type: "number", number: 8 });
+  assert.equal(state.hint, true);
+  assert.equal(state.sequenceHeard, false);
+  assert.equal(state.message, MELODY_LINES.retry);
+  assert.equal(state.completed, 0);
+  state = melodyReducer(state, { type: "listen" });
+  state = melodyReducer(state, { type: "sequence-ready" });
+  state = melodyReducer(state, { type: "number", number: 2 });
+  assert.deepEqual(state.echoed, [2]);
+  state = melodyReducer(state, { type: "number", number: 1 });
+  assert.equal(state.phase, "celebrating");
+  assert.equal(state.completed, 1);
+  assert.equal(state.telephoneRound, 1);
+  assert.equal(melodyReducer(state, { type: "number", number: 1 }), state);
+  state = melodyReducer(state, { type: "next" });
+  assert.deepEqual(state.sequence, [1, 3]);
+  assert.equal(state.sequenceHeard, false);
+  assert.equal(telephoneSequence(2).length, 3);
+  assert.equal(telephoneSequence(100).length, 4);
+});
+
+test("leaving or resting cancels pending telephone and family transitions", () => {
+  let state = melodyReducer(createMelodyState(), { type: "mode", mode: "telephone" });
+  state = melodyReducer(state, { type: "listen" });
+  state = melodyReducer(state, { type: "sleep" });
+  assert.equal(melodyReducer(state, { type: "sequence-ready" }), state);
+  const otherMode = melodyReducer(state, { type: "mode", mode: "find" });
+  assert.equal(melodyReducer(otherMode, { type: "sequence-ready" }), otherMode);
+});
+
+test("sound preferences accept only supported voices and safe playback ranges", () => {
+  const settings = readMelodySound({ voice: "unknown", volume: 8, speed: -10, keypad: "other", ringtone: "bogus" });
+  assert.equal(settings.voice, "warm");
+  assert.equal(settings.volume, 1);
+  assert.equal(settings.speed, 0.75);
+  assert.equal(settings.keypad, "telephone");
+  assert.equal(settings.ringtone, "classic");
+  assert.equal(readMelodySound({ volume: NaN }).volume, 0.7);
 });

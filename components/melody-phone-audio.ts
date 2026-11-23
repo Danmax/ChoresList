@@ -1,66 +1,147 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { narrationId, narrationParts, type MelodySoundSettings } from "@/lib/melody-sound";
+import voiceManifest from "@/lib/melody-voice-manifest.json";
 
-/** Browser speech and synthesized tones, with no microphone or recordings. */
-export function useMelodyAudio(muted: boolean) {
+const voiceClips = { warm: new Set(voiceManifest.voices.warm as string[]), story: new Set(voiceManifest.voices.story as string[]) };
+
+export function useMelodyAudio(muted: boolean, settings: MelodySoundSettings) {
   const context = useRef<AudioContext | null>(null);
-  const mutedRef = useRef(muted);
-  mutedRef.current = muted;
+  const current = useRef({ muted, settings });
+  current.current = { muted, settings };
+  const speech = useRef<HTMLAudioElement | null>(null);
+  const speechPlayer = useRef<HTMLAudioElement | null>(null);
+  const speechGeneration = useRef(0);
+  const effects = useRef(new Set<HTMLAudioElement>());
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [voiceFallback, setVoiceFallback] = useState(false);
 
   const activate = useCallback(() => {
-    if (mutedRef.current) return;
+    if (current.current.muted) return;
+    // Unlock one reusable media element during the gesture for mobile browsers.
+    if (!speechPlayer.current) {
+      const player = new Audio("/games/melody/audio/unlock.wav");
+      speechPlayer.current = player;
+      player.muted = true;
+      void player.play().then(() => {
+        if (player.src.endsWith("/unlock.wav")) player.pause();
+        player.muted = false;
+      }).catch(() => { player.muted = false; });
+    }
     try {
-      context.current ??= new AudioContext();
+      if (!context.current || context.current.state === "closed") context.current = new AudioContext();
       if (context.current.state === "suspended") void context.current.resume().catch(() => {});
-    } catch { /* Visual play also works when browser audio is unavailable. */ }
+    } catch { /* Visual play remains available without audio support. */ }
+  }, []);
+
+  const stopSpeech = useCallback(() => {
+    speechGeneration.current++;
+    if (speech.current) { speech.current.pause(); speech.current.dispatchEvent(new Event("ended")); speech.current = null; }
+    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+  }, []);
+
+  const effect = useCallback((name: string) => {
+    if (current.current.muted || current.current.settings.volume === 0) return () => {};
+    const player = new Audio(`/games/melody/audio/${name}.wav`);
+    player.volume = current.current.settings.volume * 0.65;
+    effects.current.add(player);
+    const release = () => { effects.current.delete(player); };
+    player.onended = release;
+    player.onerror = release;
+    void player.play().catch(release);
+    return () => { player.pause(); release(); };
+  }, []);
+
+  const stopEffects = useCallback(() => {
+    effects.current.forEach(player => player.pause());
+    effects.current.clear();
   }, []);
 
   const tone = useCallback((number: number, celebration = false) => {
+    if (celebration) { effect("success"); return; }
+    if (current.current.settings.keypad === "telephone") { effect(`key-${number}`); return; }
     activate();
     const audio = context.current;
-    if (!audio || audio.state !== "running" || mutedRef.current) return;
-    const notes = celebration ? [523.25, 659.25, 783.99, 1046.5] : [[261.63, 293.66, 329.63, 349.23, 392, 440, 493.88, 523.25, 587.33, 659.25][number]];
-    notes.forEach((frequency, index) => {
-      const start = audio.currentTime + index * 0.12;
-      const oscillator = audio.createOscillator();
-      const gain = audio.createGain();
-      oscillator.type = "sine";
-      oscillator.frequency.value = frequency;
-      gain.gain.setValueAtTime(0, start);
-      gain.gain.linearRampToValueAtTime(0.12, start + 0.012);
-      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.24);
-      oscillator.connect(gain).connect(audio.destination);
-      oscillator.start(start);
-      oscillator.stop(start + 0.26);
-      oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
-    });
-  }, [activate]);
+    if (!audio || audio.state !== "running" || current.current.muted) return;
+    const oscillator = audio.createOscillator(), gain = audio.createGain();
+    oscillator.type = "sine";
+    oscillator.frequency.value = [261.63, 293.66, 329.63, 349.23, 392, 440, 493.88, 523.25, 587.33, 659.25][number];
+    gain.gain.setValueAtTime(0, audio.currentTime);
+    gain.gain.linearRampToValueAtTime(0.16 * current.current.settings.volume, audio.currentTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + 0.24);
+    oscillator.connect(gain).connect(audio.destination);
+    oscillator.start(); oscillator.stop(audio.currentTime + 0.26);
+    oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
+  }, [activate, effect]);
 
-  const speak = useCallback((text: string) => {
-    if (mutedRef.current || !("speechSynthesis" in window)) return;
-    window.speechSynthesis.cancel();
+  const deviceSpeak = useCallback((text: string) => {
+    if (!("speechSynthesis" in window) || current.current.muted) return;
+    const preferences = current.current.settings;
+    const available = window.speechSynthesis.getVoices();
+    const voice = available.find(voice => voice.voiceURI === preferences.deviceVoice)
+      ?? available.find(voice => voice.lang.startsWith("en") && /natural|premium|enhanced|Samantha|Aria|Jenny/i.test(voice.name))
+      ?? available.find(voice => voice.lang.startsWith("en"));
     const utterance = new SpeechSynthesisUtterance(text);
-    const voices = window.speechSynthesis.getVoices();
-    const voice = voices.find(voice => voice.lang === "en-US" && /Samantha|Karen|Aria|Jenny/i.test(voice.name))
-      ?? voices.find(voice => voice.lang.startsWith("en"));
     if (voice) utterance.voice = voice;
     utterance.lang = "en-US";
-    utterance.rate = 0.85;
-    utterance.pitch = 1.15;
+    utterance.rate = 0.9 * preferences.speed;
+    utterance.pitch = 1;
+    utterance.volume = preferences.volume;
     window.speechSynthesis.speak(utterance);
   }, []);
 
-  const stop = useCallback(() => {
-    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
-    if (context.current?.state === "running") void context.current.suspend().catch(() => {});
-  }, []);
+  const speak = useCallback((text: string) => {
+    stopSpeech();
+    if (current.current.muted || current.current.settings.volume === 0) return;
+    const preferences = current.current.settings;
+    const parts = narrationParts(text);
+    if (preferences.voice === "device") { setVoiceFallback(false); deviceSpeak(text); return; }
+    const pack = preferences.voice;
+    if (parts.some(part => !voiceClips[pack].has(narrationId(part)))) {
+      setVoiceFallback(true); deviceSpeak(text); return;
+    }
+    setVoiceFallback(false);
+    const generation = speechGeneration.current;
+    void (async () => {
+      for (const part of parts) {
+        if (generation !== speechGeneration.current || current.current.muted) return;
+        const player = speechPlayer.current ?? new Audio();
+        speechPlayer.current = player;
+        player.src = `/games/melody/voices/${pack}/${narrationId(part)}.mp3`;
+        speech.current = player;
+        player.volume = preferences.volume;
+        player.playbackRate = preferences.speed;
+        const result = await new Promise<"ended" | "failed">((resolve) => {
+          player.onended = () => resolve("ended");
+          player.onerror = () => resolve("failed");
+          void player.play().catch(() => resolve("failed"));
+        });
+        if (generation !== speechGeneration.current) return;
+        if (result === "failed") { setVoiceFallback(true); deviceSpeak(text); break; }
+      }
+      if (generation === speechGeneration.current) speech.current = null;
+    })();
+  }, [deviceSpeak, stopSpeech]);
 
-  useEffect(() => { if (muted) stop(); }, [muted, stop]);
+  const stop = useCallback(() => {
+    stopSpeech(); stopEffects();
+    speechPlayer.current?.pause();
+    if (context.current?.state === "running") void context.current.suspend().catch(() => {});
+  }, [stopSpeech, stopEffects]);
+
+  useEffect(() => {
+    if (!("speechSynthesis" in window)) return;
+    const load = () => setVoices(window.speechSynthesis.getVoices().filter(voice => voice.lang.startsWith("en")));
+    load();
+    window.speechSynthesis.addEventListener?.("voiceschanged", load);
+    return () => window.speechSynthesis.removeEventListener?.("voiceschanged", load);
+  }, []);
+  useEffect(() => { stop(); }, [muted, settings.voice, settings.deviceVoice, settings.speed, settings.volume, stop]);
   useEffect(() => () => {
     stop();
     if (context.current && context.current.state !== "closed") void context.current.close().catch(() => {});
   }, [stop]);
 
-  return { activate, tone, speak, stop };
+  return { activate, tone, speak, stop, stopSpeech, effect, stopEffects, voices, voiceFallback };
 }

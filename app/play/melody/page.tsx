@@ -3,7 +3,7 @@ import { MelodyPhone } from "@/components/melody-phone";
 
 export const metadata: Metadata = {
   title: "Melody’s Play Phone | ChoresList",
-  description: "Tap musical numbers, count with Melody, and answer playful pretend calls. A gentle number adventure for little learners.",
+  description: "Learn numbers, call a make-believe family, and play telephone with Melody. Natural character voices, classic ringtones, and happy little adventures.",
 };
 
 export default function MelodyPage() {
