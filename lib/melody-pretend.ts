@@ -57,11 +57,7 @@ export function readPretendContacts(value: unknown): PretendContact[] {
   return contacts.length ? contacts : DEFAULT_PRETEND_CONTACTS;
 }
 
-export function telephoneSequence(round: number): number[] {
-  const patterns = [[2, 1, 3, 2], [1, 3, 2, 1], [3, 2, 1, 3], [4, 1, 5, 2], [2, 5, 3, 4], [6, 0, 7, 9], [8, 3, 9, 0]];
-  const safeRound = Math.max(0, Math.floor(Number.isFinite(round) ? round : 0));
-  return patterns[safeRound % patterns.length].slice(0, Math.min(4, 2 + Math.floor(safeRound / 2)));
-}
+export { telephoneSequence } from "./melody-telephone";
 
 export const MELODY_LINES = {
   family: "Let's make believe! Pick someone from your pretend family, then dial their three little numbers.",

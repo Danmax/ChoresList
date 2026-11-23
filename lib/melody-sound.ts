@@ -1,5 +1,7 @@
 import { createMelodyState, melodyReducer, NUMBER_NAMES, type MelodyMode } from "./melody-phone";
 import { FAMILY_STORIES, MELODY_LINES } from "./melody-pretend";
+import { FAMILY_ADVENTURES } from "./melody-family-library";
+import { CALL_INTROS, COUNT_PROMPTS, DIALOGUE_LIBRARY, DISCOVERY_OBJECTS, FIND_PROMPTS } from "./melody-content";
 
 export type MelodySoundSettings = {
   voice: "warm" | "story" | "device";
@@ -44,6 +46,15 @@ export function melodyNarrationCatalog(): Map<string, string> {
   add(createMelodyState().message);
   Object.values(MELODY_LINES).forEach(add);
   Object.values(FAMILY_STORIES).forEach(story => story.nodes.forEach(node => add(node.text)));
+  Object.values(FAMILY_ADVENTURES).forEach(adventures => adventures.forEach(story => story.nodes.forEach(node => add(node.text))));
+  Object.values(DIALOGUE_LIBRARY).forEach(lines => lines.forEach(add));
+  Object.values(CALL_INTROS).forEach(lines => lines.forEach(add));
+  DISCOVERY_OBJECTS.forEach(object => {
+    add(object.fact);
+    add(`There are no ${object.plural}! Which number means none?`);
+    COUNT_PROMPTS.forEach(prompt => add(prompt(object)));
+  });
+  NUMBER_NAMES.forEach(name => FIND_PROMPTS.forEach(prompt => add(prompt(name))));
   NUMBER_NAMES.forEach(name => add(`${name}!`));
   for (let completed = 0; completed < 22; completed++) {
     const initial = { ...createMelodyState(), completed };

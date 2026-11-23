@@ -3,11 +3,13 @@
 import { useCallback, useEffect, useReducer, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { Check, Headphones, Heart, Home, Moon, Music2, Phone, PhoneIncoming, PhoneOff, Play, RotateCcw, Settings2, Sparkles, Star, Users, Volume2, VolumeX } from "lucide-react";
-import { createMelodyState, melodyReducer, NUMBER_NAMES, type MelodyAction, type MelodyMode } from "@/lib/melody-phone";
+import { createMelodyState, melodyReducer, NUMBER_NAMES, readMelodyProgress, type MelodyAction, type MelodyMode } from "@/lib/melody-phone";
 import { useMelodyAudio } from "./melody-phone-audio";
 import { MelodyFamilyActivity, MelodySoundDialog, MelodyTelephoneActivity } from "./melody-phone-activities";
 import { DEFAULT_PRETEND_CONTACTS, MELODY_LINES, readPretendContacts, type PretendContact } from "@/lib/melody-pretend";
 import { DEFAULT_MELODY_SOUND, readMelodySound, type MelodySoundSettings } from "@/lib/melody-sound";
+import { MelodyDiscoveryPicker, MelodyObjectIcon } from "./melody-discovery";
+import { TELEPHONE_LEVELS, telephoneDifficultyForAge } from "@/lib/melody-telephone";
 import styles from "./melody-phone.module.css";
 
 const MODES = [
@@ -26,12 +28,14 @@ const FACES = {
 const KEY_COLORS = ["purple", "orange", "gold", "purple", "gold", "purple", "orange", "purple", "orange", "gold"] as const;
 
 type MelodyPhoneProps = {
+  playerId?: string;
+  age?: number;
   onExit?: () => void;
   onFinish?: (score: number, duration: number, metadata: Record<string, unknown>) => Promise<void>;
 };
 
-export function MelodyPhone({ onExit, onFinish }: MelodyPhoneProps) {
-  const [state, dispatch] = useReducer(melodyReducer, undefined, createMelodyState);
+export function MelodyPhone({ playerId, age, onExit, onFinish }: MelodyPhoneProps) {
+  const [state, dispatch] = useReducer(melodyReducer, { telephoneDifficulty: telephoneDifficultyForAge(age) }, createMelodyState);
   const [muted, setMuted] = useState(false);
   const [visible, setVisible] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -39,12 +43,15 @@ export function MelodyPhone({ onExit, onFinish }: MelodyPhoneProps) {
   const [pressed, setPressed] = useState<number | null>(null);
   const [settings, setSettings] = useState(DEFAULT_MELODY_SOUND);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [progressReady, setProgressReady] = useState(false);
   const [contacts, setContacts] = useState(DEFAULT_PRETEND_CONTACTS);
   const audio = useMelodyAudio(muted, settings);
   const startedAt = useRef<number | null>(null);
   const lastSpoken = useRef(0);
   const savingRef = useRef(false);
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const progressLoaded = useRef(false);
+  const progressKey = `melody-play:v2:${playerId ?? "guest"}`;
   const onCall = state.returnMode !== null || state.familyConnected || state.phase === "dialing";
   const welcome = state.phase === "welcome";
   const sleeping = state.phase === "sleeping";
@@ -56,7 +63,7 @@ export function MelodyPhone({ onExit, onFinish }: MelodyPhoneProps) {
   const question = state.question;
   const face = sleeping ? "sleepy" : ringing || onCall ? "ringing" : celebrating ? "excited" : state.hint ? "thinking" : state.selected !== null ? "delighted" : "happy";
   const quantity = state.mode === "explore" ? state.selected : question?.target ?? null;
-  const object = state.mode === "explore" ? { emoji: "⭐", singular: "star", plural: "stars" } : question?.object;
+  const object = state.mode === "explore" ? state.exploreObject ?? undefined : question?.object;
 
   const act = useCallback((action: MelodyAction) => {
     audio.activate();
@@ -72,6 +79,27 @@ export function MelodyPhone({ onExit, onFinish }: MelodyPhoneProps) {
     try { setSettings(readMelodySound(JSON.parse(localStorage.getItem("melody-sound:v1") ?? "null"))); } catch { /* Keep defaults. */ }
     try { setContacts(readPretendContacts(JSON.parse(localStorage.getItem("melody-family:v1") ?? "null"))); } catch { /* Keep defaults. */ }
   }, []);
+
+  useEffect(() => {
+    if (progressLoaded.current) return;
+    progressLoaded.current = true;
+    try {
+      const saved = readMelodyProgress(JSON.parse(localStorage.getItem(progressKey) ?? "null"), telephoneDifficultyForAge(age));
+      dispatch({ type: "restore", progress: saved });
+    } catch { /* A fresh discovery library remains available. */ }
+    setProgressReady(true);
+  }, [progressKey, age]);
+
+  useEffect(() => {
+    if (!progressReady) return;
+    try {
+      localStorage.setItem(progressKey, JSON.stringify({
+        contentTurn: state.contentTurn, lastObjectId: state.lastObjectId, topic: state.topic,
+        lineCursors: state.lineCursors, familyVisits: state.familyVisits, sessionSeed: state.sessionSeed + 1,
+        telephoneDifficulty: state.telephoneDifficulty, telephoneRound: state.telephoneRound,
+      }));
+    } catch { /* In-memory rotation also works without device storage. */ }
+  }, [progressKey, progressReady, state.contentTurn, state.lastObjectId, state.topic, state.lineCursors, state.familyVisits, state.sessionSeed, state.telephoneDifficulty, state.telephoneRound]);
 
   function updateSettings(next: MelodySoundSettings) {
     setSettings(next);
@@ -142,8 +170,8 @@ export function MelodyPhone({ onExit, onFinish }: MelodyPhoneProps) {
   useEffect(() => {
     if (!listening || !visible || settingsOpen) return;
     const timers: ReturnType<typeof setTimeout>[] = [];
-    const introduction = Math.ceil(2000 / settings.speed);
-    const interval = Math.ceil(1800 / settings.speed);
+    const introduction = Math.ceil(Math.max(2000, state.message.split(/\s+/).length * 550) / settings.speed);
+    const interval = Math.ceil(TELEPHONE_LEVELS[state.telephoneDifficulty].interval / settings.speed);
     state.sequence.forEach((number, index) => {
       timers.push(setTimeout(() => {
         setPressed(number); audio.tone(number); audio.speak(`${NUMBER_NAMES[number]}!`);
@@ -152,7 +180,7 @@ export function MelodyPhone({ onExit, onFinish }: MelodyPhoneProps) {
     });
     timers.push(setTimeout(() => dispatch({ type: "sequence-ready" }), introduction + state.sequence.length * interval));
     return () => { timers.forEach(clearTimeout); setPressed(null); audio.stopSpeech(); };
-  }, [listening, visible, settingsOpen, state.sequence, settings.speed, audio.speak, audio.tone, audio.stopSpeech]);
+  }, [listening, visible, settingsOpen, state.message, state.sequence, state.telephoneDifficulty, settings.speed, audio.speak, audio.tone, audio.stopSpeech]);
 
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
@@ -177,7 +205,7 @@ export function MelodyPhone({ onExit, onFinish }: MelodyPhoneProps) {
     try {
       await onFinish(state.completed, Math.round((Date.now() - startedAt.current) / 1000), {
         numbersDiscovered: state.discoveries, activitiesCompleted: state.completed,
-        pretendCalls: state.calls, mode: state.mode,
+        pretendCalls: state.calls, mode: state.mode, telephoneDifficulty: state.telephoneDifficulty,
       });
     } catch {
       setSaveError("We couldn't save this playtime. You can try again or leave.");
@@ -242,12 +270,13 @@ export function MelodyPhone({ onExit, onFinish }: MelodyPhoneProps) {
                 : sleeping ? <><div className={styles.sleepArt} aria-hidden="true">☾<span>✦</span></div><button type="button" className={styles.primaryButton} onClick={() => act({ type: "wake" })}><RotateCcw size={18} /> Play again</button>{onExit ? <button type="button" className={styles.textButton} disabled={saving} onClick={() => void exit()}>{saving ? "Saving playtime…" : "Back to games"}</button> : <Link href="/" className={styles.textButton}>Back to home</Link>}</>
                   : ringing || dialing ? <><div className={styles.ringingArt} aria-hidden="true">{state.mode === "family" ? <span className={styles.callerFace}>{activeContact?.emoji ?? "🧸"}</span> : <PhoneIncoming size={56} />}<span>{dialing ? "Waiting for a pretend hello…" : `${state.mode === "family" ? activeContact?.name ?? "Family" : "Melody"} is calling…`}</span></div><button type="button" className={styles.primaryButton} onClick={() => act({ type: dialing ? "hang-up" : "call" })}><Phone size={19} />{dialing ? "Cancel call" : state.mode === "family" ? "Answer family call" : "Answer Melody"}</button>{!dialing && <button type="button" className={styles.textButton} onClick={() => act({ type: "dismiss" })}>Not now</button>}</>
                     : <>
+                      {(state.mode === "explore" || state.mode === "count") && !onCall && <MelodyDiscoveryPicker topic={state.topic} disabled={state.phase !== "playing"} onChange={topic => act({ type: "topic", topic })} />}
                       {state.mode === "family" ? <MelodyFamilyActivity state={state} contacts={contacts} onChange={updateContacts} act={act} />
                         : state.mode === "telephone" ? <MelodyTelephoneActivity state={state} act={act} />
                         : state.mode === "find" && question ? <div className={`${styles.targetNumber} ${celebrating ? styles.targetFound : ""}`} aria-label={`Find number ${question.target}`}>{question.target}{celebrating && <span><Check size={23} strokeWidth={4} /></span>}</div>
                         : quantity === null ? <div className={styles.idleArt} aria-hidden="true"><Music2 size={34} /><span>1 2 3</span><Music2 size={25} /></div>
                           : <div className={styles.objects} role="group" aria-label={`${quantity} ${quantity === 1 ? object?.singular : object?.plural}${state.mode === "count" ? " to count" : ""}`}>
-                            {quantity === 0 ? <div className={styles.emptyBasket}><span aria-hidden="true">◯</span><strong>None. That’s zero!</strong></div> : Array.from({ length: quantity }, (_, index) => state.mode === "count" ? <button key={index} type="button" className={`${styles.countObject} ${state.counted.includes(index) ? styles.counted : ""}`} aria-label={`Count ${object?.singular} ${index + 1}`} aria-pressed={state.counted.includes(index)} disabled={celebrating} onClick={() => act({ type: "count-object", index })} style={{ "--object-index": index } as CSSProperties}><span aria-hidden="true">{object?.emoji}</span>{state.counted.includes(index) && <b>{state.counted.indexOf(index) + 1}</b>}</button> : <span className={styles.exploreObject} aria-hidden="true" key={index} style={{ "--object-index": index } as CSSProperties}>{object?.emoji}</span>)}
+                            {quantity === 0 ? <div className={styles.emptyBasket}><span aria-hidden="true">◯</span><strong>None. That’s zero!</strong></div> : Array.from({ length: quantity }, (_, index) => state.mode === "count" ? <button key={index} type="button" className={`${styles.countObject} ${state.counted.includes(index) ? styles.counted : ""}`} aria-label={`Count ${object?.singular} ${index + 1}`} aria-pressed={state.counted.includes(index)} disabled={celebrating} onClick={() => act({ type: "count-object", index })} style={{ "--object-index": index } as CSSProperties}><MelodyObjectIcon object={object} />{state.counted.includes(index) && <b>{state.counted.indexOf(index) + 1}</b>}</button> : <span className={styles.exploreObject} aria-hidden="true" key={index} style={{ "--object-index": index } as CSSProperties}><MelodyObjectIcon object={object} /></span>)}
                           </div>}
                       {celebrating ? <button type="button" className={styles.primaryButton} onClick={() => act({ type: "next" })}>{onCall ? <PhoneOff size={18} /> : <Sparkles size={18} />}{onCall ? "Say goodbye" : "Another number"}</button> : !["family", "telephone"].includes(state.mode) && <p className={styles.activityHint}>{state.mode === "count" ? "Count the pictures, then tap a number on the phone." : state.mode === "find" ? "Tap the matching button on Melody’s phone." : "Every button has a little something to discover."}</p>}
                     </>}

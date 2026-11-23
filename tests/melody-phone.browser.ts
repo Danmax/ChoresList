@@ -3,6 +3,7 @@ import { mkdir } from "node:fs/promises";
 import { chromium, expect } from "@playwright/test";
 import { DEFAULT_GAME_SETTINGS, GAME_DEFINITIONS } from "../lib/games";
 import { narrationId } from "../lib/melody-sound";
+import { telephoneAnswer, telephoneSequence } from "../lib/melody-telephone";
 
 declare global {
   interface Window { melodySpoken: string[]; melodyCanceled: number; melodyMedia: string[]; melodyPlayers: HTMLMediaElement[] }
@@ -32,7 +33,7 @@ async function main() {
     const game = page.getByRole("region", { name: "Melody's Play Phone", exact: true });
     const number = (value: number) => page.getByRole("button", { name: `Number ${value}`, exact: true });
     const status = () => game.getByRole("status");
-    const objects = () => page.getByRole("button", { name: /^Count (star|apple|balloon) \d$/ });
+    const objects = () => page.getByRole("button", { name: /^Count .+ \d+$/ });
     const response = await page.goto(`${baseUrl}/play/melody`);
     assert.equal(response?.status(), 200);
     await expect(game).toHaveAttribute("data-melody-phase", "welcome");
@@ -51,7 +52,7 @@ async function main() {
     await number(0).click();
     await expect(status()).toContainText("Zero means none");
     await page.keyboard.press("9");
-    await expect(page.getByRole("group", { name: "9 stars", exact: true })).toBeVisible();
+    await expect(page.getByRole("group", { name: /^9 / })).toBeVisible();
 
     await page.getByRole("button", { name: "Mute sound", exact: true }).click();
     const mutedSpeechCount = await page.evaluate(() => window.melodySpoken.length);
@@ -89,7 +90,7 @@ async function main() {
     await expect(page.getByText("ON A PRETEND CALL", { exact: true })).toBeVisible();
     await number(await objects().count()).click();
     await page.getByRole("button", { name: "Say goodbye", exact: true }).click();
-    await expect(status()).toContainText("Goodbye for now");
+    await expect(status()).toContainText("say goodbye");
     await expect(game).toHaveAttribute("data-melody-mode", "count");
 
     await page.getByRole("button", { name: /^Just play/ }).click();
@@ -210,7 +211,7 @@ async function main() {
     await extra.getByRole("button", { name: /Have Grandma call me/ }).click();
     await expect(extraGame).toHaveAttribute("data-melody-phase", "ringing");
     await extra.getByRole("button", { name: "Answer family call", exact: true }).first().click();
-    await expect(extra.getByRole("button", { name: /Star cookies/ })).toBeVisible();
+    await expect(extra.getByRole("button", { name: /Heart cookies/ })).toBeVisible();
     await extra.getByRole("button", { name: "Hang up", exact: true }).click();
     await extra.getByRole("button", { name: "Make your pretend family", exact: true }).click();
     await extra.getByLabel("Name for grandma", { exact: true }).fill("Nana");
@@ -228,17 +229,18 @@ async function main() {
 
     await extra.clock.install();
     await extra.getByRole("button", { name: /^Phone game/ }).click();
+    const currentSeed = await extra.evaluate(() => JSON.parse(localStorage.getItem("melody-play:v2:guest")!).sessionSeed - 1);
+    const mission = telephoneSequence(0, "gentle", currentSeed);
     await extra.getByRole("button", { name: "Hear the secret number", exact: true }).click();
     await expect(extraGame).toHaveAttribute("data-melody-phase", "listening");
     await expect(extraNumber(2)).toBeDisabled();
-    await extra.clock.fastForward(6000);
+    await extra.clock.fastForward(10000);
     await expect(extraGame).toHaveAttribute("data-melody-phase", "playing");
     await extraNumber(8).tap();
     await expect(extraGame.getByRole("status")).toContainText("try again");
     await extra.getByRole("button", { name: "Hear the number again", exact: true }).click();
-    await extra.clock.fastForward(6000);
-    await extraNumber(2).tap();
-    await extraNumber(1).tap();
+    await extra.clock.fastForward(10000);
+    for (const digit of mission) await extraNumber(digit).tap();
     await expect(extraGame).toHaveAttribute("data-melody-phase", "celebrating");
     await extra.screenshot({ path: `${screenshots}/telephone-mobile.png`, fullPage: true });
     await extra.getByRole("button", { name: "Another number", exact: true }).click();
@@ -247,9 +249,57 @@ async function main() {
     await extra.getByRole("button", { name: "Mute sound", exact: true }).click();
     const playsBeforeMute = await extra.evaluate(() => window.melodyMedia.length);
     await extra.getByRole("button", { name: "Hear the secret number", exact: true }).click();
-    await extra.clock.fastForward(6000);
+    await extra.clock.fastForward(10000);
     assert.equal(await extra.evaluate(() => window.melodyMedia.length), playsBeforeMute, "muted telephone still works visually without playing audio");
     await expect(extraGame).toHaveAttribute("data-melody-phase", "playing");
+
+    // Explore the new topic library, including SVG shapes and actual color drops.
+    await extra.getByRole("button", { name: /^Just play/ }).click();
+    for (const [topic, word] of [["hearts", "heart"], ["fruit", "apple|banana|strawberry|orange"], ["shapes", "circle|square|triangle|diamond"], ["colors", "paint drop"], ["pets", "pupp|kitten|bunn|fish"]]) {
+      await extra.getByRole("combobox", { name: "Discovery collection", exact: true }).selectOption(topic);
+      await extraNumber(3).tap();
+      await expect(extraGame.getByRole("group", { name: new RegExp(`^3 .*(${word})`) })).toBeVisible();
+      if (topic === "shapes" || topic === "colors") assert.equal(await extraGame.getByRole("group", { name: /^3 / }).locator("svg").count(), 3);
+    }
+    await extra.screenshot({ path: `${screenshots}/discovery-pets-mobile.png`, fullPage: true });
+    const savedObject = await extra.evaluate(() => JSON.parse(localStorage.getItem("melody-play:v2:guest")!).lastObjectId);
+    await extra.reload();
+    await extra.getByRole("button", { name: /^Just play/ }).click();
+    await expect(extra.getByRole("combobox", { name: "Discovery collection", exact: true })).toHaveValue("pets");
+    await extraNumber(3).tap();
+    assert.notEqual(await extra.evaluate(() => JSON.parse(localStorage.getItem("melody-play:v2:guest")!).lastObjectId), savedObject, "reopening continues the discovery rotation");
+
+    await extra.getByRole("button", { name: /^Phone game/ }).click();
+    await extra.getByRole("combobox", { name: "Telephone difficulty", exact: true }).selectOption("expert");
+    await expect(extra.getByRole("group", { name: "5 secret numbers", exact: true })).toBeVisible();
+    await expect(extra.getByText("Backwards mission · start with the last digit", { exact: true })).toBeVisible();
+    const expertSeed = await extra.evaluate(() => JSON.parse(localStorage.getItem("melody-play:v2:guest")!).sessionSeed - 1);
+    await extra.getByRole("button", { name: "Hear the secret number", exact: true }).click();
+    await expect(extra.getByRole("combobox", { name: "Telephone difficulty", exact: true })).toBeDisabled();
+    await extra.clock.fastForward(30000);
+    await expect(extraGame.getByRole("status")).toContainText("backwards");
+    for (const digit of telephoneAnswer(telephoneSequence(0, "expert", expertSeed), "expert")) await extraNumber(digit).tap();
+    await expect(extraGame).toHaveAttribute("data-melody-phase", "celebrating");
+    await extra.screenshot({ path: `${screenshots}/secret-agent-mobile.png`, fullPage: true });
+    await extra.reload();
+    await extra.getByRole("button", { name: /^Phone game/ }).click();
+    await expect(extra.getByRole("combobox", { name: "Telephone difficulty", exact: true })).toHaveValue("expert");
+    await extra.evaluate(() => {
+      const key = "melody-play:v2:guest", progress = JSON.parse(localStorage.getItem(key)!);
+      localStorage.setItem(key, JSON.stringify({ ...progress, telephoneRound: 10 }));
+    });
+    await extra.reload();
+    await extra.getByRole("button", { name: /^Phone game/ }).click();
+    await expect(extra.getByRole("group", { name: "10 secret numbers", exact: true })).toBeVisible();
+    await extra.setViewportSize({ width: 320, height: 568 });
+    assert.equal(await extra.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, "ten-digit missions wrap on small phones");
+    await extra.screenshot({ path: `${screenshots}/ten-digit-agent-mobile.png`, fullPage: true });
+
+    member.id = "older-melody-preview"; member.age = 10;
+    await page.goto(`${baseUrl}/kid/${member.id}/games`);
+    await page.getByRole("button", { name: /Melody’s Play Phone/ }).click();
+    await page.getByRole("button", { name: /^Phone game/ }).click();
+    await expect(page.getByRole("combobox", { name: "Telephone difficulty", exact: true })).toHaveValue("expert");
 
     const clip = narrationId("three!");
     const decoded = await extra.evaluate(async paths => {

@@ -194,10 +194,16 @@
 .storyChoices button { min-height: 48px; border: 1px solid #e0d3e9; border-radius: 14px; background: #f8f3fd; color: #816499; font-weight: 900; font-size: 16px; }
 .storyChoices button:hover { background: #ece0f7; }
 .callerFace { font-size: 60px !important; }
-.secretDigits { display: flex; justify-content: center; gap: 8px; margin: 22px 0; }
+.secretDigits { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; max-width: 340px; margin: 22px auto; }
 .secretDigits > span { display: grid; place-items: center; width: 55px; height: 68px; background: #f1eafa; color: #a488c0; border: 2px dashed #d0bfe1; border-radius: 15px; font-family: "Melody Rounded", sans-serif; font-size: 37px; }
 .secretDigits .secretFilled { background: #e6f2e7; border: 2px solid #b5d3b7; color: #6b9674; }
 .telephoneTip { font-size: 12px; font-weight: 700; color: #8a967d; margin: 16px 0 0; }
+.levelPicker, .discoveryPicker { display: flex; flex-direction: column; align-items: stretch; gap: 5px; text-align: left; font-size: 12px; font-weight: 800; color: #788b77; margin-top: 12px; }
+.levelPicker select, .discoveryPicker select { width: 100%; min-width: 0; min-height: 44px; padding: 8px 10px; border: 1px solid #dcd6e7; border-radius: 12px; color: #7e658e; background: #faf7fd; font-size: 14px; font-weight: 700; }
+.discoveryPicker select { color: #608669; border-color: #d6e4d0; background: #f5f9ee; }
+.levelDescription { font-size: 12px; margin: 6px 0 0; color: #8a7a99; font-weight: 700; }
+.reverseBadge { display: block; margin: 9px auto 0; padding: 6px 9px; border-radius: 10px; background: #f4eafa; color: #8c61a9; font-size: 12px; font-weight: 800; }
+.discoveryShape { display: block; width: 38px; height: 38px; }
 .soundDialog { margin: auto; width: min(470px, calc(100vw - 28px)); max-height: calc(100svh - 32px); overflow-y: auto; border: 1px solid #d7e5d6; border-radius: 25px; background: #fffef9; color: #47654f; padding: 24px; box-shadow: 0 24px 100px #1c48334d; }
 .soundDialog::backdrop { background: #34504566; backdrop-filter: blur(5px); }
 .settingsHeading { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
@@ -249,6 +255,7 @@
   .targetNumber { font-size: 65px; margin: 3px auto 5px; }
   .objects { min-height: 70px; margin: 5px auto; gap: 8px; }
   .countObject, .exploreObject { width: 46px; height: 46px; font-size: 32px; }
+  .discoveryShape { width: 32px; height: 32px; }
   .activityHint { font-size: 12px; margin-top: 6px; }
   .idleArt { height: 65px; }
   .idleArt > span { font-size: 35px; }

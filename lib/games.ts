@@ -17,7 +17,7 @@ export const GAME_DEFINITIONS: GameDefinition[] = [
   {
     key: "melody-phone", title: "Melody’s Play Phone",
     description: "Count with Melody, call your make-believe family, and play a listen-and-dial telephone game with natural character voices and happy sounds.",
-    icon: "Phone", ageMin: 3, ageMax: 6, playTime: "Play at your own pace", color: "#4f8c70", bg: "#e6f4e9",
+    icon: "Phone", ageMin: 3, ageMax: 12, playTime: "Play at your own pace", color: "#4f8c70", bg: "#e6f4e9",
   },
   {
     key: "coloring-adventures", title: "Coloring Adventures",

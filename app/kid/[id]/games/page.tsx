@@ -218,7 +218,7 @@ export default function KidGamesPage() {
           onStart={() => { setShowJohnnyMenu(false); setReward(null); setActiveGame("jungle-vine-swing"); }}
         />
       ) : activeGame === "melody-phone" ? (
-        <MelodyPhone onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("melody-phone", score, duration, metadata)} />
+        <MelodyPhone playerId={member.id} age={member.age} onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("melody-phone", score, duration, metadata)} />
       ) : activeGame === "coloring-adventures" ? (
         <ColoringAdventures memberId={member.id} playerName={member.name} onExit={() => setActiveGame(null)} onFinish={(score, duration, metadata) => recordSession("coloring-adventures", score, duration, metadata)} />
       ) : activeGame === "sunny-farm" ? (

@@ -3,6 +3,8 @@ import { readFile, stat } from "node:fs/promises";
 import { test } from "node:test";
 import { melodyNarrationCatalog, narrationId, narrationParts } from "../lib/melody-sound";
 import manifest from "../lib/melody-voice-manifest.json";
+import { createMelodyState, melodyQuestion, melodyReducer } from "../lib/melody-phone";
+import { DISCOVERY_TOPICS } from "../lib/melody-content";
 
 test("both natural voices include every game narration sentence as a real audio asset", async () => {
   const catalog = melodyNarrationCatalog();
@@ -38,5 +40,21 @@ test("telephone keys contain their standard dual tones and effects have safe PCM
     const data = await readFile(`public/games/melody/audio/${name}.wav`);
     assert.ok(data.length > 500);
     assert.equal(data.toString("ascii", 0, 4), "RIFF");
+  }
+});
+
+test("rotated runtime questions, feedback, and discoveries all stay within the voice library", () => {
+  const ids = new Set<string>(manifest.voices.warm);
+  const check = (text: string) => narrationParts(text).forEach(part => assert.ok(ids.has(narrationId(part)), `Missing voice line: ${part}`));
+  for (let turn = 0; turn < 96; turn++) {
+    for (const topic of DISCOVERY_TOPICS) {
+      const initial = createMelodyState({ contentTurn: turn, topic: topic.id });
+      check(melodyReducer(initial, { type: "number", number: 3 }).message);
+      check(melodyQuestion("count", turn % 22, true, turn, topic.id).prompt);
+      const counting = melodyReducer(initial, { type: "mode", mode: "count" });
+      check(counting.message);
+      check(melodyReducer(counting, { type: "number", number: 8 }).message);
+      check(melodyQuestion("find", turn % 22, false, turn, topic.id).prompt);
+    }
   }
 });

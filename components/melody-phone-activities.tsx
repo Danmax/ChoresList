@@ -5,6 +5,8 @@ import { Delete, Headphones, Phone, Plus, Settings2, Trash2, Volume2, X } from "
 import { CONTACT_FACES, CONTACT_NUMBERS, FAMILY_STORIES, type FamilyStoryId, type PretendContact } from "@/lib/melody-pretend";
 import type { MelodyAction, MelodyState } from "@/lib/melody-phone";
 import type { MelodySoundSettings } from "@/lib/melody-sound";
+import { familyAdventure } from "@/lib/melody-family-library";
+import { TELEPHONE_LEVELS, type TelephoneDifficulty } from "@/lib/melody-telephone";
 import styles from "./melody-phone.module.css";
 
 export function MelodyFamilyActivity({ state, contacts, onChange, act }: {
@@ -18,7 +20,7 @@ export function MelodyFamilyActivity({ state, contacts, onChange, act }: {
   const [story, setStory] = useState<FamilyStoryId>("camp");
   const contact = contacts.find(contact => contact.id === state.familyContactId);
   const compact = Boolean(contact && !showAll && !editing);
-  const adventure = FAMILY_STORIES[state.familyStory];
+  const adventure = familyAdventure(state.familyStory, state.familyAdventure);
 
   function update(contacts: PretendContact[]) {
     onChange(contacts.map((contact, index) => ({ ...contact, number: CONTACT_NUMBERS[index] })));
@@ -64,12 +66,18 @@ export function MelodyFamilyActivity({ state, contacts, onChange, act }: {
 }
 
 export function MelodyTelephoneActivity({ state, act }: { state: MelodyState; act: (action: MelodyAction) => void }) {
+  const level = TELEPHONE_LEVELS[state.telephoneDifficulty];
   return <div className={styles.telephoneActivity}>
+    <label className={styles.levelPicker}>Play level<select aria-label="Telephone difficulty" value={state.telephoneDifficulty} disabled={state.phase === "listening"} onChange={event => act({ type: "difficulty", difficulty: event.target.value as TelephoneDifficulty })}>
+      {Object.entries(TELEPHONE_LEVELS).map(([id, level]) => <option value={id} key={id}>{level.label} · {level.ages}</option>)}
+    </select></label>
+    <p className={styles.levelDescription}>{level.description}</p>
+    {level.reverse && <span className={styles.reverseBadge}>Backwards mission · start with the last digit</span>}
     <div className={styles.secretDigits} role="group" aria-label={`${state.sequence.length} secret numbers`}>
       {state.sequence.map((_, index) => <span key={index} className={state.echoed.length > index ? styles.secretFilled : ""}>{state.echoed[index] ?? (state.phase === "listening" ? "♪" : "?")}</span>)}
     </div>
     {state.phase !== "celebrating" && <button type="button" className={styles.primaryButton} disabled={state.phase === "listening"} onClick={() => act({ type: "listen" })}><Headphones size={19} />{state.phase === "listening" ? "Melody is playing…" : state.sequenceHeard || state.hint ? "Hear the number again" : "Hear the secret number"}</button>}
-    <p className={styles.telephoneTip}>{state.phase === "celebrating" ? "A lovely little number, passed from Melody to you." : state.phase === "listening" ? "Watch the buttons light up and listen closely." : state.sequenceHeard ? "Your turn! Use the phone buttons below." : "Two little numbers to start. Longer numbers as you play!"}</p>
+    <p className={styles.telephoneTip}>{state.phase === "celebrating" ? "A lovely little number, passed from Melody to you." : state.phase === "listening" ? "Watch the buttons light up and listen closely." : state.sequenceHeard ? level.reverse ? "Start with the last number you heard, then work backwards." : "Your turn! Use the phone buttons below." : `Start with ${level.min} digits. Longer codes as you play!`}</p>
   </div>;
 }
 
