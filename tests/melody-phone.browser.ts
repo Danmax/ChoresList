@@ -235,11 +235,12 @@ async function main() {
     await expect(extraGame).toHaveAttribute("data-melody-phase", "listening");
     await expect(extraNumber(2)).toBeDisabled();
     await extra.clock.fastForward(10000);
-    await expect(extraGame).toHaveAttribute("data-melody-phase", "playing");
+    await expect(extraGame).toHaveAttribute("data-melody-phase", "playing", { timeout: 30_000 });
     await extraNumber(8).tap();
     await expect(extraGame.getByRole("status")).toContainText("try again");
     await extra.getByRole("button", { name: "Hear the number again", exact: true }).click();
     await extra.clock.fastForward(10000);
+    await expect(extraGame).toHaveAttribute("data-melody-phase", "playing", { timeout: 30_000 });
     for (const digit of mission) await extraNumber(digit).tap();
     await expect(extraGame).toHaveAttribute("data-melody-phase", "celebrating");
     await extra.screenshot({ path: `${screenshots}/telephone-mobile.png`, fullPage: true });
@@ -277,6 +278,7 @@ async function main() {
     await extra.getByRole("button", { name: "Hear the secret number", exact: true }).click();
     await expect(extra.getByRole("combobox", { name: "Telephone difficulty", exact: true })).toBeDisabled();
     await extra.clock.fastForward(30000);
+    await expect(extraGame).toHaveAttribute("data-melody-phase", "playing", { timeout: 30_000 });
     await expect(extraGame.getByRole("status")).toContainText("backwards");
     for (const digit of telephoneAnswer(telephoneSequence(0, "expert", expertSeed), "expert")) await extraNumber(digit).tap();
     await expect(extraGame).toHaveAttribute("data-melody-phase", "celebrating");

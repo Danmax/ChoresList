@@ -10,6 +10,7 @@ import { DEFAULT_PRETEND_CONTACTS, MELODY_LINES, readPretendContacts, type Prete
 import { DEFAULT_MELODY_SOUND, readMelodySound, type MelodySoundSettings } from "@/lib/melody-sound";
 import { MelodyDiscoveryPicker, MelodyObjectIcon } from "./melody-discovery";
 import { TELEPHONE_LEVELS, telephoneDifficultyForAge } from "@/lib/melody-telephone";
+import { playSecretNumber } from "@/lib/melody-playback";
 import styles from "./melody-phone.module.css";
 
 const MODES = [
@@ -130,6 +131,7 @@ export function MelodyPhone({ playerId, age, onExit, onFinish }: MelodyPhoneProp
   useEffect(() => {
     if (state.revision === lastSpoken.current || !visible || settingsOpen) return;
     lastSpoken.current = state.revision;
+    if (state.phase === "listening") return; // The sequence waits for this introduction itself.
     if (state.phase === "celebrating") audio.tone(0, true);
     audio.speak(state.message);
   }, [state.revision, state.message, state.phase, visible, settingsOpen, audio.speak, audio.tone]);
@@ -169,18 +171,16 @@ export function MelodyPhone({ playerId, age, onExit, onFinish }: MelodyPhoneProp
 
   useEffect(() => {
     if (!listening || !visible || settingsOpen) return;
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    const introduction = Math.ceil(Math.max(2000, state.message.split(/\s+/).length * 550) / settings.speed);
-    const interval = Math.ceil(TELEPHONE_LEVELS[state.telephoneDifficulty].interval / settings.speed);
-    state.sequence.forEach((number, index) => {
-      timers.push(setTimeout(() => {
-        setPressed(number); audio.tone(number); audio.speak(`${NUMBER_NAMES[number]}!`);
-      }, introduction + index * interval));
-      timers.push(setTimeout(() => setPressed(null), introduction + 1000 + index * interval));
-    });
-    timers.push(setTimeout(() => dispatch({ type: "sequence-ready" }), introduction + state.sequence.length * interval));
-    return () => { timers.forEach(clearTimeout); setPressed(null); audio.stopSpeech(); };
-  }, [listening, visible, settingsOpen, state.message, state.sequence, state.telephoneDifficulty, settings.speed, audio.speak, audio.tone, audio.stopSpeech]);
+    const controller = new AbortController();
+    void playSecretNumber({
+      numbers: state.sequence, introduction: () => audio.speak(state.message),
+      speakNumber: number => audio.speak(`${NUMBER_NAMES[number]}!`),
+      highlight: setPressed, tone: audio.tone,
+      interval: Math.ceil(TELEPHONE_LEVELS[state.telephoneDifficulty].interval / settings.speed),
+      gap: Math.ceil(250 / settings.speed), signal: controller.signal,
+    }).then(completed => { if (completed && !controller.signal.aborted) dispatch({ type: "sequence-ready" }); });
+    return () => { controller.abort(); setPressed(null); audio.stopSpeech(); };
+  }, [listening, visible, settingsOpen, muted, state.message, state.sequence, state.telephoneDifficulty, settings.speed, settings.voice, settings.deviceVoice, settings.volume, audio.speak, audio.tone, audio.stopSpeech]);
 
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
@@ -260,7 +260,7 @@ export function MelodyPhone({ playerId, age, onExit, onFinish }: MelodyPhoneProp
           <nav className={styles.modes} aria-label="Choose how to play">{MODES.map(({ key, title, subtitle, icon: Icon }) => <button key={key} type="button" aria-pressed={state.mode === key && (!onCall || key === "family")} disabled={sleeping || saving} onClick={() => changeMode(key)}><Icon size={23} /><strong>{title}</strong><span>{subtitle}</span></button>)}</nav>
 
           <div className={`${styles.activityCard} ${celebrating ? styles.celebrationCard : ""}`}>
-            <div className={styles.cardTop}><span className={styles.cardTag}>{sleeping ? <Moon size={15} /> : onCall || ringing ? <PhoneIncoming size={15} /> : <Sparkles size={15} />}{sleeping ? "REST & RECHARGE" : ringing ? "A LITTLE SURPRISE" : onCall ? "ON A PRETEND CALL" : welcome ? "MEET YOUR NEW FRIEND" : state.mode === "explore" ? "A LITTLE DISCOVERY" : "LET'S PLAY TOGETHER"}</span><button type="button" className={styles.replay} aria-label="Hear Melody again" disabled={muted} onClick={replay}><Volume2 size={19} /></button></div>
+            <div className={styles.cardTop}><span className={styles.cardTag}>{sleeping ? <Moon size={15} /> : onCall || ringing ? <PhoneIncoming size={15} /> : <Sparkles size={15} />}{sleeping ? "REST & RECHARGE" : ringing ? "A LITTLE SURPRISE" : onCall ? "ON A PRETEND CALL" : welcome ? "MEET YOUR NEW FRIEND" : state.mode === "explore" ? "A LITTLE DISCOVERY" : "LET'S PLAY TOGETHER"}</span><button type="button" className={styles.replay} aria-label="Hear Melody again" disabled={muted || listening} onClick={replay}><Volume2 size={19} /></button></div>
 
             <div className={styles.activityContent}>
               <h2>{sleeping ? "That was lovely!" : dialing ? `Calling ${activeContact?.name ?? "family"}…` : ringing ? "Ring, ring!" : welcome ? "Hello, I’m Melody!" : state.mode === "family" ? state.familyConnected ? `Hello, ${activeContact?.name ?? "family"}!` : "My pretend family" : state.mode === "telephone" ? celebrating ? "You passed it!" : "The telephone game" : celebrating ? "You found it!" : state.mode === "find" ? "Can you find…" : state.mode === "count" ? `How many ${question?.object.plural}?` : state.selected === null ? "Let’s make some music." : `${NUMBER_NAMES[state.selected][0].toUpperCase()}${NUMBER_NAMES[state.selected].slice(1)}!`}</h2>

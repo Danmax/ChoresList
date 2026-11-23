@@ -5,6 +5,7 @@ import { melodyNarrationCatalog, narrationId, narrationParts } from "../lib/melo
 import manifest from "../lib/melody-voice-manifest.json";
 import { createMelodyState, melodyQuestion, melodyReducer } from "../lib/melody-phone";
 import { DISCOVERY_TOPICS } from "../lib/melody-content";
+import { playbackPause, playSecretNumber } from "../lib/melody-playback";
 
 test("both natural voices include every game narration sentence as a real audio asset", async () => {
   const catalog = melodyNarrationCatalog();
@@ -57,4 +58,74 @@ test("rotated runtime questions, feedback, and discoveries all stay within the v
       check(melodyQuestion("find", turn % 22, false, turn, topic.id).prompt);
     }
   }
+});
+
+test("secret numbers wait for the introduction and each slow voice to finish", async () => {
+  const deferred = () => {
+    let resolve!: (value: boolean) => void;
+    const promise = new Promise<boolean>(finish => { resolve = finish; });
+    return { promise, resolve };
+  };
+  const introduction = deferred(), first = deferred(), second = deferred();
+  const spoken: number[] = [], highlights: (number | null)[] = [], pauses: number[] = [];
+  let time = 0, finished = false;
+  const run = playSecretNumber({
+    numbers: [2, 1], introduction: () => introduction.promise,
+    speakNumber: number => { spoken.push(number); return number === 2 ? first.promise : second.promise; },
+    highlight: number => highlights.push(number), tone: () => {}, interval: 1800, gap: 250,
+    signal: new AbortController().signal, now: () => time,
+    pause: async milliseconds => { pauses.push(milliseconds); return true; },
+  }).then(result => { finished = true; return result; });
+  const tick = () => new Promise<void>(resolve => setImmediate(resolve));
+  await tick();
+  assert.deepEqual(spoken, []);
+  introduction.resolve(true); await tick();
+  assert.deepEqual(spoken, [2]);
+  time = 10_000; await tick();
+  assert.deepEqual(spoken, [2], "passing the old fixed timer cannot cut off a slow digit");
+  assert.deepEqual(highlights, [2]);
+  first.resolve(true); await tick();
+  assert.deepEqual(spoken, [2, 1]);
+  assert.deepEqual(highlights, [2, null, 1]);
+  assert.equal(finished, false, "answering stays locked until the final digit finishes");
+  time += 5000; second.resolve(true);
+  assert.equal(await run, true);
+  assert.deepEqual(highlights, [2, null, 1, null]);
+  assert.deepEqual(pauses, [250, 0, 250, 0, 250]);
+});
+
+test("muted or very short speech keeps a visible minimum pace between numbers", async () => {
+  const pauses: number[] = [];
+  assert.equal(await playSecretNumber({
+    numbers: [3, 4], introduction: async () => true, speakNumber: async () => true,
+    highlight: () => {}, tone: () => {}, interval: 1800, gap: 250,
+    signal: new AbortController().signal, now: () => 0,
+    pause: async milliseconds => { pauses.push(milliseconds); return true; },
+  }), true);
+  assert.deepEqual(pauses, [250, 1800, 250, 1800, 250]);
+});
+
+test("cancelled playback never speaks the next digit or completes a sequence", async () => {
+  const controller = new AbortController();
+  let resolve!: (value: boolean) => void;
+  const voice = new Promise<boolean>(finish => { resolve = finish; });
+  const spoken: number[] = [];
+  const run = playSecretNumber({
+    numbers: [2, 3], introduction: async () => true,
+    speakNumber: number => { spoken.push(number); return voice; },
+    highlight: () => {}, tone: () => {}, interval: 1800, gap: 250,
+    signal: controller.signal, pause: async () => true,
+  });
+  await new Promise<void>(finish => setImmediate(finish));
+  controller.abort(); resolve(false);
+  assert.equal(await run, false);
+  assert.deepEqual(spoken, [2]);
+});
+
+test("cancelling a between-number pause releases its timer immediately", async () => {
+  const controller = new AbortController();
+  const pause = playbackPause(60_000, controller.signal);
+  controller.abort();
+  assert.equal(await pause, false);
+  assert.equal(await playbackPause(60_000, controller.signal), false);
 });
